@@ -8,6 +8,7 @@ import {
 import {
   normalizeSheetChart,
   getSheetChartData,
+  getSheetChartSourceData,
   type ChartType,
 } from "@sheetcraft/core/sheet-charts";
 import type { SheetChartDrawing, SheetDrawing } from "@sheetcraft/core/sheet-drawings";
@@ -308,8 +309,14 @@ export function useChartActions(options: {
         error.value = true;
         return;
       }
+      const rawData = getSheetChartSourceData(
+        target.sheet,
+        next.chart,
+        options.getEvaluator(),
+        (sheetId) => target.workbook.sheets.get(sheetId),
+      );
       if (
-        !data.series.some((series) => series.values.some((value) => value !== null)) &&
+        !rawData.series.some((series) => series.values.some((value) => value !== null)) &&
         !(next.chart.source?.kind === "series" && next.chart.source.series.length === 0) &&
         next.chart.type !== "sankey"
       ) {
@@ -327,7 +334,7 @@ export function useChartActions(options: {
         error.value = true;
         return;
       }
-      preflightChartDataTable(next.chart, data, next);
+      preflightChartDataTable(next.chart, data, next, rawData);
       if (!isCurrent(target) || !allowed(target.sheet)) return;
       const current = target.sheet.drawings ?? [];
       let drawings: SheetDrawing[];

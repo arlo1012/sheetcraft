@@ -21,7 +21,11 @@ import {
   type Workbook,
 } from "@sheetcraft/core/workbook";
 import { reconcileChartRangeSeriesForRange } from "@sheetcraft/core/chart-range-series";
-import { createChartSourceCandidate } from "../../../modules/charts/chart-source-editor";
+import {
+  createChartSourceCandidate,
+  planChartSourceVisibility,
+  type ChartSourceVisibilityProof,
+} from "../../../modules/charts/chart-source-editor";
 import { useChartSourceActions } from "../../../modules/charts/useChartSourceActions";
 
 const scopes: EffectScope[] = [];
@@ -664,4 +668,171 @@ describe("source action rectangular identity authority", () => {
       }
     },
   );
+});
+
+describe("source visibility atomic owner proofs", () => {
+  function hide(f: ReturnType<typeof fixture>, index = 2) {
+    const base = structuredClone(f.current().chart);
+    const proof: ChartSourceVisibilityProof = {
+      base,
+      changes: [{ rangeBand: { seriesBy: "columns", index }, visible: false }],
+    };
+    return {
+      proof,
+      candidate: { ...f.current(), chart: planChartSourceVisibility(base, proof.changes) },
+    };
+  }
+  test("rectangle hide/show allocates only a real band, preserves all fields and has exact single-command UndoRedo", () => {
+    const f = fixture(),
+      owner = f.open(),
+      before = serializeWorkbook(f.workbook.value);
+    const { candidate, proof } = hide(f);
+    expect(owner.commit(candidate, proof)).toBe(true);
+    expect(f.current().chart.source).toBeUndefined();
+    expect(f.current().chart.range).toEqual(f.first.chart.range);
+    expect(f.current().chart.title).toBe("Sales");
+    expect(f.current().chart.rectangleSeries).toEqual({
+      rows: [],
+      columns: [{ index: 2, id: "range-series-1" }],
+    });
+    expect(f.session.history.undoStack).toHaveLength(1);
+    const hidden = serializeWorkbook(f.workbook.value);
+    expect(hidden.version).toBe(84);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    f.revision.value++;
+    expect(serializeWorkbook(f.workbook.value)).toEqual(before);
+    expect(redoWorkbookCommand(f.session)).toBe(true);
+    f.revision.value++;
+    expect(serializeWorkbook(f.workbook.value)).toEqual(hidden);
+    const showOwner = f.open(),
+      base = structuredClone(f.current().chart);
+    const show: ChartSourceVisibilityProof = {
+      base,
+      changes: [{ rangeBand: { seriesBy: "columns", index: 2 }, visible: true }],
+    };
+    expect(
+      showOwner.commit(
+        { ...f.current(), chart: planChartSourceVisibility(base, show.changes) },
+        show,
+      ),
+    ).toBe(true);
+    expect(f.current().chart.seriesFilter).toBeUndefined();
+    expect(f.current().chart.rectangleSeries).toEqual(candidate.chart.rectangleSeries);
+    expect(f.session.history.undoStack).toHaveLength(2);
+  });
+  test("hide then CRUD promotion transfers only planned seed IDs and keeps retired hidden filters reserved", () => {
+    const f = fixture(),
+      owner = f.open(),
+      { candidate, proof } = hide(f);
+    const source = createChartSourceFromRange(f.ownerSheet.id, candidate.chart);
+    expect(source.series.map((entry) => entry.id)).toEqual(["series-1", "range-series-1"]);
+    source.series.reverse();
+    const promoted = { ...candidate, chart: createChartSourceCandidate(candidate.chart, source) };
+    expect(owner.commit(promoted, proof)).toBe(true);
+    expect(f.current().chart.source?.series.map((entry) => [entry.id, entry.colorIndex])).toEqual([
+      ["range-series-1", 1],
+      ["series-1", 0],
+    ]);
+    expect(f.current().chart.seriesFilter).toEqual(candidate.chart.seriesFilter);
+    expect(f.current().chart.rectangleSeries).toBeUndefined();
+    const removeOwner = f.open(),
+      removed = structuredClone(f.current());
+    removed.chart.source!.series.shift();
+    expect(removeOwner.commit(removed)).toBe(true);
+    expect(f.current().chart.seriesFilter?.hiddenSeriesIds).toEqual(["range-series-1"]);
+  });
+  test.each([
+    "forged-base",
+    "forged-id",
+    "extra-binding",
+    "unproved-filter",
+    "dormant-source",
+  ] as const)("rejects %s without command or history", (kind) => {
+    const f = fixture(true),
+      owner = f.open(),
+      before = serializeWorkbook(f.workbook.value);
+    const { candidate, proof } = hide(f);
+    if (kind === "forged-base") proof.base.rectangleSeries!.columns[2]!.id = "dormant-style";
+    if (kind === "forged-id") candidate.chart.rectangleSeries!.columns[2]!.id = "dormant-style";
+    if (kind === "extra-binding")
+      candidate.chart.rectangleSeries!.rows.push({ index: 1, id: "fresh" });
+    if (kind === "unproved-filter")
+      candidate.chart.seriesFilter!.hiddenSeriesIds.push("dormant-style");
+    if (kind === "dormant-source") {
+      const source = createChartSourceFromRange(f.ownerSheet.id, candidate.chart);
+      source.series[0]!.id = "row-style";
+      candidate.chart = createChartSourceCandidate(candidate.chart, source);
+    }
+    expect(owner.commit(candidate, proof)).toBe(false);
+    expect(f.actions.dialog.value).toBe(owner);
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(serializeWorkbook(f.workbook.value)).toEqual(before);
+    expect(f.session.history.undoStack).toHaveLength(0);
+  });
+  test("getter-bearing proof does not execute the getter or replace the retained owner", () => {
+    const f = fixture(),
+      owner = f.open(),
+      { candidate, proof } = hide(f);
+    const getter = vi.fn(() => proof.changes);
+    Object.defineProperty(proof, "changes", { get: getter });
+    expect(owner.commit(candidate, proof)).toBe(false);
+    expect(getter).not.toHaveBeenCalled();
+    expect(f.actions.dialog.value).toBe(owner);
+    expect(f.execute).not.toHaveBeenCalled();
+  });
+  test("all-hidden invalid definitions and complete raw table budgets cannot be bypassed by the filter", () => {
+    const f = fixture(),
+      owner = f.open(),
+      invalid = f.candidate();
+    invalid.chart.source.series[0]!.values = { kind: "range", sheetId: "missing", range: null };
+    invalid.chart.seriesFilter = {
+      hiddenSeriesIds: invalid.chart.source.series.map((entry) => entry.id),
+    };
+    expect(owner.commit(invalid)).toBe(false);
+    expect(f.execute).not.toHaveBeenCalled();
+    f.actions.close();
+    f.ownerSheet.drawings = [
+      {
+        ...f.first,
+        chart: {
+          ...f.first.chart,
+          elements: { ...f.first.chart.elements, dataTable: "withLegendKeys" },
+        },
+      },
+      f.other,
+    ];
+    const tableOwner = f.open(),
+      table = structuredClone(tableOwner.initial);
+    table.chart = createChartSourceCandidate(table.chart, {
+      kind: "series",
+      categories: { kind: "generated" },
+      series: Array.from({ length: 9 }, (_, index) => ({
+        id: `extra-${index}`,
+        colorIndex: index,
+        name: { kind: "literal" as const, text: "entry" },
+        values: { kind: "literal" as const, values: [1, 2, 3] },
+      })),
+    });
+    table.chart.seriesFilter = {
+      hiddenSeriesIds: table.chart.source!.series.map((entry) => entry.id),
+    };
+    expect(tableOwner.commit(table)).toBe(false);
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(f.actions.dialog.value).toBe(tableOwner);
+  });
+});
+
+test("captured explicit-empty filter exact no-op consumes no history or command", () => {
+  const f = fixture();
+  f.first.chart = createChartSourceCandidate(
+    f.first.chart,
+    createChartSourceFromRange(f.ownerSheet.id, f.first.chart),
+  );
+  f.first.chart.seriesFilter = { hiddenSeriesIds: [] };
+  const before = serializeWorkbook(f.workbook.value),
+    owner = f.open();
+  expect(owner.commit(structuredClone(owner.initial))).toBe(true);
+  expect(f.execute).not.toHaveBeenCalled();
+  expect(f.session.history.undoStack).toHaveLength(0);
+  expect(serializeWorkbook(f.workbook.value)).toEqual(before);
 });

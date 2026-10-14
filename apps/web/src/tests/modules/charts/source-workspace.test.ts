@@ -24,6 +24,8 @@ import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import SpreadsheetRibbon from "../../../app/SpreadsheetRibbon.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
 import SheetDrawingLayer from "../../../modules/sheet-drawings/components/SheetDrawingLayer.vue";
+import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
+import ChartFormatPane from "../../../modules/charts/components/ChartFormatPane.vue";
 import ChartSourceDialog from "../../../modules/charts/components/ChartSourceDialog.vue";
 import ChartSeriesDialog from "../../../modules/charts/components/ChartSeriesDialog.vue";
 import ChartCategoriesDialog from "../../../modules/charts/components/ChartCategoriesDialog.vue";
@@ -732,4 +734,270 @@ describe("Select Data through real Workspace", () => {
       if (kind === "permission") expect(f.controller.activeSheet.value.id).toBe("other");
     },
   );
+});
+
+async function seriesVisible(source: Pick<VueWrapper, "findAll">, index: number, visible: boolean) {
+  const inputs = source.findAll<HTMLInputElement>("[data-source-visibility] input[type=checkbox]");
+  expect(inputs[index], "Missing actual Workspace series checkbox").toBeDefined();
+  if (inputs[index]!.element.checked !== visible) inputs[index]!.element.click();
+  await flushPromises();
+  expect(
+    source.findAll<HTMLInputElement>("[data-source-visibility] input[type=checkbox]")[index]!
+      .element.checked,
+  ).toBe(visible);
+}
+async function chooseFormatElement(wrapper: VueWrapper, value: string) {
+  const select = wrapper.getComponent(ChartElementsToolbar).getComponent(Select);
+  const option = select.props("options")?.find((item) => "value" in item && item.value === value);
+  if (!option) throw new Error("Missing chart format element");
+  await select.get(".t-input__inner").trigger("keydown", { key: "ArrowDown", code: "ArrowDown" });
+  await expect
+    .poll(() => document.querySelectorAll(".chart-format-options-popup .t-select-option").length)
+    .toBeGreaterThan(0);
+  const row = [
+    ...document.querySelectorAll<HTMLElement>(".chart-format-options-popup .t-select-option"),
+  ].find((item) => item.textContent?.trim() === option.label);
+  if (!row) throw new Error("Missing native chart format option");
+  await new DOMWrapper(row).trigger("pointerdown");
+  await new DOMWrapper(row).trigger("click");
+  await flushPromises();
+  return wrapper.getComponent(ChartFormatPane);
+}
+
+describe("series filters through actual Workspace Select Data", () => {
+  test("real Cancel writes nothing, all-hidden OK keeps range/title and reopening/show/UndoRedo are exact", async () => {
+    const f = await fixture(),
+      before = serializeWorkbook(f.workbook),
+      original = chart(f.sheet);
+    let source = await openSource(f.wrapper);
+    await seriesVisible(source, 1, false);
+    expect(renderData(sourceProbe(source)).series.map((entry) => entry.name)).toEqual(["apple"]);
+    expect(chart(f.sheet)).toEqual(original);
+    expect(f.controller.session.history.undoStack).toHaveLength(0);
+    await footer("source", "Cancel");
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    source = await openSource(f.wrapper);
+    await seriesVisible(source, 0, false);
+    await seriesVisible(source, 1, false);
+    expect(renderData(sourceProbe(source))).toMatchObject({
+      categories: ["east", "north", "south"],
+      series: [],
+    });
+    await footer("source", "OK");
+    expect(f.wrapper.findComponent(ChartSourceDialog).exists()).toBe(false);
+    expect(chart(f.sheet).chart.source).toBeUndefined();
+    expect(chart(f.sheet).chart.range).toEqual(original.chart.range);
+    expect(chart(f.sheet).chart.title).toBe("Sales");
+    expect(chart(f.sheet).chart.rectangleSeries?.columns).toEqual([
+      { index: 1, id: "range-series-1" },
+      { index: 2, id: "range-series-2" },
+    ]);
+    expect(f.controller.session.history.undoStack).toHaveLength(1);
+    const hidden = serializeWorkbook(f.workbook);
+    expect(f.controller.undo()).toBe(true);
+    await nextTick();
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    expect(f.controller.redo()).toBe(true);
+    await nextTick();
+    expect(serializeWorkbook(f.workbook)).toEqual(hidden);
+    source = await openSource(f.wrapper);
+    expect(
+      source.findAll("[data-source-series]").map((row) => row.text().replace(/^\d+\s*/, "")),
+    ).toEqual(["apple", "pear"]);
+    expect(
+      source
+        .findAll<HTMLInputElement>("[data-source-visibility] input")
+        .map((input) => input.element.checked),
+    ).toEqual([false, false]);
+    await seriesVisible(source, 1, true);
+    await footer("source", "OK");
+    expect(
+      renderData(ownerProbe(f.wrapper)).series.map((entry) => [entry.name, entry.colorIndex]),
+    ).toEqual([["pear", 1]]);
+    expect(f.controller.session.history.undoStack).toHaveLength(2);
+    expect(f.controller.undo()).toBe(true);
+    await nextTick();
+    expect(serializeWorkbook(f.workbook)).toEqual(hidden);
+    expect(f.controller.undo()).toBe(true);
+    await nextTick();
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+  });
+  test("hide-show net-zero retains a real redo branch and never persists preview seed IDs", async () => {
+    const f = await fixture(),
+      original = chart(f.sheet);
+    expect(
+      f.controller.executeCommand(
+        createSetSheetDrawingsCommand(f.sheet.id, [
+          { ...original, chart: { ...original.chart, title: "Redo title" } },
+          chart(f.sheet, "chart-two"),
+        ]),
+      ),
+    ).toBe(true);
+    expect(f.controller.undo()).toBe(true);
+    await nextTick();
+    const before = serializeWorkbook(f.workbook),
+      redo = [...f.controller.session.history.redoStack];
+    const source = await openSource(f.wrapper);
+    await seriesVisible(source, 0, false);
+    await seriesVisible(source, 1, false);
+    await seriesVisible(source, 0, true);
+    await seriesVisible(source, 1, true);
+    expect(sourceDraft(source).chart.source).toBeUndefined();
+    expect(sourceDraft(source).chart.rectangleSeries).toBeUndefined();
+    await footer("source", "OK");
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    expect(f.controller.session.history.undoStack).toHaveLength(0);
+    expect(f.controller.session.history.redoStack).toEqual(redo);
+    expect(f.controller.redo()).toBe(true);
+    expect(chart(f.sheet).chart.title).toBe("Redo title");
+  });
+  test("hidden Edit and reorder promote planned band IDs in one command without altering the old document", async () => {
+    const f = await fixture(),
+      before = serializeWorkbook(f.workbook),
+      source = await openSource(f.wrapper);
+    await seriesVisible(source, 1, false);
+    await source.get('[data-source-series="series-2"]').trigger("click");
+    await source.get("[data-source-edit]").trigger("click");
+    const editor = source.getComponent(ChartSeriesDialog);
+    await editor.get("[data-series-name] input").setValue("Hidden pear");
+    await footer("series", "OK");
+    await source.get("[data-source-up]").trigger("click");
+    expect(renderData(sourceProbe(source)).series.map((entry) => entry.name)).toEqual(["apple"]);
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    await footer("source", "OK");
+    expect(f.wrapper.findComponent(ChartSourceDialog).exists()).toBe(false);
+    expect(
+      chart(f.sheet).chart.source?.series.map((entry) => [entry.id, entry.colorIndex]),
+    ).toEqual([
+      ["range-series-1", 1],
+      ["series-1", 0],
+    ]);
+    expect(chart(f.sheet).chart.seriesFilter).toEqual({ hiddenSeriesIds: ["range-series-1"] });
+    expect(f.controller.session.history.undoStack).toHaveLength(1);
+    expect(f.controller.undo()).toBe(true);
+    await nextTick();
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+  });
+  test("inactive column intent survives row promotion and overlapping source reset in the real dialog owner", async () => {
+    const f = await fixture(),
+      before = serializeWorkbook(f.workbook),
+      source = await openSource(f.wrapper);
+    await seriesVisible(source, 1, false);
+    source.getComponent(Select).vm.$emit("change", "rows");
+    await flushPromises();
+    await source.get("[data-source-categories]").trigger("click");
+    await source.getComponent(ChartCategoriesDialog).get("input").setValue("='Source Data'!B1:C1");
+    await footer("categories", "OK");
+    await source.get("[data-chart-source-range] input").setValue("='Source Data'!A1:C4");
+    await source.get("[data-reset-chart-range]").trigger("click");
+    source.getComponent(Select).vm.$emit("change", "columns");
+    await flushPromises();
+    expect(
+      source
+        .findAll<HTMLInputElement>("[data-source-visibility] input")
+        .map((input) => input.element.checked),
+    ).toEqual([true, false]);
+    await footer("source", "OK");
+    expect(f.wrapper.findComponent(ChartSourceDialog).exists()).toBe(false);
+    expect(chart(f.sheet).chart.source).toBeUndefined();
+    expect(chart(f.sheet).chart.rectangleSeries?.columns).toEqual([
+      { index: 2, id: "range-series-1" },
+    ]);
+    expect(chart(f.sheet).chart.seriesFilter).toEqual({ hiddenSeriesIds: ["range-series-1"] });
+    expect(f.controller.session.history.undoStack).toHaveLength(1);
+    expect(f.controller.undo()).toBe(true);
+    await nextTick();
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+  });
+  test("hidden series stays selectable for formatting and its color persists after showing it", async () => {
+    const f = await fixture(),
+      source = await openSource(f.wrapper);
+    await seriesVisible(source, 1, false);
+    await footer("source", "OK");
+    const targetSelect = f.wrapper.getComponent(ChartElementsToolbar).getComponent(Select);
+    expect(
+      targetSelect
+        .props("options")
+        ?.find((item) => "value" in item && item.value === "range-series:columns:2")?.label,
+    ).toContain("pear");
+    const pane = await chooseFormatElement(f.wrapper, "range-series:columns:2");
+    const color = pane
+      .findAllComponents(ColorPaletteSelect)
+      .find((item) => item.props("label") === "Series color")!;
+    expect(color).toBeDefined();
+    color.vm.$emit("select", "#f12345");
+    await flushPromises();
+    const id = chart(f.sheet).chart.rectangleSeries!.columns[0]!.id;
+    expect(chart(f.sheet).chart.format?.series).toContainEqual({ id, color: "#f12345" });
+    expect(renderData(ownerProbe(f.wrapper)).series.map((entry) => entry.name)).toEqual(["apple"]);
+    const reopen = await openSource(f.wrapper);
+    await seriesVisible(reopen, 1, true);
+    await footer("source", "OK");
+    expect(chart(f.sheet).chart.seriesFilter).toBeUndefined();
+    expect(chart(f.sheet).chart.format?.series).toContainEqual({ id, color: "#f12345" });
+    expect(renderData(ownerProbe(f.wrapper)).series.map((entry) => entry.name)).toEqual([
+      "apple",
+      "pear",
+    ]);
+    expect(renderData(ownerProbe(f.wrapper)).series[1]?.id).toBe(id);
+  });
+  test("all-hidden source opens Change Type and unchanged OK retains the filtered owner without invalid-source failure", async () => {
+    const f = await fixture(),
+      source = await openSource(f.wrapper);
+    await seriesVisible(source, 0, false);
+    await seriesVisible(source, 1, false);
+    await footer("source", "OK");
+    const before = serializeWorkbook(f.workbook),
+      undo = f.controller.session.history.undoStack.length;
+    const trigger = f.wrapper
+      .getComponent(ChartElementsToolbar)
+      .get('[aria-label="Change chart type"]');
+    await trigger.trigger("pointerdown");
+    await trigger.trigger("click");
+    await flushPromises();
+    expect(f.wrapper.findComponent(ChartEditorDialog).exists()).toBe(true);
+    await footer("editor", "OK");
+    expect(f.wrapper.findComponent(ChartEditorDialog).exists()).toBe(false);
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    expect(f.controller.session.history.undoStack).toHaveLength(undo);
+  });
+});
+
+describe("new Add filter lineage through Workspace", () => {
+  test("pure accepted Add-hide-remove restores the original rectangle and preserves the existing redo branch", async () => {
+    const f = await fixture(),
+      original = chart(f.sheet);
+    expect(
+      f.controller.executeCommand(
+        createSetSheetDrawingsCommand(f.sheet.id, [
+          { ...original, chart: { ...original.chart, title: "Redo title" } },
+          chart(f.sheet, "chart-two"),
+        ]),
+      ),
+    ).toBe(true);
+    expect(f.controller.undo()).toBe(true);
+    await nextTick();
+    const before = serializeWorkbook(f.workbook),
+      redo = [...f.controller.session.history.redoStack];
+    const source = await openSource(f.wrapper);
+    await source.get("[data-source-add]").trigger("click");
+    const adding = source.getComponent(ChartSeriesDialog);
+    await adding.get("[data-series-name] input").setValue("Temporary added");
+    await adding.get("[data-series-values] input").setValue("={1,2,3}");
+    await footer("series", "OK");
+    await seriesVisible(source, 2, false);
+    await source.get("[data-source-up]").trigger("click");
+    await source.get("[data-source-down]").trigger("click");
+    await source.get("[data-source-remove]").trigger("click");
+    expect(source.findAll("[data-source-series]")).toHaveLength(2);
+    expect(sourceDraft(source).chart.source).toBeUndefined();
+    expect(sourceDraft(source).chart.seriesFilter).toBeUndefined();
+    await footer("source", "OK");
+    expect(f.wrapper.findComponent(ChartSourceDialog).exists()).toBe(false);
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    expect(f.controller.session.history.undoStack).toHaveLength(0);
+    expect(f.controller.session.history.redoStack).toEqual(redo);
+    expect(f.controller.redo()).toBe(true);
+    expect(chart(f.sheet).chart.title).toBe("Redo title");
+  });
 });

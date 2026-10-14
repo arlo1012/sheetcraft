@@ -93,6 +93,7 @@ export const chartsEnUS = {
     "Enter a valid row or column reference with one label for each value.",
   "chart.sourceApplyFailed":
     "The chart could not be updated. Your draft is retained; check that the chart is still editable, then retry.",
+  "chart.sourceSeriesVisibility": "Show {name}",
   "chart.sourceSeries": "Series",
   "chart.sourceColumns": "Each column is a series",
   "chart.sourceRows": "Each row is a series",
@@ -136,7 +137,9 @@ export const chartsEnUS = {
   "chart.formatCategoryAxis": "Category axis",
   "chart.formatValueAxis": "Value axis",
   "chart.formatSecondaryValueAxis": "Secondary value axis",
+  "chart.formatHiddenSeriesName": "Series: {name} (hidden)",
   "chart.formatSeriesName": "Series: {name}",
+  "chart.formatDuplicateSeriesName": "{name} ({index})",
   "chart.formatSelectHint": "Choose an element to format its text, axes or appearance.",
   "chart.formatSeriesUnavailable":
     "This source or chart type does not support individual series formatting yet. Applicable titles, plots and axes remain editable. Ordinary ranges and worksheet-series sources support direct series formatting.",
@@ -191,6 +194,8 @@ export const chartsEnUS = {
   "chart.formatFinishComposition": "Finish composing the input before applying it.",
   "chart.formatFontHint": "Unavailable fonts may be substituted on this device.",
   "chart.formatClose": "Close",
+  "chart.seriesFilterExportBlocked":
+    "XLSX does not yet support chart series visibility ({locations}). Export was stopped; your workbook has not changed.",
   "chart.formatExportBlocked":
     "XLSX does not yet support chart subtypes and detailed appearance ({locations}). Export was stopped; your chart settings have not changed.",
   "chart.formatSelection": "Format selection",

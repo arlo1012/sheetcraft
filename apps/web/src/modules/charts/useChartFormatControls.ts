@@ -1,7 +1,11 @@
 import { computed, getCurrentScope, onScopeDispose, ref } from "vue";
 import { canUseSheetPermission } from "@sheetcraft/core";
 import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
-import { getSheetChartData, type ChartData } from "@sheetcraft/core/sheet-charts";
+import {
+  getSheetChartData,
+  getSheetChartSourceData,
+  type ChartData,
+} from "@sheetcraft/core/sheet-charts";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { Sheet, SheetEvaluator, Workbook } from "@sheetcraft/core/workbook";
 import { applyChartFormatIntent } from "./chart-format-intents";
@@ -59,7 +63,7 @@ export function useChartFormatControls(options: {
       isCurrent() && !options.isBusy() && canUseSheetPermission(sheet, "editObjects");
     let data: ChartData;
     try {
-      data = getSheetChartData(sheet, drawing.chart, options.getEvaluator(), (sheetId) =>
+      data = getSheetChartSourceData(sheet, drawing.chart, options.getEvaluator(), (sheetId) =>
         workbook.sheets.get(sheetId),
       );
     } catch {
@@ -78,9 +82,13 @@ export function useChartFormatControls(options: {
         try {
           if (!options.flush() || !allowed()) return false;
           if (
-            !getChartFormatTargets(drawing.chart, capturedData).some(
-              (candidate) => chartFormatTargetKey(candidate) === chartFormatTargetKey(target),
-            )
+            !getChartFormatTargets(
+              drawing.chart,
+              capturedData,
+              getSheetChartData(sheet, drawing.chart, options.getEvaluator(), (sheetId) =>
+                workbook.sheets.get(sheetId),
+              ),
+            ).some((candidate) => chartFormatTargetKey(candidate) === chartFormatTargetKey(target))
           )
             throw new TypeError("Chart element is unavailable.");
           const chart = applyChartFormatIntent(drawing.chart, target, intent);
@@ -95,7 +103,14 @@ export function useChartFormatControls(options: {
             error.value = false;
             return true;
           }
-          preflightChartDataTable(chart, preparedData, drawing);
+          preflightChartDataTable(
+            chart,
+            preparedData,
+            drawing,
+            getSheetChartSourceData(sheet, chart, options.getEvaluator(), (sheetId) =>
+              workbook.sheets.get(sheetId),
+            ),
+          );
           if (!allowed()) return false;
           const next = { ...drawing, chart };
           const command = createSetSheetDrawingsCommand(

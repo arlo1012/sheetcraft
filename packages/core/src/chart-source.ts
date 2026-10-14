@@ -250,6 +250,7 @@ export function createChartSourceFromRange(
     ...(chart.rectangleSeries?.rows ?? []).map((entry) => entry.id),
     ...(chart.rectangleSeries?.columns ?? []).map((entry) => entry.id),
     ...(chart.format?.series ?? []).map((entry) => entry.id),
+    ...(chart.seriesFilter?.hiddenSeriesIds ?? []),
   ]);
   const bindings = new Map(
     (chart.rectangleSeries?.[chart.seriesBy] ?? []).map((entry) => [entry.index, entry.id]),

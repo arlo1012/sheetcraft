@@ -4,6 +4,7 @@ import {
   createWorkbook,
   getActiveSheet,
   insertSheet,
+  createWorkbookEvaluator,
 } from "@sheetcraft/core/workbook";
 import {
   parseChartSourceCategories,
@@ -13,6 +14,9 @@ import {
   formatChartSourceValues,
   allocateChartSourceSeriesId,
   createChartSourceCandidate,
+  planChartSourceVisibility,
+  readChartSourceVisibilityProof,
+  readChartSourcePreview,
 } from "../../../modules/charts/chart-source-editor";
 import { createChartSourceFromRange } from "@sheetcraft/core/chart-source";
 import { normalizeSheetChart, type SheetChart } from "@sheetcraft/core/sheet-charts";
@@ -137,5 +141,95 @@ describe("range source identity drafts", () => {
     expect(allocateChartSourceSeriesId(chart, chart.source!)).toBe("series-4");
     expect(chart.source!.series).toHaveLength(1);
     expect(chart.format?.series).toHaveLength(2);
+  });
+});
+
+describe("source-owned visibility planning", () => {
+  function chart(): SheetChart {
+    return {
+      type: "column",
+      range: { start: { row: 0, column: 0 }, end: { row: 3, column: 2 } },
+      title: "Keep",
+      headerRow: true,
+      headerColumn: true,
+      seriesBy: "columns",
+      legend: true,
+      labels: false,
+      stacked: false,
+      showHidden: false,
+    };
+  }
+  test("net-zero changes allocate nothing and inactive/header intents retain their exact physical owner", () => {
+    const base = chart(),
+      before = structuredClone(base);
+    expect(planChartSourceVisibility(base, [])).toEqual(base);
+    expect(
+      planChartSourceVisibility(base, [
+        { rangeBand: { seriesBy: "columns", index: 1 }, visible: true },
+      ]),
+    ).toEqual(base);
+    const planned = planChartSourceVisibility({ ...base, seriesBy: "rows" }, [
+      { rangeBand: { seriesBy: "columns", index: 1 }, visible: false },
+      { rangeBand: { seriesBy: "rows", index: 0 }, visible: false },
+    ]);
+    expect(planned.seriesBy).toBe("rows");
+    expect(planned.headerRow).toBe(true);
+    expect(planned.rectangleSeries).toEqual({
+      columns: [{ index: 1, id: "range-series-1" }],
+      rows: [{ index: 0, id: "range-series-2" }],
+    });
+    expect(planned.seriesFilter?.hiddenSeriesIds).toEqual(["range-series-1", "range-series-2"]);
+    expect(base).toEqual(before);
+  });
+  test("proofs reject accessors, unknown fields, duplicate targets and aggregate over-budget changes", () => {
+    let calls = 0;
+    const proof = {
+      base: chart(),
+      get changes() {
+        calls++;
+        return [];
+      },
+    };
+    expect(() => readChartSourceVisibilityProof(proof)).toThrow(/accessor/);
+    expect(calls).toBe(0);
+    expect(() =>
+      readChartSourceVisibilityProof({ base: chart(), changes: [], rogue: true }),
+    ).toThrow();
+    expect(() =>
+      planChartSourceVisibility(chart(), [
+        { rangeBand: { seriesBy: "columns", index: 1 }, visible: false },
+        { rangeBand: { seriesBy: "columns", index: 1 }, visible: true },
+      ]),
+    ).toThrow(/distinct/);
+    expect(() =>
+      planChartSourceVisibility(
+        chart(),
+        Array.from({ length: 513 }, (_, index) => ({
+          rangeBand: { seriesBy: "columns" as const, index },
+          visible: false,
+        })),
+      ),
+    ).toThrow(/512/);
+  });
+  test("Add reserves dormant filter IDs and hidden invalid source definitions remain invalid", () => {
+    const f = fixture(),
+      base = chart();
+    const source = createChartSourceFromRange(f.sheet.id, base);
+    const candidate = createChartSourceCandidate(base, source);
+    candidate.seriesFilter = { hiddenSeriesIds: ["series-1", "series-3", "series-4"] };
+    expect(allocateChartSourceSeriesId(candidate, source)).toBe("series-5");
+    candidate.source.series[0]!.values = { kind: "range", sheetId: "missing", range: null };
+    const preview = readChartSourcePreview(
+      f.sheet,
+      candidate,
+      createWorkbookEvaluator(f.workbook, f.sheet.id),
+      f.workbook,
+    );
+    expect(preview.invalid).toBe(true);
+    expect(preview.sourceData.diagnostics).toContainEqual({
+      code: "broken-reference",
+      role: "values",
+      seriesId: "series-1",
+    });
   });
 });

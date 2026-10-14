@@ -13,7 +13,8 @@ import {
   type ChartSourceSeries,
 } from "@sheetcraft/core/chart-source";
 import { reconcileChartRangeSeriesForRange } from "@sheetcraft/core/chart-range-series";
-import type { SheetChart } from "@sheetcraft/core/sheet-charts";
+import type { ChartSeriesVisibilityChange } from "@sheetcraft/core/chart-series-filter";
+import { normalizeSheetChart, type SheetChart } from "@sheetcraft/core/sheet-charts";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { Sheet, SheetEvaluator, Workbook } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
@@ -25,9 +26,11 @@ import {
   formatChartSourceName,
   getChartSourceApplicability,
   getEditableChartSource,
+  planChartSourceVisibility,
   parseChartSourceRange,
   readChartSourcePreview,
   type ChartSourceReferencePicker,
+  type ChartSourceVisibilityProof,
 } from "../chart-source-editor";
 import ChartContent from "./ChartContent.vue";
 import ChartSeriesDialog from "./ChartSeriesDialog.vue";
@@ -44,7 +47,7 @@ const props = withDefaults(
     error?: boolean;
     suspended?: boolean;
     ownerValid?: () => boolean;
-    commit: (drawing: SheetChartDrawing) => boolean;
+    commit: (drawing: SheetChartDrawing, proof?: ChartSourceVisibilityProof) => boolean;
     selectReference?: ChartSourceReferencePicker;
   }>(),
   { error: false, suspended: false },
@@ -53,6 +56,9 @@ const emit = defineEmits<{ close: [] }>();
 const { t } = useAppI18n();
 const root = ref<HTMLElement>();
 const draft = ref(cloneChartSourceDrawing(props.drawing));
+// Sparse user intents are separate from both the document and read-only promotion seeds.
+const visibilityChanges = ref<ChartSeriesVisibilityChange[]>([]);
+let promotionProof: ChartSourceVisibilityProof | undefined;
 const sourceText = ref(
   !draft.value.chart.source && draft.value.chart.range
     ? formatRangeReference(props.sheet.name, draft.value.chart.range)
@@ -68,6 +74,9 @@ let epoch = 0;
 let tokenCounter = 0;
 let pickerEpoch = 0;
 const entryTokens = new Map<string, number>();
+// IDs enter this set only after an actual nested Add succeeds in this draft.
+// They have never belonged to the document and need no retired filter tombstone.
+const addedIds = new Set<string>();
 type SeriesSession = {
   kind: "series";
   token: number;
@@ -96,14 +105,63 @@ const source = computed(() => {
     return undefined;
   }
 });
+function visibilityKey(change: ChartSeriesVisibilityChange): string {
+  return "seriesId" in change
+    ? `id:${change.seriesId}`
+    : `band:${change.rangeBand.seriesBy}:${change.rangeBand.index}`;
+}
+function cloneVisibilityChanges(): ChartSeriesVisibilityChange[] {
+  return visibilityChanges.value.map((change) =>
+    "seriesId" in change
+      ? { seriesId: change.seriesId, visible: change.visible }
+      : { rangeBand: { ...change.rangeBand }, visible: change.visible },
+  );
+}
+function seriesTarget(
+  index: number,
+  id: string,
+):
+  | Omit<Extract<ChartSeriesVisibilityChange, { seriesId: string }>, "visible">
+  | Omit<Extract<ChartSeriesVisibilityChange, { rangeBand: unknown }>, "visible"> {
+  const chart = draft.value.chart;
+  if (chart.source || !chart.range) return { seriesId: id };
+  const rows = chart.seriesBy === "rows";
+  const start =
+    chart.range.start[rows ? "row" : "column"] +
+    (rows ? Number(chart.headerRow) : Number(chart.headerColumn));
+  return { rangeBand: { seriesBy: chart.seriesBy, index: start + index } };
+}
+function targetVisible(change: ChartSeriesVisibilityChange): boolean {
+  const pending = visibilityChanges.value.find(
+    (item) => visibilityKey(item) === visibilityKey(change),
+  );
+  if (pending) return pending.visible;
+  const chart = draft.value.chart;
+  const id =
+    "seriesId" in change
+      ? change.seriesId
+      : chart.rectangleSeries?.[change.rangeBand.seriesBy].find(
+          (binding) => binding.index === change.rangeBand.index,
+        )?.id;
+  return id === undefined || !chart.seriesFilter?.hiddenSeriesIds.includes(id);
+}
+const previewChart = computed(() => {
+  if (!source.value) return draft.value.chart;
+  const chart = createChartSourceCandidate(draft.value.chart, source.value);
+  // Map physical intents to temporary read seeds only in this detached preview.
+  const changes = source.value.series.map((entry, index) => ({
+    seriesId: entry.id,
+    visible: targetVisible({ ...seriesTarget(index, entry.id), visible: true }),
+  }));
+  try {
+    return planChartSourceVisibility(chart, changes);
+  } catch {
+    return chart;
+  }
+});
 const preview = computed(() => {
   void props.revision;
-  return readChartSourcePreview(
-    props.sheet,
-    source.value ? createChartSourceCandidate(draft.value.chart, source.value) : draft.value.chart,
-    props.evaluator,
-    props.workbook,
-  );
+  return readChartSourcePreview(props.sheet, previewChart.value, props.evaluator, props.workbook);
 });
 const selectedIndex = computed(
   () => source.value?.series.findIndex((entry) => entry.id === selectedId.value) ?? -1,
@@ -112,8 +170,11 @@ const orderedSeries = computed(
   () =>
     source.value?.series.map((entry, index) => ({
       ...entry,
+      target: seriesTarget(index, entry.id),
+      visibilityKey: visibilityKey({ ...seriesTarget(index, entry.id), visible: true }),
+      visible: targetVisible({ ...seriesTarget(index, entry.id), visible: true }),
       label:
-        preview.value.data.series.find((resolved) => resolved.id === entry.id)?.name ??
+        preview.value.sourceData.series.find((resolved) => resolved.id === entry.id)?.name ??
         (entry.name.kind === "literal"
           ? entry.name.text || `${t("chart.sourceSeries")} ${index + 1}`
           : formatChartSourceName(props.workbook, entry.name)),
@@ -123,7 +184,12 @@ const directionOptions = computed(() => [
   { value: "columns", label: t("chart.sourceColumns") },
   { value: "rows", label: t("chart.sourceRows") },
 ]);
-const previewDrawing = computed(() => ({ ...draft.value, width: 680, height: 250 }));
+const previewDrawing = computed(() => ({
+  ...draft.value,
+  chart: visibilityChanges.value.length ? previewChart.value : draft.value.chart,
+  width: 680,
+  height: 250,
+}));
 function resetTokens(): void {
   entryTokens.clear();
   for (const entry of source.value?.series ?? []) entryTokens.set(entry.id, ++tokenCounter);
@@ -137,11 +203,93 @@ function syncInput(): void {
   const input = root.value?.querySelector<HTMLInputElement>("[data-chart-source-range] input");
   if (input) sourceText.value = input.value;
 }
-function setSource(next: NonNullable<typeof source.value>): void {
-  draft.value.chart = createChartSourceCandidate(draft.value.chart, next);
-  sourceText.value = "";
+function setSource(
+  next: NonNullable<typeof source.value>,
+  discardAddedId?: string,
+): Map<string, string> {
+  const replacements = new Map<string, string>();
+  let chart = draft.value.chart;
+  if (!chart.source && source.value) {
+    const base = cloneChartSourceDrawing(draft.value).chart;
+    const changes = cloneVisibilityChanges();
+    chart = planChartSourceVisibility(base, changes);
+    const materialized = getEditableChartSource(props.sheet.id, chart, props.sheet);
+    source.value.series.forEach((entry, index) =>
+      replacements.set(entry.id, materialized.series[index]!.id),
+    );
+    next = normalizeChartSource({
+      ...next,
+      series: next.series.map((entry) => ({
+        ...entry,
+        id: replacements.get(entry.id) ?? entry.id,
+      })),
+    });
+    promotionProof = { base, changes };
+    for (const [oldId, newId] of replacements) {
+      const token = entryTokens.get(oldId);
+      if (token !== undefined) entryTokens.set(newId, token);
+      if (oldId !== newId) entryTokens.delete(oldId);
+    }
+    if (selectedId.value) selectedId.value = replacements.get(selectedId.value) ?? selectedId.value;
+  } else {
+    if (discardAddedId) {
+      const hidden = chart.seriesFilter?.hiddenSeriesIds.filter((id) => id !== discardAddedId);
+      const { seriesFilter: _previous, ...rest } = chart;
+      chart = hidden?.length
+        ? { ...rest, seriesFilter: { hiddenSeriesIds: hidden } }
+        : props.drawing.chart.seriesFilter?.hiddenSeriesIds.length === 0
+          ? { ...rest, seriesFilter: { hiddenSeriesIds: [] } }
+          : rest;
+    }
+    chart = planChartSourceVisibility(
+      chart,
+      visibilityChanges.value.filter(
+        (change) => !(discardAddedId && "seriesId" in change && change.seriesId === discardAddedId),
+      ),
+    );
+  }
+  draft.value.chart = createChartSourceCandidate(chart, next);
+  visibilityChanges.value = [];
+  if (discardAddedId && promotionProof?.base.range) {
+    const planned = planChartSourceVisibility(promotionProof.base, promotionProof.changes);
+    const plannedSource = getEditableChartSource(props.sheet.id, planned, props.sheet);
+    const seeded = createChartSourceCandidate(planned, plannedSource);
+    const comparable = (chart: SheetChart) => {
+      const normalized = normalizeSheetChart(chart);
+      if (!normalized.seriesFilter?.hiddenSeriesIds.length) delete normalized.seriesFilter;
+      return JSON.stringify(normalized);
+    };
+    if (comparable(draft.value.chart) === comparable(seeded)) {
+      // Pure Add/hide/Remove returns to the rectangle draft. Its read seeds and
+      // any filter-only allocations must not become a new source/history edit.
+      const baseSource = getEditableChartSource(props.sheet.id, promotionProof.base, props.sheet);
+      next.series.forEach((entry, index) =>
+        replacements.set(entry.id, baseSource.series[index]!.id),
+      );
+      draft.value.chart = promotionProof.base;
+      visibilityChanges.value = promotionProof.changes;
+      promotionProof = undefined;
+      resetTokens();
+    }
+  }
+  sourceText.value =
+    draft.value.chart.source || !draft.value.chart.range
+      ? ""
+      : formatRangeReference(props.sheet.name, draft.value.chart.range);
   invalidRange.value = false;
   feedback.value = false;
+  return replacements;
+}
+function applySource(
+  next: NonNullable<typeof source.value>,
+  discardAddedId?: string,
+): Map<string, string> | undefined {
+  try {
+    return setSource(next, discardAddedId);
+  } catch {
+    feedback.value = true;
+    return undefined;
+  }
 }
 function close(): void {
   if (!alive) return;
@@ -168,7 +316,21 @@ function confirm(): void {
     invalidRange.value = true;
     return;
   }
-  if (!props.commit(cloneChartSourceDrawing(draft.value))) {
+  let candidate: SheetChartDrawing;
+  let proof = promotionProof;
+  try {
+    candidate = cloneChartSourceDrawing(draft.value);
+    candidate.chart = planChartSourceVisibility(candidate.chart, visibilityChanges.value);
+    if (!draft.value.chart.source && visibilityChanges.value.length)
+      proof = {
+        base: cloneChartSourceDrawing(draft.value).chart,
+        changes: cloneVisibilityChanges(),
+      };
+  } catch {
+    feedback.value = true;
+    return;
+  }
+  if (!props.commit(candidate, proof)) {
     feedback.value = true;
     return;
   }
@@ -190,10 +352,65 @@ function resetRange(): boolean {
   // resets never make arbitrary identity edits or acquire new formatting identities.
   const base: SheetChart = { ...draft.value.chart, range: props.drawing.chart.range };
   delete base.source;
+  if (props.drawing.chart.seriesFilter) base.seriesFilter = props.drawing.chart.seriesFilter;
+  else delete base.seriesFilter;
   if (props.drawing.chart.rectangleSeries)
     base.rectangleSeries = props.drawing.chart.rectangleSeries;
   else delete base.rectangleSeries;
   try {
+    const oldRange = draft.value.chart.range ?? promotionProof?.base.range;
+    let carried = visibilityChanges.value.filter((change) => "rangeBand" in change);
+    if (draft.value.chart.source && promotionProof?.base.range) {
+      const promoted = planChartSourceVisibility(promotionProof.base, promotionProof.changes);
+      const seeds = getEditableChartSource(props.sheet.id, promoted, props.sheet);
+      const rows = promoted.seriesBy === "rows";
+      const start =
+        promoted.range!.start[rows ? "row" : "column"] +
+        (rows ? Number(promoted.headerRow) : Number(promoted.headerColumn));
+      // Inactive/header selections are absent from promoted active seeds, but
+      // remain owned by their original physical bands. Overlay only the active
+      // explicit seeds' later checkbox state instead of replacing that scope.
+      const byBand = new Map(
+        promotionProof.changes
+          .filter((change) => "rangeBand" in change)
+          .map((change) => [visibilityKey(change), change] as const),
+      );
+      seeds.series.forEach((entry, index) => {
+        const change: ChartSeriesVisibilityChange = {
+          rangeBand: { seriesBy: promoted.seriesBy, index: start + index },
+          visible: targetVisible({ seriesId: entry.id, visible: true }),
+        };
+        byBand.set(visibilityKey(change), change);
+      });
+      carried = [...byBand.values()];
+    }
+    const intersection =
+      oldRange && resolved.sheetId === props.sheet.id
+        ? {
+            start: {
+              row: Math.max(oldRange.start.row, resolved.range.start.row),
+              column: Math.max(oldRange.start.column, resolved.range.start.column),
+            },
+            end: {
+              row: Math.min(oldRange.end.row, resolved.range.end.row),
+              column: Math.min(oldRange.end.column, resolved.range.end.column),
+            },
+          }
+        : undefined;
+    carried = carried.filter((change) => {
+      if (
+        !intersection ||
+        intersection.start.row > intersection.end.row ||
+        intersection.start.column > intersection.end.column ||
+        !("rangeBand" in change)
+      )
+        return false;
+      const axis = change.rangeBand.seriesBy === "rows" ? "row" : "column";
+      return (
+        change.rangeBand.index >= intersection.start[axis] &&
+        change.rangeBand.index <= intersection.end[axis]
+      );
+    });
     let chart = reconcileChartRangeSeriesForRange(
       base,
       resolved.range,
@@ -213,6 +430,9 @@ function resetRange(): boolean {
       return false;
     }
     draft.value.chart = chart;
+    visibilityChanges.value = chart.source ? [] : carried;
+    promotionProof = undefined;
+    addedIds.clear();
     sourceText.value = chart.source ? "" : formatRangeReference(props.sheet.name, resolved.range);
     invalidRange.value = false;
     feedback.value = false;
@@ -261,6 +481,25 @@ function prepareSourceAction(): boolean {
 function changeHidden(value: unknown): void {
   if (typeof value === "boolean" && prepareSourceAction()) draft.value.chart.showHidden = value;
 }
+function changeVisibility(target: ReturnType<typeof seriesTarget>, value: unknown): void {
+  const beforeEpoch = epoch;
+  if (typeof value !== "boolean" || !prepareSourceAction() || beforeEpoch !== epoch) return;
+  const change: ChartSeriesVisibilityChange = { ...target, visible: value };
+  const key = visibilityKey(change);
+  if (!orderedSeries.value.some((entry) => entry.visibilityKey === key)) return;
+  const remaining = visibilityChanges.value.filter((item) => visibilityKey(item) !== key);
+  // A net-zero intent is absent, so a hide/show draft never allocates an orphan identity.
+  const chart = draft.value.chart;
+  const id =
+    "seriesId" in change
+      ? change.seriesId
+      : chart.rectangleSeries?.[change.rangeBand.seriesBy].find(
+          (binding) => binding.index === change.rangeBand.index,
+        )?.id;
+  const originalVisible = id === undefined || !chart.seriesFilter?.hiddenSeriesIds.includes(id);
+  visibilityChanges.value = value === originalVisible ? remaining : [...remaining, change];
+  feedback.value = false;
+}
 function select(id: string): void {
   if (prepareSourceAction()) selectedId.value = id;
 }
@@ -269,9 +508,12 @@ function remove(): void {
   const next = normalizeChartSource(source.value);
   const index = selectedIndex.value;
   const removed = next.series.splice(index, 1)[0]!;
+  const replacements = applySource(next, addedIds.has(removed.id) ? removed.id : undefined);
+  if (!replacements) return;
   entryTokens.delete(removed.id);
-  setSource(next);
-  selectedId.value = next.series[Math.min(index, next.series.length - 1)]?.id;
+  addedIds.delete(removed.id);
+  const selected = next.series[Math.min(index, next.series.length - 1)]?.id;
+  selectedId.value = selected ? (replacements.get(selected) ?? selected) : undefined;
 }
 function move(delta: -1 | 1): void {
   if (!prepareSourceAction() || !source.value) return;
@@ -281,7 +523,7 @@ function move(delta: -1 | 1): void {
   const next = normalizeChartSource(source.value);
   const entry = next.series.splice(index, 1)[0]!;
   next.series.splice(nextIndex, 0, entry);
-  setSource(next);
+  applySource(next);
 }
 function openSeries(adding: boolean): void {
   if (!prepareSourceAction() || !source.value || (adding && source.value.series.length >= 256))
@@ -346,9 +588,13 @@ function openSeries(adding: boolean): void {
         props.workbook,
       );
       if (result.invalid) return false;
-      setSource(next);
-      if (adding) entryTokens.set(entry.id, entryToken!);
-      selectedId.value = entry.id;
+      const replacements = applySource(next);
+      if (!replacements) return false;
+      if (adding) {
+        entryTokens.set(entry.id, entryToken!);
+        addedIds.add(replacements.get(entry.id) ?? entry.id);
+      }
+      selectedId.value = replacements.get(entry.id) ?? entry.id;
       return true;
     },
   };
@@ -377,8 +623,7 @@ function openCategories(): void {
         ).invalid
       )
         return false;
-      setSource(next);
-      return true;
+      return applySource(next) !== undefined;
     },
   };
   nested.value = session;
@@ -584,25 +829,38 @@ onBeforeUnmount(() => {
           </div>
           <div
             class="chart-source-editor__list"
-            role="listbox"
+            role="list"
             :aria-label="t('chart.sourceLegendEntries')"
           >
-            <button
+            <div
               v-for="(entry, index) in orderedSeries"
-              :key="entry.id"
-              type="button"
-              role="option"
-              :aria-selected="entry.id === selectedId"
-              :disabled="blocked"
+              :key="entry.visibilityKey"
+              role="listitem"
               class="chart-source-editor__series"
               :class="{ 'is-selected': entry.id === selectedId }"
-              :data-source-series="entry.id"
-              @click="select(entry.id)"
-              @dblclick="openSeries(false)"
             >
-              <span class="chart-source-editor__ordinal">{{ index + 1 }}</span
-              ><span class="chart-source-editor__series-label">{{ entry.label }}</span>
-            </button>
+              <Checkbox
+                :checked="entry.visible"
+                :disabled="blocked"
+                :aria-label="t('chart.sourceSeriesVisibility', { name: entry.label })"
+                :data-source-visibility="entry.visibilityKey"
+                @click.stop
+                @dblclick.stop
+                @change="changeVisibility(entry.target, $event)"
+              />
+              <button
+                type="button"
+                :aria-pressed="entry.id === selectedId"
+                :disabled="blocked"
+                class="chart-source-editor__series-select"
+                :data-source-series="entry.id"
+                @click="select(entry.id)"
+                @dblclick="openSeries(false)"
+              >
+                <span class="chart-source-editor__ordinal">{{ index + 1 }}</span
+                ><span class="chart-source-editor__series-label">{{ entry.label }}</span>
+              </button>
+            </div>
             <p v-if="!orderedSeries.length" class="chart-source-editor__empty">
               {{ t("chart.sourceNoSeries") }}
             </p>
@@ -789,20 +1047,33 @@ onBeforeUnmount(() => {
     align-items: center;
     gap: 10px;
     width: 100%;
-    padding: 7px 10px;
+    padding: 0 10px;
     border: 0;
     border-radius: var(--sheetcraft-radius-default);
     text-align: left;
     background: transparent;
     color: inherit;
     font: inherit;
-    cursor: pointer;
-    &:hover:not(:disabled) {
+    &:hover {
       background: var(--sheetcraft-surface-hover);
     }
     &.is-selected {
       background: var(--sheetcraft-action-primary-subtle);
     }
+  }
+  &__series-select {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+    padding: 7px 0;
+    border: 0;
+    text-align: left;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
     &:disabled {
       color: var(--sheetcraft-text-disabled);
       cursor: default;

@@ -5,7 +5,12 @@ import { createChartSourceFromRange } from "@sheetcraft/core/chart-source";
 import * as chartSourceApi from "@sheetcraft/core/chart-source";
 import { createWorkbookSession } from "@sheetcraft/core/history";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
-import { getSheetChartData, type ChartData, type ChartType } from "@sheetcraft/core/sheet-charts";
+import {
+  getSheetChartData,
+  getSheetChartSourceData,
+  type ChartData,
+  type ChartType,
+} from "@sheetcraft/core/sheet-charts";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
   createSheet,
@@ -21,8 +26,15 @@ import {
 import {
   ChartClipboardSourceError,
   ChartClipboardSourceErrorReason as Reason,
+  cloneChartClipboardDrawingData,
   planChartClipboardSourceForTarget,
 } from "../../../modules/charts/chart-clipboard-source";
+import {
+  assertChartClipboardSourcePrepared,
+  assertChartDrawingPreserved,
+  captureChartDrawingForest,
+  detachChartDrawingForest,
+} from "../../../modules/charts/chart-source-ownership";
 
 import { createChartOption } from "../../../modules/charts/chart-option";
 
@@ -869,5 +881,341 @@ describe("Chart clipboard bound range identity", () => {
     expectReason(() => f.plan(), Reason.InvalidChartPayload);
     expect(read).not.toHaveBeenCalled();
     expect(f.before()).toEqual(before);
+  });
+});
+
+function filteredFixture(type: ChartType = "column", seriesBy: "rows" | "columns" = "columns") {
+  const f = fixture(type);
+  const chart = f.chartDrawing.chart;
+  chart.seriesBy = seriesBy;
+  const active = [
+    { index: 0, id: "header" },
+    { index: 1, id: "active-one" },
+    { index: 2, id: "active-two" },
+    { index: 3, id: "active-three" },
+  ];
+  const inactive = [{ index: 2, id: "inactive" }];
+  chart.rectangleSeries =
+    seriesBy === "rows" ? { rows: active, columns: inactive } : { rows: inactive, columns: active };
+  chart.seriesFilter = { hiddenSeriesIds: ["header", "inactive", "retired"] };
+  chart.presentation = { palette: ["#101010", "#202020", "#303030"] };
+  chart.format!.series!.push(
+    { id: "header", color: "#333333" },
+    { id: "inactive", color: "#444444" },
+    { id: "active-one", color: "#aa0000", strokeWidth: 3, smooth: true, markers: true },
+    { id: "active-two", axis: "secondary", strokeWidth: 4, markers: false },
+  );
+  return f;
+}
+
+describe("Chart clipboard source-owned series filters", () => {
+  test.each(allTypes)(
+    "same-sheet and deleted-range %s keep dormant filters without source reads",
+    (type) => {
+      const f = fixture(type);
+      f.chartDrawing.chart.seriesFilter = { hiddenSeriesIds: ["retired"] };
+      const read = vi.spyOn(f.evaluator, "getComputedValue").mockImplementation(() => {
+        throw new Error("Unexpected dormant source evaluation");
+      });
+      const before = f.before();
+      expect(f.plan(f.sourceSheet)).toEqual(f.chartDrawing);
+      expect(f.before()).toEqual(before);
+      f.chartDrawing.chart.range = null;
+      expect(f.plan()).toEqual(f.chartDrawing);
+      expect(read).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(
+    promotableTypes.flatMap((type) =>
+      (["rows", "columns"] as const).flatMap((seriesBy) =>
+        (["first", "middle", "all"] as const).map((selection) => ({ type, seriesBy, selection })),
+      ),
+    ),
+  )(
+    "$type/$seriesBy hide=$selection retains definitions, paint, axes and actual options",
+    ({ type, seriesBy, selection }) => {
+      const f = filteredFixture(type, seriesBy);
+      const chart = f.chartDrawing.chart;
+      const selected =
+        selection === "all"
+          ? ["active-one", "active-two", "active-three"]
+          : [selection === "first" ? "active-one" : "active-two"];
+      chart.seriesFilter!.hiddenSeriesIds.push(...selected);
+      const before = f.before();
+      const raw = getSheetChartSourceData(f.sourceSheet, chart, f.evaluator, f.resolveSheet);
+      const visible = f.read(f.sourceSheet, f.chartDrawing);
+      const sameSheet = f.plan(f.sourceSheet);
+      expect(sameSheet).toEqual(f.chartDrawing);
+      sameSheet.chart.seriesFilter!.hiddenSeriesIds.reverse();
+      expect(f.before()).toEqual(before);
+      const result = f.plan();
+      expect(result.chart.source?.series.map((entry) => entry.id)).toEqual([
+        "active-one",
+        "active-two",
+        "active-three",
+      ]);
+      expect(result.chart.source?.series.map((entry) => entry.colorIndex)).toEqual([0, 1, 2]);
+      expect(result.chart.rectangleSeries).toBeUndefined();
+      expect(result.chart.range).toBeNull();
+      const { rectangleSeries: _bindings, range: _range, ...retained } = chart;
+      const { source: _source, range: _promotedRange, ...promotedRetained } = result.chart;
+      expect(promotedRetained).toEqual(retained);
+      expect(JSON.stringify(result.chart.seriesFilter)).toBe(JSON.stringify(chart.seriesFilter));
+      const derived = f.read(f.targetSheet, result);
+      expect(presentation(derived)).toEqual(presentation(visible));
+      expect(derived.series.map((entry) => entry.colorIndex)).toEqual(
+        raw.series.flatMap((entry, index) => (selected.includes(entry.id!) ? [] : [index])),
+      );
+      expect(derived.series.every((entry) => entry.numberFormat?.kind === "number")).toBe(true);
+      expect(visibleOptions(createChartOption(result.chart, derived))).toEqual(
+        visibleOptions(createChartOption(chart, visible)),
+      );
+      expect(() =>
+        assertChartClipboardSourcePrepared(f.chartDrawing, result, f.sourceSheet, f.targetSheet),
+      ).not.toThrow();
+      if (selection === "all") {
+        expect(derived.series).toEqual([]);
+        expect(derived.categories).toEqual(raw.categories);
+        expect(result.chart.source?.series).toHaveLength(3);
+      }
+      result.chart.seriesFilter!.hiddenSeriesIds.push("changed");
+      expect(f.before()).toEqual(before);
+    },
+  );
+
+  test.each(["rows", "columns"] as const)(
+    "%s promotion reserves every dormant filter ID before assigning new sources",
+    (seriesBy) => {
+      const f = filteredFixture("line", seriesBy);
+      f.chartDrawing.chart.rectangleSeries![seriesBy] = [{ index: 1, id: "active-one" }];
+      f.chartDrawing.chart.seriesFilter!.hiddenSeriesIds.push("active-one", "series-1", "series-2");
+      const before = f.before();
+      const result = f.plan();
+      expect(result.chart.source?.series.map((entry) => entry.id)).toEqual([
+        "active-one",
+        "series-3",
+        "series-4",
+      ]);
+      expect(f.read(f.targetSheet, result).series.map((entry) => entry.id)).toEqual([
+        "series-3",
+        "series-4",
+      ]);
+      expect(result.chart.seriesFilter).toEqual(f.chartDrawing.chart.seriesFilter);
+      expect(f.before()).toEqual(before);
+    },
+  );
+
+  test.each([
+    { id: "inactive", index: 2 },
+    { id: "header", index: 2 },
+    { id: "retired", index: 2 },
+    { id: "fresh-but-mismatched", index: 0 },
+    { id: "active-one", index: 2 },
+  ])("refuses planner ID=$id at ordinal=$index before evaluating", ({ id, index }) => {
+    const f = filteredFixture();
+    f.chartDrawing.chart.rectangleSeries!.columns = [{ index: 1, id: "active-one" }];
+    const source = createChartSourceFromRange(
+      f.sourceSheet.id,
+      f.chartDrawing.chart,
+      f.sourceSheet,
+    );
+    source.series[index]!.id = id;
+    const before = f.before();
+    const read = vi.spyOn(f.evaluator, "getComputedValue");
+    const planner = vi.spyOn(chartSourceApi, "createChartSourceFromRange").mockReturnValue(source);
+    try {
+      // A duplicate ID remains malformed source data; other identity collisions
+      // receive the typed provenance refusal even without a matching style.
+      expectReason(
+        () => f.plan(),
+        id === "active-one" ? Reason.NonEquivalentSource : Reason.DormantSeriesIdCollision,
+      );
+      expect(read).not.toHaveBeenCalled();
+      expect(f.before()).toEqual(before);
+    } finally {
+      planner.mockRestore();
+      read.mockRestore();
+    }
+  });
+
+  test.each(["broken", "mismatch", "budget", "changed-values"] as const)(
+    "all-hidden cannot conceal a promoted source that is $0",
+    (defect) => {
+      const f = filteredFixture();
+      f.chartDrawing.chart.seriesFilter!.hiddenSeriesIds.push(
+        "active-one",
+        "active-two",
+        "active-three",
+      );
+      const source = createChartSourceFromRange(
+        f.sourceSheet.id,
+        f.chartDrawing.chart,
+        f.sourceSheet,
+      );
+      if (defect === "broken")
+        source.series[0]!.values = { kind: "range", sheetId: "deleted", range: null };
+      else if (defect === "mismatch")
+        source.series[0]!.values = { kind: "literal", values: [1, 2] };
+      else if (defect === "budget")
+        source.series[0]!.values = {
+          kind: "literal",
+          values: Array.from({ length: 10001 }, () => 1),
+        };
+      else source.series[0]!.values = { kind: "literal", values: [9, 8, 7] };
+      const before = f.before();
+      const planner = vi
+        .spyOn(chartSourceApi, "createChartSourceFromRange")
+        .mockReturnValue(source);
+      try {
+        expectReason(() => f.plan(), Reason.NonEquivalentSource);
+        expect(f.before()).toEqual(before);
+      } finally {
+        planner.mockRestore();
+      }
+    },
+  );
+
+  test("already explicit all-hidden definitions stay detached and retain raw invalid diagnostics", () => {
+    const f = filteredFixture();
+    const source = createChartSourceFromRange(
+      f.sourceSheet.id,
+      f.chartDrawing.chart,
+      f.sourceSheet,
+    );
+    delete f.chartDrawing.chart.rectangleSeries;
+    f.chartDrawing.chart.range = null;
+    f.chartDrawing.chart.source = source;
+    f.chartDrawing.chart.seriesFilter!.hiddenSeriesIds.push(
+      "active-one",
+      "active-two",
+      "active-three",
+    );
+    source.series[0]!.values = { kind: "range", sheetId: "missing", range: null };
+    const read = vi.spyOn(f.evaluator, "getComputedValue");
+    const before = f.before();
+    const result = f.plan();
+    expect(result).toEqual(f.chartDrawing);
+    expect(read).not.toHaveBeenCalled();
+    const data = f.read(f.targetSheet, result);
+    expect(data.categories).toEqual([]);
+    expect(data.series).toEqual([]);
+    expect(data.diagnostics).toContainEqual({
+      code: "broken-reference",
+      role: "values",
+      seriesId: "active-one",
+    });
+    result.chart.source!.series.reverse();
+    result.chart.seriesFilter!.hiddenSeriesIds.reverse();
+    expect(f.before()).toEqual(before);
+  });
+
+  test("filter accessors, sparse selections and excess budgets fail before getters or evaluation", () => {
+    const f = filteredFixture();
+    let reads = 0;
+    const getter = () => {
+      reads++;
+      return ["active-one"];
+    };
+    const candidates = Array.from({ length: 6 }, () => structuredClone(f.chartDrawing));
+    Object.defineProperty(candidates[0]!.chart, "seriesFilter", { enumerable: true, get: getter });
+    Object.defineProperty(candidates[1]!.chart.seriesFilter!, "hiddenSeriesIds", {
+      enumerable: true,
+      get: getter,
+    });
+    Object.defineProperty(candidates[2]!.chart.seriesFilter!.hiddenSeriesIds, "0", {
+      enumerable: true,
+      get: getter,
+    });
+    candidates[3]!.chart.seriesFilter!.hiddenSeriesIds = [];
+    candidates[3]!.chart.seriesFilter!.hiddenSeriesIds.length = 2;
+    candidates[4]!.chart.seriesFilter!.hiddenSeriesIds = Array.from(
+      { length: 513 },
+      (_, index) => `retired-${index}`,
+    );
+    candidates[5]!.chart.seriesFilter!.hiddenSeriesIds = ["active-one", "active-one"];
+    const read = vi.spyOn(f.evaluator, "getComputedValue");
+    const before = f.before();
+    for (const candidate of candidates) {
+      expectReason(() => f.plan(f.targetSheet, candidate), Reason.InvalidChartPayload);
+      if (candidate !== candidates[4] && candidate !== candidates[5])
+        expect(() => detachChartDrawingForest([candidate])).toThrow();
+    }
+    expect(reads).toBe(0);
+    expect(read).not.toHaveBeenCalled();
+    expect(f.before()).toEqual(before);
+  });
+
+  test("clipboard cloning bounds nested extension traversal even on all-hidden charts", () => {
+    const f = filteredFixture();
+    f.chartDrawing.chart.seriesFilter!.hiddenSeriesIds.push(
+      "active-one",
+      "active-two",
+      "active-three",
+    );
+    const large = Object.fromEntries(
+      Array.from({ length: 52 }, (_, index) => [`field-${index}`, null]),
+    );
+    Object.assign(f.chartDrawing.chart, { extra: Array.from({ length: 10000 }, () => large) });
+    expect(() => cloneChartClipboardDrawingData(f.chartDrawing)).toThrow("too large");
+    expectReason(() => f.plan(), Reason.InvalidChartPayload);
+  });
+});
+
+describe("Chart clipboard source-only host ownership", () => {
+  test.each([
+    "filter-edit",
+    "filter-order",
+    "filter-delete",
+    "style",
+    "geometry",
+    "identity",
+  ] as const)("source hook cannot include a $0 change", (change) => {
+    const f = filteredFixture();
+    f.chartDrawing.chart.seriesFilter!.hiddenSeriesIds.push("active-one");
+    const expected = structuredClone(f.chartDrawing);
+    const candidate = f.plan();
+    if (change === "filter-edit") candidate.chart.seriesFilter!.hiddenSeriesIds.push("active-two");
+    else if (change === "filter-order") candidate.chart.seriesFilter!.hiddenSeriesIds.reverse();
+    else if (change === "filter-delete") delete candidate.chart.seriesFilter;
+    else if (change === "style") candidate.chart.format!.series![0]!.color = "#000000";
+    else if (change === "geometry") candidate.width++;
+    else candidate.chart.source!.series[0]!.id = "changed";
+    expect(() =>
+      assertChartClipboardSourcePrepared(expected, candidate, f.sourceSheet, f.targetSheet),
+    ).toThrow();
+    expect(f.chartDrawing).toEqual(expected);
+  });
+
+  test("same-sheet copies retain explicit empty filters and exact-assert snapshots are detached", () => {
+    const f = filteredFixture();
+    f.chartDrawing.chart.seriesFilter = { hiddenSeriesIds: [] };
+    const snapshots = captureChartDrawingForest([f.chartDrawing]);
+    const candidate = f.plan(f.sourceSheet);
+    expect(() =>
+      assertChartClipboardSourcePrepared(snapshots[0]!, candidate, f.sourceSheet, f.sourceSheet),
+    ).not.toThrow();
+    delete candidate.chart.seriesFilter;
+    expect(() => assertChartDrawingPreserved(snapshots[0]!, candidate)).toThrow();
+    f.chartDrawing.chart.seriesFilter.hiddenSeriesIds.push("active-one");
+    expect((snapshots[0] as SheetChartDrawing).chart.seriesFilter?.hiddenSeriesIds).toEqual([]);
+  });
+
+  test("source-only preparation rejects a filter getter before it can run", () => {
+    const f = filteredFixture();
+    const candidate = f.plan();
+    let reads = 0;
+    Object.defineProperty(f.chartDrawing.chart.seriesFilter!, "hiddenSeriesIds", {
+      enumerable: true,
+      get: () => {
+        reads++;
+        return [];
+      },
+    });
+    expect(() =>
+      assertChartClipboardSourcePrepared(f.chartDrawing, candidate, f.sourceSheet, f.targetSheet),
+    ).toThrow();
+    expect(() => captureChartDrawingForest([f.chartDrawing])).toThrow();
+    expect(reads).toBe(0);
   });
 });

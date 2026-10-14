@@ -142,9 +142,10 @@ import SparklineDialog from "../modules/sparklines/components/SparklineDialog.vu
 import { useChartActions } from "../modules/charts/useChartActions";
 import { useChartObjectControls } from "../modules/charts/useChartObjectControls";
 import { useChartFormatControls } from "../modules/charts/useChartFormatControls";
-import { getSheetChartData } from "@sheetcraft/core/sheet-charts";
+import { getSheetChartData, getSheetChartSourceData } from "@sheetcraft/core/sheet-charts";
 import {
   getChartFormatTargets,
+  getChartFormatSeries,
   chartFormatTargetKey,
   type ChartFormatTarget,
 } from "../modules/charts/chart-format-pane";
@@ -1652,6 +1653,10 @@ const chartObjectControls = useChartObjectControls({
     getSheetChartData(activeSheet.value, chart, activeSheetEvaluator.value, (sheetId) =>
       session.workbook.sheets.get(sheetId),
     ),
+  getSourceData: (_drawing, chart) =>
+    getSheetChartSourceData(activeSheet.value, chart, activeSheetEvaluator.value, (sheetId) =>
+      session.workbook.sheets.get(sheetId),
+    ),
   getAxisTitle: () => t("chart.axisTitlePlaceholder"),
 });
 const chartObjectContext = chartObjectControls.snapshot;
@@ -1680,21 +1685,41 @@ const chartFormatChoices = computed(() => {
   const owner = chartObjectContext.value;
   if (!owner) return [];
   try {
-    const data = getSheetChartData(
+    const data = getSheetChartSourceData(
       activeSheet.value,
       owner.drawing.chart,
       activeSheetEvaluator.value,
       (sheetId) => session.workbook.sheets.get(sheetId),
     );
-    return getChartFormatTargets(owner.drawing.chart, data).map((target) => ({
+    const visibleData = getSheetChartData(
+      activeSheet.value,
+      owner.drawing.chart,
+      activeSheetEvaluator.value,
+      (sheetId) => session.workbook.sheets.get(sheetId),
+    );
+    const series = getChartFormatSeries(owner.drawing.chart, data);
+    const seriesNames = new Map<string, number>();
+    for (const entry of series) seriesNames.set(entry.name, (seriesNames.get(entry.name) ?? 0) + 1);
+    const hidden = new Set(owner.drawing.chart.seriesFilter?.hiddenSeriesIds);
+    return getChartFormatTargets(owner.drawing.chart, data, visibleData).map((target) => ({
       target,
       label:
         target.kind === "series"
-          ? t("chart.formatSeriesName", {
-              name:
-                data.series.find((series) => series.id === target.seriesId)?.name ??
-                target.seriesId,
-            })
+          ? t(
+              hidden.has(target.seriesId)
+                ? "chart.formatHiddenSeriesName"
+                : "chart.formatSeriesName",
+              {
+                name: (() => {
+                  const index = series.findIndex((entry) => entry.id === target.seriesId);
+                  const entry = series[index];
+                  if (!entry) return target.seriesId;
+                  return (seriesNames.get(entry.name) ?? 0) > 1
+                    ? t("chart.formatDuplicateSeriesName", { name: entry.name, index: index + 1 })
+                    : entry.name;
+                })(),
+              },
+            )
           : target.kind === "chart"
             ? t("chart.formatChartArea")
             : target.kind === "title"

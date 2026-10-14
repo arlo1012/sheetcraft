@@ -23,6 +23,7 @@ import {
   type SheetEvaluator,
 } from "./workbook.js";
 import { normalizeCellNumberFormat, type CellNumberFormat } from "./style.js";
+import { readChartSeriesFilter, type ChartSeriesFilter } from "./chart-series-filter.js";
 
 export type ChartType =
   | "column"
@@ -50,6 +51,8 @@ export type ChartElementSettings = {
   labelScope?: "all" | "lastCategory" | "lastSeries";
 };
 export type SheetChart = {
+  /** Source-owned hidden selections, including retired and inactive identities. */
+  seriesFilter?: ChartSeriesFilter;
   /** Sparse identities owned by a live ordinary rectangle, including inactive bands. */
   rectangleSeries?: ChartRectangleSeries;
   /** Ordered live sources, exclusive of rectangle and PivotTable/cache sources. */
@@ -154,6 +157,7 @@ function normalizeChartElementSettings(value: unknown): ChartElementSettings {
   return result;
 }
 export function normalizeSheetChart(chart: SheetChart): SheetChart {
+  const seriesFilter = readChartSeriesFilter(chart);
   let rectangleSeriesValue: unknown;
   const hasRectangleSeries = !!chart && typeof chart === "object" && "rectangleSeries" in chart;
   if (hasRectangleSeries) {
@@ -246,6 +250,7 @@ export function normalizeSheetChart(chart: SheetChart): SheetChart {
     ? normalizeChartRectangleSeries(rectangleSeriesValue, range!)
     : undefined;
   return {
+    ...(seriesFilter !== undefined ? { seriesFilter } : {}),
     ...(rectangleSeries !== undefined ? { rectangleSeries } : {}),
     ...(source !== undefined ? { source } : {}),
     ...(chart.pivotTableId ? { pivotTableId: chart.pivotTableId } : {}),
@@ -325,12 +330,15 @@ export function normalizeChartDataCache(data: ChartData): ChartData {
     records: data.records.map((row) => [...row]),
   };
 }
-export function getSheetChartData(
+/** Existing unfiltered source derivation, including worksheet-hidden masks and diagnostics. */
+export function getSheetChartSourceData(
   sheet: Sheet,
   chart: SheetChart,
   evaluator: SheetEvaluator,
   resolveSheet?: (sheetId: string) => Sheet | undefined,
 ): ChartData {
+  // Validate raw new-feature ownership before any legacy source/cache reads.
+  readChartSeriesFilter(chart);
   if ("source" in chart)
     return getChartSourceData(sheet, normalizeSheetChart(chart), evaluator, resolveSheet);
   if (chart.dataCache !== undefined) return normalizeChartDataCache(chart.dataCache);
@@ -474,5 +482,42 @@ export function getSheetChartData(
       values: rows.map((row) => numeric(row, column)),
     })),
     records,
+  };
+}
+
+/** Validate every source first, then project active source IDs without document writes. */
+export function getSheetChartData(
+  sheet: Sheet,
+  chart: SheetChart,
+  evaluator: SheetEvaluator,
+  resolveSheet?: (sheetId: string) => Sheet | undefined,
+): ChartData {
+  const filter = readChartSeriesFilter(chart);
+  const source = getSheetChartSourceData(sheet, chart, evaluator, resolveSheet);
+  if (
+    !filter?.hiddenSeriesIds.length ||
+    !["column", "bar", "line", "area", "radar"].includes(chart.type)
+  )
+    return source;
+  const hidden = new Set(filter.hiddenSeriesIds);
+  const retained = source.series.flatMap((entry, index) =>
+    entry.id !== undefined && hidden.has(entry.id) ? [] : [index],
+  );
+  if (retained.length === source.series.length) return source;
+  return {
+    ...source,
+    series: retained.map((index) => {
+      const entry = source.series[index]!;
+      return chart.source === undefined ? { ...entry, colorIndex: index } : entry;
+    }),
+    // Rectangle records retain the historical row orientation. Explicit records
+    // are category + series columns, so their projection follows the same mask.
+    records:
+      chart.source === undefined
+        ? source.records
+        : source.records.map((record) => [
+            record[0]!,
+            ...retained.map((index) => record[index + 1]!),
+          ]),
   };
 }

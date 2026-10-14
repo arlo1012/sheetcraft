@@ -8,13 +8,20 @@ import {
 import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
 import {
   getSheetChartData,
+  getSheetChartSourceData,
   normalizeSheetChart,
   type SheetChart,
 } from "@sheetcraft/core/sheet-charts";
 import { normalizeSheetDrawings, type SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { Sheet, SheetEvaluator, Workbook } from "@sheetcraft/core/workbook";
-import type { ChartSourceReferenceRole } from "./chart-source-editor";
+import {
+  planChartSourceVisibility,
+  readChartSourceVisibilityProof,
+  type ChartSourceReferenceRole,
+  type ChartSourceVisibilityProof,
+} from "./chart-source-editor";
 import { preflightChartDataTable } from "./chart-data-table-preflight";
+import { countChartDataTableText } from "./chart-data-table";
 
 type SourceOwner = {
   dialogId: number;
@@ -24,7 +31,7 @@ type SourceOwner = {
   initial: SheetChartDrawing;
   picking: boolean;
   isCurrent: () => boolean;
-  commit: (drawing: SheetChartDrawing) => boolean;
+  commit: (drawing: SheetChartDrawing, proof?: ChartSourceVisibilityProof) => boolean;
   close: () => void;
   selectReference: (current: string, role: ChartSourceReferenceRole) => Promise<string | undefined>;
 };
@@ -73,7 +80,11 @@ export function useChartSourceActions(options: {
     dialog.value = undefined;
     error.value = false;
   }
-  function commit(target: SourceOwner, candidate: SheetChartDrawing): boolean {
+  function commit(
+    target: SourceOwner,
+    candidate: SheetChartDrawing,
+    proofValue?: ChartSourceVisibilityProof,
+  ): boolean {
     if (applying || preparing || !allowed(target) || target.picking) return false;
     preparing = true;
     try {
@@ -93,13 +104,37 @@ export function useChartSourceActions(options: {
         throw new TypeError("Data selection cannot alter drawing geometry or identity.");
       const chart = normalizeSheetChart(candidate.chart);
       const initialChart = normalizeSheetChart(target.initial.chart);
-      const rectangleBase = { ...initialChart };
-      delete rectangleBase.source;
-      const expectedBindings = chart.source
-        ? undefined
-        : reconcileChartRangeSeriesForRange(rectangleBase, chart.range).rectangleSeries;
+      const proof =
+        proofValue === undefined ? undefined : readChartSourceVisibilityProof(proofValue);
+      const selectionKeys = ["headerRow", "headerColumn", "seriesBy", "showHidden"] as const;
+      function expectedBase(selection: SheetChart): SheetChart {
+        let base = { ...initialChart };
+        for (const key of selectionKeys) Object.assign(base, { [key]: selection[key] });
+        if (selection.source) return base;
+        delete base.source;
+        base = reconcileChartRangeSeriesForRange(base, selection.range);
+        return base;
+      }
+      if (
+        proof &&
+        JSON.stringify(proof.base) !== JSON.stringify(normalizeSheetChart(expectedBase(proof.base)))
+      )
+        throw new TypeError("Visibility proof must use the captured source and reconciled range.");
+      const planned = proof
+        ? normalizeSheetChart(planChartSourceVisibility(proof.base, proof.changes))
+        : normalizeSheetChart(expectedBase(chart));
+      if (!chart.source && JSON.stringify(chart.range) !== JSON.stringify(planned.range))
+        throw new TypeError("Visibility proof must match the final source rectangle.");
+      const expectedBindings = chart.source ? undefined : planned.rectangleSeries;
       if (JSON.stringify(chart.rectangleSeries) !== JSON.stringify(expectedBindings))
-        throw new TypeError("Data selection cannot edit rectangle series identities.");
+        throw new TypeError(
+          "Data selection requires the exact planned rectangle series identities.",
+        );
+      if (
+        !chart.source &&
+        JSON.stringify(chart.seriesFilter) !== JSON.stringify(planned.seriesFilter)
+      )
+        throw new TypeError("Rectangle filters require the exact planned visibility changes.");
       if (chart.source) {
         // Only actual source seeds may keep identities whose formatting is already
         // present. Inactive bands and removed formats cannot be activated by Add.
@@ -107,16 +142,20 @@ export function useChartSourceActions(options: {
           ...(initialChart.format?.series ?? []).map((entry) => entry.id),
           ...(initialChart.rectangleSeries?.rows ?? []).map((entry) => entry.id),
           ...(initialChart.rectangleSeries?.columns ?? []).map((entry) => entry.id),
+          ...(initialChart.seriesFilter?.hiddenSeriesIds ?? []),
+          ...(planned.rectangleSeries?.rows ?? []).map((entry) => entry.id),
+          ...(planned.rectangleSeries?.columns ?? []).map((entry) => entry.id),
+          ...(planned.seriesFilter?.hiddenSeriesIds ?? []),
         ]);
         const seedChart = {
-          ...initialChart,
+          ...planned,
           seriesBy: chart.seriesBy,
           headerRow: chart.headerRow,
           headerColumn: chart.headerColumn,
           showHidden: chart.showHidden,
         };
-        const seeds = initialChart.source
-          ? initialChart.source.series
+        const seeds = seedChart.source
+          ? seedChart.source.series
           : getChartSourceApplicability(seedChart) === "editable"
             ? createChartSourceFromRange(target.sheet.id, seedChart, target.sheet).series
             : [];
@@ -125,6 +164,17 @@ export function useChartSourceActions(options: {
           throw new TypeError(
             "Data selection cannot activate an unrelated dormant series identity.",
           );
+        // Retired or unrelated dormant IDs stay unchanged. Current/seed source
+        // IDs alone may be toggled; removing a hidden entry keeps its reserved ID.
+        const editableFilterIds = new Set([
+          ...seedIds,
+          ...chart.source.series.map((entry) => entry.id),
+        ]);
+        const originalHidden = new Set(planned.seriesFilter?.hiddenSeriesIds);
+        const candidateHidden = new Set(chart.seriesFilter?.hiddenSeriesIds);
+        for (const id of new Set([...originalHidden, ...candidateHidden]))
+          if (!editableFilterIds.has(id) && originalHidden.has(id) !== candidateHidden.has(id))
+            throw new TypeError("Data selection cannot alter an unrelated dormant filter ID.");
       }
       const preserved: Partial<SheetChart> = { ...chart };
       const original: Partial<SheetChart> = { ...initialChart };
@@ -136,6 +186,7 @@ export function useChartSourceActions(options: {
         "showHidden",
         "source",
         "rectangleSeries",
+        "seriesFilter",
       ] as const) {
         delete preserved[key];
         delete original[key];
@@ -146,15 +197,20 @@ export function useChartSourceActions(options: {
       const ownerEvaluator =
         target.sheet === options.getSheet() ? evaluator : evaluator.forSheet?.(target.sheet.id);
       if (!ownerEvaluator) throw new TypeError("Chart owner evaluator is unavailable.");
-      const data = getSheetChartData(target.sheet, chart, ownerEvaluator, (id) =>
+      const sourceData = getSheetChartSourceData(target.sheet, chart, ownerEvaluator, (id) =>
         target.workbook.sheets.get(id),
       );
       if (
-        data.diagnostics?.some(
+        sourceData.diagnostics?.some(
           (item) => item.code === "broken-reference" || item.code === "length-mismatch",
         )
       )
         throw new TypeError("Chart references must resolve to equally sized vectors.");
+      // Source admission always uses every definition, before the visibility projection.
+      countChartDataTableText(chart, sourceData);
+      const data = getSheetChartData(target.sheet, chart, ownerEvaluator, (id) =>
+        target.workbook.sheets.get(id),
+      );
       if (!allowed(target)) return false;
       if (JSON.stringify(chart) === JSON.stringify(normalizeSheetChart(target.initial.chart))) {
         close(target);
@@ -237,7 +293,7 @@ export function useChartSourceActions(options: {
         initial: drawing,
         picking: false,
         isCurrent: () => current(next),
-        commit: (candidate) => commit(next, candidate),
+        commit: (candidate, proof) => commit(next, candidate, proof),
         close: () => close(next),
         selectReference: (value, role) => pick(next, value, role),
       };

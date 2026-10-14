@@ -127,6 +127,7 @@ export function ensureChartRangeSeriesIdentity(
     ...previous.rows.map((entry) => entry.id),
     ...previous.columns.map((entry) => entry.id),
     ...(chart.format?.series ?? []).map((entry) => entry.id),
+    ...(chart.seriesFilter?.hiddenSeriesIds ?? []),
   ]);
   let suffix = 1;
   while (used.has(`range-series-${suffix}`)) suffix++;

@@ -7,7 +7,17 @@ import {
   type ChartSourceName,
   type ChartSourceValues,
 } from "@sheetcraft/core/chart-source";
-import { getSheetChartData, type ChartData, type SheetChart } from "@sheetcraft/core/sheet-charts";
+import {
+  planChartSeriesVisibility,
+  type ChartSeriesVisibilityChange,
+} from "@sheetcraft/core/chart-series-filter";
+import {
+  getSheetChartData,
+  getSheetChartSourceData,
+  normalizeSheetChart,
+  type ChartData,
+  type SheetChart,
+} from "@sheetcraft/core/sheet-charts";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { CellRange, Sheet, SheetEvaluator, Workbook } from "@sheetcraft/core/workbook";
 import {
@@ -20,6 +30,141 @@ export type ChartSourceReferencePicker = (
   current: string,
   role: ChartSourceReferenceRole,
 ) => Promise<string | undefined>;
+/** Detached, transient evidence for the captured source owner. Never document metadata. */
+export type ChartSourceVisibilityProof = {
+  base: SheetChart;
+  changes: ChartSeriesVisibilityChange[];
+};
+
+function ownData(value: unknown, budget = { remaining: 100000 }, depth = 0): unknown {
+  if (--budget.remaining < 0 || depth > 32)
+    throw new RangeError("Chart source visibility proof is too large.");
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (!value || typeof value !== "object")
+    throw new TypeError("Chart source visibility proof requires ordinary own data.");
+  const array = Array.isArray(value);
+  const prototype: unknown = Object.getPrototypeOf(value);
+  if (prototype !== (array ? Array.prototype : Object.prototype) && prototype !== null)
+    throw new TypeError("Chart source visibility proof requires ordinary own data.");
+  const copy: Record<string, unknown> | unknown[] = array ? [] : {};
+  const keys = Reflect.ownKeys(value);
+  for (const key of keys) {
+    if (array && key === "length") continue;
+    const field = Object.getOwnPropertyDescriptor(value, key)!;
+    if (
+      typeof key !== "string" ||
+      !("value" in field) ||
+      (array && (!/^(?:0|[1-9]\d*)$/.test(key) || Number(key) >= value.length))
+    )
+      throw new TypeError(
+        "Chart source visibility proof cannot contain accessors or extra array fields.",
+      );
+    Object.defineProperty(copy, key, {
+      value: ownData(field.value, budget, depth + 1),
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+  }
+  if (array && keys.length !== value.length + 1)
+    throw new TypeError("Chart source visibility proof requires dense arrays.");
+  return copy;
+}
+
+/** Reject proof accessors before legacy chart normalization can inspect its fields. */
+export function readChartSourceVisibilityProof(value: unknown): ChartSourceVisibilityProof {
+  const proof = ownData(value) as ChartSourceVisibilityProof;
+  if (
+    !proof ||
+    Array.isArray(proof) ||
+    Object.keys(proof).sort().join(",") !== "base,changes" ||
+    !Array.isArray(proof.changes)
+  )
+    throw new TypeError("Chart source visibility proof requires only base and changes.");
+  const base = normalizeSheetChart(proof.base);
+  if (Object.keys(proof.base).some((key) => !Object.hasOwn(base, key)))
+    throw new TypeError("Chart source visibility proof has unknown chart fields.");
+  // The planner validates the complete change shape, targets and bounds.
+  planChartSourceVisibility(base, proof.changes);
+  return { base, changes: proof.changes };
+}
+
+/** Materialize net intents in deterministic direction/band order, then restore the final layout.
+ * Header and inactive-direction intents were staged while those bands were editable.
+ * Keeping them here preserves dormancy without persisting any read-generated seed IDs. */
+export function planChartSourceVisibility(
+  input: SheetChart,
+  changes: readonly ChartSeriesVisibilityChange[],
+): SheetChart {
+  const entries = ownData(changes) as ChartSeriesVisibilityChange[];
+  if (!Array.isArray(entries) || entries.length > 512)
+    throw new RangeError("Chart source visibility requires at most 512 net changes.");
+  const base = normalizeSheetChart(input);
+  if (!entries.length) return base;
+  const seen = new Set<string>();
+  for (const change of entries) {
+    if (!change || Array.isArray(change) || typeof change.visible !== "boolean")
+      throw new TypeError("Chart source visibility requires boolean own changes.");
+    const explicit = "seriesId" in change;
+    const fields = Object.keys(change).sort().join(",");
+    if (fields !== (explicit ? "seriesId,visible" : "rangeBand,visible"))
+      throw new TypeError("Unknown chart source visibility change fields.");
+    if (
+      !explicit &&
+      (!change.rangeBand || Object.keys(change.rangeBand).sort().join(",") !== "index,seriesBy")
+    )
+      throw new TypeError("Unknown chart source visibility band fields.");
+    if (
+      !explicit &&
+      ((change.rangeBand.seriesBy !== "rows" && change.rangeBand.seriesBy !== "columns") ||
+        !Number.isInteger(change.rangeBand.index) ||
+        change.rangeBand.index < 0)
+    )
+      throw new RangeError("Chart source visibility requires a valid physical band.");
+    const key = explicit
+      ? `id:${change.seriesId}`
+      : `band:${change.rangeBand.seriesBy}:${change.rangeBand.index}`;
+    if (seen.has(key)) throw new RangeError("Chart source visibility targets must be distinct.");
+    seen.add(key);
+  }
+  if (base.source) return planChartSeriesVisibility(base, entries);
+  if (entries.some((change) => "seriesId" in change))
+    throw new RangeError("Rectangle visibility requires physical bands.");
+  let candidate = base;
+  // Shows free a full filter budget before any effective hide is allocated.
+  for (const visible of [true, false]) {
+    for (const seriesBy of ["columns", "rows"] as const) {
+      const group = entries
+        .filter(
+          (change) =>
+            "rangeBand" in change &&
+            change.rangeBand.seriesBy === seriesBy &&
+            change.visible === visible,
+        )
+        .sort(
+          (left, right) =>
+            ("rangeBand" in left ? left.rangeBand.index : 0) -
+            ("rangeBand" in right ? right.rangeBand.index : 0),
+        );
+      if (!group.length) continue;
+      candidate = planChartSeriesVisibility(
+        {
+          ...candidate,
+          seriesBy,
+          ...(seriesBy === "rows" ? { headerRow: false } : { headerColumn: false }),
+        },
+        group,
+      );
+    }
+  }
+  return {
+    ...candidate,
+    seriesBy: base.seriesBy,
+    headerRow: base.headerRow,
+    headerColumn: base.headerColumn,
+  };
+}
 export type ChartSourceApplicability =
   | "editable"
   | "pivot"
@@ -59,6 +204,7 @@ export function allocateChartSourceSeriesId(chart: SheetChart, source: ChartSeri
     ...(chart.format?.series ?? []).map((entry) => entry.id),
     ...(chart.rectangleSeries?.rows ?? []).map((entry) => entry.id),
     ...(chart.rectangleSeries?.columns ?? []).map((entry) => entry.id),
+    ...(chart.seriesFilter?.hiddenSeriesIds ?? []),
   ]);
   let ordinal = 1;
   while (used.has(`series-${ordinal}`)) ordinal++;
@@ -70,17 +216,22 @@ export function readChartSourcePreview(
   chart: SheetChart,
   evaluator: SheetEvaluator,
   workbook: Workbook,
-): { data: ChartData; invalid: boolean } {
+): { data: ChartData; sourceData: ChartData; invalid: boolean } {
   try {
+    const sourceData = getSheetChartSourceData(sheet, chart, evaluator, (id) =>
+      workbook.sheets.get(id),
+    );
     const data = getSheetChartData(sheet, chart, evaluator, (id) => workbook.sheets.get(id));
     return {
       data,
-      invalid: !!data.diagnostics?.some(
+      sourceData,
+      invalid: !!sourceData.diagnostics?.some(
         (entry) => entry.code === "broken-reference" || entry.code === "length-mismatch",
       ),
     };
   } catch {
-    return { data: { categories: [], series: [], records: [] }, invalid: true };
+    const data = { categories: [], series: [], records: [] };
+    return { data, sourceData: data, invalid: true };
   }
 }
 

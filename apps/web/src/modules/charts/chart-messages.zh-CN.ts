@@ -82,6 +82,7 @@ export const chartsZhCN = {
   "chart.sourceInvalidSeries": "请输入有效名称和数值序列，数值个数须与类别数一致。",
   "chart.sourceInvalidCategories": "请输入有效的一行或一列引用，标签个数须与数值个数一致。",
   "chart.sourceApplyFailed": "图表更新失败，已保留草稿。请确认图表仍可编辑后重试。",
+  "chart.sourceSeriesVisibility": "显示 {name}",
   "chart.sourceSeries": "系列",
   "chart.sourceColumns": "每列数据作为一个系列",
   "chart.sourceRows": "每行数据作为一个系列",
@@ -119,7 +120,9 @@ export const chartsZhCN = {
   "chart.formatCategoryAxis": "分类轴",
   "chart.formatValueAxis": "数值轴",
   "chart.formatSecondaryValueAxis": "次要数值轴",
+  "chart.formatHiddenSeriesName": "系列：{name}（已隐藏）",
   "chart.formatSeriesName": "系列：{name}",
+  "chart.formatDuplicateSeriesName": "{name}（{index}）",
   "chart.formatSelectHint": "选择元素，设置文字、坐标轴或外观。",
   "chart.formatSeriesUnavailable":
     "此来源或图型暂不支持单个系列格式；仍可设置适用的标题、绘图区与坐标轴。普通区域图表和工作表系列来源可直接设置单个系列。",
@@ -173,6 +176,8 @@ export const chartsZhCN = {
   "chart.formatFinishComposition": "请先完成文字输入，再应用更改。",
   "chart.formatFontHint": "此设备未安装的字体可能会被替代。",
   "chart.formatClose": "关闭",
+  "chart.seriesFilterExportBlocked":
+    "XLSX 暂不支持图表系列显示筛选（{locations}）。已停止导出，工作簿没有改变。",
   "chart.formatExportBlocked":
     "XLSX 暂不支持图表子型与详细外观（{locations}）。已停止导出，图表设置未改变。",
   "chart.formatSelection": "设置所选元素格式",

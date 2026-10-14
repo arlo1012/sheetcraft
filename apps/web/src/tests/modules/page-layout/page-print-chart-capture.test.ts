@@ -925,3 +925,71 @@ test("printing rejects disguised chart payload instead of dropping it from a non
   expect(() => f.capture()).toThrow(/Chart payloads require an own chart drawing kind/);
   expect(JSON.stringify(f.sheet.drawings)).toBe(before);
 });
+
+describe("source-owned visibility print leases", () => {
+  test("all-hidden captures an empty projection with original source and stable identity", () => {
+    const drawing = chart();
+    drawing.chart.seriesFilter = { hiddenSeriesIds: ["stable-late", "stable-early"] };
+    const f = fixture([drawing]),
+      before = JSON.stringify(drawing),
+      pass = f.capture();
+    expect(pass.entries[0]!.data.series).toEqual([]);
+    expect(pass.entries[0]!.drawing.chart.source!.series).toHaveLength(2);
+    expect(pass.entries[0]!.drawing.chart.seriesFilter).toEqual(drawing.chart.seriesFilter);
+    pass.assertCurrent();
+    expect(JSON.stringify(drawing)).toBe(before);
+  });
+  test("a hidden literal value remains part of the immutable print source lease", () => {
+    const drawing = chart();
+    drawing.chart.seriesFilter = { hiddenSeriesIds: ["stable-late"] };
+    const f = fixture([drawing]),
+      pass = f.capture();
+    expect(pass.entries[0]!.data.series.map((entry) => entry.id)).toEqual(["stable-early"]);
+    const values = drawing.chart.source!.series[0]!.values;
+    if (values.kind !== "literal") throw new Error("Missing literal fixture");
+    values.values[0] = 999;
+    expect(() => pass.assertCurrent()).toThrow(ChartPrintUnavailableError);
+  });
+  test("a hidden broken reference never becomes a valid print", () => {
+    const drawing = chart();
+    drawing.chart.source!.series[0]!.values = { kind: "range", sheetId: "deleted", range: null };
+    drawing.chart.seriesFilter = { hiddenSeriesIds: ["stable-late"] };
+    expect(fixture([drawing]).capture).toThrow(/unavailable or inconsistent/);
+  });
+  test("hiding excess series does not bypass complete data table source admission", () => {
+    const drawing = chart();
+    const source = drawing.chart.source!;
+    source.series = Array.from({ length: 9 }, (_, index) => ({
+      id: `s${index}`,
+      colorIndex: index,
+      name: { kind: "literal", text: `Series${index}` },
+      values: { kind: "literal", values: [1, 2, 3] },
+    }));
+    drawing.chart.seriesFilter = {
+      hiddenSeriesIds: source.series.slice(1).map((entry) => entry.id),
+    };
+    drawing.chart.elements = { dataTable: "withLegendKeys" };
+    expect(fixture([drawing]).capture).toThrow(/complete source budget/);
+  });
+  test("all-hidden large sources still count against the batch value budget", () => {
+    const drawings = Array.from({ length: 12 }, (_, index) => {
+      const drawing = chart(`large-${index}`);
+      drawing.chart.source = {
+        kind: "series",
+        categories: { kind: "generated" },
+        series: [
+          {
+            id: "large",
+            colorIndex: 0,
+            name: { kind: "literal", text: "" },
+            values: { kind: "literal", values: Array.from({ length: 5000 }, () => 1) },
+          },
+        ],
+      };
+      drawing.chart.seriesFilter = { hiddenSeriesIds: ["large"] };
+      return drawing;
+    });
+    expect(fixture(drawings.slice(0, 5)).capture().entries).toHaveLength(5);
+    expect(fixture(drawings).capture).toThrow(/text or value budget/);
+  });
+});

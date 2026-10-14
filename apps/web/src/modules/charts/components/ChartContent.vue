@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
   getSheetChartData,
+  getSheetChartSourceData,
   normalizeSheetChart,
   type SheetChart,
 } from "@sheetcraft/core/sheet-charts";
@@ -10,6 +11,7 @@ import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import { init, type EChartsType } from "../chart-runtime";
 import { createChartOption } from "../chart-option";
 import {
+  countChartDataTableText,
   createChartDataTablePlan,
   prepareChartDataTableOption,
   applyChartDataTableGraphics,
@@ -49,8 +51,15 @@ const result = computed(() => {
       props.evaluator,
       props.resolveSheet,
     );
+    const sourceData = getSheetChartSourceData(
+      props.sheet,
+      normalizeSheetChart(paintChart.value),
+      props.evaluator,
+      props.resolveSheet,
+    );
     return {
       data,
+      sourceData,
       invalid: Boolean(
         data.diagnostics?.some(
           (entry) => entry.code === "broken-reference" || entry.code === "length-mismatch",
@@ -58,7 +67,11 @@ const result = computed(() => {
       ),
     };
   } catch {
-    return { data: { categories: [], series: [], records: [] }, invalid: true };
+    return {
+      data: { categories: [], series: [], records: [] },
+      sourceData: { categories: [], series: [], records: [] },
+      invalid: true,
+    };
   }
 });
 const data = computed(() => result.value.data);
@@ -212,6 +225,7 @@ function render() {
       if (Array.isArray(axis)) for (const item of axis) item.triggerEvent = true;
       else if (axis) axis.triggerEvent = true;
     }
+    countChartDataTableText(paintChart.value, result.value.sourceData);
     const table = createChartDataTablePlan(paintChart.value, data.value, props.drawing);
     chart.setOption(prepareChartDataTableOption(option, table), { notMerge: true });
     if (table) applyChartDataTableGraphics(chart, table);

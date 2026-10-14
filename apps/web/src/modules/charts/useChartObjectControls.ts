@@ -79,6 +79,7 @@ export function useChartObjectControls(options: {
   source?: (drawing: SheetChartDrawing) => void;
   format?: (drawing: SheetChartDrawing, target: ChartFormatTarget) => void;
   getData?: (drawing: SheetChartDrawing, chart: SheetChart) => ChartData;
+  getSourceData?: (drawing: SheetChartDrawing, chart: SheetChart) => ChartData;
   getAxisTitle?: () => string;
 }) {
   const error = ref(false);
@@ -116,7 +117,12 @@ export function useChartObjectControls(options: {
     const validateTable = (chart: SheetChart) => {
       if (chart.elements?.dataTable && chart.elements.dataTable !== "none") {
         if (!options.getData) throw new Error("Chart table source is unavailable.");
-        preflightChartDataTable(chart, options.getData(drawing, chart), drawing);
+        preflightChartDataTable(
+          chart,
+          options.getData(drawing, chart),
+          drawing,
+          options.getSourceData?.(drawing, chart),
+        );
       }
       return chart;
     };

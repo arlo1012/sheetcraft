@@ -2,6 +2,7 @@ import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
 import { init } from "./chart-runtime";
 import { createChartOption } from "./chart-option";
 import {
+  countChartDataTableText,
   createChartDataTablePlan,
   prepareChartDataTableOption,
   applyChartDataTableGraphics,
@@ -13,7 +14,10 @@ export function preflightChartDataTable(
   chart: SheetChart,
   data: ChartData,
   dimensions: { width: number; height: number },
+  sourceData: ChartData = data,
 ): void {
+  // A visibility mask does not relax the admission budget of the source owner.
+  countChartDataTableText(chart, sourceData);
   const plan = createChartDataTablePlan(chart, data, dimensions);
   if (!plan) return;
   const option = prepareChartDataTableOption(createChartOption(chart, data, dimensions), plan);

@@ -1,7 +1,13 @@
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import { Checkbox } from "tdesign-vue-next/es/checkbox";
+import { Select } from "tdesign-vue-next/es/select";
 import { nextTick } from "vue";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { normalizeSheetChart, type SheetChart } from "@sheetcraft/core/sheet-charts";
+import {
+  getSheetChartData,
+  normalizeSheetChart,
+  type SheetChart,
+} from "@sheetcraft/core/sheet-charts";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
   createSheet,
@@ -11,11 +17,15 @@ import {
   insertSheet,
   setCellContent,
 } from "@sheetcraft/core/workbook";
+import ChartContent from "../../../modules/charts/components/ChartContent.vue";
 import ChartSourceDialog from "../../../modules/charts/components/ChartSourceDialog.vue";
 import ChartSeriesDialog from "../../../modules/charts/components/ChartSeriesDialog.vue";
 import ChartCategoriesDialog from "../../../modules/charts/components/ChartCategoriesDialog.vue";
 import { createAppI18n } from "../../../shared/i18n";
-import type { ChartSourceReferencePicker } from "../../../modules/charts/chart-source-editor";
+import type {
+  ChartSourceReferencePicker,
+  ChartSourceVisibilityProof,
+} from "../../../modules/charts/chart-source-editor";
 
 // Use the actual SVG renderer without relying on happy-dom layout or a browser canvas.
 vi.mock("../../../modules/charts/chart-runtime", async (importOriginal) => {
@@ -114,7 +124,7 @@ function fixture(
   const original = structuredClone(drawing);
   let result = options.commitResult ?? true;
   let valid = true;
-  const commit = vi.fn((draft: SheetChartDrawing) => {
+  const commit = vi.fn((draft: SheetChartDrawing, _proof?: ChartSourceVisibilityProof) => {
     normalizeSheetChart(draft.chart);
     return result;
   });
@@ -608,4 +618,392 @@ describe("Select Data sparse rectangle identity", () => {
     expect(chart.source?.series.some((entry) => entry.id === "series-1")).toBe(false);
     expect(chart.format).toEqual(f.original.chart.format);
   });
+});
+
+function visibilityInputs(): HTMLInputElement[] {
+  return [
+    ...element(parent).querySelectorAll<HTMLInputElement>(
+      "[data-source-visibility] input[type=checkbox]",
+    ),
+  ];
+}
+async function visibility(index: number, checked: boolean) {
+  const input = visibilityInputs()[index]!;
+  expect(input, "Missing actual series checkbox").toBeDefined();
+  if (input.checked !== checked) input.click();
+  await settle();
+  expect(visibilityInputs()[index]?.checked).toBe(checked);
+}
+function plotted(f: ReturnType<typeof fixture>) {
+  const drawing = f.wrapper.getComponent(ChartContent).props("drawing") as SheetChartDrawing;
+  return getSheetChartData(
+    f.sheet,
+    drawing.chart,
+    createWorkbookEvaluator(f.workbook, f.sheet.id),
+    (id) => f.workbook.sheets.get(id),
+  );
+}
+
+describe("Select Data actual series checkboxes", () => {
+  test.each(["column", "bar", "line", "area", "radar"] as const)(
+    "%s checkbox previews retained definitions, keeps rectangle controls/selection and Cancel writes nothing",
+    async (type) => {
+      const f = fixture({ chart: { type } });
+      await settle();
+      expect(visibilityInputs().map((input) => input.checked)).toEqual([true, true]);
+      expect(document.querySelector("button [data-source-visibility]")).toBeNull();
+      expect(element('[data-source-visibility="band:columns:2"]').getAttribute("aria-label")).toBe(
+        "Show pear",
+      );
+      await visibility(1, false);
+      expect(names()).toEqual(["apple", "pear"]);
+      expect(plotted(f).series.map((entry) => [entry.name, entry.colorIndex])).toEqual([
+        ["apple", 0],
+      ]);
+      expect(element('[data-source-series="series-1"]').getAttribute("aria-pressed")).toBe("true");
+      expect(element('[aria-label="Series direction"]')).toBeDefined();
+      expect(element<HTMLInputElement>(`${parent} [data-chart-source-range] input`).value).toBe(
+        "=Sheet1!$A$1:$C$4",
+      );
+      expect(f.drawing).toEqual(f.original);
+      expect(f.commit).not.toHaveBeenCalled();
+      await footer(parent, "cancel");
+      expect(f.commit).not.toHaveBeenCalled();
+    },
+  );
+  test("OK materializes range-band filter atomically, reopening retains unchecked rows and rechecking restores colors", async () => {
+    const f = fixture();
+    await settle();
+    await visibility(0, false);
+    await footer(parent, "confirm");
+    const hidden = f.commit.mock.calls[0]![0].chart;
+    expect(hidden.source).toBeUndefined();
+    expect(hidden.range).toEqual(f.original.chart.range);
+    expect(hidden.rectangleSeries).toEqual({
+      rows: [],
+      columns: [{ index: 1, id: "range-series-1" }],
+    });
+    expect(hidden.seriesFilter).toEqual({ hiddenSeriesIds: ["range-series-1"] });
+    expect(hidden.title).toBe("Untouched title");
+    expect(hidden.elements).toEqual(f.original.chart.elements);
+    expect(f.commit.mock.calls[0]![1]?.changes).toEqual([
+      { rangeBand: { seriesBy: "columns", index: 1 }, visible: false },
+    ]);
+    f.wrapper.unmount();
+    const reopened = fixture({ chart: hidden });
+    await settle();
+    expect(names()).toEqual(["apple", "pear"]);
+    expect(visibilityInputs().map((input) => input.checked)).toEqual([false, true]);
+    expect(plotted(reopened).series.map((entry) => [entry.name, entry.colorIndex])).toEqual([
+      ["pear", 1],
+    ]);
+    await visibility(0, true);
+    expect(plotted(reopened).series.map((entry) => [entry.name, entry.colorIndex])).toEqual([
+      ["apple", 0],
+      ["pear", 1],
+    ]);
+    await footer(parent, "confirm");
+    expect(reopened.commit.mock.calls[0]![0].chart.seriesFilter).toBeUndefined();
+    expect(reopened.commit.mock.calls[0]![0].chart.rectangleSeries).toEqual(hidden.rectangleSeries);
+  });
+  test("all-hidden keeps raw categories/title and hide-show net-zero commits the exact original without seed IDs", async () => {
+    const f = fixture();
+    await settle();
+    await visibility(0, false);
+    await visibility(1, false);
+    expect(names()).toEqual(["apple", "pear"]);
+    expect(plotted(f).series).toEqual([]);
+    expect(plotted(f).categories).toEqual(["east", "north", "south"]);
+    expect(element(parent).textContent).toContain("north");
+    await visibility(0, true);
+    await visibility(1, true);
+    await visibility(1, false);
+    await visibility(1, true);
+    await footer(parent, "confirm");
+    expect(f.commit.mock.calls[0]![0]).toEqual(f.original);
+    expect(f.commit.mock.calls[0]![1]).toBeUndefined();
+  });
+  test("hidden rows remain editable and later CRUD promotes real IDs with stable palettes and a retained filter", async () => {
+    const f = fixture();
+    await settle();
+    await visibility(1, false);
+    await click('[data-source-series="series-2"]');
+    await click("[data-source-edit]");
+    await input(`${series} [data-series-name] input`, "hidden pear edited");
+    await footer(series, "confirm");
+    expect(names()).toEqual(["apple", "hidden pear edited"]);
+    expect(visibilityInputs().map((input) => input.checked)).toEqual([true, false]);
+    expect(plotted(f).series.map((entry) => entry.name)).toEqual(["apple"]);
+    await click("[data-source-up]");
+    expect(names()).toEqual(["hidden pear edited", "apple"]);
+    await add("bonus", "={1,2,3}");
+    expect(visibilityInputs().map((input) => input.checked)).toEqual([false, true, true]);
+    await footer(parent, "confirm");
+    const chart = f.commit.mock.calls[0]![0].chart;
+    expect(chart.source?.series.map((entry) => [entry.id, entry.colorIndex])).toEqual([
+      ["range-series-1", 1],
+      ["series-1", 0],
+      ["series-2", 2],
+    ]);
+    expect(chart.seriesFilter).toEqual({ hiddenSeriesIds: ["range-series-1"] });
+    expect(chart.range).toBeNull();
+    expect(chart.rectangleSeries).toBeUndefined();
+  });
+  test("pending physical selections survive direction/header dormancy and overlapping ranges but disjoint reset retires them", async () => {
+    const f = fixture();
+    await settle();
+    await visibility(1, false);
+    f.wrapper.getComponent(Select).vm.$emit("change", "rows");
+    await settle();
+    expect(visibilityInputs().map((input) => input.checked)).toEqual([true, true, true]);
+    f.wrapper.getComponent(Select).vm.$emit("change", "columns");
+    await settle();
+    expect(visibilityInputs().map((input) => input.checked)).toEqual([true, false]);
+    await input(`${parent} [data-chart-source-range] input`, "=Sheet1!B1:C4");
+    await click("[data-reset-chart-range]");
+    // Column B becomes the header band; column C retains its physical selection.
+    expect(visibilityInputs().map((input) => input.checked)).toEqual([false]);
+    await input(`${parent} [data-chart-source-range] input`, "=Sheet1!A20:C23");
+    await click("[data-reset-chart-range]");
+    await input(`${parent} [data-chart-source-range] input`, "=Sheet1!A1:C4");
+    await click("[data-reset-chart-range]");
+    expect(visibilityInputs().map((input) => input.checked)).toEqual([true, true]);
+    await footer(parent, "confirm");
+    expect(f.commit.mock.calls[0]![0]).toEqual(f.original);
+  });
+  test("checkbox draft survives IME, owner failure, rejected commit and retry without document mutation", async () => {
+    const f = fixture({ commitResult: false });
+    await settle();
+    await visibility(1, false);
+    const target = element<HTMLInputElement>(`${parent} [data-chart-source-range] input`);
+    target.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    await footer(parent, "confirm");
+    expect(f.commit).not.toHaveBeenCalled();
+    expect(visibilityInputs()[1]?.checked).toBe(false);
+    target.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true }));
+    await footer(parent, "confirm");
+    expect(f.commit).toHaveBeenCalledTimes(1);
+    expect(visibilityInputs()[1]?.checked).toBe(false);
+    expect(f.drawing).toEqual(f.original);
+    const first = f.commit.mock.calls[0]![0];
+    f.accept();
+    await footer(parent, "confirm");
+    expect(f.commit.mock.calls[1]![0]).toEqual(first);
+    f.wrapper.unmount();
+    const stale = fixture();
+    await settle();
+    await visibility(0, false);
+    stale.invalidate();
+    await footer(parent, "confirm");
+    expect(stale.commit).not.toHaveBeenCalled();
+    expect(visibilityInputs()[0]?.checked).toBe(false);
+  });
+});
+
+describe("visibility draft scope across source controls", () => {
+  test("inactive physical intents survive promotion, overlapping rectangle reset and switching back", async () => {
+    const f = fixture();
+    await settle();
+    await visibility(1, false);
+    f.wrapper.getComponent(Select).vm.$emit("change", "rows");
+    await settle();
+    await click("[data-source-categories]");
+    await input(`${categories} input`, "=Sheet1!B1:C1");
+    await footer(categories, "confirm");
+    expect(element(parent).querySelector('[aria-label="Series direction"]')).toBeNull();
+    await input(`${parent} [data-chart-source-range] input`, "=Sheet1!A1:C4");
+    await click("[data-reset-chart-range]");
+    f.wrapper.getComponent(Select).vm.$emit("change", "columns");
+    await settle();
+    expect(visibilityInputs().map((input) => input.checked)).toEqual([true, false]);
+    await footer(parent, "confirm");
+    const chart = f.commit.mock.calls[0]![0].chart;
+    expect(chart.source).toBeUndefined();
+    expect(chart.rectangleSeries?.columns).toEqual([{ index: 2, id: "range-series-1" }]);
+    expect(chart.seriesFilter).toEqual({ hiddenSeriesIds: ["range-series-1"] });
+  });
+  test("a pending data band becomes a dormant header without losing its filter selection", async () => {
+    const f = fixture({ chart: { headerColumn: false } });
+    await settle();
+    await visibility(0, false);
+    const header = f.wrapper
+      .findAllComponents(Checkbox)
+      .find((item) => item.text() === "First column contains categories")!;
+    header.get<HTMLInputElement>("input").element.click();
+    await settle();
+    expect(visibilityInputs().map((input) => input.checked)).toEqual([true, true]);
+    await footer(parent, "confirm");
+    const chart = f.commit.mock.calls[0]![0].chart;
+    expect(chart.headerColumn).toBe(true);
+    expect(chart.rectangleSeries?.columns).toEqual([{ index: 0, id: "range-series-1" }]);
+    expect(chart.seriesFilter).toEqual({ hiddenSeriesIds: ["range-series-1"] });
+    f.wrapper.unmount();
+    const reopened = fixture({ chart });
+    await settle();
+    const restore = reopened.wrapper
+      .findAllComponents(Checkbox)
+      .find((item) => item.text() === "First column contains categories")!;
+    restore.get<HTMLInputElement>("input").element.click();
+    await settle();
+    expect(visibilityInputs().map((input) => input.checked)).toEqual([false, true, true]);
+  });
+  test("canceled picker and hidden invalid definitions retain the checkbox draft and reject stale data", async () => {
+    let resolve: ((value: string | undefined) => void) | undefined;
+    const picker = vi.fn(
+      () =>
+        new Promise<string | undefined>((done) => {
+          resolve = done;
+        }),
+    );
+    const f = fixture({ selectReference: picker });
+    await settle();
+    await visibility(1, false);
+    await click('[aria-label="Pick a chart data range"]');
+    resolve!(undefined);
+    await settle();
+    expect(visibilityInputs().map((input) => input.checked)).toEqual([true, false]);
+    await footer(parent, "confirm");
+    expect(f.commit.mock.calls[0]![0].chart.seriesFilter?.hiddenSeriesIds).toEqual([
+      "range-series-1",
+    ]);
+    f.wrapper.unmount();
+    const source = {
+      kind: "series" as const,
+      categories: { kind: "generated" as const },
+      series: [
+        {
+          id: "hidden-broken",
+          colorIndex: 0,
+          name: { kind: "literal" as const, text: "broken" },
+          values: { kind: "range" as const, sheetId: "missing", range: null },
+        },
+      ],
+    };
+    const broken = fixture({
+      chart: { range: null, source, seriesFilter: { hiddenSeriesIds: ["hidden-broken"] } },
+    });
+    await settle();
+    expect(names()).toEqual(["broken"]);
+    expect(visibilityInputs()[0]?.checked).toBe(false);
+    await footer(parent, "confirm");
+    expect(broken.commit).not.toHaveBeenCalled();
+    expect(element('[role="alert"]').textContent).toContain("valid range in this workbook");
+  });
+});
+
+test("visibility exhaustion retains the complete draft, selected entry token and nested editor", async () => {
+  const f = fixture({
+    chart: {
+      seriesFilter: {
+        hiddenSeriesIds: Array.from({ length: 512 }, (_, index) => `retired-${index}`),
+      },
+    },
+  });
+  await settle();
+  await visibility(1, false);
+  await click("[data-source-remove]");
+  expect(names()).toEqual(["apple", "pear"]);
+  await click("[data-source-edit]");
+  await input(`${series} [data-series-name] input`, "retained edit");
+  await footer(series, "confirm");
+  expect(f.wrapper.findComponent(ChartSeriesDialog).exists()).toBe(true);
+  await footer(series, "cancel");
+  expect(names()).toEqual(["apple", "pear"]);
+  expect(visibilityInputs()[1]?.checked).toBe(false);
+  await visibility(1, true);
+  await click("[data-source-edit]");
+  await input(`${series} [data-series-name] input`, "allowed edit");
+  await footer(series, "confirm");
+  expect(names()).toEqual(["allowed edit", "pear"]);
+  expect(f.drawing).toEqual(f.original);
+  expect(f.commit).not.toHaveBeenCalled();
+});
+
+describe("new Add filter lineage stays draft-only", () => {
+  test("accepted Add then hide/materialize/remove restores the exact rectangle without an orphan filter or proof", async () => {
+    const f = fixture();
+    await settle();
+    await add("draft only", "={1,2,3}");
+    await visibility(2, false);
+    await click("[data-source-up]");
+    await click("[data-source-down]");
+    await click("[data-source-remove]");
+    expect(names()).toEqual(["apple", "pear"]);
+    expect(visibilityInputs().map((input) => input.checked)).toEqual([true, true]);
+    expect(element(parent).querySelector('[aria-label="Series direction"]')).not.toBeNull();
+    await footer(parent, "confirm");
+    expect(f.commit.mock.calls[0]![0]).toEqual(f.original);
+    expect(f.commit.mock.calls[0]![1]).toBeUndefined();
+  });
+  test("new hidden Add removal preserves captured hidden IDs and unrelated source edits", async () => {
+    const source = {
+      kind: "series" as const,
+      categories: { kind: "generated" as const },
+      series: [
+        {
+          id: "existing-apple",
+          colorIndex: 0,
+          name: { kind: "literal" as const, text: "apple" },
+          values: { kind: "literal" as const, values: [1, 2, 3] },
+        },
+        {
+          id: "existing-pear",
+          colorIndex: 1,
+          name: { kind: "literal" as const, text: "pear" },
+          values: { kind: "literal" as const, values: [4, 5, 6] },
+        },
+      ],
+    };
+    const f = fixture({
+      chart: {
+        range: null,
+        source,
+        seriesFilter: { hiddenSeriesIds: ["existing-apple", "retired-filter"] },
+      },
+    });
+    await settle();
+    await click('[data-source-series="existing-pear"]');
+    await click("[data-source-edit]");
+    await input(`${series} [data-series-name] input`, "pear edited");
+    await footer(series, "confirm");
+    await add("new removed", "={7,8,9}");
+    await visibility(2, false);
+    await click("[data-source-remove]");
+    expect(names()).toEqual(["apple", "pear edited"]);
+    expect(visibilityInputs().map((input) => input.checked)).toEqual([false, true]);
+    await footer(parent, "confirm");
+    expect(f.commit.mock.calls[0]![0].chart.seriesFilter).toEqual({
+      hiddenSeriesIds: ["existing-apple", "retired-filter"],
+    });
+    expect(f.commit.mock.calls[0]![0].chart.source?.series).toHaveLength(2);
+  });
+});
+
+test("fresh Add-hide-remove preserves a captured explicit-empty filter as an exact no-op", async () => {
+  const source = {
+    kind: "series" as const,
+    categories: { kind: "generated" as const },
+    series: [
+      {
+        id: "existing-apple",
+        colorIndex: 0,
+        name: { kind: "literal" as const, text: "apple" },
+        values: { kind: "literal" as const, values: [1, 2, 3] },
+      },
+      {
+        id: "existing-pear",
+        colorIndex: 1,
+        name: { kind: "literal" as const, text: "pear" },
+        values: { kind: "literal" as const, values: [4, 5, 6] },
+      },
+    ],
+  };
+  const f = fixture({ chart: { range: null, source, seriesFilter: { hiddenSeriesIds: [] } } });
+  await settle();
+  await add("new canceled", "={7,8,9}");
+  await visibility(2, false);
+  await click("[data-source-remove]");
+  await footer(parent, "confirm");
+  expect(f.commit.mock.calls[0]![0]).toEqual(f.original);
+  expect(f.commit.mock.calls[0]![0].chart.seriesFilter).toEqual({ hiddenSeriesIds: [] });
 });

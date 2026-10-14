@@ -1,5 +1,14 @@
-import { createChartSourceFromRange } from "@sheetcraft/core/chart-source";
-import { getSheetChartData, type ChartData, type SheetChart } from "@sheetcraft/core/sheet-charts";
+import {
+  createChartSourceFromRange,
+  normalizeChartSource,
+  type ChartSeriesSource,
+} from "@sheetcraft/core/chart-source";
+import {
+  getSheetChartData,
+  getSheetChartSourceData,
+  type ChartData,
+  type SheetChart,
+} from "@sheetcraft/core/sheet-charts";
 import { normalizeSheetDrawing, type SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 
@@ -107,15 +116,52 @@ function sheetIdentity(sheet: Sheet | undefined): string | undefined {
 function visiblePresentation(chart: SheetChart, data: ChartData): unknown {
   return {
     categories: data.categories,
-    series: data.series.map((entry) => ({
-      name: entry.name,
-      values: entry.values,
-      numberFormat: entry.numberFormat,
-      // The same stable ID must resolve exactly the same per-series paint/axis
-      // settings after promotion; newly allocated IDs have no dormant format.
-      format: chart.format?.series?.find((format) => format.id === entry.id),
-    })),
+    series: data.series.map((entry, index) => {
+      const format = chart.format?.series?.find((format) => format.id === entry.id);
+      return {
+        name: entry.name,
+        values: entry.values,
+        numberFormat: entry.numberFormat,
+        // Range survivors retain the pre-filter palette ordinal. An explicit
+        // paint override supersedes the palette; other paint/axis settings must
+        // still resolve to exactly the same bound series after promotion.
+        paletteIndex: format?.color === undefined ? (entry.colorIndex ?? index) : undefined,
+        format,
+      };
+    }),
   };
+}
+
+/** A promotion may retain only the ID bound to that exact active physical band. */
+export function assertChartSourcePromotionIdentity(
+  chart: SheetChart,
+  source: ChartSeriesSource,
+): void {
+  if (!chart.range || chart.source !== undefined)
+    throw new TypeError("Chart source promotion requires an ordinary live rectangle.");
+  const axis = chart.seriesBy === "rows" ? "row" : "column";
+  const header = chart.seriesBy === "rows" ? chart.headerRow : chart.headerColumn;
+  const first = chart.range.start[axis] + Number(header);
+  const last = chart.range.end[axis];
+  const bindings = new Map(
+    (chart.rectangleSeries?.[chart.seriesBy] ?? [])
+      .filter((entry) => entry.index >= first && entry.index <= last)
+      .map((entry) => [entry.index, entry.id]),
+  );
+  const reserved = new Set([
+    ...(chart.rectangleSeries?.rows ?? []).map((entry) => entry.id),
+    ...(chart.rectangleSeries?.columns ?? []).map((entry) => entry.id),
+    ...(chart.format?.series ?? []).map((entry) => entry.id),
+    ...(chart.seriesFilter?.hiddenSeriesIds ?? []),
+  ]);
+  if (
+    source.series.length !== Math.max(0, last - first + 1) ||
+    source.series.some((entry, index) => {
+      const bound = bindings.get(first + index);
+      return bound !== undefined ? entry.id !== bound : reserved.has(entry.id);
+    })
+  )
+    throw new TypeError("Chart source promotion changed an active ID or activated a dormant ID.");
 }
 
 /**
@@ -188,36 +234,36 @@ export function planChartClipboardSourceForTarget(
       "This live legacy Chart type cannot change owner sheets losslessly.",
     );
   try {
-    const source = createChartSourceFromRange(sourceId, chart, sourceSheet);
-    const sourceIds = new Set(source.series.map((entry) => entry.id));
-    const range = chart.range!;
-    const axis = chart.seriesBy === "rows" ? "row" : "column";
-    const header = chart.seriesBy === "rows" ? chart.headerRow : chart.headerColumn;
-    const activeBindings = new Set(
-      (chart.rectangleSeries?.[chart.seriesBy] ?? [])
-        .filter((entry) => entry.index >= range.start[axis] + Number(header))
-        .map((entry) => entry.id),
-    );
-    if (
-      chart.format?.series?.some(
-        (entry) => sourceIds.has(entry.id) && !activeBindings.has(entry.id),
-      )
-    )
+    const source = normalizeChartSource(createChartSourceFromRange(sourceId, chart, sourceSheet));
+    try {
+      assertChartSourcePromotionIdentity(chart, source);
+    } catch {
       fail(
         ChartClipboardSourceErrorReason.DormantSeriesIdCollision,
-        "Promotion would activate a dormant Chart series format.",
+        "Promotion would change an active Chart series ID or activate a dormant ID.",
       );
+    }
     const { rectangleSeries: _rectangleSeries, ...rectangle } = chart;
     const promoted = { ...rectangle, range: null, source };
+    const legacySourceData = getSheetChartSourceData(sourceSheet, chart, evaluator, resolveSheet);
+    const promotedSourceData = getSheetChartSourceData(
+      sourceSheet,
+      promoted,
+      evaluator,
+      resolveSheet,
+    );
     const legacyData = getSheetChartData(sourceSheet, chart, evaluator, resolveSheet);
     const promotedData = getSheetChartData(sourceSheet, promoted, evaluator, resolveSheet);
     if (
-      promotedData.diagnostics?.some(
-        (entry) => entry.code === "broken-reference" || entry.code === "length-mismatch",
+      [legacySourceData, promotedSourceData].some((data) =>
+        data.diagnostics?.some(
+          (entry) => entry.code === "broken-reference" || entry.code === "length-mismatch",
+        ),
       ) ||
+      JSON.stringify(visiblePresentation(chart, legacySourceData)) !==
+        JSON.stringify(visiblePresentation(promoted, promotedSourceData)) ||
       JSON.stringify(visiblePresentation(chart, legacyData)) !==
-        JSON.stringify(visiblePresentation(promoted, promotedData)) ||
-      promotedData.series.some((entry, index) => entry.colorIndex !== index)
+        JSON.stringify(visiblePresentation(promoted, promotedData))
     )
       fail(
         ChartClipboardSourceErrorReason.NonEquivalentSource,

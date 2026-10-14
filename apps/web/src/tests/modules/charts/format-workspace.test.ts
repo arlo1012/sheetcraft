@@ -202,6 +202,15 @@ describe("chart formatting real Workspace", () => {
       sheet = getActiveSheet(controller.session.workbook);
     await select(wrapper);
     const before = serializeWorkbook(controller.session.workbook);
+    const seriesOptions = wrapper
+      .getComponent(ChartElementsToolbar)
+      .getComponent(Select)
+      .props("options");
+    expect(
+      seriesOptions?.filter(
+        (item) => "value" in item && String(item.value).startsWith("range-series:"),
+      ),
+    ).toMatchObject([{ label: "Series: same (1)" }, { label: "Series: same (2)" }]);
     const pane = await chooseElement(wrapper, "range-series:columns:2");
     expect(chart(sheet).chart.rectangleSeries).toBeUndefined();
     expect(controller.session.history.undoStack).toHaveLength(0);

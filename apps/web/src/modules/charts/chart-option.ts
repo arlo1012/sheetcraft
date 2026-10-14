@@ -171,6 +171,14 @@ function buildChartOption(
     if (chart.source.series.length === 0)
       return { animation: false, backgroundColor: background, series: [] };
   }
+  // The complete source stays editable even when every series is unchecked.
+  // Keep the drawing and stored appearance, while clearing its painted interior.
+  if (
+    chart.seriesFilter !== undefined &&
+    ["column", "bar", "line", "area", "radar"].includes(chart.type) &&
+    data.series.length === 0
+  )
+    return { animation: false, backgroundColor: background, series: [] };
   const layout = createElementLayout(chart, data, dimensions);
   const plotBounds = layout
     ? {

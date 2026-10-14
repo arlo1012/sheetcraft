@@ -5,6 +5,7 @@ import {
 } from "@sheetcraft/core/sheet-drawings";
 import {
   getSheetChartData,
+  getSheetChartSourceData,
   normalizeChartDataCache,
   type ChartData,
 } from "@sheetcraft/core/sheet-charts";
@@ -219,9 +220,12 @@ export function capturePrintChartPass(options: {
         )
       )
         throw new Error("The associated PivotTable source is unavailable.");
+      const raw = clonePrintData(
+        getSheetChartSourceData(sheet, drawing.chart, evaluator, resolveSheet),
+      );
       const derived = getSheetChartData(sheet, drawing.chart, evaluator, resolveSheet);
       if (
-        derived.diagnostics?.some(
+        raw.diagnostics?.some(
           (entry) => entry.code === "broken-reference" || entry.code === "length-mismatch",
         )
       )
@@ -230,9 +234,9 @@ export function capturePrintChartPass(options: {
       let textSize = 0;
       for (const value of [
         drawing.chart.title,
-        ...data.categories,
-        ...data.series.map((entry) => entry.name),
-        ...data.records.flat().filter((value): value is string => typeof value === "string"),
+        ...raw.categories,
+        ...raw.series.map((entry) => entry.name),
+        ...raw.records.flat().filter((value): value is string => typeof value === "string"),
       ]) {
         if (value.length > 4096)
           throw new Error(
@@ -240,11 +244,11 @@ export function capturePrintChartPass(options: {
           );
         textSize += value.length;
       }
-      textSize += countChartDataTableText(drawing.chart, data);
+      textSize += countChartDataTableText(drawing.chart, raw);
       totalText += textSize;
       totalValues +=
-        data.series.reduce((count, entry) => count + entry.values.length, 0) +
-        data.records.reduce((count, row) => count + row.length, 0);
+        raw.series.reduce((count, entry) => count + entry.values.length, 0) +
+        raw.records.reduce((count, row) => count + row.length, 0);
       if (textSize > MAX_CHART_TEXT || totalText > MAX_BATCH_TEXT || totalValues > MAX_BATCH_VALUES)
         throw new Error(
           "Chart print data exceeds its text or value budget. Reduce the chart data before printing.",
@@ -278,7 +282,7 @@ export function capturePrintChartPass(options: {
         bounds,
       });
       entries.push(entry);
-      signatures.set(sourceRoot, JSON.stringify([drawing, data]));
+      signatures.set(sourceRoot, JSON.stringify([drawing, raw, data]));
     } catch (cause) {
       throw new ChartPrintUnavailableError(
         [sourceRoot.id],
@@ -325,10 +329,13 @@ export function capturePrintChartPass(options: {
       try {
         const current = normalizeSheetDrawing(entry.sourceRoot);
         if (current.kind !== "chart") throw new Error("The chart kind changed.");
+        const raw = clonePrintData(
+          getSheetChartSourceData(sheet, current.chart, evaluator, resolveSheet),
+        );
         const data = clonePrintData(
           getSheetChartData(sheet, current.chart, evaluator, resolveSheet),
         );
-        if (JSON.stringify([current, data]) !== signatures.get(entry.sourceRoot))
+        if (JSON.stringify([current, raw, data]) !== signatures.get(entry.sourceRoot))
           throw new Error("The chart data or appearance changed.");
       } catch (cause) {
         throw new ChartPrintUnavailableError(

@@ -651,3 +651,79 @@ test("real print data table paints raw values using the leased font before copy 
     result.dispose();
   }
 });
+
+test("native Canvas print hides series without palette renumbering and retains the source", () => {
+  const workbook = createWorkbook({ id: "filter-print", sheetId: "data" }),
+    sheet = getActiveSheet(workbook);
+  const owner = drawing({
+    legend: true,
+    source: {
+      kind: "series",
+      categories: { kind: "generated" },
+      series: [
+        {
+          id: "hide",
+          colorIndex: 0,
+          name: { kind: "literal", text: "Hidden series" },
+          values: { kind: "literal", values: [10, 20] },
+        },
+        {
+          id: "show",
+          colorIndex: 1,
+          name: { kind: "literal", text: "Visible series" },
+          values: { kind: "literal", values: [70, 80] },
+        },
+      ],
+    },
+    seriesFilter: { hiddenSeriesIds: ["hide"] },
+  });
+  const original = JSON.stringify(owner),
+    source = getSheetChartData(sheet, owner.chart, createSheetEvaluator(sheet));
+  const result = renderChartPrintPresentation(owner, source, options);
+  try {
+    const copied = contexts.get(result.canvas)!.copies[0]!.paints;
+    expect(
+      copied.some((paint) => paint.operation === "text" && paint.text === "Visible series"),
+    ).toBe(true);
+    expect(
+      copied.some((paint) => paint.operation === "text" && paint.text === "Hidden series"),
+    ).toBe(false);
+    expect(copied.some((paint) => paint.operation === "fill" && paint.fill === "#16a34a")).toBe(
+      true,
+    );
+    expect(JSON.stringify(owner)).toBe(original);
+  } finally {
+    result.dispose();
+  }
+});
+
+test("all-hidden native Canvas print clears the complete interior without removing the object", () => {
+  const workbook = createWorkbook({ id: "filter-empty", sheetId: "data" }),
+    sheet = getActiveSheet(workbook);
+  const owner = drawing({
+    source: {
+      kind: "series",
+      categories: { kind: "generated" },
+      series: [
+        {
+          id: "hidden",
+          colorIndex: 0,
+          name: { kind: "literal", text: "Hidden series" },
+          values: { kind: "literal", values: [10, 20] },
+        },
+      ],
+    },
+    seriesFilter: { hiddenSeriesIds: ["hidden"] },
+    format: { valueAxis: { min: 0, max: 100, title: "Stored axis" } },
+  });
+  const source = getSheetChartData(sheet, owner.chart, createSheetEvaluator(sheet));
+  const result = renderChartPrintPresentation(owner, source, options);
+  try {
+    const copied = contexts.get(result.canvas)!.copies[0]!.paints;
+    expect(copied.filter((paint) => paint.operation === "text")).toEqual([]);
+    expect(owner.chart.source!.series).toHaveLength(1);
+    expect(result.canvas.width).toBeGreaterThan(0);
+  } finally {
+    result.dispose();
+  }
+});

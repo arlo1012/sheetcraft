@@ -1,8 +1,11 @@
 import { MAX_SHAPE_GROUP_NODES } from "@sheetcraft/core/shape-group";
 import { normalizeShapeDrawingForest } from "@sheetcraft/core/shape-group-planning";
-import { createChartSourceFromRange } from "@sheetcraft/core/chart-source";
+import { createChartSourceFromRange, normalizeChartSource } from "@sheetcraft/core/chart-source";
 import type { Sheet } from "@sheetcraft/core/workbook";
-import { cloneChartClipboardDrawingData } from "./chart-clipboard-source";
+import {
+  assertChartSourcePromotionIdentity,
+  cloneChartClipboardDrawingData,
+} from "./chart-clipboard-source";
 import { normalizeSheetDrawing, type SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 
 /** Source planning belongs before placement; host preparation cannot silently rewrite it. */
@@ -10,8 +13,8 @@ export function assertChartDrawingPreserved(expected: SheetDrawing, candidate: S
   if (expected.kind !== "chart") return;
   if (
     candidate.kind !== "chart" ||
-    JSON.stringify(normalizeSheetDrawing(expected)) !==
-      JSON.stringify(normalizeSheetDrawing(candidate))
+    JSON.stringify(normalizeSheetDrawing(cloneChartClipboardDrawingData(expected))) !==
+      JSON.stringify(normalizeSheetDrawing(cloneChartClipboardDrawingData(candidate)))
   )
     throw new TypeError(
       "Chart preparation changed captured source, appearance, geometry or identity.",
@@ -20,7 +23,9 @@ export function assertChartDrawingPreserved(expected: SheetDrawing, candidate: S
 
 /** A detached before-preparation snapshot also catches a mutating host or changed sibling. */
 export function captureChartDrawingForest(values: readonly SheetDrawing[]): SheetDrawing[] {
-  return values.filter((value) => value.kind === "chart").map(normalizeSheetDrawing);
+  return values
+    .filter((value) => value.kind === "chart")
+    .map((value) => normalizeSheetDrawing(cloneChartClipboardDrawingData(value)));
 }
 export function assertChartForestPreserved(
   expected: readonly SheetDrawing[],
@@ -85,6 +90,7 @@ export function assertChartClipboardSourcePrepared(
       throw new TypeError("Source planning changed a non-Chart object.");
     return;
   }
+  expected = cloneChartClipboardDrawingData(expected);
   if (sourceSheet !== targetSheet && expected.chart.pivotTableId !== undefined)
     throw new TypeError("A PivotChart source cannot be carried into another worksheet.");
   if (
@@ -101,23 +107,10 @@ export function assertChartClipboardSourcePrepared(
     !["column", "bar", "line", "area", "radar"].includes(expected.chart.type)
   )
     throw new TypeError("Chart source planning cannot promote this legacy source.");
-  const source = createChartSourceFromRange(sourceSheet.id, expected.chart, sourceSheet);
-  const axis = expected.chart.seriesBy === "rows" ? "row" : "column";
-  const header =
-    expected.chart.seriesBy === "rows" ? expected.chart.headerRow : expected.chart.headerColumn;
-  const first = expected.chart.range.start[axis] + Number(header);
-  const transferred = new Set(
-    expected.chart.rectangleSeries?.[expected.chart.seriesBy]
-      .filter((binding) => binding.index >= first)
-      .map((binding) => binding.id) ?? [],
+  const source = normalizeChartSource(
+    createChartSourceFromRange(sourceSheet.id, expected.chart, sourceSheet),
   );
-  if (
-    expected.chart.format?.series?.some(
-      (entry) =>
-        source.series.some((series) => series.id === entry.id) && !transferred.has(entry.id),
-    )
-  )
-    throw new TypeError("Chart source planning cannot activate dormant series styles.");
+  assertChartSourcePromotionIdentity(expected.chart, source);
   const { rectangleSeries: _bindings, ...chart } = expected.chart;
   assertChartDrawingPreserved({ ...expected, chart: { ...chart, range: null, source } }, candidate);
 }

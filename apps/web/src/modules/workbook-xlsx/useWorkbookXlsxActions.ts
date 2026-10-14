@@ -23,6 +23,7 @@ export type XlsxFeedbackKey =
   | "chart.elementExportBlocked"
   | "chart.sourceExportBlocked"
   | "chart.formatExportBlocked"
+  | "chart.seriesFilterExportBlocked"
   | "xlsx.feedback.numericTableTotals"
   | "xlsx.feedback.exported"
   | "xlsx.feedback.failed"
@@ -139,13 +140,30 @@ export function useWorkbookXlsxActions(options: {
     return false;
   }
 
+  function setChartSeriesFilterFailure(report?: XlsxCompatibilityReport): boolean {
+    const locations = report?.issues.flatMap((issue) =>
+      issue.code === "feature-omitted" && issue.severity === "block"
+        ? issue.locations.filter((location) => location.endsWith(".chart.seriesFilter"))
+        : [],
+    );
+    if (!locations?.length) return false;
+    feedback.value = {
+      key: "chart.seriesFilterExportBlocked",
+      error: true,
+      locations: locations.join("; "),
+    };
+    return true;
+  }
   function setChartFormatFailure(report?: XlsxCompatibilityReport): boolean {
     const locations = report?.issues.flatMap((issue) =>
       issue.code === "feature-omitted" && issue.severity === "block"
         ? issue.locations.filter((location) =>
-            [".chart.format", ".chart.presentation", ".chart.stacked"].some((suffix) =>
-              location.endsWith(suffix),
-            ),
+            [
+              ".chart.format",
+              ".chart.presentation",
+              ".chart.stacked",
+              ".chart.rectangleSeries",
+            ].some((suffix) => location.endsWith(suffix)),
           )
         : [],
     );
@@ -192,6 +210,7 @@ export function useWorkbookXlsxActions(options: {
     if (
       error instanceof XlsxWorkerFailure &&
       (setNumericTotalsFailure(error.report) ||
+        setChartSeriesFilterFailure(error.report) ||
         setChartFormatFailure(error.report) ||
         setChartSourceFailure(error.report) ||
         setChartElementFailure(error.report))
@@ -342,6 +361,7 @@ export function useWorkbookXlsxActions(options: {
       if (hasBlockingIssue(response.report)) {
         if (
           !setNumericTotalsFailure(response.report) &&
+          !setChartSeriesFilterFailure(response.report) &&
           !setChartFormatFailure(response.report) &&
           !setChartSourceFailure(response.report) &&
           !setChartElementFailure(response.report)

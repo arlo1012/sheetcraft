@@ -80,7 +80,15 @@ function mountActions(assetStore?: ImageAssetStore, timeoutMs?: number) {
 }
 
 describe("XLSX export image preparation", () => {
-  test.each(["elements", "source", "format", "presentation", "stacked"] as const)(
+  test.each([
+    "elements",
+    "source",
+    "format",
+    "presentation",
+    "stacked",
+    "rectangleSeries",
+    "seriesFilter",
+  ] as const)(
     "new chart %s show blocked feedback before flush, assets, worker or download",
     async (field) => {
       const get = vi.fn(async () => imageAsset()),
@@ -134,16 +142,30 @@ describe("XLSX export image preparation", () => {
         delete drawing.chart.elements;
         drawing.chart.stacked = true;
       }
+      if (field === "rectangleSeries") {
+        delete drawing.chart.elements;
+        drawing.chart.range = { start: { row: 0, column: 0 }, end: { row: 3, column: 2 } };
+        drawing.chart.rectangleSeries = { rows: [], columns: [{ index: 1, id: "range-series-1" }] };
+      }
+      if (field === "seriesFilter") {
+        delete drawing.chart.elements;
+        drawing.chart.seriesFilter = { hiddenSeriesIds: ["retired-filter-id"] };
+      }
       getActiveSheet(f.workbook).drawings = [drawing];
       const before = serializeWorkbook(f.workbook);
       await f.actions.exportXlsx();
       expect(f.actions.feedback.value).toEqual({
         key:
-          field === "format" || field === "presentation" || field === "stacked"
+          field === "format" ||
+          field === "presentation" ||
+          field === "stacked" ||
+          field === "rectangleSeries"
             ? "chart.formatExportBlocked"
-            : field === "source"
-              ? "chart.sourceExportBlocked"
-              : "chart.elementExportBlocked",
+            : field === "seriesFilter"
+              ? "chart.seriesFilterExportBlocked"
+              : field === "source"
+                ? "chart.sourceExportBlocked"
+                : "chart.elementExportBlocked",
         error: true,
         locations: `Sheet1.drawings["chart"].chart.${field}`,
       });

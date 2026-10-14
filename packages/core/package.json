@@ -359,6 +359,10 @@
     "./chart-range-series": {
       "types": "./dist/chart-range-series.d.ts",
       "import": "./dist/chart-range-series.js"
+    },
+    "./chart-series-filter": {
+      "types": "./dist/chart-series-filter.d.ts",
+      "import": "./dist/chart-series-filter.js"
     }
   },
   "scripts": {

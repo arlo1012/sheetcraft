@@ -132,15 +132,20 @@ export function getChartFormatCapabilities(chart: SheetChart, data?: ChartData) 
   };
 }
 
-export function getChartFormatTargets(chart: SheetChart, data: ChartData): ChartFormatTarget[] {
-  const capabilities = getChartFormatCapabilities(chart, data);
+export function getChartFormatTargets(
+  chart: SheetChart,
+  data: ChartData,
+  visibleData: ChartData = data,
+): ChartFormatTarget[] {
+  const capabilities = getChartFormatCapabilities(chart, visibleData);
   const targets: ChartFormatTarget[] = [{ kind: "chart" }];
   if (capabilities.title) targets.push({ kind: "title" });
   if (capabilities.plot) targets.push({ kind: "plot" });
   if (capabilities.categoryAxis) targets.push({ kind: "categoryAxis" });
   if (capabilities.valueAxis) targets.push({ kind: "valueAxis" });
   if (capabilities.secondaryValueAxis) targets.push({ kind: "secondaryValueAxis" });
-  if (capabilities.series)
+  // Hidden definitions remain format targets; painted axes follow only visible data.
+  if (getChartFormatCapabilities(chart, data).series)
     targets.push(
       ...getChartFormatSeries(chart, data).map((entry) => ({
         kind: "series" as const,
