@@ -70,10 +70,14 @@ export function useChartFormatControls(options: {
       return;
     }
     const capturedData = data;
+    const visibleData = getSheetChartData(sheet, drawing.chart, options.getEvaluator(), (sheetId) =>
+      workbook.sheets.get(sheetId),
+    );
     return {
       drawing,
       target,
       data: capturedData,
+      visibleData,
       disabled: !canUseSheetPermission(sheet, "editObjects"),
       isCurrent,
       apply(intent: ChartFormatIntent): boolean {

@@ -130,6 +130,29 @@ function populate(sheet: Sheet) {
   );
 }
 
+test("Combo print capture retains detached physical series bands and dormant routing", () => {
+  const root = chart("combo", {
+    type: "combo",
+    range: { start: { row: 0, column: 0 }, end: { row: 3, column: 1 } },
+    rectangleSeries: { rows: [], columns: [{ index: 1, id: "revenue" }] },
+    format: { series: [{ id: "revenue", drawType: "line", axis: "secondary", markers: false }] },
+  });
+  delete root.chart.source;
+  const f = fixture([root]);
+  populate(f.sheet);
+  const before = JSON.stringify(root),
+    pass = f.capture();
+  expect(pass.entries[0]?.data.series[0]).toMatchObject({
+    id: "revenue",
+    rangeBand: { seriesBy: "columns", index: 1 },
+    values: [10, 0, -2],
+  });
+  expect(Object.isFrozen(pass.entries[0]?.data.series[0]?.rangeBand)).toBe(true);
+  expect(pass.entries[0]?.drawing.chart.format).toEqual(root.chart.format);
+  expect(JSON.stringify(root)).toBe(before);
+  pass.assertCurrent();
+});
+
 function crossSheetFixture() {
   const workbook = createWorkbook({ id: "print", sheetId: "sheet" });
   const sheet = getActiveSheet(workbook);
@@ -224,13 +247,16 @@ describe("validated Chart print capture", () => {
     const pass = f.capture();
     expect(pass.entries[0]!.data).toEqual({
       categories: ["East", "West", "North"],
-      series: [{ name: "Revenue", values: [10, 0, -2] }],
+      series: [
+        { name: "Revenue", values: [10, 0, -2], rangeBand: { seriesBy: "columns", index: 1 } },
+      ],
       records: [
         ["East", 10],
         ["West", 0],
         ["North", -2],
       ],
     });
+    expect(pass.entries[0]!.data.series[0]?.id).toBeUndefined();
     expect(pass.entries[0]!.drawing.chart.range).toEqual(drawing.chart.range);
     expect(pass.entries[0]!.drawing.chart.range).not.toBe(drawing.chart.range);
     expect(pass.entries[0]!.drawing.chart.source).toBeUndefined();

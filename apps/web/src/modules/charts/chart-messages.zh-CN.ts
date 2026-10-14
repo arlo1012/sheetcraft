@@ -51,6 +51,18 @@ export const chartsZhCN = {
   "chart.invalidSource": "请选择当前工作表内有效的数据区域，并确保包含该图表所需的数值列。",
   "chart.column": "柱形图",
   "chart.bar": "条形图",
+  "chart.comboExportBlocked":
+    "柱形图–折线图组合暂不支持导出为 XLSX。仍可使用内部保存、复制和打印。",
+  "chart.combo": "柱形图–折线图组合",
+  "chart.comboRecipe": "簇状柱形图–折线图",
+  "chart.comboLineMarkers": "带数据标记的折线图",
+  "chart.comboSecondaryAxis": "次坐标轴",
+  "chart.comboSeriesType": "{name}的图表类型",
+  "chart.comboSeriesSecondaryAxis": "{name}使用次坐标轴",
+  "chart.comboHint":
+    "为每个系列选择柱形图或折线图。此预设将第一个系列设为柱形图，其余系列设为不带标记的折线图，均使用主坐标轴。",
+  "chart.comboEmpty": "没有系列",
+  "chart.comboUnavailable": "组合设置支持最多 256 个实时工作表系列或自定义系列。",
   "chart.line": "折线图",
   "chart.area": "面积图",
   "chart.pie": "饼图",

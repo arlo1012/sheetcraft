@@ -7,15 +7,22 @@ import type { ChartElementSettings, SheetChart } from "@sheetcraft/core/sheet-ch
 import { useAppI18n } from "../../../shared/i18n";
 import { getChartElementCapabilities, getChartElementSettings } from "../chart-elements";
 import type { ChartElementPatch } from "../chart-element-controls";
+import type { ChartComboSeriesChange } from "@sheetcraft/core/chart-combo";
 
-const props = defineProps<{ chart: SheetChart; disabled: boolean }>();
+const props = defineProps<{
+  chart: SheetChart;
+  disabled: boolean;
+  comboSeriesChanges?: readonly ChartComboSeriesChange[];
+}>();
 const emit = defineEmits<{ patch: [patch: ChartElementPatch] }>();
 const { t } = useAppI18n();
 const root = ref<HTMLElement | null>(null);
 const titleId = `chart-element-title-${useId()}`;
 const titleDraft = ref(props.chart.title);
 const compositionBlocked = ref(false);
-const capabilities = computed(() => getChartElementCapabilities(props.chart.type));
+const capabilities = computed(() =>
+  getChartElementCapabilities(props.chart.type, props.chart, props.comboSeriesChanges),
+);
 const settings = computed(() => getChartElementSettings(props.chart));
 const popupClass = `chart-element-options-${useId().replace(/[^a-zA-Z0-9_-]/g, "_")}`;
 const popupProps = { overlayClassName: ["chart-element-options-popup", popupClass] };

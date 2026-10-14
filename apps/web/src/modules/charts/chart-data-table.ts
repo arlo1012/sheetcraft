@@ -8,6 +8,8 @@ import type {
 import { normalizeChartFormat } from "@sheetcraft/core/chart-format";
 import { formatCellNumberValue } from "@sheetcraft/core/number-format";
 import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
+import type { ChartComboSeriesChange } from "@sheetcraft/core/chart-combo";
+import { getChartComboDataSeriesSettings } from "./chart-format-render";
 import {
   getChartPresentationBackground,
   getChartPresentationTextColor,
@@ -47,6 +49,8 @@ export type ChartDataTablePlan = Readonly<{
   rows: readonly Readonly<{
     seriesIndex: number;
     id?: string;
+    key: "column" | "line" | "markerLine";
+    strokeWidth: number;
     label: TableText;
     cells: readonly Readonly<{ value: number | null; label: TableText }>[];
   }>[];
@@ -124,7 +128,7 @@ export function countChartDataTableText(chart: SheetChart, data: ChartData): num
   if (
     !chart.elements?.dataTable ||
     chart.elements.dataTable === "none" ||
-    !["column", "line", "area"].includes(chart.type) ||
+    !["column", "line", "area", "combo"].includes(chart.type) ||
     !data.categories.length ||
     !data.series.length
   )
@@ -168,12 +172,13 @@ export function createChartDataTablePlan(
   chart: SheetChart,
   data: ChartData,
   dimensions: Dimensions,
+  comboSeriesChanges?: readonly ChartComboSeriesChange[],
 ): ChartDataTablePlan | undefined {
   const mode = chart.elements?.dataTable;
   if (mode === undefined || mode === "none") return undefined;
   if (mode !== "withLegendKeys" && mode !== "withoutLegendKeys")
     unavailable("has an unsupported setting.");
-  if (!["column", "line", "area"].includes(chart.type)) return undefined;
+  if (!["column", "line", "area", "combo"].includes(chart.type)) return undefined;
   if (
     data.diagnostics?.some(
       (entry) => entry.code === "broken-reference" || entry.code === "length-mismatch",
@@ -229,9 +234,32 @@ export function createChartDataTablePlan(
     }));
     const rows = data.series.map((series, seriesIndex) => {
       if (series.values.length !== categories.length) unavailable("source has mismatched lengths.");
+      const settings =
+        series.id === undefined
+          ? undefined
+          : format?.series?.find((entry) => entry.id === series.id);
+      const combo =
+        chart.type === "combo"
+          ? getChartComboDataSeriesSettings(chart, series, comboSeriesChanges)
+          : undefined;
+      const key: "column" | "line" | "markerLine" = combo
+        ? combo.drawType === "column"
+          ? "column"
+          : combo.markers
+            ? "markerLine"
+            : "line"
+        : chart.type === "column"
+          ? "column"
+          : (settings?.markers ??
+              (chart.type === "line" ? chart.presentation?.lineMarkers : undefined) ??
+              true)
+            ? "markerLine"
+            : "line";
       return {
         seriesIndex,
         ...(series.id !== undefined ? { id: series.id } : {}),
+        key,
+        strokeWidth: settings?.strokeWidth ?? 2,
         label: text(series.name),
         cells: series.values.map((value) => {
           if (value === null) return { value, label: text("", true) };
@@ -266,7 +294,9 @@ export function createChartDataTablePlan(
       categories.length +
       rows.length +
       categories.length * rows.length +
-      (mode === "withLegendKeys" ? rows.length : 0);
+      (mode === "withLegendKeys"
+        ? rows.reduce((count, row) => count + (row.key === "markerLine" ? 2 : 1), 0)
+        : 0);
     if (primitiveUpperBound > limit.primitives) unavailable("exceeds the 1024-primitive budget.");
     if (
       tableHeight > height * 0.4 ||
@@ -602,12 +632,28 @@ export function applyChartDataTableGraphics(
       const y = top + (rowIndex + 1.5) * plan.rowHeight;
       const keyWidth = plan.mode === "withLegendKeys" ? 16 : 0;
       if (keyWidth)
-        children.push({
-          type: "rect",
-          silent: true,
-          shape: { x: tableLeft + PAD, y: y - 5, width: 10, height: 10 },
-          style: { fill: paints[rowIndex] },
-        });
+        if (row.key === "column")
+          children.push({
+            type: "rect",
+            silent: true,
+            shape: { x: tableLeft + PAD, y: y - 5, width: 10, height: 10 },
+            style: { fill: paints[rowIndex] },
+          });
+        else {
+          children.push({
+            type: "line",
+            silent: true,
+            shape: { x1: tableLeft + PAD, y1: y, x2: tableLeft + PAD + 10, y2: y },
+            style: { stroke: paints[rowIndex], lineWidth: row.strokeWidth },
+          });
+          if (row.key === "markerLine")
+            children.push({
+              type: "circle",
+              silent: true,
+              shape: { cx: tableLeft + PAD + 5, cy: y, r: 3 },
+              style: { fill: paints[rowIndex] },
+            });
+        }
       run(row.label, tableLeft + PAD + keyWidth, y, plan.labelGutter - PAD * 2 - keyWidth, "left");
       display.forEach((category, index) =>
         run(

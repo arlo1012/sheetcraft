@@ -15,6 +15,11 @@ import type { CellNumberFormat } from "@sheetcraft/core/style";
 import type { ChartData, ChartSeries, SheetChart } from "@sheetcraft/core/sheet-charts";
 import type { ChartPresentationSettings } from "@sheetcraft/core/chart-presentation";
 import {
+  resolveChartComboSeriesSettings,
+  type ChartComboSeriesChange,
+  type ChartComboSeriesSettings,
+} from "@sheetcraft/core/chart-combo";
+import {
   chartPercentAxisDomain,
   chartPercentAxisSettings,
   getChartPresentationTextColor,
@@ -31,6 +36,22 @@ type ChartAxisIntervals = {
   minorDivisions?: number;
 };
 const MAX_AXIS_TICKS = 2048;
+
+/** Range bands remain physical preview identities; saved ID formats are resolved by Core. */
+export function getChartComboDataSeriesSettings(
+  chart: SheetChart,
+  series: ChartSeries,
+  changes?: readonly ChartComboSeriesChange[],
+): ChartComboSeriesSettings {
+  const target = series.rangeBand
+    ? { rangeBand: series.rangeBand }
+    : series.id !== undefined
+      ? { seriesId: series.id }
+      : undefined;
+  return target
+    ? resolveChartComboSeriesSettings(chart, target, changes)
+    : { drawType: "column", axis: "primary", markers: false };
+}
 
 function textStyle(format?: ChartTextFormat) {
   return {
@@ -370,14 +391,16 @@ export function applyChartCommonFormat(
   option: EChartsOption,
   chart: SheetChart,
   data: ChartData,
+  comboSeriesChanges?: readonly ChartComboSeriesChange[],
 ): EChartsOption {
   const presentation = getChartRenderPresentation(chart);
   const percent = presentation?.percentStacked === true;
   option = presentationText(option, presentation, getChartPresentationTextColor(chart));
   const field = Object.getOwnPropertyDescriptor(chart, "format");
-  if (!field) return option;
-  if (!("value" in field)) throw new TypeError("Chart format requires an own data field.");
-  const format = normalizeChartFormat(field.value);
+  const combo = chart.type === "combo";
+  if (!field && !combo) return option;
+  if (field && !("value" in field)) throw new TypeError("Chart format requires an own data field.");
+  const format = field ? normalizeChartFormat(field.value) : {};
   const next: EChartsOption = { ...option };
   if (format.title && option.title && !Array.isArray(option.title))
     next.title = {
@@ -386,11 +409,13 @@ export function applyChartCommonFormat(
     };
   const bars = chart.type === "bar" || chart.type === "column";
   const lines = chart.type === "line" || chart.type === "area";
-  const cartesian = bars || lines || chart.type === "scatter";
+  const cartesian = bars || lines || combo || chart.type === "scatter";
   const selectedFormat = (entry: ChartSeries | undefined) =>
     entry?.id !== undefined ? format.series?.find((item) => item.id === entry.id) : undefined;
   const secondary = (entry: ChartSeries) =>
-    (bars || lines) && selectedFormat(entry)?.axis === "secondary";
+    combo
+      ? getChartComboDataSeriesSettings(chart, entry, comboSeriesChanges).axis === "secondary"
+      : (bars || lines) && selectedFormat(entry)?.axis === "secondary";
   if (cartesian && format.plot && option.grid && !Array.isArray(option.grid))
     next.grid = {
       ...option.grid,
@@ -437,6 +462,12 @@ export function applyChartCommonFormat(
   const primary = valueSeries.filter((entry) => !secondary(entry));
   const secondaryEntries = data.series.filter(secondary);
   const hasSecondary = secondaryEntries.length > 0;
+  const secondaryColumns =
+    combo &&
+    secondaryEntries.some(
+      (entry) =>
+        getChartComboDataSeriesSettings(chart, entry, comboSeriesChanges).drawType === "column",
+    );
   const isStacked = chart.stacked && (bars || lines);
   const mainBase = horizontal ? x : y;
   if (mainBase.type !== "value")
@@ -500,7 +531,10 @@ export function applyChartCommonFormat(
     next.yAxis = hasSecondary && bars ? [category, { ...category, show: false }] : category;
   } else {
     next.yAxis = otherAxis ? [mainAxis, otherAxis] : mainAxis;
-    next.xAxis = hasSecondary && bars ? [category, { ...category, show: false }] : category;
+    next.xAxis =
+      (hasSecondary && bars) || secondaryColumns
+        ? [category, { ...category, show: false }]
+        : category;
   }
   if (Array.isArray(option.series))
     next.series = option.series.map((series, index): SeriesOption => {
@@ -512,7 +546,10 @@ export function applyChartCommonFormat(
       const common = {
         ...(horizontal
           ? { xAxisIndex: axisIndex, yAxisIndex: bars ? axisIndex : 0 }
-          : { yAxisIndex: axisIndex, xAxisIndex: bars ? axisIndex : 0 }),
+          : {
+              yAxisIndex: axisIndex,
+              xAxisIndex: bars || (combo && series.type === "bar") ? axisIndex : 0,
+            }),
         ...(isStacked ? { stack: isSecondary ? "secondary-total" : "primary-total" } : {}),
         ...(settings?.color ? { itemStyle: { ...series.itemStyle, color: settings.color } } : {}),
         ...(hasSecondary ? { z: isSecondary ? 3 : 2 } : {}),
@@ -527,8 +564,12 @@ export function applyChartCommonFormat(
             ...(settings?.color ? { color: settings.color } : {}),
             ...(settings?.strokeWidth !== undefined ? { width: settings.strokeWidth } : {}),
           },
-          ...(settings?.smooth !== undefined ? { smooth: settings.smooth } : {}),
-          ...(settings?.markers !== undefined
+          ...(combo
+            ? { smooth: false }
+            : settings?.smooth !== undefined
+              ? { smooth: settings.smooth }
+              : {}),
+          ...(!combo && settings?.markers !== undefined
             ? { showSymbol: settings.markers, symbol: settings.markers ? "circle" : "none" }
             : {}),
           ...(chart.type === "area" && settings?.color
@@ -541,7 +582,14 @@ export function applyChartCommonFormat(
         type: "bar",
         ...(format.bar
           ? chartBarGapRatios(
-              isStacked ? 1 : (isSecondary ? secondaryEntries : primary).length,
+              isStacked
+                ? 1
+                : (isSecondary ? secondaryEntries : primary).filter(
+                    (entry) =>
+                      !combo ||
+                      getChartComboDataSeriesSettings(chart, entry, comboSeriesChanges).drawType ===
+                        "column",
+                  ).length,
               format.bar.gapWidth,
               format.bar.overlap,
             )

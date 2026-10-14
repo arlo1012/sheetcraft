@@ -4,6 +4,10 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { Select } from "tdesign-vue-next/es/select";
 import { createChartSourceFromRange } from "@sheetcraft/core/chart-source";
 import {
+  resolveChartComboSeriesSettings,
+  type ChartComboSeriesChange,
+} from "@sheetcraft/core/chart-combo";
+import {
   createSetCellContentCommand,
   createSetSheetDrawingsCommand,
   createSetSheetProtectionCommand,
@@ -65,7 +69,7 @@ vi.mock("../../../app/composables/useSpreadsheetWorkspaceController", async (imp
 // probe captures the exact live source resolver/evaluator delivered by Workspace.
 const ChartContentProbe = defineComponent({
   name: "ChartContent",
-  props: ["drawing", "sheet", "evaluator", "revision", "resolveSheet"],
+  props: ["drawing", "sheet", "evaluator", "revision", "resolveSheet", "comboSeriesChanges"],
   setup: () => () => h("div", { "data-chart-content-probe": "" }),
 });
 const mounted: VueWrapper[] = [];
@@ -999,5 +1003,183 @@ describe("new Add filter lineage through Workspace", () => {
     expect(f.controller.session.history.redoStack).toEqual(redo);
     expect(f.controller.redo()).toBe(true);
     expect(chart(f.sheet).chart.title).toBe("Redo title");
+  });
+});
+
+async function openComboEditor(wrapper: VueWrapper) {
+  await selectChart(wrapper);
+  const trigger = wrapper
+    .getComponent(ChartElementsToolbar)
+    .get('[aria-label="Change chart type"]');
+  await trigger.trigger("pointerdown");
+  await trigger.trigger("click");
+  await flushPromises();
+  return wrapper.getComponent(ChartEditorDialog);
+}
+async function chooseComboOption(root: Pick<VueWrapper, "get">, selector: string, label: string) {
+  const optionSelector =
+    selector === "[data-chart-editor-type]"
+      ? ".chart-editor-options-popup .t-select-option"
+      : ".t-select-option";
+  await root
+    .get(selector)
+    .get(".t-input__inner")
+    .trigger("keydown", { key: "ArrowDown", code: "ArrowDown" });
+  await expect
+    .poll(() =>
+      new DOMWrapper(document.body).findAll(optionSelector).some((entry) => entry.text() === label),
+    )
+    .toBe(true);
+  const option = new DOMWrapper(document.body)
+    .findAll(optionSelector)
+    .find((entry) => entry.text() === label)!;
+  await option.trigger("pointerdown");
+  await option.trigger("click");
+  await flushPromises();
+}
+
+describe("bounded Combo through real Workspace initialization and native controls", () => {
+  test("Combo recipe then final Pie commits without hidden Combo edits or promoting the range", async () => {
+    const f = await fixture(),
+      before = serializeWorkbook(f.workbook),
+      editor = await openComboEditor(f.wrapper);
+    await chooseComboOption(editor, "[data-chart-editor-type]", "Column–Line Combo");
+    await chooseComboOption(editor, "[data-chart-editor-type]", "Pie");
+    await footer("editor", "OK");
+    expect(f.wrapper.findComponent(ChartEditorDialog).exists()).toBe(false);
+    const saved = chart(f.sheet).chart;
+    expect(saved.type).toBe("pie");
+    expect(saved.source).toBeUndefined();
+    expect(saved.range).toEqual(drawing().chart.range);
+    expect(saved.format?.series?.some((entry) => entry.drawType === "line")).not.toBe(true);
+    expect(saved.rectangleSeries).toBeUndefined();
+    expect(f.controller.session.history.undoStack).toHaveLength(1);
+    expect(f.controller.undo()).toBe(true);
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+  });
+  test("a final stacked markerless Line variant does not acquire hidden Combo marker choices", async () => {
+    const f = await fixture(),
+      editor = await openComboEditor(f.wrapper);
+    await chooseComboOption(editor, "[data-chart-editor-type]", "Column–Line Combo");
+    await chooseComboOption(
+      editor,
+      '[data-chart-combo-type="band:columns:2"]',
+      "Line with Markers",
+    );
+    await chooseComboOption(editor, "[data-chart-editor-type]", "Line");
+    await editor.get('[data-chart-variant="percentStacked"]').trigger("click");
+    await footer("editor", "OK");
+    expect(f.wrapper.findComponent(ChartEditorDialog).exists()).toBe(false);
+    expect(chart(f.sheet).chart).toMatchObject({
+      type: "line",
+      stacked: true,
+      presentation: { percentStacked: true, lineMarkers: false },
+    });
+    expect(chart(f.sheet).chart.source).toBeUndefined();
+    expect(chart(f.sheet).chart.rectangleSeries).toBeUndefined();
+    expect(f.controller.session.history.undoStack).toHaveLength(1);
+  });
+  test("native Combo recipe previews without identity/source/history writes and Cancel keeps exact workbook", async () => {
+    const f = await fixture(),
+      before = serializeWorkbook(f.workbook),
+      editor = await openComboEditor(f.wrapper);
+    await chooseComboOption(editor, "[data-chart-editor-type]", "Column–Line Combo");
+    const probe = editor.getComponent(ChartContentProbe),
+      preview = probe.props("drawing") as SheetChartDrawing;
+    expect(preview.chart.type).toBe("combo");
+    expect(preview.chart.source).toBeUndefined();
+    expect(preview.chart.rectangleSeries).toBeUndefined();
+    expect(probe.props("comboSeriesChanges")).toEqual([
+      {
+        rangeBand: { seriesBy: "columns", index: 1 },
+        drawType: "column",
+        axis: "primary",
+        markers: false,
+      },
+      {
+        rangeBand: { seriesBy: "columns", index: 2 },
+        drawType: "line",
+        axis: "primary",
+        markers: false,
+      },
+    ]);
+    expect(f.wrapper.getComponent(SheetDrawingLayer).props("selectedDrawingId")).toBe("chart-one");
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    expect(f.controller.session.history.undoStack).toHaveLength(0);
+    await footer("editor", "Cancel");
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+  });
+  test("OK/reopen marker and secondary Cancel/OK use exact owner and one Undo per edit", async () => {
+    const f = await fixture(),
+      before = serializeWorkbook(f.workbook),
+      sibling = before.sheets
+        .find((sheet) => sheet.id === "source")!
+        .drawings!.find((drawing) => drawing.id === "chart-two")!;
+    let editor = await openComboEditor(f.wrapper);
+    await chooseComboOption(editor, "[data-chart-editor-type]", "Column–Line Combo");
+    await footer("editor", "OK");
+    expect(chart(f.sheet).chart.type).toBe("combo");
+    expect(chart(f.sheet).chart.source).toBeUndefined();
+    const first = serializeWorkbook(f.workbook);
+    expect(f.controller.session.history.undoStack).toHaveLength(1);
+    editor = await openComboEditor(f.wrapper);
+    await chooseComboOption(
+      editor,
+      '[data-chart-combo-type="band:columns:2"]',
+      "Line with Markers",
+    );
+    editor
+      .get<HTMLInputElement>('[data-chart-combo-secondary="band:columns:2"] input[type=checkbox]')
+      .element.click();
+    await flushPromises();
+    expect(serializeWorkbook(f.workbook)).toEqual(first);
+    await footer("editor", "Cancel");
+    expect(serializeWorkbook(f.workbook)).toEqual(first);
+    editor = await openComboEditor(f.wrapper);
+    await chooseComboOption(
+      editor,
+      '[data-chart-combo-type="band:columns:2"]',
+      "Line with Markers",
+    );
+    editor
+      .get<HTMLInputElement>('[data-chart-combo-secondary="band:columns:2"] input[type=checkbox]')
+      .element.click();
+    await flushPromises();
+    await footer("editor", "OK");
+    const final = serializeWorkbook(f.workbook);
+    expect(
+      resolveChartComboSeriesSettings(chart(f.sheet).chart, {
+        rangeBand: { seriesBy: "columns", index: 2 },
+      }),
+    ).toEqual({ drawType: "line", axis: "secondary", markers: true });
+    expect(chart(f.sheet, "chart-two")).toEqual(sibling);
+    expect(f.controller.session.history.undoStack).toHaveLength(2);
+    expect(f.controller.undo()).toBe(true);
+    expect(serializeWorkbook(f.workbook)).toEqual(first);
+    expect(f.controller.undo()).toBe(true);
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    expect(f.controller.redo()).toBe(true);
+    expect(f.controller.redo()).toBe(true);
+    expect(serializeWorkbook(f.workbook)).toEqual(final);
+  });
+  test("a hidden first raw source remains recipe column; visible next series is plain line", async () => {
+    const source = createChartSourceFromRange("source", drawing().chart);
+    const hidden = source.series[0]!.id;
+    const f = await fixture({ source, seriesFilter: { hiddenSeriesIds: [hidden] } }),
+      editor = await openComboEditor(f.wrapper);
+    await chooseComboOption(editor, "[data-chart-editor-type]", "Column–Line Combo");
+    const choices = editor
+      .getComponent(ChartContentProbe)
+      .props("comboSeriesChanges") as ChartComboSeriesChange[];
+    expect(choices).toMatchObject([
+      { seriesId: hidden, drawType: "column" },
+      { seriesId: source.series[1]!.id, drawType: "line", markers: false },
+    ]);
+    await footer("editor", "OK");
+    expect(chart(f.sheet).chart.source).toEqual(source);
+    expect(chart(f.sheet).chart.seriesFilter).toEqual({ hiddenSeriesIds: [hidden] });
+    expect(renderData(ownerProbe(f.wrapper)).series.map((entry) => entry.id)).toEqual([
+      source.series[1]!.id,
+    ]);
   });
 });

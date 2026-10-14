@@ -104,7 +104,7 @@ export function assertChartClipboardSourcePrepared(
   }
   if (
     expected.chart.pivotTableId ||
-    !["column", "bar", "line", "area", "radar"].includes(expected.chart.type)
+    !["column", "bar", "line", "area", "radar", "combo"].includes(expected.chart.type)
   )
     throw new TypeError("Chart source planning cannot promote this legacy source.");
   const source = normalizeChartSource(

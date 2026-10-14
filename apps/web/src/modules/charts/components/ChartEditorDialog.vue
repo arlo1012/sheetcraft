@@ -1,11 +1,20 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { Button } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Select } from "tdesign-vue-next/es/select";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
-import { normalizeSheetChart, type ChartType } from "@sheetcraft/core/sheet-charts";
+import {
+  normalizeSheetChart,
+  getSheetChartSourceData,
+  type ChartType,
+} from "@sheetcraft/core/sheet-charts";
+import {
+  normalizeChartComboSeriesChanges,
+  type ChartComboSeriesChange,
+  type ChartComboSeriesTarget,
+} from "@sheetcraft/core/chart-combo";
 import { reconcileChartRangeSeriesForRange } from "@sheetcraft/core/chart-range-series";
 import type { Sheet, SheetEvaluator, Workbook } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
@@ -17,6 +26,7 @@ import {
 import ChartContent from "./ChartContent.vue";
 import ChartElementsControls from "./ChartElementsControls.vue";
 import ChartSubtypeControls from "./ChartSubtypeControls.vue";
+import ChartComboControls from "./ChartComboControls.vue";
 import ChartStyleGallery from "./ChartStyleGallery.vue";
 import {
   applyChartDesignIntent,
@@ -36,11 +46,12 @@ const props = defineProps<{
   disabled: boolean;
   error: boolean;
   suspended: boolean;
+  comboRecipe?: boolean;
   selectReference: (current: string) => Promise<string | undefined>;
 }>();
 const emit = defineEmits<{
   editPivot: [id: string];
-  confirm: [drawing: SheetChartDrawing, source: string];
+  confirm: [drawing: SheetChartDrawing, source: string, comboChanges?: ChartComboSeriesChange[]];
   close: [];
 }>();
 const { t } = useAppI18n();
@@ -48,6 +59,12 @@ const draft = ref<SheetChartDrawing>({
   ...props.drawing,
   chart: normalizeSheetChart(props.drawing.chart),
 });
+const comboChanges = ref<ChartComboSeriesChange[]>([]);
+const initialComboRecipePending = ref(props.comboRecipe === true);
+const comboInitialized = ref(
+  (props.drawing.chart.type === "combo" && !props.comboRecipe) ||
+    !!props.drawing.chart.format?.series?.some((series) => series.drawType !== undefined),
+);
 const elementsControls = ref<InstanceType<typeof ChartElementsControls>>();
 function patchElements(patch: ChartElementPatch): void {
   if (props.disabled) return;
@@ -87,7 +104,8 @@ function changeType(value: unknown): void {
     props.disabled ||
     typeof value !== "string" ||
     !types.includes(value as ChartType) ||
-    elementsControls.value?.blockComposition()
+    elementsControls.value?.blockComposition() ||
+    (value === "combo" && !!(draft.value.chart.pivotTableId || draft.value.chart.dataCache))
   )
     return;
   const type = value as ChartType;
@@ -100,7 +118,12 @@ function changeType(value: unknown): void {
     const next = changeChartType(draft.value.chart, type);
     const title = elementsControls.value?.pendingTitle();
     if (title !== undefined) next.title = title;
+    const previousType = draft.value.chart.type;
     draft.value.chart = normalizeSheetChart(next);
+    if (type === "combo" && previousType !== "combo" && !comboInitialized.value) {
+      initialComboRecipePending.value = true;
+      applyComboRecipe();
+    }
     designFailed.value = false;
   } catch {
     designFailed.value = true;
@@ -109,7 +132,14 @@ function changeType(value: unknown): void {
 function confirm(): void {
   if (props.disabled) return;
   if (elementsControls.value?.commitTitle() === false) return;
-  emit("confirm", draft.value, source.value);
+  emit(
+    "confirm",
+    draft.value,
+    source.value,
+    draft.value.chart.type === "combo" && activeComboChanges.value.length
+      ? normalizeChartComboSeriesChanges(activeComboChanges.value)
+      : undefined,
+  );
 }
 const source = ref(
   props.drawing.chart.range
@@ -134,10 +164,98 @@ const previewDrawing = computed(() => {
     ),
   };
 });
+// Combo controls always read every physical/defined series, including hidden ones.
+// Conversion here is detached and never plans identities or rewrites the source.
+const comboSeries = computed(() => {
+  void props.revision;
+  try {
+    const chart = previewDrawing.value.chart;
+    if (chart.pivotTableId || chart.dataCache) return [];
+    return getSheetChartSourceData(
+      props.sheet,
+      { ...changeChartType(chart, "combo"), showHidden: true },
+      props.evaluator,
+      (sheetId) => props.workbook.sheets.get(sheetId),
+    ).series;
+  } catch {
+    return [];
+  }
+});
+function comboTargetKey(target: ChartComboSeriesTarget): string {
+  return "rangeBand" in target
+    ? `band:${target.rangeBand.seriesBy}:${target.rangeBand.index}`
+    : `id:${target.seriesId}`;
+}
+const comboTargets = computed<ChartComboSeriesTarget[]>(() =>
+  comboSeries.value.flatMap<ChartComboSeriesTarget>((series) =>
+    series.rangeBand
+      ? [{ rangeBand: { ...series.rangeBand } }]
+      : series.id
+        ? [{ seriesId: series.id }]
+        : [],
+  ),
+);
+const comboAvailable = computed(
+  () =>
+    !draft.value.chart.pivotTableId &&
+    !draft.value.chart.dataCache &&
+    comboSeries.value.length <= 256 &&
+    comboTargets.value.length === comboSeries.value.length,
+);
+const activeComboChanges = computed(() => {
+  const keys = new Set(comboTargets.value.map(comboTargetKey));
+  return comboChanges.value.filter((change) => keys.has(comboTargetKey(change)));
+});
+function patchCombo(change: ChartComboSeriesChange): void {
+  if (props.disabled || elementsControls.value?.blockComposition() || !comboAvailable.value) return;
+  try {
+    const key = comboTargetKey(change);
+    if (!comboTargets.value.some((target) => comboTargetKey(target) === key)) return;
+    const next = normalizeChartComboSeriesChanges([
+      ...activeComboChanges.value.filter((entry) => comboTargetKey(entry) !== key),
+      change,
+    ]);
+    comboChanges.value = next;
+    comboInitialized.value = true;
+    initialComboRecipePending.value = false;
+    designFailed.value = false;
+  } catch {
+    designFailed.value = true;
+  }
+}
+function applyComboRecipe(): boolean {
+  if (
+    props.disabled ||
+    elementsControls.value?.blockComposition() ||
+    !comboAvailable.value ||
+    comboTargets.value.length < 2
+  )
+    return false;
+  comboChanges.value = normalizeChartComboSeriesChanges(
+    comboTargets.value.map((target, index) => ({
+      ...target,
+      drawType: index === 0 ? "column" : "line",
+      axis: "primary",
+      markers: false,
+    })),
+  );
+  comboInitialized.value = true;
+  initialComboRecipePending.value = false;
+  designFailed.value = false;
+  return true;
+}
+watch(
+  comboTargets,
+  () => {
+    if (initialComboRecipePending.value && draft.value.chart.type === "combo") applyComboRecipe();
+  },
+  { immediate: true },
+);
 const types: ChartType[] = [
   "column",
   "bar",
   "line",
+  "combo",
   "area",
   "pie",
   "doughnut",
@@ -153,8 +271,9 @@ const options = computed(() =>
     label: t(`chart.${type}`),
     value: type,
     disabled:
-      !!draft.value.chart.source &&
-      getChartSourceApplicability({ ...draft.value.chart, type }) !== "editable",
+      (type === "combo" && !!(draft.value.chart.pivotTableId || draft.value.chart.dataCache)) ||
+      (!!draft.value.chart.source &&
+        getChartSourceApplicability({ ...draft.value.chart, type }) !== "editable"),
   })),
 );
 </script>
@@ -202,6 +321,7 @@ const options = computed(() =>
       <div class="chart-editor__field">
         <span>{{ t("chart.type") }}</span>
         <Select
+          data-chart-editor-type
           :value="draft.chart.type"
           @change="changeType"
           :options="options"
@@ -217,6 +337,18 @@ const options = computed(() =>
         :disabled="disabled"
         :apply="applyDesign"
       />
+      <ChartComboControls
+        v-if="draft.chart.type === 'combo' && comboAvailable"
+        :chart="previewDrawing.chart"
+        :series="comboSeries"
+        :changes="activeComboChanges"
+        :disabled="disabled"
+        @change="patchCombo"
+        @recipe="applyComboRecipe"
+      />
+      <p v-else-if="draft.chart.type === 'combo'" class="chart-editor__hint">
+        {{ t("chart.comboUnavailable") }}
+      </p>
       <ChartStyleGallery :chart="draft.chart" :disabled="disabled" :apply="applyDesign" />
       <p v-if="designFailed" class="chart-editor__error" role="alert">
         {{ t("chart.designApplyFailed") }}
@@ -266,6 +398,7 @@ const options = computed(() =>
       <ChartElementsControls
         ref="elementsControls"
         :chart="draft.chart"
+        :combo-series-changes="activeComboChanges"
         :disabled="disabled"
         @patch="patchElements"
       />
@@ -286,6 +419,7 @@ const options = computed(() =>
       <div class="chart-editor__preview">
         <ChartContent
           :drawing="previewDrawing"
+          :combo-series-changes="activeComboChanges"
           :sheet="sheet"
           :evaluator="evaluator"
           :revision="revision"

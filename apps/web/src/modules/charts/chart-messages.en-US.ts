@@ -58,6 +58,19 @@ export const chartsEnUS = {
     "Select a valid source range on this sheet containing the numeric columns required by the chart.",
   "chart.column": "Column",
   "chart.bar": "Bar",
+  "chart.comboExportBlocked":
+    "Column–Line Combo cannot currently be exported to XLSX. Internal save, copy and print remain available.",
+  "chart.combo": "Column–Line Combo",
+  "chart.comboRecipe": "Clustered Column – Line",
+  "chart.comboLineMarkers": "Line with Markers",
+  "chart.comboSecondaryAxis": "Secondary Axis",
+  "chart.comboSeriesType": "Chart type for {name}",
+  "chart.comboSeriesSecondaryAxis": "Secondary axis for {name}",
+  "chart.comboHint":
+    "Choose a column or line type for each series. The recipe uses the first series as columns and all remaining series as plain lines on the primary axis.",
+  "chart.comboEmpty": "No series",
+  "chart.comboUnavailable":
+    "Combination settings are available for up to 256 live worksheet or custom series.",
   "chart.line": "Line",
   "chart.area": "Area",
   "chart.pie": "Pie",

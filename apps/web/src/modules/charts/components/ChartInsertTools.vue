@@ -221,6 +221,9 @@ function insert(type: ChartType) {
         :style="floatingStyles"
         :label="t('chart.more')"
       >
+        <MenuItem data-chart-combo-recipe @select="insert('combo')">{{
+          t("chart.combo")
+        }}</MenuItem>
         <MenuItem @select="insert('doughnut')">{{ t("chart.doughnut") }}</MenuItem
         ><MenuItem @select="insert('radar')">{{ t("chart.radar") }}</MenuItem>
         <MenuItem @select="insert('treemap')">{{ t("chart.treemap") }}</MenuItem

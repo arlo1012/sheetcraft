@@ -14,7 +14,11 @@ const { t } = useAppI18n();
 const failed = ref(false);
 let active = true;
 const supported = computed(
-  () => props.chart.type === "column" || props.chart.type === "line" || props.chart.type === "area",
+  () =>
+    props.chart.type === "column" ||
+    props.chart.type === "line" ||
+    props.chart.type === "area" ||
+    props.chart.type === "combo",
 );
 const selected = computed(() => props.chart.elements?.dataTable ?? "none");
 watch(

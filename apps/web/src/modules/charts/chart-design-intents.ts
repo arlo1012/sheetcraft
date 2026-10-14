@@ -41,6 +41,7 @@ const chartTypes: readonly (ChartType | "dashboard")[] = [
   "column",
   "bar",
   "line",
+  "combo",
   "area",
   "pie",
   "doughnut",
@@ -118,6 +119,7 @@ export function changeChartType(chart: SheetChart, type: ChartType): SheetChart 
   if (!chartTypes.includes(type)) throw new RangeError("Unknown chart type.");
   const next = normalizeSheetChart(chart);
   next.type = type;
+  if (type === "combo") next.stacked = false;
   if (next.presentation) {
     if (!isCommonChartType(type)) delete next.presentation.percentStacked;
     if (type !== "line") delete next.presentation.lineMarkers;

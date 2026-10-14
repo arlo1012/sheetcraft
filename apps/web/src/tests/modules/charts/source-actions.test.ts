@@ -836,3 +836,34 @@ test("captured explicit-empty filter exact no-op consumes no history or command"
   expect(f.session.history.undoStack).toHaveLength(0);
   expect(serializeWorkbook(f.workbook.value)).toEqual(before);
 });
+
+describe("source commit final presentation and captured definition", () => {
+  test("actual axis tick budget rejects new values before command even without a data table", () => {
+    const f = fixture();
+    f.first.chart.format = { valueAxis: { majorUnit: 1 } };
+    const before = serializeWorkbook(f.workbook.value),
+      owner = f.open(),
+      draft = f.candidate();
+    draft.chart.source.series[0]!.values = { kind: "literal", values: [1, 10000, 20000] };
+    expect(owner.commit(draft)).toBe(false);
+    expect(f.actions.dialog.value).toBe(owner);
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(f.session.history.undoStack).toHaveLength(0);
+    expect(serializeWorkbook(f.workbook.value)).toEqual(before);
+  });
+  test("flush changing the same chart definition cannot overwrite the newer owner", () => {
+    const f = fixture(),
+      owner = f.open(),
+      draft = f.candidate();
+    draft.chart.source.series.reverse();
+    f.flush.mockImplementation(() => {
+      f.current().chart.title = "Newer chart title";
+      return true;
+    });
+    expect(owner.commit(draft)).toBe(false);
+    expect(f.current().chart.title).toBe("Newer chart title");
+    expect(f.current().chart.source).toBeUndefined();
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(f.session.history.undoStack).toHaveLength(0);
+  });
+});

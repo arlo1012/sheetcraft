@@ -22,6 +22,7 @@ import {
 } from "./chart-source-editor";
 import { preflightChartDataTable } from "./chart-data-table-preflight";
 import { countChartDataTableText } from "./chart-data-table";
+import { createChartOption } from "./chart-option";
 
 type SourceOwner = {
   dialogId: number;
@@ -29,6 +30,7 @@ type SourceOwner = {
   generation: number;
   sheet: Sheet;
   initial: SheetChartDrawing;
+  initialChartFingerprint: string;
   picking: boolean;
   isCurrent: () => boolean;
   commit: (drawing: SheetChartDrawing, proof?: ChartSourceVisibilityProof) => boolean;
@@ -57,6 +59,16 @@ export function useChartSourceActions(options: {
   let applying = false;
   let preparing = false;
 
+  function matchesCapturedChart(target: SourceOwner): boolean {
+    try {
+      return (
+        JSON.stringify(normalizeSheetChart(target.initial.chart)) === target.initialChartFingerprint
+      );
+    } catch {
+      return false;
+    }
+  }
+
   function validOwner(target: SourceOwner): boolean {
     return (
       !disposed &&
@@ -64,6 +76,7 @@ export function useChartSourceActions(options: {
       target.generation === options.getGeneration() &&
       target.workbook.sheets.get(target.sheet.id) === target.sheet &&
       target.sheet.drawings?.includes(target.initial) === true &&
+      matchesCapturedChart(target) &&
       (target.picking || target.sheet === options.getSheet())
     );
   }
@@ -211,6 +224,10 @@ export function useChartSourceActions(options: {
       const data = getSheetChartData(target.sheet, chart, ownerEvaluator, (id) =>
         target.workbook.sheets.get(id),
       );
+      createChartOption(chart, data, {
+        width: target.initial.width,
+        height: target.initial.height,
+      });
       if (!allowed(target)) return false;
       if (JSON.stringify(chart) === JSON.stringify(normalizeSheetChart(target.initial.chart))) {
         close(target);
@@ -291,6 +308,7 @@ export function useChartSourceActions(options: {
         generation,
         sheet,
         initial: drawing,
+        initialChartFingerprint: JSON.stringify(normalizeSheetChart(drawing.chart)),
         picking: false,
         isCurrent: () => current(next),
         commit: (candidate, proof) => commit(next, candidate, proof),

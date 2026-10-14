@@ -96,6 +96,26 @@ export function assertXlsxPictureGeometrySupport(workbook: Workbook): void {
   };
   for (const sheet of getWorkbookSheets(workbook)) {
     for (const drawing of sheet.drawings ?? []) {
+      if (
+        drawing.kind === "chart" &&
+        Object.getOwnPropertyDescriptor(drawing.chart, "type")?.value === "combo"
+      ) {
+        const location = `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.type`;
+        throw new XlsxWorkerFailure("Column–Line Combo is not yet supported by XLSX export.", {
+          issues: [{ code: "feature-omitted", severity: "block", count: 1, locations: [location] }],
+        });
+      }
+      if (drawing.kind === "chart" && "format" in drawing.chart) {
+        const location = `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.format`;
+        throw new XlsxWorkerFailure(
+          "Detailed chart formatting is not yet supported by XLSX export.",
+          {
+            issues: [
+              { code: "feature-omitted", severity: "block", count: 1, locations: [location] },
+            ],
+          },
+        );
+      }
       if (drawing.kind === "chart" && "seriesFilter" in drawing.chart) {
         const location = `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.seriesFilter`;
         throw new XlsxWorkerFailure(
@@ -128,17 +148,6 @@ export function assertXlsxPictureGeometrySupport(workbook: Workbook): void {
         const location = `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.${field}`;
         throw new XlsxWorkerFailure(
           "Chart subtypes and detailed presentation are not yet supported by XLSX export.",
-          {
-            issues: [
-              { code: "feature-omitted", severity: "block", count: 1, locations: [location] },
-            ],
-          },
-        );
-      }
-      if (drawing.kind === "chart" && "format" in drawing.chart) {
-        const location = `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.format`;
-        throw new XlsxWorkerFailure(
-          "Detailed chart formatting is not yet supported by XLSX export.",
           {
             issues: [
               { code: "feature-omitted", severity: "block", count: 1, locations: [location] },

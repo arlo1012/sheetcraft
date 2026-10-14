@@ -43,7 +43,7 @@ export type ChartClipboardSourcePlanInput = {
   resolveSheet?: (sheetId: string) => Sheet | undefined;
 };
 
-const promotableTypes = new Set(["column", "bar", "line", "area", "radar"]);
+const promotableTypes = new Set(["column", "bar", "line", "area", "radar", "combo"]);
 
 function fail(reason: ChartClipboardSourceErrorReason, message: string): never {
   throw new ChartClipboardSourceError(reason, message);

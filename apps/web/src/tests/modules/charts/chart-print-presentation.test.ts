@@ -6,6 +6,7 @@ import { applyChartFormatIntent } from "../../../modules/charts/chart-format-int
 import { getChartFormatTargets } from "../../../modules/charts/chart-format-pane";
 import { getInstanceByDom } from "echarts/core";
 import * as chartRuntime from "../../../modules/charts/chart-runtime";
+import { comboChart, comboData } from "./combo-fixture";
 import {
   CHART_PRINT_MAX_SURFACE_PIXELS,
   renderChartPrintPresentation,
@@ -153,6 +154,7 @@ let contexts: Map<HTMLCanvasElement, NativeCanvasRecorder>;
 let allMeasures: Array<{ text: string; font: string }>;
 let nativeWidths = new Map<string, number>();
 let instances: chartRuntime.EChartsType[];
+let nativeOptions: unknown[];
 let nativeLayoutBounds: Array<{ text: string; width: number }>;
 let missingContext: number | undefined;
 let contextCount: number;
@@ -204,6 +206,7 @@ beforeEach(() => {
   allMeasures = [];
   nativeWidths = new Map();
   instances = [];
+  nativeOptions = [];
   nativeLayoutBounds = [];
   missingContext = undefined;
   contextCount = 0;
@@ -217,6 +220,7 @@ beforeEach(() => {
       flush = zr.flush.bind(zr);
     vi.spyOn(zr, "flush").mockImplementation(() => {
       flush();
+      nativeOptions.push(instance.getOption());
       for (const item of zr.storage.getDisplayList()) {
         const text: unknown = Object.getOwnPropertyDescriptor(item.style, "text")?.value;
         if (typeof text === "string")
@@ -727,3 +731,53 @@ test("all-hidden native Canvas print clears the complete interior without removi
     result.dispose();
   }
 });
+
+test.each([false, true])(
+  "native Combo print paints bars and rigid line with markers=%s using both axes",
+  (markers) => {
+    const chart = comboChart();
+    chart.format!.series![0]!.markers = markers;
+    const owner = drawing(chart),
+      before = structuredClone(owner);
+    const result = renderChartPrintPresentation(owner, comboData, options);
+    try {
+      const copied = contexts.get(result.canvas)!.copies[0]!.paints;
+      expect(
+        copied.some(
+          (paint) =>
+            paint.operation === "fill" &&
+            paint.fill === "#2563eb" &&
+            paint.path?.some((step) => step.startsWith("rect:")),
+        ),
+      ).toBe(true);
+      expect(
+        copied.some(
+          (paint) =>
+            paint.operation === "stroke" &&
+            paint.fill === "#a1b2c3" &&
+            paint.path?.some((step) => step.startsWith("line:")),
+        ),
+      ).toBe(true);
+      expect(
+        copied.filter((paint) => paint.operation === "text").map((paint) => paint.text),
+      ).toEqual(expect.arrayContaining(["apple", "pear", "east", "north", "south"]));
+      expect(nativeOptions).toContainEqual(
+        expect.objectContaining({
+          series: [
+            expect.objectContaining({ type: "bar" }),
+            expect.objectContaining({
+              type: "line",
+              yAxisIndex: 1,
+              showSymbol: markers,
+              smooth: false,
+            }),
+          ],
+        }),
+      );
+      expect(owner).toEqual(before);
+      expect(instances[0]!.isDisposed()).toBe(true);
+    } finally {
+      result.dispose();
+    }
+  },
+);

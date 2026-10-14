@@ -49,6 +49,23 @@ function fixture(range = { start: { row: 0, column: 0 }, end: { row: 2, column: 
   };
 }
 describe("chart actions", () => {
+  test("the captured host rejects hidden Combo choices when the final draft is another type", () => {
+    const f = fixture();
+    f.actions.insert("combo");
+    const draft = f.actions.editing.value!;
+    f.actions.confirm({ ...draft, chart: { ...draft.chart, type: "line" } }, "A1:B3", [
+      {
+        rangeBand: { seriesBy: "columns", index: 1 },
+        drawType: "line",
+        axis: "secondary",
+        markers: true,
+      },
+    ]);
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(f.actions.error.value).toBe(true);
+    expect(f.actions.editing.value).toBeDefined();
+    expect(f.getSheet().drawings ?? []).toEqual([]);
+  });
   test("inserts and edits a chart through Core without adding a duplicate", () => {
     const f = fixture();
     f.actions.insert("column");

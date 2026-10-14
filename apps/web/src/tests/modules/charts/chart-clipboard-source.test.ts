@@ -37,6 +37,7 @@ import {
 } from "../../../modules/charts/chart-source-ownership";
 
 import { createChartOption } from "../../../modules/charts/chart-option";
+import { resolveChartComboSeriesSettings } from "@sheetcraft/core/chart-combo";
 
 const allTypes: ChartType[] = [
   "column",
@@ -1218,4 +1219,54 @@ describe("Chart clipboard source-only host ownership", () => {
     expect(() => captureChartDrawingForest([f.chartDrawing])).toThrow();
     expect(reads).toBe(0);
   });
+});
+
+test("cross-sheet Combo promotion preserves physical routes, filter and raw source colors", () => {
+  const f = fixture("combo"),
+    owner = f.chartDrawing;
+  owner.chart.rectangleSeries = {
+    rows: [],
+    columns: [
+      { index: 1, id: "apple" },
+      { index: 2, id: "pear" },
+    ],
+  };
+  owner.chart.format = {
+    series: [
+      {
+        id: "pear",
+        drawType: "line",
+        axis: "secondary",
+        markers: true,
+        color: "#abcdef",
+        strokeWidth: 4,
+      },
+    ],
+  };
+  owner.chart.seriesFilter = { hiddenSeriesIds: ["apple"] };
+  const before = f.before(),
+    initialData = f.read(f.sourceSheet, owner),
+    result = f.plan();
+  expect(result.chart.source?.series.map((entry) => [entry.id, entry.colorIndex])).toEqual([
+    ["apple", 0],
+    ["pear", 1],
+    ["series-1", 2],
+  ]);
+  expect(result.chart.seriesFilter).toEqual(owner.chart.seriesFilter);
+  expect(result.chart.format).toEqual(owner.chart.format);
+  expect(resolveChartComboSeriesSettings(result.chart, { seriesId: "pear" })).toEqual({
+    drawType: "line",
+    axis: "secondary",
+    markers: true,
+  });
+  expect(presentation(f.read(f.targetSheet, result))).toEqual(presentation(initialData));
+  expect(() =>
+    assertChartClipboardSourcePrepared(owner, result, f.sourceSheet, f.targetSheet),
+  ).not.toThrow();
+  const forged = structuredClone(result);
+  forged.chart.format!.series![0]!.drawType = "column";
+  expect(() =>
+    assertChartClipboardSourcePrepared(owner, forged, f.sourceSheet, f.targetSheet),
+  ).toThrow();
+  expect(f.before()).toEqual(before);
 });

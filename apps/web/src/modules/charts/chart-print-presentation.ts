@@ -4,6 +4,7 @@ import { CanvasRenderer } from "echarts/renderers";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import { normalizeChartDataCache, type ChartData } from "@sheetcraft/core/sheet-charts";
 import { normalizeChartFormat } from "@sheetcraft/core/chart-format";
+import type { ChartComboSeriesChange } from "@sheetcraft/core/chart-combo";
 import { init, type EChartsType } from "./chart-runtime";
 import { createChartOption } from "./chart-option";
 import {
@@ -32,6 +33,7 @@ export type ChartPrintPresentationOptions = {
   density: number;
   /** Optional caller-owned, already-loaded immutable native font aliases. */
   resolveFontFamily?: (original: string) => string;
+  comboSeriesChanges?: readonly ChartComboSeriesChange[];
 };
 
 export type ChartPrintPresentation = {
@@ -88,6 +90,7 @@ function validateDrawing(drawing: SheetChartDrawing, data: ChartData) {
       "bar",
       "line",
       "area",
+      "combo",
       "pie",
       "doughnut",
       "scatter",
@@ -278,8 +281,11 @@ export function renderChartPrintPresentation(
   const option =
     drawing.chart.type === "wordCloud"
       ? undefined
-      : printOption(createChartOption(drawing.chart, data, options), options.resolveFontFamily);
-  const table = createChartDataTablePlan(drawing.chart, data, options);
+      : printOption(
+          createChartOption(drawing.chart, data, options, options.comboSeriesChanges),
+          options.resolveFontFamily,
+        );
+  const table = createChartDataTablePlan(drawing.chart, data, options, options.comboSeriesChanges);
   const output = canvas2D(options.document, size.width, size.height);
   let engineCanvas: HTMLCanvasElement | undefined;
   let instance: EChartsType | undefined;

@@ -14,6 +14,7 @@ import {
   type ChartRangeSeriesBand,
 } from "@sheetcraft/core/chart-range-series";
 import type { ChartElementPatch } from "./chart-element-controls";
+import { resolveChartComboSeriesSettings } from "@sheetcraft/core/chart-combo";
 
 export type ChartFormatTarget =
   | { kind: "chart" | "title" | "plot" | "categoryAxis" | "valueAxis" | "secondaryValueAxis" }
@@ -77,7 +78,7 @@ export function isChartRangeBandEditable(chart: SheetChart, band: ChartRangeSeri
     chart.pivotTableId ||
     chart.dataCache ||
     !chart.range ||
-    !["column", "bar", "line", "area", "radar"].includes(chart.type) ||
+    !["column", "bar", "line", "area", "radar", "combo"].includes(chart.type) ||
     band.seriesBy !== chart.seriesBy ||
     !Number.isInteger(band.index)
   )
@@ -99,23 +100,51 @@ export function resolveChartFormatSeriesId(
       : undefined;
 }
 
-export function getChartFormatCapabilities(chart: SheetChart, data?: ChartData) {
+export function getChartFormatCapabilities(
+  chart: SheetChart,
+  data?: ChartData,
+  target?: ChartFormatTarget,
+) {
   const plotSeries = chart.type === "scatter" ? data?.series.slice(1) : data?.series;
   const hasData = data === undefined || !!plotSeries?.some((entry) => entry.values.length > 0);
   const bars = chart.type === "column" || chart.type === "bar";
   const lines = chart.type === "line" || chart.type === "area";
-  const cartesian = bars || lines || chart.type === "scatter";
+  const combo = chart.type === "combo";
+  const selectedCombo =
+    combo && target?.kind === "series"
+      ? resolveChartComboSeriesSettings(
+          chart,
+          target.rangeBand ? { rangeBand: target.rangeBand } : { seriesId: target.seriesId },
+        )
+      : undefined;
+  const cartesian = bars || lines || combo || chart.type === "scatter";
   const series = data ? getChartFormatSeries(chart, data) : (chart.source?.series ?? []);
+  const comboKinds = combo
+    ? series.map(
+        (entry) =>
+          resolveChartComboSeriesSettings(
+            chart,
+            "rangeBand" in entry && entry.rangeBand
+              ? { rangeBand: entry.rangeBand }
+              : { seriesId: entry.id },
+          ).drawType,
+      )
+    : [];
+  const comboLine =
+    combo && (selectedCombo ? selectedCombo.drawType === "line" : comboKinds.includes("line"));
+  const comboColumn =
+    combo && (selectedCombo ? selectedCombo.drawType === "column" : comboKinds.includes("column"));
   const boundIds = new Set(chart.rectangleSeries?.[chart.seriesBy].map((entry) => entry.id) ?? []);
   return {
     hasData,
     title: !!chart.title.trim() && chart.elements?.titlePosition !== "none",
     plot: hasData && cartesian,
-    categoryAxis: hasData && (bars || lines) && (data === undefined || data.categories.length > 0),
+    categoryAxis:
+      hasData && (bars || lines || combo) && (data === undefined || data.categories.length > 0),
     valueAxis: hasData && cartesian,
     secondaryValueAxis:
       hasData &&
-      (bars || lines) &&
+      (bars || lines || combo) &&
       series.some(
         (entry) =>
           (chart.source !== undefined || boundIds.has(entry.id)) &&
@@ -123,12 +152,12 @@ export function getChartFormatCapabilities(chart: SheetChart, data?: ChartData) 
             (format) => format.id === entry.id && format.axis === "secondary",
           ),
       ),
-    bar: hasData && bars,
-    series: hasData && series.length > 0 && (bars || lines || chart.type === "radar"),
-    seriesAxis: bars || lines,
-    seriesStroke: lines || chart.type === "radar",
+    bar: hasData && (bars || comboColumn),
+    series: hasData && series.length > 0 && (bars || lines || combo || chart.type === "radar"),
+    seriesAxis: bars || lines || combo,
+    seriesStroke: lines || comboLine || chart.type === "radar",
     seriesSmooth: lines,
-    seriesMarkers: lines || chart.type === "radar",
+    seriesMarkers: lines || comboLine || chart.type === "radar",
   };
 }
 

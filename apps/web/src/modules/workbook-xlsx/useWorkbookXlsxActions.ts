@@ -23,6 +23,7 @@ export type XlsxFeedbackKey =
   | "chart.elementExportBlocked"
   | "chart.sourceExportBlocked"
   | "chart.formatExportBlocked"
+  | "chart.comboExportBlocked"
   | "chart.seriesFilterExportBlocked"
   | "xlsx.feedback.numericTableTotals"
   | "xlsx.feedback.exported"
@@ -140,6 +141,20 @@ export function useWorkbookXlsxActions(options: {
     return false;
   }
 
+  function setChartComboFailure(report?: XlsxCompatibilityReport): boolean {
+    const locations = report?.issues.flatMap((issue) =>
+      issue.code === "feature-omitted" && issue.severity === "block"
+        ? issue.locations.filter((location) => location.endsWith(".chart.type"))
+        : [],
+    );
+    if (!locations?.length) return false;
+    feedback.value = {
+      key: "chart.comboExportBlocked",
+      error: true,
+      locations: locations.join("; "),
+    };
+    return true;
+  }
   function setChartSeriesFilterFailure(report?: XlsxCompatibilityReport): boolean {
     const locations = report?.issues.flatMap((issue) =>
       issue.code === "feature-omitted" && issue.severity === "block"
@@ -210,6 +225,7 @@ export function useWorkbookXlsxActions(options: {
     if (
       error instanceof XlsxWorkerFailure &&
       (setNumericTotalsFailure(error.report) ||
+        setChartComboFailure(error.report) ||
         setChartSeriesFilterFailure(error.report) ||
         setChartFormatFailure(error.report) ||
         setChartSourceFailure(error.report) ||
@@ -361,6 +377,7 @@ export function useWorkbookXlsxActions(options: {
       if (hasBlockingIssue(response.report)) {
         if (
           !setNumericTotalsFailure(response.report) &&
+          !setChartComboFailure(response.report) &&
           !setChartSeriesFilterFailure(response.report) &&
           !setChartFormatFailure(response.report) &&
           !setChartSourceFailure(response.report) &&

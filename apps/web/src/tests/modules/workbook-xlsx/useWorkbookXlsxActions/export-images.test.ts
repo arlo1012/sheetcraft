@@ -88,6 +88,7 @@ describe("XLSX export image preparation", () => {
     "stacked",
     "rectangleSeries",
     "seriesFilter",
+    "combo",
   ] as const)(
     "new chart %s show blocked feedback before flush, assets, worker or download",
     async (field) => {
@@ -151,23 +152,29 @@ describe("XLSX export image preparation", () => {
         delete drawing.chart.elements;
         drawing.chart.seriesFilter = { hiddenSeriesIds: ["retired-filter-id"] };
       }
+      if (field === "combo") {
+        delete drawing.chart.elements;
+        drawing.chart.type = "combo";
+      }
       getActiveSheet(f.workbook).drawings = [drawing];
       const before = serializeWorkbook(f.workbook);
       await f.actions.exportXlsx();
       expect(f.actions.feedback.value).toEqual({
         key:
-          field === "format" ||
-          field === "presentation" ||
-          field === "stacked" ||
-          field === "rectangleSeries"
-            ? "chart.formatExportBlocked"
-            : field === "seriesFilter"
-              ? "chart.seriesFilterExportBlocked"
-              : field === "source"
-                ? "chart.sourceExportBlocked"
-                : "chart.elementExportBlocked",
+          field === "combo"
+            ? "chart.comboExportBlocked"
+            : field === "format" ||
+                field === "presentation" ||
+                field === "stacked" ||
+                field === "rectangleSeries"
+              ? "chart.formatExportBlocked"
+              : field === "seriesFilter"
+                ? "chart.seriesFilterExportBlocked"
+                : field === "source"
+                  ? "chart.sourceExportBlocked"
+                  : "chart.elementExportBlocked",
         error: true,
-        locations: `Sheet1.drawings["chart"].chart.${field}`,
+        locations: `Sheet1.drawings["chart"].chart.${field === "combo" ? "type" : field}`,
       });
       expect(f.flushPendingEdits).not.toHaveBeenCalled();
       expect(get).not.toHaveBeenCalled();

@@ -118,6 +118,9 @@ function clonePrintData(data: ChartData): ChartData {
     ...(data.series[index]?.colorIndex !== undefined
       ? { colorIndex: data.series[index]!.colorIndex }
       : {}),
+    ...(data.series[index]?.rangeBand !== undefined
+      ? { rangeBand: { ...data.series[index]!.rangeBand } }
+      : {}),
   }));
   if (data.diagnostics) clone.diagnostics = data.diagnostics.map((entry) => ({ ...entry }));
   return clone;

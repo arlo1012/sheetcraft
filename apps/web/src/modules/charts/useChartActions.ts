@@ -10,6 +10,7 @@ import {
   getSheetChartData,
   getSheetChartSourceData,
   type ChartType,
+  type SheetChart,
 } from "@sheetcraft/core/sheet-charts";
 import type { SheetChartDrawing, SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { SheetPivotTable } from "@sheetcraft/core/pivot-tables";
@@ -21,6 +22,12 @@ import {
   type SheetEvaluator,
 } from "@sheetcraft/core/workbook";
 import { resolveDataRange } from "@sheetcraft/core/data-range";
+import {
+  normalizeChartComboSeriesChanges,
+  planChartColumnLineCombo,
+  type ChartComboSeriesChange,
+} from "@sheetcraft/core/chart-combo";
+import { createChartOption } from "./chart-option";
 import { preflightChartDataTable } from "./chart-data-table-preflight";
 import { reconcileChartRangeSeriesForRange } from "@sheetcraft/core/chart-range-series";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
@@ -38,14 +45,21 @@ type ChartTarget = {
   sheet: Sheet;
   report?: SheetPivotTable;
   existing?: SheetChartDrawing;
+  existingFingerprint?: string;
 };
 type ChartDialog = ChartTarget & {
   dialogId: number;
   drawingId: string;
   initial: SheetChartDrawing;
   dashboard: boolean;
+  comboRecipe: boolean;
+  sourceFingerprint: string;
   isCurrent: () => boolean;
-  confirm: (drawing: SheetChartDrawing, source: string) => void;
+  confirm: (
+    drawing: SheetChartDrawing,
+    source: string,
+    comboChanges?: readonly ChartComboSeriesChange[],
+  ) => void;
   close: () => void;
   editPivot: (id: string) => void;
 };
@@ -72,7 +86,17 @@ export function useChartActions(options: {
   let disposed = false;
   const allowed = (sheet: Sheet) =>
     !disposed && !options.isBusy() && canUseSheetPermission(sheet, "editObjects");
+  function chartFingerprint(chart: SheetChart): string {
+    return JSON.stringify(normalizeSheetChart(chart));
+  }
   function hasTargetIdentity(target: ChartTarget): boolean {
+    if (target.existing) {
+      try {
+        if (chartFingerprint(target.existing.chart) !== target.existingFingerprint) return false;
+      } catch {
+        return false;
+      }
+    }
     return (
       !disposed &&
       target.workbook === options.getWorkbook() &&
@@ -110,7 +134,20 @@ export function useChartActions(options: {
       sheet = options.getSheet();
     const report = reportId ? sheet.pivotTables?.find((item) => item.id === reportId) : undefined;
     if (reportId && !report) return;
-    const target = { workbook, sheet, generation: options.getGeneration?.(), report, existing };
+    let existingFingerprint: string | undefined;
+    try {
+      if (existing) existingFingerprint = chartFingerprint(existing.chart);
+    } catch {
+      return;
+    }
+    const target = {
+      workbook,
+      sheet,
+      generation: options.getGeneration?.(),
+      report,
+      existing,
+      existingFingerprint,
+    };
     return hasTargetIdentity(target) ? target : undefined;
   }
   function prepare(target: ChartTarget): boolean {
@@ -124,15 +161,22 @@ export function useChartActions(options: {
       allowed(target.sheet)
     );
   }
-  function open(target: ChartTarget, initial: SheetChartDrawing, dashboard = false): void {
+  function open(
+    target: ChartTarget,
+    initial: SheetChartDrawing,
+    dashboard = false,
+    comboRecipe = false,
+  ): void {
     const next: ChartDialog = {
       ...target,
       dialogId: ++dialogId,
       drawingId: initial.id,
       initial,
       dashboard,
+      comboRecipe,
+      sourceFingerprint: JSON.stringify(normalizeSheetChart(initial.chart).source ?? null),
       isCurrent: () => isCurrent(next),
-      confirm: (drawing, source) => confirm(drawing, source, next),
+      confirm: (drawing, source, comboChanges) => confirm(drawing, source, comboChanges, next),
       close: () => close(next),
       editPivot: (id) => {
         if (!isCurrent(next) || next.report?.id !== id) return;
@@ -215,7 +259,7 @@ export function useChartActions(options: {
         kind: "variant",
         variant: request.variant,
       });
-    open(target, drawing, type === "dashboard");
+    open(target, drawing, type === "dashboard", type === "combo");
     if (invalidSelection) error.value = true;
   }
   function insertPivot(id: string) {
@@ -246,7 +290,12 @@ export function useChartActions(options: {
     sheets.set(target.sheet.id, { ...target.sheet });
     return applyWorkbookCommand({ ...target.workbook, sheets }, command) === null;
   }
-  function confirm(drawing: SheetChartDrawing, source: string, target = dialog.value) {
+  function confirm(
+    drawing: SheetChartDrawing,
+    source: string,
+    comboChanges?: readonly ChartComboSeriesChange[],
+    target = dialog.value,
+  ) {
     if (!target || dialog.value !== target || confirming || disposed) return;
     if (!hasTargetIdentity(target)) {
       close(target);
@@ -277,7 +326,7 @@ export function useChartActions(options: {
         error.value = true;
         return;
       }
-      const next: SheetChartDrawing = {
+      let next: SheetChartDrawing = {
         ...drawing,
         chart: normalizeSheetChart({
           ...reconcileChartRangeSeriesForRange(
@@ -298,6 +347,21 @@ export function useChartActions(options: {
             : {}),
         }),
       };
+      if (JSON.stringify(next.chart.source ?? null) !== target.sourceFingerprint) {
+        error.value = true;
+        return;
+      }
+      const changes = normalizeChartComboSeriesChanges(comboChanges ?? []);
+      if (changes.length) {
+        if (next.chart.type !== "combo" || next.chart.pivotTableId || next.chart.dataCache) {
+          error.value = true;
+          return;
+        }
+        next = { ...next, chart: planChartColumnLineCombo(next.chart, changes) };
+      }
+      // Source and owner checks precede detached planning; the final paint/table
+      // option is prepared only after settings and any necessary identities agree.
+      if (!isCurrent(target) || !allowed(target.sheet)) return;
       const data = getSheetChartData(target.sheet, next.chart, options.getEvaluator(), (sheetId) =>
         target.workbook.sheets.get(sheetId),
       );
@@ -334,6 +398,7 @@ export function useChartActions(options: {
         error.value = true;
         return;
       }
+      createChartOption(next.chart, data, next);
       preflightChartDataTable(next.chart, data, next, rawData);
       if (!isCurrent(target) || !allowed(target.sheet)) return;
       const current = target.sheet.drawings ?? [];

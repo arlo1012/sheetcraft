@@ -1,6 +1,7 @@
 import { normalizeChartFormat } from "@sheetcraft/core/chart-format";
 import { normalizeSheetChart, type SheetChart } from "@sheetcraft/core/sheet-charts";
 import { ensureChartRangeSeriesIdentity } from "@sheetcraft/core/chart-range-series";
+import { resolveChartComboSeriesSettings } from "@sheetcraft/core/chart-combo";
 import {
   isChartRangeBandEditable,
   resolveChartFormatSeriesId,
@@ -46,7 +47,13 @@ export function applyChartFormatIntent(
   const sharedBarControls =
     intent.kind === "chart" &&
     target.kind === "series" &&
-    (chart.type === "column" || chart.type === "bar") &&
+    (chart.type === "column" ||
+      chart.type === "bar" ||
+      (chart.type === "combo" &&
+        resolveChartComboSeriesSettings(
+          chart,
+          target.rangeBand ? { rangeBand: target.rangeBand } : { seriesId: target.seriesId },
+        ).drawType === "column")) &&
     (target.rangeBand
       ? isChartRangeBandEditable(chart, target.rangeBand)
       : chart.source?.series.some((entry) => entry.id === target.seriesId));
@@ -65,7 +72,14 @@ export function applyChartFormatIntent(
       throw new TypeError("Chart series identity is unavailable.");
     let id = resolveChartFormatSeriesId(chart, target);
     if (intent.format !== undefined)
-      validateDataRecord(intent.format, ["axis", "color", "strokeWidth", "smooth", "markers"]);
+      validateDataRecord(intent.format, [
+        "axis",
+        "color",
+        "strokeWidth",
+        "smooth",
+        "markers",
+        "drawType",
+      ]);
     if (!id) {
       if (intent.format === undefined || Object.keys(intent.format).length === 0)
         return normalizeSheetChart(chart);
@@ -76,16 +90,34 @@ export function applyChartFormatIntent(
     }
     const remaining = format.series ?? [];
     const index = remaining.findIndex((entry) => entry.id === id);
+    const previous = index < 0 ? undefined : remaining[index];
     if (intent.format !== undefined) {
+      if (Object.hasOwn(intent.format, "drawType") && intent.format.drawType !== previous?.drawType)
+        throw new TypeError("Series routing belongs to the captured Combo type editor.");
       // The stable ID is supplied by the captured target, never by form data.
-      const next = { ...intent.format, id };
+      const next = {
+        ...intent.format,
+        ...(previous?.drawType === undefined ? {} : { drawType: previous.drawType }),
+        id,
+      };
       if (index < 0) remaining.push(next);
       else remaining[index] = next;
-    } else if (index >= 0) remaining.splice(index, 1);
+    } else if (index >= 0 && previous) {
+      const routing = {
+        id,
+        ...(previous.drawType === undefined ? {} : { drawType: previous.drawType }),
+        ...(chart.type === "combo" && previous.axis !== undefined ? { axis: previous.axis } : {}),
+        ...(chart.type === "combo" && previous.markers !== undefined
+          ? { markers: previous.markers }
+          : {}),
+      };
+      if (Object.keys(routing).length > 1) remaining[index] = routing;
+      else remaining.splice(index, 1);
+    }
     if (remaining.length) format.series = remaining;
     else delete format.series;
   } else if (intent.kind === "chart") {
-    if (chart.type !== "column" && chart.type !== "bar")
+    if (chart.type !== "column" && chart.type !== "bar" && chart.type !== "combo")
       throw new TypeError("Only bars have a chart-wide gap and overlap.");
     if (intent.format === undefined) delete format.bar;
     else format.bar = intent.format;

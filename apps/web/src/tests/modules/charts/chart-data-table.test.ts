@@ -8,6 +8,7 @@ import {
   prepareChartDataTableOption,
 } from "../../../modules/charts/chart-data-table";
 import { createChartOption } from "../../../modules/charts/chart-option";
+import { comboChart, comboData } from "./combo-fixture";
 
 const chart: SheetChart = {
   type: "column",
@@ -61,6 +62,20 @@ function required(chartValue = chart, dataValue = data, size = dimensions) {
 }
 
 describe("bounded complete raw chart data table plans", () => {
+  test("Combo keys match columns, plain lines and marked lines without changing raw cells", () => {
+    const source = { ...comboChart(), elements: { dataTable: "withLegendKeys" as const } };
+    const plain = required(source, comboData);
+    expect(plain.rows.map((row) => [row.key, row.strokeWidth])).toEqual([
+      ["column", 2],
+      ["line", 5],
+    ]);
+    const marked = createChartDataTablePlan(source, comboData, dimensions, [
+      { seriesId: "pear", drawType: "line", axis: "secondary", markers: true },
+    ]);
+    expect(marked?.rows[1]?.key).toBe("markerLine");
+    expect(marked?.rows.map((row) => row.cells)).toEqual(plain.rows.map((row) => row.cells));
+    expect(source.format?.series?.[0]?.markers).toBe(false);
+  });
   test("baseline keeps all categories, source row identities and values without mutating source", () => {
     const source = structuredClone(data),
       originalChart = structuredClone(chart);

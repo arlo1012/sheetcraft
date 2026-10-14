@@ -7,8 +7,9 @@ import {
   type SheetChart,
 } from "@sheetcraft/core/sheet-charts";
 import type { ChartPresentationSettings } from "@sheetcraft/core/chart-presentation";
+import type { ChartComboSeriesChange } from "@sheetcraft/core/chart-combo";
 import { getChartElementCapabilities, getChartElementSettings } from "./chart-elements";
-import { applyChartCommonFormat } from "./chart-format-render";
+import { applyChartCommonFormat, getChartComboDataSeriesSettings } from "./chart-format-render";
 import {
   chartPercentAxisDomain,
   createChartPresentationData,
@@ -155,11 +156,12 @@ function buildChartOption(
   data: ChartData,
   dimensions?: ChartDimensions,
   presentation?: ChartPresentationSettings,
+  comboSeriesChanges?: readonly ChartComboSeriesChange[],
 ): EChartsOption {
   const palette = presentation?.palette ?? colors;
   const background = presentation?.background ?? "#ffffff";
   if (chart.source !== undefined) {
-    if (!["column", "bar", "line", "area", "radar"].includes(chart.type))
+    if (!["column", "bar", "line", "area", "radar", "combo"].includes(chart.type))
       throw new RangeError("This chart type does not support an ordered series source.");
     if (
       data.diagnostics?.some(
@@ -174,9 +176,10 @@ function buildChartOption(
   // The complete source stays editable even when every series is unchecked.
   // Keep the drawing and stored appearance, while clearing its painted interior.
   if (
-    chart.seriesFilter !== undefined &&
-    ["column", "bar", "line", "area", "radar"].includes(chart.type) &&
-    data.series.length === 0
+    (chart.seriesFilter !== undefined &&
+      ["column", "bar", "line", "area", "radar", "combo"].includes(chart.type) &&
+      data.series.length === 0) ||
+    (chart.type === "combo" && (!data.categories.length || !data.series.length))
   )
     return { animation: false, backgroundColor: background, series: [] };
   const layout = createElementLayout(chart, data, dimensions);
@@ -198,6 +201,31 @@ function buildChartOption(
     textStyle: { fontFamily: "Arial, sans-serif" },
     ...(layout ? { title: layout.title, legend: layout.legend } : {}),
   };
+  if (chart.type === "combo" && common.legend && !Array.isArray(common.legend)) {
+    const seen = new Set<string>();
+    // Native LineSeries always draws a marker in its legend. Explicit plain-line
+    // icons inherit the engine's actual series paint instead of remapping a palette.
+    common.legend.data = data.series.flatMap((series) => {
+      if (seen.has(series.name)) return [];
+      seen.add(series.name);
+      const settings = getChartComboDataSeriesSettings(chart, series, comboSeriesChanges);
+      const saved =
+        series.id === undefined
+          ? undefined
+          : chart.format?.series?.find((entry) => entry.id === series.id);
+      return [
+        {
+          name: series.name,
+          ...(settings.drawType === "line" && !settings.markers
+            ? {
+                icon: "line",
+                itemStyle: { borderColor: "auto", borderWidth: saved?.strokeWidth ?? 2 },
+              }
+            : {}),
+        },
+      ];
+    });
+  }
   if (chart.type === "pie" || chart.type === "doughnut")
     return {
       ...common,
@@ -349,7 +377,13 @@ function buildChartOption(
   const labelPosition = chart.elements?.labelPosition;
   const outsideLabels =
     chart.labels &&
-    (chart.type === "bar" || chart.type === "column") &&
+    (chart.type === "bar" ||
+      chart.type === "column" ||
+      (chart.type === "combo" &&
+        data.series.some(
+          (entry) =>
+            getChartComboDataSeriesSettings(chart, entry, comboSeriesChanges).drawType === "column",
+        ))) &&
     labelPosition === "outsideEnd";
   const labelClearance = outsideLabels
     ? Math.min(
@@ -370,14 +404,30 @@ function buildChartOption(
         label: { show: chart.labels },
       }))
     : data.series.map((series) =>
-        chart.type === "line" || chart.type === "area"
+        chart.type === "line" ||
+        chart.type === "area" ||
+        (chart.type === "combo" &&
+          getChartComboDataSeriesSettings(chart, series, comboSeriesChanges).drawType === "line")
           ? {
               type: "line",
               ...seriesAppearance(series, palette),
               name: series.name,
               data: series.values,
-              showSymbol: presentation?.lineMarkers ?? true,
-              ...(presentation?.lineMarkers === false ? { symbol: "none" } : {}),
+              showSymbol:
+                chart.type === "combo"
+                  ? getChartComboDataSeriesSettings(chart, series, comboSeriesChanges).markers
+                  : (presentation?.lineMarkers ?? true),
+              ...(chart.type === "combo"
+                ? {
+                    symbol: getChartComboDataSeriesSettings(chart, series, comboSeriesChanges)
+                      .markers
+                      ? "circle"
+                      : "none",
+                    smooth: false,
+                  }
+                : presentation?.lineMarkers === false
+                  ? { symbol: "none" }
+                  : {}),
               connectNulls: false,
               ...(chart.type === "area"
                 ? {
@@ -441,7 +491,14 @@ function buildChartOption(
             outsideLabels && !horizontal ? labelClearance : 0,
           ),
         },
-    xAxis: horizontal || scatter ? { type: "value" } : { type: "category", data: data.categories },
+    xAxis:
+      horizontal || scatter
+        ? { type: "value" }
+        : {
+            type: "category",
+            data: data.categories,
+            ...(chart.type === "combo" ? { boundaryGap: true } : {}),
+          },
     yAxis: horizontal ? { type: "category", data: data.categories } : { type: "value" },
     series,
   };
@@ -452,12 +509,19 @@ export function createChartOption(
   chart: SheetChart,
   data: ChartData,
   dimensions?: ChartDimensions,
+  comboSeriesChanges?: readonly ChartComboSeriesChange[],
 ): EChartsOption {
   chart = normalizeSheetChart(chart);
   const presentation = getChartRenderPresentation(chart);
   const renderedData = createChartPresentationData(chart, data, presentation);
   const percent = presentation?.percentStacked === true;
-  const option = buildChartOption(chart, renderedData, dimensions, presentation);
+  const option = buildChartOption(
+    chart,
+    renderedData,
+    dimensions,
+    presentation,
+    comboSeriesChanges,
+  );
   const formatValue = (value: unknown, format?: CellNumberFormat): string => {
     if (Array.isArray(value)) return value.map((entry) => formatValue(entry, format)).join(" / ");
     return typeof value === "number"
@@ -465,7 +529,7 @@ export function createChartOption(
       : String(value ?? "");
   };
   const plotted = chart.type === "scatter" ? data.series.slice(1) : data.series;
-  const cartesianLabels = ["column", "bar", "line", "area"].includes(chart.type);
+  const cartesianLabels = ["column", "bar", "line", "area", "combo"].includes(chart.type);
   const customLabels =
     cartesianLabels &&
     (chart.elements?.labelContent !== undefined || chart.elements?.labelScope !== undefined);
@@ -540,5 +604,5 @@ export function createChartOption(
     option.yAxis = valueAxis(
       percent ? { kind: "percent", fractionDigits: 0 } : uniformFormat(plotted),
     );
-  return applyChartCommonFormat(option, chart, renderedData);
+  return applyChartCommonFormat(option, chart, renderedData, comboSeriesChanges);
 }

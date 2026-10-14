@@ -8,6 +8,7 @@ import {
   type SheetChart,
 } from "@sheetcraft/core/sheet-charts";
 import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
+import type { ChartComboSeriesChange } from "@sheetcraft/core/chart-combo";
 import { init, type EChartsType } from "../chart-runtime";
 import { createChartOption } from "../chart-option";
 import {
@@ -31,6 +32,7 @@ import { useAppI18n } from "../../../shared/i18n";
 const props = defineProps<{
   drawing: SheetChartDrawing;
   paintChart?: SheetChart;
+  comboSeriesChanges?: readonly ChartComboSeriesChange[];
   sheet: Sheet;
   evaluator: SheetEvaluator;
   resolveSheet?: (sheetId: string) => Sheet | undefined;
@@ -214,10 +216,15 @@ function render() {
       tableError.value = false;
       return;
     }
-    const option = createChartOption(paintChart.value, data.value, {
-      width: props.drawing.width,
-      height: props.drawing.height,
-    });
+    const option = createChartOption(
+      paintChart.value,
+      data.value,
+      {
+        width: props.drawing.width,
+        height: props.drawing.height,
+      },
+      props.comboSeriesChanges,
+    );
     // Enable native title/axis hit events without changing legacy serialized options.
     if (option.title && !Array.isArray(option.title))
       option.title = { ...option.title, triggerEvent: true };
@@ -226,7 +233,12 @@ function render() {
       else if (axis) axis.triggerEvent = true;
     }
     countChartDataTableText(paintChart.value, result.value.sourceData);
-    const table = createChartDataTablePlan(paintChart.value, data.value, props.drawing);
+    const table = createChartDataTablePlan(
+      paintChart.value,
+      data.value,
+      props.drawing,
+      props.comboSeriesChanges,
+    );
     chart.setOption(prepareChartDataTableOption(option, table), { notMerge: true });
     if (table) applyChartDataTableGraphics(chart, table);
     bindEvents(chart);
@@ -253,7 +265,10 @@ onMounted(() => {
   observer = new ResizeObserver(render);
   if (root.value) observer.observe(root.value);
 });
-watch([() => props.drawing, result, paintChart], render, { deep: true, flush: "post" });
+watch([() => props.drawing, result, paintChart, () => props.comboSeriesChanges], render, {
+  deep: true,
+  flush: "post",
+});
 watch([fontFamilies, () => props.drawing, () => props.revision, paintChart], () => loadFonts(), {
   immediate: true,
   flush: "post",

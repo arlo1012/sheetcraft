@@ -52,6 +52,7 @@ import {
 const props = defineProps<{
   drawing: SheetChartDrawing;
   data: ChartData;
+  visibleData?: ChartData;
   target: ChartFormatTarget;
   disabled: boolean;
   error?: string;
@@ -63,8 +64,16 @@ const paneId = `chart-format-${useId()}`;
 const popupProps = { overlayClassName: "chart-format-options-popup" };
 const root = ref<HTMLElement>();
 const chart = computed(() => props.drawing.chart);
-const capabilities = computed(() => getChartFormatCapabilities(chart.value, props.data));
-const targets = computed(() => getChartFormatTargets(chart.value, props.data));
+const capabilities = computed(() =>
+  getChartFormatCapabilities(
+    chart.value,
+    props.target.kind === "series" ? props.data : (props.visibleData ?? props.data),
+    props.target,
+  ),
+);
+const targets = computed(() =>
+  getChartFormatTargets(chart.value, props.data, props.visibleData ?? props.data),
+);
 const targetKey = computed(() => chartFormatTargetKey(props.target));
 const ownerKey = computed(() => `${props.drawing.id}/${targetKey.value}`);
 let live = true;
@@ -178,16 +187,17 @@ function numericValue(field: ChartFormatNumericField): number | undefined {
   }
 }
 const sourceSeries = computed(() =>
-  (chart.value.type === "scatter" ? props.data.series.slice(1) : props.data.series).filter(
-    (entry) => {
-      const secondary =
-        !!entry.id &&
-        chart.value.format?.series?.some(
-          (format) => format.id === entry.id && format.axis === "secondary",
-        );
-      return kind.value === "secondaryValueAxis" ? secondary : !secondary;
-    },
-  ),
+  (chart.value.type === "scatter"
+    ? (props.visibleData ?? props.data).series.slice(1)
+    : (props.visibleData ?? props.data).series
+  ).filter((entry) => {
+    const secondary =
+      !!entry.id &&
+      chart.value.format?.series?.some(
+        (format) => format.id === entry.id && format.axis === "secondary",
+      );
+    return kind.value === "secondaryValueAxis" ? secondary : !secondary;
+  }),
 );
 const linkedToSource = computed(
   () =>
@@ -1478,7 +1488,10 @@ function escapeDraft(event: KeyboardEvent): void {
           >
           <TCheckbox
             v-if="capabilities.seriesMarkers"
-            :checked="series.markers ?? chart.presentation?.lineMarkers ?? true"
+            :checked="
+              series.markers ??
+              (chart.type === 'combo' ? false : (chart.presentation?.lineMarkers ?? true))
+            "
             :disabled="disabled"
             :onChange="captureAction((value: unknown) => setSeries('markers', !!value))"
             >{{ t("chart.formatMarkers") }}</TCheckbox
