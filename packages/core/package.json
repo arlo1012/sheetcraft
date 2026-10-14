@@ -156,6 +156,10 @@
       "types": "./dist/sheet-drawings.d.ts",
       "import": "./dist/sheet-drawings.js"
     },
+    "./chart-combo": {
+      "types": "./dist/chart-combo.d.ts",
+      "import": "./dist/chart-combo.js"
+    },
     "./chart-format": {
       "types": "./dist/chart-format.d.ts",
       "import": "./dist/chart-format.js"

@@ -149,7 +149,7 @@ export function planChartSeriesVisibility(
   if (
     "pivotTableId" in input ||
     "dataCache" in input ||
-    !["column", "bar", "line", "area", "radar"].includes(chart.type)
+    !["column", "bar", "line", "area", "radar", "combo"].includes(chart.type)
   )
     throw new RangeError("Only ordinary supported chart sources have editable series visibility.");
   const explicitIds = new Set(chart.source?.series.map((entry) => entry.id));

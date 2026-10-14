@@ -110,7 +110,7 @@ export function ensureChartRangeSeriesIdentity(
     chart.source !== undefined ||
     chart.dataCache !== undefined ||
     chart.pivotTableId !== undefined ||
-    !["column", "bar", "line", "area", "radar"].includes(chart.type)
+    !["column", "bar", "line", "area", "radar", "combo"].includes(chart.type)
   )
     throw new RangeError("Only ordinary live rectangular chart series can acquire identities.");
   const target = normalizeBand(band, chart);

@@ -1,3 +1,4 @@
+import { readChartComboFeature } from "./chart-combo.js";
 import { normalizeCellImage } from "./cell-picture-frame.js";
 import {
   hasPicturePropertiesField,
@@ -328,6 +329,8 @@ export type WorkbookSnapshotV82 = Omit<WorkbookSnapshotV81, "version"> & { versi
 export type WorkbookSnapshotV83 = Omit<WorkbookSnapshotV82, "version"> & { version: 83 };
 /** Conditional envelope for sparse chart-local hidden series choices. */
 export type WorkbookSnapshotV84 = Omit<WorkbookSnapshotV83, "version"> & { version: 84 };
+/** Conditional envelope for bounded 2D column–line combo routing, including dormant draw types. */
+export type WorkbookSnapshotV85 = Omit<WorkbookSnapshotV84, "version"> & { version: 85 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -370,8 +373,9 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV81
   | WorkbookSnapshotV82
   | WorkbookSnapshotV83
-  | WorkbookSnapshotV84;
-type WorkbookWritePayload = Omit<WorkbookSnapshotV84, "version"> & {
+  | WorkbookSnapshotV84
+  | WorkbookSnapshotV85;
+type WorkbookWritePayload = Omit<WorkbookSnapshotV85, "version"> & {
   version: WorkbookSnapshot["version"];
 };
 export type SheetSnapshot = SheetSnapshotV7 & {
@@ -474,7 +478,8 @@ type SnapshotVersion =
   | 81
   | 82
   | 83
-  | 84;
+  | 84
+  | 85;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -511,6 +516,19 @@ function chartLayoutContainer(value: unknown, key: string): unknown {
     const field = Object.getOwnPropertyDescriptor(owner, key);
     if (field) return "value" in field ? (field.value as unknown) : undefined;
     owner = Object.getPrototypeOf(owner) as object | null;
+  }
+}
+
+/** Raw combo routing, including dormant drawType choices, never invokes caller accessors. */
+function chartComboFeaturePath(chart: UnknownRecord): string | undefined {
+  if (chartLayoutContainer(chart, "type") === "combo") return "type";
+  const series = chartLayoutContainer(chartLayoutContainer(chart, "format"), "series");
+  if (!series || (typeof series !== "object" && typeof series !== "function")) return;
+  for (const key of Reflect.ownKeys(series)) {
+    if (typeof key !== "string" || !/^(0|[1-9]\d*)$/.test(key)) continue;
+    const entry = chartLayoutContainer(series, key);
+    if (entry && (typeof entry === "object" || typeof entry === "function") && "drawType" in entry)
+      return `format.series[${key}].drawType`;
   }
 }
 
@@ -551,6 +569,7 @@ function inspectShapeSnapshotFeatures(
   hasChartLayout: boolean;
   hasChartRectangleSeries: boolean;
   hasChartSeriesFilter: boolean;
+  hasChartCombo: boolean;
   hasOpenArea: boolean;
   hasModernWordArt: boolean;
   hasTextWarp: boolean;
@@ -570,6 +589,7 @@ function inspectShapeSnapshotFeatures(
     hasChartLayout = false,
     hasChartRectangleSeries = false,
     hasChartSeriesFilter = false,
+    hasChartCombo = false,
     hasOpenArea = false,
     hasModernWordArt = false,
     hasTextWarp = false,
@@ -681,6 +701,17 @@ function inspectShapeSnapshotFeatures(
             return fail(`${path}.chart.format`, "Chart format must be an own data field.");
           hasChartFormat = true;
         }
+        // Existing raw80–84 feature gates retain precedence over combo admission.
+        // Common-format admission here must precede every legacy drawing read.
+        const comboFeature = chartComboFeaturePath(chart);
+        if (comboFeature) {
+          if (version !== undefined && version < 85)
+            return fail(`${path}.chart`, "Chart combos require snapshot version 85.");
+          if (drawingKind !== "chart")
+            return fail(`${path}.chart`, "Chart combos require an own chart drawing kind.");
+          hasChartCombo = true;
+        }
+        readChartComboFeature(chart);
         if ("source" in chart) {
           if (version !== undefined && version < 79)
             return fail(
@@ -886,6 +917,7 @@ function inspectShapeSnapshotFeatures(
     hasChartLayout,
     hasChartRectangleSeries,
     hasChartSeriesFilter,
+    hasChartCombo,
     hasOpenArea,
     hasModernWordArt,
     hasTextWarp,
@@ -1995,6 +2027,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
   let hasChartLayout = false;
   let hasChartRectangleSeries = false;
   let hasChartSeriesFilter = false;
+  let hasChartCombo = false;
   let hasOpenShapeArea = false;
   let hasModernWordArt = false;
   let hasTextWarp = false;
@@ -2022,6 +2055,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       hasChartLayout ||= scene.hasChartLayout;
       hasChartRectangleSeries ||= scene.hasChartRectangleSeries;
       hasChartSeriesFilter ||= scene.hasChartSeriesFilter;
+      hasChartCombo ||= scene.hasChartCombo;
       hasOpenShapeArea ||= scene.hasOpenArea;
       hasModernWordArt ||= scene.hasModernWordArt;
       hasTextWarp ||= scene.hasTextWarp;
@@ -2430,6 +2464,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasChartLayout) version = 82;
     if (hasChartRectangleSeries) version = 83;
     if (hasChartSeriesFilter) version = 84;
+    if (hasChartCombo) version = 85;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -2831,6 +2866,14 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     )
   )
     snapshot.version = 84;
+  if (
+    sheets.some((sheet) =>
+      sheet.drawings?.some(
+        (drawing) => inspectShapeSnapshotFeatures(drawing, "$.drawings").hasChartCombo,
+      ),
+    )
+  )
+    snapshot.version = 85;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -2922,7 +2965,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 81 &&
     record.version !== 82 &&
     record.version !== 83 &&
-    record.version !== 84
+    record.version !== 84 &&
+    record.version !== 85
   ) {
     throw new WorkbookDomainError(
       {

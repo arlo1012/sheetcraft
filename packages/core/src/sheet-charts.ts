@@ -1,3 +1,4 @@
+import { readChartComboFeature } from "./chart-combo.js";
 import {
   normalizeChartSource,
   type ChartSeriesSource,
@@ -27,6 +28,7 @@ import { readChartSeriesFilter, type ChartSeriesFilter } from "./chart-series-fi
 
 export type ChartType =
   | "column"
+  | "combo"
   | "bar"
   | "line"
   | "area"
@@ -77,6 +79,7 @@ export type SheetChart = {
 };
 const types = new Set([
   "column",
+  "combo",
   "bar",
   "line",
   "area",
@@ -157,6 +160,7 @@ function normalizeChartElementSettings(value: unknown): ChartElementSettings {
   return result;
 }
 export function normalizeSheetChart(chart: SheetChart): SheetChart {
+  readChartComboFeature(chart);
   const seriesFilter = readChartSeriesFilter(chart);
   let rectangleSeriesValue: unknown;
   const hasRectangleSeries = !!chart && typeof chart === "object" && "rectangleSeries" in chart;
@@ -205,11 +209,12 @@ export function normalizeSheetChart(chart: SheetChart): SheetChart {
   }
   if (
     !chart ||
+    (chart.type === "combo" && chart.stacked !== false) ||
     (source !== undefined &&
       (chart.range !== null ||
         chart.pivotTableId !== undefined ||
         chart.dataCache !== undefined ||
-        !["column", "bar", "line", "area", "radar"].includes(chart.type))) ||
+        !["column", "bar", "line", "area", "radar", "combo"].includes(chart.type))) ||
     (chart.pivotTableId !== undefined && chart.dataCache !== undefined) ||
     (chart.pivotTableId !== undefined &&
       (typeof chart.pivotTableId !== "string" || !chart.pivotTableId.trim())) ||
@@ -238,6 +243,12 @@ export function normalizeSheetChart(chart: SheetChart): SheetChart {
       (range.end.row - range.start.row + 1) * (range.end.column - range.start.column + 1) > 10000)
   )
     throw new RangeError("Chart source must contain at most 10,000 cells.");
+  if (chart.type === "combo" && range !== null) {
+    const axis = chart.seriesBy === "rows" ? "row" : "column";
+    const header = chart.seriesBy === "rows" ? chart.headerRow : chart.headerColumn;
+    if (range.end[axis] - range.start[axis] + 1 - Number(header) > 256)
+      throw new RangeError("Chart combo physical series budget exceeded.");
+  }
   if (
     hasRectangleSeries &&
     (range === null ||
@@ -338,6 +349,7 @@ export function getSheetChartSourceData(
   resolveSheet?: (sheetId: string) => Sheet | undefined,
 ): ChartData {
   // Validate raw new-feature ownership before any legacy source/cache reads.
+  readChartComboFeature(chart);
   readChartSeriesFilter(chart);
   if ("source" in chart)
     return getChartSourceData(sheet, normalizeSheetChart(chart), evaluator, resolveSheet);
@@ -443,7 +455,7 @@ export function getSheetChartSourceData(
       ? { numberFormat: { ...first } }
       : {};
   };
-  const identities = ["column", "bar", "line", "area", "radar"].includes(chart.type)
+  const identities = ["column", "bar", "line", "area", "radar", "combo"].includes(chart.type)
     ? new Map(
         (normalized.rectangleSeries?.[chart.seriesBy] ?? []).map((entry) => [
           entry.index,
@@ -496,7 +508,7 @@ export function getSheetChartData(
   const source = getSheetChartSourceData(sheet, chart, evaluator, resolveSheet);
   if (
     !filter?.hiddenSeriesIds.length ||
-    !["column", "bar", "line", "area", "radar"].includes(chart.type)
+    !["column", "bar", "line", "area", "radar", "combo"].includes(chart.type)
   )
     return source;
   const hidden = new Set(filter.hiddenSeriesIds);

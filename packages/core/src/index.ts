@@ -17,6 +17,7 @@ export * from "./selection-summary.js";
 export * from "./serialization.js";
 export * from "./style.js";
 export * from "./chart-format.js";
+export * from "./chart-combo.js";
 export * from "./chart-range-series.js";
 export * from "./chart-series-filter.js";
 export * from "./chart-presentation.js";

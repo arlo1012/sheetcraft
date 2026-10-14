@@ -207,7 +207,8 @@ export function getChartSourceApplicability(
 ): "editable" | "pivot" | "cached" | "unsupported-type" | "broken-range" {
   if (chart.pivotTableId !== undefined) return "pivot";
   if (chart.dataCache !== undefined) return "cached";
-  if (!["column", "bar", "line", "area", "radar"].includes(chart.type)) return "unsupported-type";
+  if (!["column", "bar", "line", "area", "radar", "combo"].includes(chart.type))
+    return "unsupported-type";
   return chart.source !== undefined || chart.range !== null ? "editable" : "broken-range";
 }
 /** Lossless promotion includes hidden vectors and the original absolute header references. */

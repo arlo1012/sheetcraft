@@ -43,6 +43,8 @@ export type ChartValueAxisFormat = {
 export type ChartSeriesFormat = {
   /** Stable source identity, including dormant sources; never a name or ordinal. */
   id: string;
+  /** Used by bounded column–line combo charts; dormant for every other type. */
+  drawType?: "column" | "line";
   axis?: "primary" | "secondary";
   color?: string;
   strokeWidth?: number;
@@ -281,7 +283,15 @@ function series(value: unknown): ChartSeriesFormat[] {
   const entries = readPictureDataArray(value as readonly unknown[], "chart series formats", 256);
   const ids = new Set<string>();
   return entries.map((entry) => {
-    const source = record(entry, ["id", "axis", "color", "strokeWidth", "smooth", "markers"]);
+    const source = record(entry, [
+      "id",
+      "drawType",
+      "axis",
+      "color",
+      "strokeWidth",
+      "smooth",
+      "markers",
+    ]);
     if (
       typeof source.id !== "string" ||
       !source.id.trim() ||
@@ -291,6 +301,11 @@ function series(value: unknown): ChartSeriesFormat[] {
       throw new RangeError("Chart series formats require unique bounded stable IDs.");
     ids.add(source.id);
     const result: ChartSeriesFormat = { id: source.id };
+    if (Object.hasOwn(source, "drawType")) {
+      if (source.drawType !== "column" && source.drawType !== "line")
+        throw new RangeError("Invalid chart series draw type.");
+      result.drawType = source.drawType;
+    }
     if (Object.hasOwn(source, "axis")) {
       if (source.axis !== "primary" && source.axis !== "secondary")
         throw new RangeError("Invalid chart series value axis.");

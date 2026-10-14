@@ -1,3 +1,4 @@
+import { readChartComboFeature } from "./chart-combo.js";
 import { mapChartRangeSeries } from "./chart-range-series.js";
 import { normalizeEquationFlipState, type EquationFlipState } from "./equation-flip.js";
 import {
@@ -286,6 +287,8 @@ function assertChartPayloadOwnership(value: object): void {
   const chart = Object.getOwnPropertyDescriptor(value, "chart");
   if (!chart || !("value" in chart))
     throw new TypeError("Chart payloads must be own data fields, not accessors.");
+  // Admit raw combo and all format records before legacy placement/identity getters.
+  readChartComboFeature(chart.value);
 }
 
 function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance {

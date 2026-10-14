@@ -1135,6 +1135,27 @@ export async function encodeWithNativeXlsx(
   let detailedChartFormat = false;
   for (const sheet of sheets) {
     for (const drawing of sheet.drawings ?? []) {
+      if (
+        drawing.kind === "chart" &&
+        Object.getOwnPropertyDescriptor(drawing.chart, "type")?.value === "combo"
+      ) {
+        detailedChartFormat = true;
+        report.add(
+          "feature-omitted",
+          "block",
+          `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.type`,
+        );
+        continue;
+      }
+      if (drawing.kind === "chart" && "format" in drawing.chart) {
+        detailedChartFormat = true;
+        report.add(
+          "feature-omitted",
+          "block",
+          `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.format`,
+        );
+        continue;
+      }
       if (drawing.kind === "chart" && "seriesFilter" in drawing.chart) {
         detailedChartFormat = true;
         report.add(
@@ -1169,14 +1190,6 @@ export async function encodeWithNativeXlsx(
           "feature-omitted",
           "block",
           `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.stacked`,
-        );
-      }
-      if (drawing.kind === "chart" && "format" in drawing.chart) {
-        detailedChartFormat = true;
-        report.add(
-          "feature-omitted",
-          "block",
-          `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.format`,
         );
       }
       if (drawing.kind === "chart" && "source" in drawing.chart) {
