@@ -2,6 +2,9 @@ import type { PagePrintMessageSchema } from "./page-print-messages";
 
 export const pagePrintEnUS = {
   pagePrint: {
+    unsupportedEquations:
+      "Equation printing is unavailable because mathematical layout or fonts could not be verified. No blank print will be generated, and your workbook is unchanged.",
+    preparingEquations: "Preparing mathematical layout and fonts…",
     invalidRange:
       "Cannot preview this print range. Check page settings or narrow the range (up to 10,000 pages).",
     unsupportedPictures:

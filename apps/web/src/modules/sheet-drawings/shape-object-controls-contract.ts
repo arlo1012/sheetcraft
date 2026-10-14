@@ -18,7 +18,7 @@ export type ShapeObjectOrderAction = Extract<
 export type ShapeSelectionPaneRow = {
   readonly path: readonly string[];
   readonly name: string;
-  readonly kind: "shape" | "textBox" | "shapeGroup";
+  readonly kind: "shape" | "textBox" | "equation" | "shapeGroup";
   readonly depth: number;
   readonly selected: boolean;
   readonly canEdit: boolean;
@@ -50,6 +50,7 @@ const en = {
   close: "Close Selection Pane",
   shape: "Shape",
   textBox: "Text Box",
+  equation: "Equation",
   shapeGroup: "Group",
   select: "Select",
   name: "Object name",
@@ -85,6 +86,7 @@ const zh: typeof en = {
   close: "关闭选择窗格",
   shape: "形状",
   textBox: "文本框",
+  equation: "公式",
   shapeGroup: "组合",
   select: "选择",
   name: "对象名称",

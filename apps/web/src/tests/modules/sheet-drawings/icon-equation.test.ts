@@ -87,7 +87,10 @@ describe("existing icon and equation objects", () => {
     expect(wrapper.findAll('input[type="color"]')).toHaveLength(3);
     expect(wrapper.text()).toContain("Bold");
     expect(wrapper.text()).toContain("Italic");
-    const rendered = mount(DrawingContent, { props: { drawing: original } });
+    const rendered = mount(DrawingContent, {
+      props: { drawing: original },
+      global: { plugins: [createAppI18n("en-US")] },
+    });
     mounted.push(rendered);
     expect(rendered.get("svg g").attributes()).toMatchObject({
       fill: "#abcdef",
@@ -103,7 +106,10 @@ describe("existing icon and equation objects", () => {
   });
   test("equation renderer retains LaTeX source and uses bounded untrusted KaTeX", async () => {
     const original = drawing("equation");
-    const rendered = mount(DrawingContent, { props: { drawing: original } });
+    const rendered = mount(DrawingContent, {
+      props: { drawing: original },
+      global: { plugins: [createAppI18n("en-US")] },
+    });
     mounted.push(rendered);
     await flushPromises();
     expect(rendered.find(".katex").exists()).toBe(true);

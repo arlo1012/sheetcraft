@@ -39,7 +39,7 @@ function tree(format: ShapeTextCharacterFormat = characterEffects()): ShapeGroup
 }
 function richLeaf(root: ShapeGroupDrawing) {
   const target = traverseShapeGroup(root).find(({ node }) => node.id === "rich")!.node;
-  if (target.kind === "shapeGroup") throw Error("Expected leaf");
+  if (target.kind !== "shape" && target.kind !== "textBox") throw Error("Expected leaf");
   return target;
 }
 
@@ -277,9 +277,11 @@ describe("conditional V72 local glyph effect internal persistence", () => {
       createId: () => `copy-${++id}`,
     })[0] as ShapeGroupDrawing;
     const copiedLeaf = traverseShapeGroup(copied).find(
-      ({ node }) => node.kind !== "shapeGroup" && node.shapeText?.characterRuns,
+      ({ node }) =>
+        (node.kind === "shape" || node.kind === "textBox") && node.shapeText?.characterRuns,
     )?.node;
-    if (!copiedLeaf || copiedLeaf.kind === "shapeGroup") throw Error("Expected copied rich leaf");
+    if (!copiedLeaf || (copiedLeaf.kind !== "shape" && copiedLeaf.kind !== "textBox"))
+      throw Error("Expected copied rich leaf");
     copiedLeaf.shapeText!.characterRuns![0]!.reflection = { kind: "none" };
     expect(serializeWorkbook(session.workbook)).toEqual(after);
     const sparse = createSheetSparseState(sheet),

@@ -1,3 +1,4 @@
+import { equationMessagesEnUS } from "../../../modules/sheet-drawings/equation/equation-messages.en-US";
 import { symbolsEnUS } from "../../../modules/insert-tools/symbol-messages.en-US";
 import { pivotsEnUS } from "../../../modules/pivot-tables/pivot-messages.en-US";
 import { controlsEnUS } from "../../../modules/form-controls/control-messages.en-US";
@@ -24,6 +25,7 @@ import { tablesEnUS } from "../../../modules/table-styles/table-messages.en-US";
 import { pictureFormatEnUS } from "../../../modules/sheet-images/picture-format-messages.en-US";
 
 export const enUS = {
+  equation: equationMessagesEnUS,
   ...symbolsEnUS,
   ...pivotsEnUS,
   ...controlsEnUS,

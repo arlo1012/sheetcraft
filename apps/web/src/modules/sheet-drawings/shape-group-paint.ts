@@ -352,6 +352,8 @@ export function planShapeGroupPaint(options: ShapeGroupPaintOptions): ShapeGroup
   if (!projection || projection.sourceRoot !== options.root)
     throw new TypeError("Shape group paint requires the exact owner of its whole-sheet pass.");
   const snapshotRoot = freezeSnapshot(cloneShapeGroup(options.root));
+  if (traverseShapeGroupVisibility(snapshotRoot).some(({ node }) => node.kind === "equation"))
+    throw new TypeError("Mathematical group members require their dedicated native consumer.");
   const snapshots = new Map(
     traverseShapeGroupVisibility(snapshotRoot).map((visit) => [key(visit.path), visit]),
   );

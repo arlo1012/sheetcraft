@@ -1,10 +1,16 @@
+import { toggleEquationFlipState, type EquationFlipAxis } from "./equation-flip.js";
+import { resolveSheetShapeConnections } from "./shape-connector-layout.js";
 import { materializeShapeGroup3dReleaseChildren } from "./shape-group-3d.js";
 import type { PictureSheetMetrics } from "./picture-axis-metrics.js";
 import { readPictureDataArray } from "./picture-data-array.js";
-import { resolvePictureLayout } from "./picture-frame.js";
+import { normalizePictureAngle, resolvePictureLayout } from "./picture-frame.js";
 import { anchorShapeFrameRect, resolveShapeFrame, type ResolvedShapeFrame } from "./shape-frame.js";
 import {
   cloneShapeGroupChild,
+  findShapeGroupNode,
+  MAX_SHAPE_GROUP_DEPTH,
+  type ShapeGroupPath,
+  type SheetGroupedEquationDrawing,
   isShapeGroupDrawing,
   MAX_SHAPE_GROUP_NODES,
   normalizeShapeGroup,
@@ -25,6 +31,8 @@ import {
 } from "./shape-object-properties.js";
 import {
   isFramedShapeDrawing,
+  isFramedEquationDrawing,
+  type SheetFramedEquationDrawing,
   normalizeSheetDrawing,
   normalizeSheetDrawings,
   type SheetDrawing,
@@ -35,7 +43,8 @@ import {
 export type ShapeGroupEligibleRoot =
   | ShapeGroupDrawing
   | SheetFramedGraphicDrawing
-  | (SheetGraphicDrawing & { kind: "shape" | "textBox" });
+  | SheetFramedEquationDrawing
+  | (SheetGraphicDrawing & { kind: "shape" | "textBox" | "equation" });
 
 function dataRecord(value: unknown, name: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -59,7 +68,12 @@ function ids(value: readonly string[]): string[] {
   return result;
 }
 export function isShapeGroupEligibleRoot(value: SheetDrawing): value is ShapeGroupEligibleRoot {
-  return value.kind === "shapeGroup" || value.kind === "shape" || value.kind === "textBox";
+  return (
+    value.kind === "shapeGroup" ||
+    value.kind === "shape" ||
+    value.kind === "textBox" ||
+    value.kind === "equation"
+  );
 }
 /** Complete source-checked forest, including ordinary drawing IDs and unselected owned trees. */
 export function normalizeShapeDrawingForest(values: readonly SheetDrawing[]): SheetDrawing[] {
@@ -83,7 +97,7 @@ export function resolveShapeRootLayout(
   metrics: PictureSheetMetrics,
 ): ResolvedShapeFrame {
   if (isShapeGroupDrawing(value)) return resolveShapeGroup(value, metrics).layout;
-  if (isFramedShapeDrawing(value))
+  if (isFramedShapeDrawing(value) || isFramedEquationDrawing(value))
     return resolveShapeFrame(value.shapeFrame, metrics, value.rotation);
   return resolvePictureLayout(
     {
@@ -120,6 +134,32 @@ function toMember(
       members: value.members.map(cloneShapeGroupChild),
     };
   }
+  if (value.kind === "equation") {
+    const math: SheetGroupedEquationDrawing = {
+      id: value.id,
+      kind: "equation",
+      name: value.name,
+      text: value.text,
+      shape: value.shape,
+      fill: value.fill,
+      stroke: value.stroke,
+      strokeWidth: value.strokeWidth,
+      color: value.color,
+      fontSize: value.fontSize,
+      bold: value.bold,
+      italic: value.italic,
+      rotation: placement.rotation,
+      groupFrame: placement.groupFrame,
+      ...(value.equationDocument ? { equationDocument: value.equationDocument } : {}),
+      ...(value.equationFlipX ? { equationFlipX: true as const } : {}),
+      ...(value.equationFlipY ? { equationFlipY: true as const } : {}),
+      ...(value.hidden ? { hidden: true as const } : {}),
+      ...(isFramedEquationDrawing(value) && value.shapeProperties
+        ? { shapeProperties: value.shapeProperties }
+        : {}),
+    };
+    return math;
+  }
   if (isFramedShapeDrawing(value)) {
     const { shapeFrame: _frame, ...appearance } = value;
     return { ...appearance, groupFrame: placement.groupFrame, rotation: placement.rotation };
@@ -135,6 +175,96 @@ function toMember(
   return { ...appearance, groupFrame: placement.groupFrame, rotation: placement.rotation };
 }
 
+const equationPromotionFields = [
+  "id",
+  "kind",
+  "name",
+  "text",
+  "shape",
+  "fill",
+  "stroke",
+  "strokeWidth",
+  "color",
+  "fontSize",
+  "bold",
+  "italic",
+  "rotation",
+  "anchor",
+  "offsetX",
+  "offsetY",
+  "width",
+  "height",
+  "equationDocument",
+  "equationFlipX",
+  "equationFlipY",
+] as const;
+/** Legacy Equation grouping is a strict, explicit source/placement promotion boundary. */
+function assertEquationRootPromotionSource(value: SheetDrawing): void {
+  if (Object.getOwnPropertyDescriptor(value, "kind")?.value !== "equation" || "shapeFrame" in value)
+    return;
+  const source = dataRecord(value, "legacy Equation promotion source");
+  for (const key of Reflect.ownKeys(source)) {
+    if (typeof key !== "string" || !(equationPromotionFields as readonly string[]).includes(key))
+      throw new TypeError("Unknown or conflicting legacy Equation promotion field.");
+    if (source[key] === undefined)
+      throw new TypeError("Legacy Equation promotion requires defined own data fields.");
+  }
+  for (const key of equationPromotionFields) {
+    if (!Object.hasOwn(source, key) && key in value)
+      throw new TypeError("Legacy Equation promotion fields must be own data fields.");
+    if (
+      !Object.hasOwn(source, key) &&
+      key !== "equationDocument" &&
+      key !== "equationFlipX" &&
+      key !== "equationFlipY"
+    )
+      throw new TypeError("Legacy Equation promotion requires its complete source and placement.");
+  }
+  const anchor = dataRecord(source.anchor, "legacy Equation promotion anchor");
+  if (
+    Reflect.ownKeys(anchor).some((key) => key !== "row" && key !== "column") ||
+    !Object.hasOwn(anchor, "row") ||
+    !Object.hasOwn(anchor, "column")
+  )
+    throw new TypeError("Legacy Equation promotion anchors require only own row and column data.");
+}
+/** Explicit object operation only; loading a legacy source never rewrites its placement. */
+export function promoteEquationRootFrame(
+  value: SheetDrawing,
+  metrics: PictureSheetMetrics,
+): SheetFramedEquationDrawing {
+  if (value.kind !== "equation") throw new TypeError("Equation promotion requires a math root.");
+  assertEquationRootPromotionSource(value);
+  const normalized = normalizeSheetDrawing(value);
+  if (normalized.kind !== "equation")
+    throw new TypeError("Equation promotion changed its source kind.");
+  if (isFramedEquationDrawing(normalized)) return normalized;
+  const legacy = { ...normalized, kind: "equation" as const };
+  const layout = resolveShapeRootLayout(legacy, metrics);
+  const {
+    anchor: _anchor,
+    offsetX: _offsetX,
+    offsetY: _offsetY,
+    width: _width,
+    height: _height,
+    ...appearance
+  } = legacy;
+  const result = normalizeSheetDrawing({
+    ...appearance,
+    shapeFrame: {
+      kind: "shape-frame-v1",
+      anchor: {
+        mode: "fixed",
+        x: layout.rect.x,
+        y: layout.rect.y,
+        size: { width: layout.rect.width, height: layout.rect.height },
+      },
+    },
+  });
+  if (!isFramedEquationDrawing(result))
+    throw new TypeError("Equation promotion lost its dedicated frame.");
+  return result;
+}
 /**
  * Explicit promotion boundary. Noncontiguous selected roots retain their stack order
  * inside a new zero-rotation owner inserted at the highest selected root's slot.
@@ -145,9 +275,18 @@ export function groupShapeRoots(
   identity: { id: string; name: string },
   metrics: PictureSheetMetrics,
 ): SheetDrawing[] {
+  const targets = ids(selectedIds);
+  const raw = readPictureDataArray(values, "shape grouping roots", MAX_SHAPE_GROUP_NODES);
+  for (const target of targets) {
+    const matches = raw.filter(
+      (value) => Object.getOwnPropertyDescriptor(value, "id")?.value === target,
+    );
+    if (matches.length !== 1)
+      throw new TypeError("Grouping targets require unique own source IDs.");
+    assertEquationRootPromotionSource(matches[0]!);
+  }
   const roots = normalizeShapeDrawingForest(values);
   assertShapeDrawingForestLayouts(roots, metrics);
-  const targets = ids(selectedIds);
   if (targets.length < 2) throw new RangeError("Grouping requires at least two shape roots.");
   const selected = new Set(targets);
   if (selected.size !== targets.length) throw new TypeError("Duplicate shape grouping targets.");
@@ -233,7 +372,7 @@ export function releaseShapeGroupChild(
     shapeFrame,
     rotation: world.angleDeg,
     ...(shapeProperties ? { shapeProperties } : {}),
-  } as ShapeGroupDrawing | SheetFramedGraphicDrawing);
+  });
 }
 /** One level only, at the existing stack slot; root behavior and every child's world layout survive. */
 export function ungroupShapeRoot(
@@ -258,5 +397,97 @@ export function ungroupShapeRoot(
     roots.flatMap((root) => (root.id === groupId ? released : [root])),
   );
   assertShapeDrawingForestLayouts(result, metrics);
+  return result;
+}
+
+/** Reflect only local centers/angles. Math flags remain independent of shape-body flips. */
+function reflectShapeGroupMember(member: ShapeGroupChild, axis: EquationFlipAxis): void {
+  const rect = member.groupFrame.rect;
+  member.groupFrame = {
+    ...member.groupFrame,
+    rect: {
+      ...rect,
+      ...(axis === "horizontal"
+        ? { xRatio: 1 - rect.xRatio - rect.widthRatio }
+        : { yRatio: 1 - rect.yRatio - rect.heightRatio }),
+    },
+  };
+  member.rotation = normalizePictureAngle(-member.rotation);
+  if (member.kind === "shapeGroup")
+    for (const child of member.members) reflectShapeGroupMember(child, axis);
+  else toggleShapeOrEquationFlip(member, axis);
+}
+function toggleShapeOrEquationFlip(
+  node: SheetDrawing | ShapeGroupChild,
+  axis: EquationFlipAxis,
+): void {
+  if (node.kind === "equation") {
+    const flags = toggleEquationFlipState(node, axis);
+    delete node.equationFlipX;
+    delete node.equationFlipY;
+    Object.assign(node, flags);
+    return;
+  }
+  if (node.kind !== "shape" && node.kind !== "textBox")
+    throw new TypeError("Shape flips require a shape, text box or equation.");
+  const key = axis === "horizontal" ? "shapeFlipX" : "shapeFlipY";
+  if (node[key]) delete node[key];
+  else node[key] = true;
+}
+function assertShapeNodeFlippable(node: SheetDrawing | ShapeGroupChild, reflected = false): void {
+  if (node.kind === "shapeGroup") {
+    for (const child of node.members) assertShapeNodeFlippable(child, true);
+    return;
+  }
+  if (node.kind !== "shape" && node.kind !== "textBox" && node.kind !== "equation")
+    throw new TypeError("Shape flips require a shape, text box or equation.");
+  if (node.kind === "shape" && node.shapeConnector && !reflected)
+    throw new TypeError("A live connector cannot use ordinary shape flip geometry.");
+}
+/** Atomic pure forest plan. IDs, exact owner paths and connector sources stay intact. */
+export function planFlipShapeDrawingNodes(
+  values: readonly SheetDrawing[],
+  selectedPaths: readonly ShapeGroupPath[],
+  axis: EquationFlipAxis,
+  metrics: PictureSheetMetrics,
+): SheetDrawing[] {
+  if (axis !== "horizontal" && axis !== "vertical")
+    throw new TypeError("Unknown shape drawing flip axis.");
+  const roots = normalizeShapeDrawingForest(values);
+  assertShapeDrawingForestLayouts(roots, metrics);
+  const paths = readPictureDataArray(
+    selectedPaths,
+    "shape flip selection",
+    MAX_SHAPE_GROUP_NODES,
+  ).map((path) => readPictureDataArray(path, "shape flip path", MAX_SHAPE_GROUP_DEPTH + 1));
+  const targets = paths.map((path) => {
+    if (!path.length || path.some((id) => typeof id !== "string" || !id.trim()))
+      throw new TypeError("Shape flip paths require non-empty IDs.");
+    const root = roots.find((entry) => entry.id === path[0]);
+    const node =
+      path.length === 1
+        ? root
+        : root && isShapeGroupDrawing(root)
+          ? findShapeGroupNode(root, path)?.node
+          : undefined;
+    if (!node) throw new TypeError("Shape flip target is missing or reparented.");
+    return { node, path };
+  });
+  const selected = new Set(targets.map(({ node }) => node.id));
+  if (selected.size !== targets.length) throw new TypeError("Duplicate shape flip targets.");
+  const retained = targets.filter(({ path }) => !path.slice(0, -1).some((id) => selected.has(id)));
+  for (const { node } of retained) assertShapeNodeFlippable(node);
+  for (const { node } of retained)
+    if (node.kind === "shapeGroup")
+      for (const member of node.members) reflectShapeGroupMember(member, axis);
+    else toggleShapeOrEquationFlip(node, axis);
+  const result = normalizeShapeDrawingForest(roots);
+  assertShapeDrawingForestLayouts(result, metrics);
+  const hasConnector = result.some((root) =>
+    isShapeGroupDrawing(root)
+      ? traverseShapeGroup(root).some(({ node }) => node.kind === "shape" && node.shapeConnector)
+      : root.kind === "shape" && root.shapeConnector,
+  );
+  if (hasConnector) resolveSheetShapeConnections(result, metrics);
   return result;
 }

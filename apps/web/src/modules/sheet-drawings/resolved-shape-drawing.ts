@@ -1,9 +1,12 @@
 import { assertNoUnresolvedShapeConnectors } from "./shape-document-support";
+import { assertEquationGeometryPreserved } from "./equation/equation-source-ownership";
 import {
   isFramedShapeDrawing,
+  isFramedEquationDrawing,
   normalizeSheetDrawing,
   type SheetDrawing,
   type SheetFramedGraphicDrawing,
+  type SheetFramedEquationDrawing,
   type SheetLegacyDrawing,
 } from "@sheetcraft/core/sheet-drawings";
 import {
@@ -16,6 +19,12 @@ import {
   locatePictureAxisPoint,
   type PictureSheetMetrics,
 } from "@sheetcraft/core/picture-axis-metrics";
+
+function isFramedDrawingLeaf(
+  source: SheetDrawing,
+): source is SheetFramedGraphicDrawing | SheetFramedEquationDrawing {
+  return isFramedShapeDrawing(source) || isFramedEquationDrawing(source);
+}
 
 /** The source is the exact public owner; a canonical shape's view is disposable. */
 export type ResolvedShapeDrawing = {
@@ -32,6 +41,9 @@ const appearanceFields = [
   "name",
   "hidden",
   "text",
+  "equationDocument",
+  "equationFlipX",
+  "equationFlipY",
   "textReference",
   "shape",
   "fill",
@@ -110,7 +122,7 @@ export function resolveShapeDrawing(
   assertNoUnresolvedShapeConnectors("shape-projection", [source]);
   if (source.kind === "shapeGroup")
     throw new TypeError("A shape group requires its owned-tree projection, not a leaf view.");
-  if (!isFramedShapeDrawing(source)) {
+  if (!isFramedDrawingLeaf(source)) {
     const rect = getViewRect(source, metrics);
     return {
       source,
@@ -121,6 +133,8 @@ export function resolveShapeDrawing(
     };
   }
   const normalized = normalizeSheetDrawing(source);
+  if (!isFramedDrawingLeaf(normalized))
+    throw new TypeError("Framed drawing normalization lost placement.");
   const { shapeFrame, shapeProperties: _properties, ...appearance } = normalized;
   const { rect, collapsed } = resolveShapeFrame(shapeFrame, metrics, normalized.rotation);
   const anchor = shapeFrame.anchor;
@@ -154,7 +168,7 @@ export function updateResolvedShapeDrawing(
   if (metrics !== resolved.metrics)
     throw new TypeError("A shape view edit must use its original metrics snapshot.");
   const source = resolved.source;
-  const framed = isFramedShapeDrawing(source);
+  const framed = isFramedDrawingLeaf(source);
   assertDataRecord(
     nextView,
     framed
@@ -169,6 +183,7 @@ export function updateResolvedShapeDrawing(
   );
   if (nextView.id !== source.id || nextView.kind !== source.kind)
     throw new TypeError("A shape view edit must retain its source identity and kind.");
+  assertEquationGeometryPreserved(source, nextView);
   if (
     source.kind === "textBox" &&
     source.textReference &&
@@ -177,7 +192,7 @@ export function updateResolvedShapeDrawing(
       JSON.stringify(nextView.textReference) !== JSON.stringify(source.textReference))
   )
     throw new TypeError("A linked text box paint view cannot edit or remove its source reference.");
-  if (!isFramedShapeDrawing(source)) {
+  if (!isFramedDrawingLeaf(source)) {
     normalizeSheetDrawing(nextView);
     return nextView;
   }
@@ -187,7 +202,10 @@ export function updateResolvedShapeDrawing(
     rect.y !== resolved.rect.y ||
     rect.width !== resolved.rect.width ||
     rect.height !== resolved.rect.height;
-  const appearance = {} as Omit<SheetFramedGraphicDrawing, "shapeFrame" | "shapeProperties">;
+  const appearance = {} as Omit<
+    SheetFramedGraphicDrawing | SheetFramedEquationDrawing,
+    "shapeFrame" | "shapeProperties"
+  >;
   for (const key of appearanceFields) {
     const field = Object.getOwnPropertyDescriptor(nextView, key);
     if (field)
@@ -198,13 +216,15 @@ export function updateResolvedShapeDrawing(
         configurable: true,
       });
   }
-  return normalizeSheetDrawing({
+  const placement = {
     ...appearance,
     id: source.id,
-    kind: source.kind,
     shapeFrame: placementChanged
       ? reanchorShapeFrame(source.shapeFrame, rect, metrics)
       : source.shapeFrame,
     ...(source.shapeProperties ? { shapeProperties: source.shapeProperties } : {}),
-  });
+  };
+  return source.kind === "equation"
+    ? normalizeSheetDrawing({ ...placement, kind: "equation" })
+    : normalizeSheetDrawing({ ...placement, kind: source.kind });
 }

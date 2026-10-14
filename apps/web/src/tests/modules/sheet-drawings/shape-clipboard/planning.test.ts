@@ -82,7 +82,7 @@ describe("internal shape object clipboard plans", () => {
     const inner = cloned.members[1]!;
     if (inner.kind !== "shapeGroup") throw Error("Expected subgroup");
     const art = inner.members[1]!;
-    if (art.kind === "shapeGroup") throw Error("Expected WordArt");
+    if (art.kind !== "shape" && art.kind !== "textBox") throw Error("Expected graphic WordArt");
     expect(art.hidden).toBe(true);
     expect(art.wordArt).toBe(true);
     expect(art.shapeStyle?.fill).toMatchObject({ value: { assetId: "body-asset" } });

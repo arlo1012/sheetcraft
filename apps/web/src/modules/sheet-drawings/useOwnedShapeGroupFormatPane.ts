@@ -145,7 +145,9 @@ export function useOwnedShapeGroupFormatPane(options: {
     if (!source || !owner) return;
     try {
       const target = findShapeGroupNode(source, owner.path)?.node;
-      return target && (target.kind === "shapeGroup" || !target.shapeConnector)
+      return target &&
+        (target.kind === "shapeGroup" ||
+          ((target.kind === "shape" || target.kind === "textBox") && !target.shapeConnector))
         ? target
         : undefined;
     } catch {
@@ -639,7 +641,12 @@ export function useOwnedShapeGroupFormatPane(options: {
       )
         return false;
       const target = findShapeGroupNode(applied, selection.path)?.node;
-      if (!target || (target.kind === "shape" && target.shapeConnector)) return false;
+      if (
+        !target ||
+        target.kind === "equation" ||
+        (target.kind === "shape" && target.shapeConnector)
+      )
+        return false;
       const appliedMetrics = options.getMetrics?.();
       if (!appliedMetrics) return false;
       selection.lease = {

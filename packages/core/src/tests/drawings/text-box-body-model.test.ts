@@ -50,7 +50,7 @@ function bodyTree(): ShapeGroupDrawing {
 }
 function bodyLeaf(tree: ShapeGroupDrawing) {
   const target = traverseShapeGroup(tree).find(({ node }) => node.kind === "textBox")!.node;
-  if (target.kind === "shapeGroup") throw Error("Expected text box");
+  if (target.kind !== "textBox") throw Error("Expected text box");
   return target;
 }
 function assertDetached(source: unknown, target: unknown) {

@@ -2,6 +2,9 @@ import type { PagePrintMessageSchema } from "./page-print-messages";
 
 export const pagePrintZhCN = {
   pagePrint: {
+    unsupportedEquations:
+      "无法核验公式排版或字体，当前不能打印。不会生成缺失公式的空白打印，工作簿未改动。",
+    preparingEquations: "正在准备公式排版与字体…",
     invalidRange: "无法生成打印预览。请检查页面设置，或缩小打印区域（最多 10,000 页）。",
     unsupportedPictures: "打印预览暂不支持图片框架或嵌套图片组合。工作簿未被修改。",
     popupBlocked: "请允许浏览器打开打印窗口。",

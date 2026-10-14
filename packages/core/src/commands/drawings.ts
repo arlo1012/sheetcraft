@@ -128,6 +128,9 @@ const drawingDataKeys = [
   "hidden",
   "shapeStyle",
   "shapeText",
+  "equationDocument",
+  "equationFlipX",
+  "equationFlipY",
   "textReference",
   "wordArt",
   "textDirection",
@@ -143,6 +146,7 @@ const drawingDataKeys = [
 ] as const;
 
 const drawingPayloadOwners = [
+  ["equationDocument", "equation"],
   ["members", "shapeGroup"],
   ["chart", "chart"],
   ["camera", "camera"],

@@ -55,7 +55,7 @@ function owned(style: unknown = fullStyle()): ShapeGroupDrawing {
 function target(drawing: SheetDrawing) {
   if (drawing.kind !== "shapeGroup") return drawing as SheetGraphicDrawing;
   const result = traverseShapeGroup(drawing).find(({ node }) => node.kind === "textBox")!.node;
-  if (result.kind === "shapeGroup") throw Error("Expected text box");
+  if (result.kind !== "textBox") throw Error("Expected text box");
   return result;
 }
 function emptySnapshot() {

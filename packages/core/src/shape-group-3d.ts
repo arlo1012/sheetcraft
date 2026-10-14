@@ -59,6 +59,8 @@ export function resolveShapeGroup3dSource(
         .filter(({ node, path: leaf }) => node.kind !== "shapeGroup" && below(leaf, target.path))
         .map(({ path: leaf }) => leaf),
     };
+  if (target.node.kind === "equation")
+    return { ownerPath: null, source: "absent", inherited: false, affectedLeafPaths: [] };
   return {
     ...(target.node.shapeStyle?.rotation3d
       ? { rotation3d: target.node.shapeStyle.rotation3d }
@@ -122,6 +124,7 @@ export function materializeShapeGroup3dReleaseChildren(
       if (node.kind === "shapeGroup") pending.push(...node.members);
     }
     if (!materialize) return child;
+    if (child.kind === "equation") throw new TypeError("Equation 3D release is unsupported.");
     return normalizeShapeGroupChild(
       child.kind === "shapeGroup"
         ? { ...child, group3d: { rotation3d: rotation3d! } }

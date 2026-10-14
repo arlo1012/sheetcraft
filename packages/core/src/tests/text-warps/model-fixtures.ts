@@ -81,6 +81,7 @@ export function warpedTree(kind: "shape" | "textBox" = "shape"): ShapeGroupDrawi
 
 export function textWarpLeaf(root: ShapeGroupDrawing) {
   const target = traverseShapeGroup(root).find(({ node }) => node.id === "warped-leaf")!.node;
-  if (target.kind === "shapeGroup") throw Error("Expected a text-warp leaf.");
+  if (target.kind !== "shape" && target.kind !== "textBox")
+    throw Error("Expected a text-warp leaf.");
   return target;
 }

@@ -5,6 +5,7 @@ import {
   traverseShapeGroup,
   type ShapeGroupPath,
   type SheetGroupedGraphicDrawing,
+  type SheetGroupedEquationDrawing,
 } from "@sheetcraft/core/shape-group";
 import {
   resolveSheetShapeConnections,
@@ -64,7 +65,7 @@ export type ShapeConnectorRenderSource =
 
 export type ResolvedShapeRenderLeaf = Readonly<{
   sourceRoot: SheetDrawing;
-  sourceNode: SheetDrawing | SheetGroupedGraphicDrawing;
+  sourceNode: SheetDrawing | SheetGroupedGraphicDrawing | SheetGroupedEquationDrawing;
   path: ShapeGroupPath;
   /** Editing continues to use this genuine carrier projection, never the paint view. */
   carrierRoot?: ResolvedShapeDrawing;
@@ -208,6 +209,25 @@ function graphicView(
     delete view.shapeFlipY;
   }
   return freezeSnapshot(view);
+}
+/** Mathematics has source and placement, but no ordinary shape-body projection. */
+function equationView(
+  source: SheetGroupedEquationDrawing,
+  layout: ShapeConnectorPaintLayout,
+  metrics: PictureSheetMetrics,
+): SheetGraphicDrawing {
+  const { groupFrame: _frame, shapeProperties: _properties, ...appearance } = source;
+  const column = locatePictureAxisPoint(layout.rect.x, metrics.columns);
+  const row = locatePictureAxisPoint(layout.rect.y, metrics.rows);
+  return freezeSnapshot({
+    ...appearance,
+    rotation: layout.angleDeg,
+    anchor: { column: column.index, row: row.index },
+    offsetX: layout.rect.x - metrics.columns.visiblePrefix(column.index),
+    offsetY: layout.rect.y - metrics.rows.visiblePrefix(row.index),
+    width: layout.rect.width,
+    height: layout.rect.height,
+  });
 }
 function connectorSource(
   node: GraphicSource,
@@ -429,11 +449,16 @@ export function resolveShapeForestForRender(options: {
         get lease() {
           return (lease ??= leaseShapeGroupNode(captured, path));
         },
-        view: resolved.carrierLayout ? graphicView(node, resolved.carrierLayout, metrics) : null,
+        view: resolved.carrierLayout
+          ? node.kind === "equation"
+            ? equationView(node, resolved.carrierLayout, metrics)
+            : graphicView(node, resolved.carrierLayout, metrics)
+          : null,
         ...(groupScene ? { groupScene } : {}),
       };
       ownedLeaves.push(leaf);
-      const connector = connectorSource(node, connections, metrics);
+      const connector =
+        node.kind === "equation" ? undefined : connectorSource(node, connections, metrics);
       addLeaf({
         sourceRoot,
         sourceNode: current,

@@ -19,15 +19,18 @@ import {
   type ResolvedShapeGroupNode,
 } from "@sheetcraft/core/shape-group-layout";
 import {
-  assertShapeDrawingForestLayouts,
-  isShapeGroupEligibleRoot,
   normalizeShapeDrawingForest,
   releaseShapeGroupChild,
-  resolveShapeRootLayout,
 } from "@sheetcraft/core/shape-group-planning";
 import { anchorShapeFrameRect } from "@sheetcraft/core/shape-frame";
 import { hasShapeObjectFrame, type SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { CellAddress } from "@sheetcraft/core/workbook";
+import {
+  assertDrawingClipboardForestLayouts,
+  isDrawingClipboardEligibleRoot,
+  resolveDrawingClipboardRootLayout,
+} from "./drawing-clipboard-eligibility";
+import { assertEquationGeometryPreserved } from "./equation/equation-source-ownership";
 
 export type ShapeClipboardFailure =
   | "invalid-selection"
@@ -107,7 +110,7 @@ export function captureShapeClipboardSelection(
   metrics: PictureSheetMetrics,
 ): ShapeClipboardSelection {
   const sourceForest = normalizeShapeDrawingForest(values);
-  assertShapeDrawingForestLayouts(sourceForest, metrics);
+  assertDrawingClipboardForestLayouts(sourceForest, metrics);
   const paths = dataArray(pathsValue, MAX_SHAPE_GROUP_NODES).map((value) => {
     const path = dataArray(value, MAX_SHAPE_GROUP_DEPTH + 1);
     if (!path.length || path.some((id) => typeof id !== "string" || !id.trim()))
@@ -125,7 +128,7 @@ export function captureShapeClipboardSelection(
     const visit = byId.get(path.at(-1)!);
     if (
       !visit ||
-      !isShapeGroupEligibleRoot(visit.root) ||
+      !isDrawingClipboardEligibleRoot(visit.root) ||
       visit.path.length !== path.length ||
       !below(visit.path, path)
     )
@@ -179,9 +182,9 @@ export function captureShapeClipboardSelection(
   }
   const roots = selectedPaths.map((path): SheetDrawing => {
     const root = capturedRoots.get(path[0]!)!;
-    if (!isShapeGroupEligibleRoot(root)) throw new ShapeClipboardError("invalid-selection");
+    if (!isDrawingClipboardEligibleRoot(root)) throw new ShapeClipboardError("invalid-selection");
     if (path.length === 1) {
-      if (resolveShapeRootLayout(root, metrics).collapsed)
+      if (resolveDrawingClipboardRootLayout(root, metrics).collapsed)
         throw new ShapeClipboardError("collapsed-selection");
       return root;
     }
@@ -251,11 +254,11 @@ export function placeShapeClipboardRoots(
   )
     throw new ShapeClipboardError("invalid-placement");
   const roots = normalizeShapeDrawingForest(values);
-  if (!roots.length || roots.some((root) => !isShapeGroupEligibleRoot(root)))
+  if (!roots.length || roots.some((root) => !isDrawingClipboardEligibleRoot(root)))
     throw new ShapeClipboardError("invalid-selection");
   const boxes = roots.map((root) => {
-    if (!isShapeGroupEligibleRoot(root)) throw new ShapeClipboardError("invalid-selection");
-    const layout = resolveShapeRootLayout(root, sourceMetrics);
+    if (!isDrawingClipboardEligibleRoot(root)) throw new ShapeClipboardError("invalid-selection");
+    const layout = resolveDrawingClipboardRootLayout(root, sourceMetrics);
     if (layout.collapsed) throw new ShapeClipboardError("collapsed-selection");
     return layout.rect;
   });
@@ -291,7 +294,7 @@ export function placeShapeClipboardRoots(
     };
   });
   const result = normalizeShapeDrawingForest(placed);
-  assertShapeDrawingForestLayouts(result, targetMetrics);
+  assertDrawingClipboardForestLayouts(result, targetMetrics);
   return result;
 }
 
@@ -306,6 +309,7 @@ export function planShapeClipboardPaste(options: {
   createId: () => string;
 }): { roots: SheetDrawing[]; nextForest: SheetDrawing[] } {
   const target = normalizeShapeDrawingForest(options.targetForest);
+  assertDrawingClipboardForestLayouts(target, options.targetMetrics);
   const roots = planCloneShapeRootsForClipboard(
     options.selection.roots,
     options.selection.roots.map((root) => root.id),
@@ -331,11 +335,13 @@ export function planShapeClipboardPaste(options: {
       ? planDeleteShapeGroupNodes(target, options.selection.selectedPaths, options.sourceMetrics)
       : target;
   const nextForest = normalizeShapeDrawingForest([...surviving, ...placed]);
-  assertShapeDrawingForestLayouts(nextForest, options.targetMetrics);
+  assertDrawingClipboardForestLayouts(nextForest, options.targetMetrics);
   return { roots: placed, nextForest };
 }
 
 export type ShapeClipboardCrossSheetPlan = {
+  /** Fresh outer IDs retain an explicit source identity for transfer admission. */
+  equationSources: readonly { sourceId: string; targetId: string }[];
   roots: SheetDrawing[];
   sourceForest: SheetDrawing[];
   targetForest: SheetDrawing[];
@@ -353,6 +359,7 @@ export function planCrossSheetShapeClipboardCut(options: {
   createId: () => string;
 }): ShapeClipboardCrossSheetPlan {
   const source = normalizeShapeDrawingForest(options.selection.sourceForest);
+  assertDrawingClipboardForestLayouts(source, options.sourceMetrics);
   const visits = source.flatMap<SourceVisit>((root) =>
     isShapeGroupDrawing(root)
       ? traverseShapeGroup(root).map(({ node, path }) => ({ node, path, root }))
@@ -380,7 +387,22 @@ export function planCrossSheetShapeClipboardCut(options: {
     options.sourceMetrics,
   );
   const pasted = planShapeClipboardPaste({ ...options, mode: "copy" });
+  const flatten = (roots: readonly SheetDrawing[]) =>
+    roots.flatMap<SheetDrawing | ShapeGroupNode>((root) =>
+      root.kind === "shapeGroup" ? traverseShapeGroup(root).map(({ node }) => node) : [root],
+    );
+  const originals = flatten(options.selection.roots),
+    clones = flatten(pasted.roots);
+  if (originals.length !== clones.length) throw new ShapeClipboardError("command-rejected");
+  const equationSources = originals.flatMap((sourceNode, index) => {
+    const targetNode = clones[index]!;
+    if (sourceNode.kind !== targetNode.kind) throw new ShapeClipboardError("command-rejected");
+    if (sourceNode.kind !== "equation") return [];
+    assertEquationGeometryPreserved(sourceNode, targetNode);
+    return [{ sourceId: sourceNode.id, targetId: targetNode.id }];
+  });
   return {
+    equationSources,
     roots: pasted.roots,
     sourceForest,
     targetForest: pasted.nextForest,

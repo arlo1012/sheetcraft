@@ -52,6 +52,6 @@ export function target(drawing: SheetDrawing) {
     return drawing;
   }
   const node = traverseShapeGroup(drawing).find(({ node }) => node.kind === "textBox")!.node;
-  if (node.kind === "shapeGroup") throw Error("Expected text box");
+  if (node.kind !== "textBox") throw Error("Expected text box");
   return node;
 }

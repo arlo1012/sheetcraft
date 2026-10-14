@@ -111,7 +111,8 @@ describe("canonical canvas text session and real Core transactions", () => {
         root.kind === "shapeGroup"
           ? findShapeGroupNode(root, ["outer", "nested", "target"])!.node
           : root;
-      if (target.kind === "shapeGroup") throw Error("Expected text leaf");
+      if (target.kind !== "shape" && target.kind !== "textBox")
+        throw Error("Expected graphic text leaf");
       target.shapeText!.layout.autoFit = "resize-shape";
       const f = fixture(owned ? [root] : [root, connectorRoot()]);
       try {

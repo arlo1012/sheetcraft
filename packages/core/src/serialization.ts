@@ -308,6 +308,12 @@ export type WorkbookSnapshotV72 = Omit<WorkbookSnapshotV71, "version"> & { versi
 export type WorkbookSnapshotV73 = Omit<WorkbookSnapshotV72, "version"> & { version: 73 };
 /** Conditional envelope for TextBox single-cell references. */
 export type WorkbookSnapshotV74 = Omit<WorkbookSnapshotV73, "version"> & { version: 74 };
+/** Conditional envelope for explicitly owned structured equation documents. */
+export type WorkbookSnapshotV75 = Omit<WorkbookSnapshotV74, "version"> & { version: 75 };
+/** Conditional envelope for canonical raw or structured Equation root placement. */
+export type WorkbookSnapshotV76 = Omit<WorkbookSnapshotV75, "version"> & { version: 76 };
+/** Conditional envelope for Equation-owned group children and dedicated math flip state. */
+export type WorkbookSnapshotV77 = Omit<WorkbookSnapshotV76, "version"> & { version: 77 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -340,8 +346,11 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV71
   | WorkbookSnapshotV72
   | WorkbookSnapshotV73
-  | WorkbookSnapshotV74;
-type WorkbookWritePayload = Omit<WorkbookSnapshotV74, "version"> & {
+  | WorkbookSnapshotV74
+  | WorkbookSnapshotV75
+  | WorkbookSnapshotV76
+  | WorkbookSnapshotV77;
+type WorkbookWritePayload = Omit<WorkbookSnapshotV77, "version"> & {
   version: WorkbookSnapshot["version"];
 };
 export type SheetSnapshot = SheetSnapshotV7 & {
@@ -434,7 +443,10 @@ type SnapshotVersion =
   | 71
   | 72
   | 73
-  | 74;
+  | 74
+  | 75
+  | 76
+  | 77;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -470,6 +482,9 @@ function inspectShapeSnapshotFeatures(
   hasTextBox3d: boolean;
   hasTextBoxBodyStyle: boolean;
   hasTextReference: boolean;
+  hasEquationDocument: boolean;
+  hasEquationFrame: boolean;
+  hasEquationGroupFlip: boolean;
   hasOpenArea: boolean;
   hasModernWordArt: boolean;
   hasTextWarp: boolean;
@@ -479,6 +494,9 @@ function inspectShapeSnapshotFeatures(
     hasTextBox3d = false,
     hasTextBoxBodyStyle = false,
     hasTextReference = false,
+    hasEquationDocument = false,
+    hasEquationFrame = false,
+    hasEquationGroupFlip = false,
     hasOpenArea = false,
     hasModernWordArt = false,
     hasTextWarp = false,
@@ -494,6 +512,52 @@ function inspectShapeSnapshotFeatures(
       const node = asRecord(entry.value, path);
       if (seen.has(node)) throw new TypeError("Cyclic or shared shape group ownership.");
       seen.add(node);
+      const drawingKind = Object.getOwnPropertyDescriptor(node, "kind")?.value;
+      const hasMathFlipField = "equationFlipX" in node || "equationFlipY" in node;
+      const hasOwnedEquation =
+        drawingKind === "equation" && (entry.depth > 0 || "groupFrame" in node);
+      if (hasMathFlipField || hasOwnedEquation) {
+        // Reject earlier envelopes by feature presence before reading even malformed math fields.
+        if (version !== undefined && version < 77)
+          return fail(path, "Equation group children and math flips require snapshot version 77.");
+        for (const key of ["equationFlipX", "equationFlipY"] as const) {
+          if (!(key in node)) continue;
+          const field = Object.getOwnPropertyDescriptor(node, key);
+          if (!field || !("value" in field) || field.value !== true || drawingKind !== "equation")
+            return fail(
+              `${path}.${key}`,
+              "Equation flips require Equation-only sparse true data fields.",
+            );
+        }
+        hasEquationGroupFlip = true;
+      }
+      if (drawingKind === "equation" && ("shapeFrame" in node || "shapeProperties" in node)) {
+        // Both opaque raw source and structured documents use this new placement protocol.
+        // Reject old envelopes before touching even malformed or inherited frame payloads.
+        if (version !== undefined && version < 76)
+          return fail(
+            `${path}.shapeFrame`,
+            "Canonical equation placement requires snapshot version 76.",
+          );
+        for (const key of ["shapeFrame", "shapeProperties"] as const) {
+          if (!(key in node)) continue;
+          const field = Object.getOwnPropertyDescriptor(node, key);
+          if (!field || !("value" in field))
+            return fail(`${path}.${key}`, "Equation placement must use own data fields.");
+        }
+        hasEquationFrame = true;
+      }
+      if ("equationDocument" in node) {
+        if (version !== undefined && version < 75)
+          return fail(
+            `${path}.equationDocument`,
+            "Equation documents require snapshot version 75.",
+          );
+        const equationField = Object.getOwnPropertyDescriptor(node, "equationDocument");
+        if (!equationField || !("value" in equationField))
+          return fail(`${path}.equationDocument`, "Equation documents must be own data fields.");
+        hasEquationDocument = true;
+      }
       if ("textReference" in node) {
         if (version !== undefined && version < 74)
           return fail(`${path}.textReference`, "Text box references require snapshot version 74.");
@@ -616,6 +680,9 @@ function inspectShapeSnapshotFeatures(
     hasTextBox3d,
     hasTextBoxBodyStyle,
     hasTextReference,
+    hasEquationDocument,
+    hasEquationFrame,
+    hasEquationGroupFlip,
     hasOpenArea,
     hasModernWordArt,
     hasTextWarp,
@@ -1715,6 +1782,9 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
   let hasTextBoxBody3d = false;
   let hasTextBoxBodyStyle = false;
   let hasTextReference = false;
+  let hasEquationDocument = false;
+  let hasEquationFrame = false;
+  let hasEquationGroupFlip = false;
   let hasOpenShapeArea = false;
   let hasModernWordArt = false;
   let hasTextWarp = false;
@@ -1732,6 +1802,9 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       hasTextBoxBody3d ||= scene.hasTextBox3d;
       hasTextBoxBodyStyle ||= scene.hasTextBoxBodyStyle;
       hasTextReference ||= scene.hasTextReference;
+      hasEquationDocument ||= scene.hasEquationDocument;
+      hasEquationFrame ||= scene.hasEquationFrame;
+      hasEquationGroupFlip ||= scene.hasEquationGroupFlip;
       hasOpenShapeArea ||= scene.hasOpenArea;
       hasModernWordArt ||= scene.hasModernWordArt;
       hasTextWarp ||= scene.hasTextWarp;
@@ -2130,6 +2203,9 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     // Infer last so unrelated earlier features cannot lower the text-box body protocol.
     if (hasTextBoxBodyStyle) version = 73;
     if (hasTextReference) version = 74;
+    if (hasEquationDocument) version = 75;
+    if (hasEquationFrame) version = 76;
+    if (hasEquationGroupFlip) version = 77;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -2450,6 +2526,30 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     )
   )
     snapshot.version = 74;
+  if (
+    sheets.some((sheet) =>
+      sheet.drawings?.some(
+        (drawing) => inspectShapeSnapshotFeatures(drawing, "$.drawings").hasEquationDocument,
+      ),
+    )
+  )
+    snapshot.version = 75;
+  if (
+    sheets.some((sheet) =>
+      sheet.drawings?.some(
+        (drawing) => inspectShapeSnapshotFeatures(drawing, "$.drawings").hasEquationFrame,
+      ),
+    )
+  )
+    snapshot.version = 76;
+  if (
+    sheets.some((sheet) =>
+      sheet.drawings?.some(
+        (drawing) => inspectShapeSnapshotFeatures(drawing, "$.drawings").hasEquationGroupFlip,
+      ),
+    )
+  )
+    snapshot.version = 77;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -2531,7 +2631,10 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 71 &&
     record.version !== 72 &&
     record.version !== 73 &&
-    record.version !== 74
+    record.version !== 74 &&
+    record.version !== 75 &&
+    record.version !== 76 &&
+    record.version !== 77
   ) {
     throw new WorkbookDomainError(
       {

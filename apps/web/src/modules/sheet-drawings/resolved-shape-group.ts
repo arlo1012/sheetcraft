@@ -6,6 +6,7 @@ import {
   type ShapeGroupedGroup,
   type ShapeGroupPath,
   type SheetGroupedGraphicDrawing,
+  type SheetGroupedEquationDrawing,
 } from "@sheetcraft/core/shape-group";
 import {
   resolveShapeGroup,
@@ -27,6 +28,7 @@ import {
 } from "@sheetcraft/core/shape-frame";
 import { getShapeObjectProperties } from "@sheetcraft/core/shape-object-properties";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import { assertEquationGeometryPreserved } from "./equation/equation-source-ownership";
 import type { PictureRotation3d } from "@sheetcraft/core/picture-detailed-style";
 import {
   createShapeGroupSceneProjection,
@@ -36,7 +38,7 @@ import {
 /** Exact public ownership is separate from each disposable, world-space view. */
 export type ResolvedShapeGroupLeaf = {
   readonly sourceRoot: ShapeGroupDrawing;
-  readonly sourceNode: SheetGroupedGraphicDrawing;
+  readonly sourceNode: SheetGroupedGraphicDrawing | SheetGroupedEquationDrawing;
   readonly metrics: PictureSheetMetrics;
   readonly path: ShapeGroupPath;
   readonly parentPath: ShapeGroupPath;
@@ -80,6 +82,9 @@ const appearanceFields = [
   "name",
   "hidden",
   "text",
+  "equationDocument",
+  "equationFlipX",
+  "equationFlipY",
   "textReference",
   "shape",
   "fill",
@@ -137,7 +142,7 @@ function pickAppearance(value: object): Record<string, unknown> {
 }
 
 function worldView(
-  node: SheetGroupedGraphicDrawing,
+  node: SheetGroupedGraphicDrawing | SheetGroupedEquationDrawing,
   layout: ResolvedShapeFrame,
   metrics: PictureSheetMetrics,
 ): SheetGraphicDrawing {
@@ -278,6 +283,7 @@ export function updateResolvedShapeGroupLeaf(
   const fields = readDataRecord(nextView, viewFields);
   if (fields.id !== leaf.sourceNode.id || fields.kind !== leaf.sourceNode.kind)
     throw new TypeError("A shape group view edit must retain its source identity and kind.");
+  assertEquationGeometryPreserved(leaf.sourceNode, nextView);
   if (
     leaf.sourceNode.kind === "textBox" &&
     leaf.sourceNode.textReference &&
@@ -295,7 +301,7 @@ export function updateResolvedShapeGroupLeaf(
     rotation: source.rotation,
     groupFrame: source.groupFrame,
     ...(source.shapeProperties ? { shapeProperties: source.shapeProperties } : {}),
-  } as SheetGroupedGraphicDrawing;
+  } as SheetGroupedGraphicDrawing | SheetGroupedEquationDrawing;
   return applyShapeGroupChildWorldEdit(
     leaf.sourceRoot,
     leaf.lease,

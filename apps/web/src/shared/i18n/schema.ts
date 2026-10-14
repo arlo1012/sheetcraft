@@ -1,3 +1,4 @@
+import type { equationMessagesEnUS } from "../../modules/sheet-drawings/equation/equation-messages.en-US";
 import type { symbolsEnUS } from "../../modules/insert-tools/symbol-messages.en-US";
 import type { pivotsEnUS } from "../../modules/pivot-tables/pivot-messages.en-US";
 import type { controlsEnUS } from "../../modules/form-controls/control-messages.en-US";
@@ -49,6 +50,7 @@ type ToolMessageSchema = typeof symbolsEnUS &
   PictureFormatMessageSchema;
 
 export type MessageSchema = ToolMessageSchema & {
+  equation: { [Key in keyof typeof equationMessagesEnUS]: string };
   dataTools: {
     dropdownList: string;
     dropdown: {

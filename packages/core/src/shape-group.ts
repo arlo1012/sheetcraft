@@ -13,7 +13,11 @@ import {
   type ShapeDetailedStyle,
 } from "./shape-style.js";
 import { getShapeTextAssetIds } from "./shape-text.js";
-import { normalizeSheetDrawing, type SheetFramedGraphicDrawing } from "./sheet-drawings.js";
+import {
+  normalizeSheetDrawing,
+  type SheetFramedGraphicDrawing,
+  type SheetFramedEquationDrawing,
+} from "./sheet-drawings.js";
 import { MAX_SHAPE_GROUP_DEPTH, MAX_SHAPE_GROUP_NODES } from "./shape-group-limits.js";
 export { MAX_SHAPE_GROUP_DEPTH, MAX_SHAPE_GROUP_NODES } from "./shape-group-limits.js";
 
@@ -40,6 +44,10 @@ export type ShapeGroupLocalFrame = {
 export type SheetGroupedGraphicDrawing = Omit<SheetFramedGraphicDrawing, "shapeFrame"> & {
   groupFrame: ShapeGroupLocalFrame;
 };
+/** Dedicated math source; an Equation never acquires shape body/text fields. */
+export type SheetGroupedEquationDrawing = Omit<SheetFramedEquationDrawing, "shapeFrame"> & {
+  groupFrame: ShapeGroupLocalFrame;
+};
 export type ShapeGroupedGroup = {
   kind: "shapeGroup";
   id: string;
@@ -55,7 +63,10 @@ export type ShapeGroupedGroup = {
   /** Bottom-to-top sibling order; this array is the only ownership relation. */
   members: ShapeGroupChild[];
 };
-export type ShapeGroupChild = SheetGroupedGraphicDrawing | ShapeGroupedGroup;
+export type ShapeGroupChild =
+  | SheetGroupedGraphicDrawing
+  | SheetGroupedEquationDrawing
+  | ShapeGroupedGroup;
 export type ShapeGroupDrawing = {
   kind: "shapeGroup";
   id: string;
@@ -130,9 +141,17 @@ export function isSheetGroupedGraphicDrawing(value: unknown): value is SheetGrou
   const tag = kind(value);
   return (tag === "shape" || tag === "textBox") && Object.hasOwn(value as object, "groupFrame");
 }
+export function isSheetGroupedEquationDrawing(
+  value: unknown,
+): value is SheetGroupedEquationDrawing {
+  return kind(value) === "equation" && Object.hasOwn(value as object, "groupFrame");
+}
 export function isShapeGroupNode(value: unknown): value is ShapeGroupNode {
   return (
-    isShapeGroupDrawing(value) || isShapeGroupedGroup(value) || isSheetGroupedGraphicDrawing(value)
+    isShapeGroupDrawing(value) ||
+    isShapeGroupedGroup(value) ||
+    isSheetGroupedGraphicDrawing(value) ||
+    isSheetGroupedEquationDrawing(value)
   );
 }
 
@@ -176,6 +195,34 @@ const leafKeys = [
   "shapeProperties",
   "groupFrame",
 ] as const;
+const equationLeafKeys = [
+  "kind",
+  "id",
+  "name",
+  "text",
+  "shape",
+  "fill",
+  "stroke",
+  "strokeWidth",
+  "color",
+  "fontSize",
+  "bold",
+  "italic",
+  "rotation",
+  "equationDocument",
+  "equationFlipX",
+  "equationFlipY",
+  "hidden",
+  "shapeProperties",
+  "groupFrame",
+] as const;
+const equationOptionalLeafKeys = [
+  "equationDocument",
+  "equationFlipX",
+  "equationFlipY",
+  "hidden",
+  "shapeProperties",
+] as const;
 function nodeRecord(value: unknown, root: boolean): Record<string, unknown> {
   if (
     value &&
@@ -192,6 +239,21 @@ function nodeRecord(value: unknown, root: boolean): Record<string, unknown> {
     return record(value, [...groupKeys, "shapeFrame"], "root shape group");
   if (!root && kind(value) === "shapeGroup")
     return record(value, [...groupKeys, "groupFrame"], "nested shape group");
+  if (!root && kind(value) === "equation") {
+    const source = record(value, equationLeafKeys, "grouped equation drawing");
+    if (!value || typeof value !== "object")
+      throw new TypeError("Expected an owned Equation data record.");
+    // Validate ORIGINAL field presence before any copy could erase inherited or non-enumerable data.
+    for (const key of equationLeafKeys) {
+      const field = Object.getOwnPropertyDescriptor(value, key);
+      if (!field) {
+        if (key in value || !(equationOptionalLeafKeys as readonly string[]).includes(key))
+          throw new TypeError("Grouped equations require own source and placement data fields.");
+      } else if (!("value" in field) || field.value === undefined)
+        throw new TypeError("Grouped equations require defined own data fields, not accessors.");
+    }
+    return source;
+  }
   if (!root && (kind(value) === "shape" || kind(value) === "textBox"))
     return record(value, leafKeys, "grouped graphic drawing");
   throw new TypeError(root ? "Expected a root shape group." : "Unknown shape group child kind.");
@@ -200,9 +262,18 @@ function nodeRecord(value: unknown, root: boolean): Record<string, unknown> {
 /** Validate the entire ownership graph before normalizing any appearance or placement. */
 function preflight(values: readonly unknown[], roots: boolean): void {
   const entries = readPictureDataArray(values, "shape group collection", MAX_SHAPE_GROUP_NODES);
-  const pending = entries.map((value) => ({ value, depth: 0, root: roots, activeCamera: false }));
+  const pending = entries.map((value, tree) => ({
+    value,
+    tree,
+    depth: 0,
+    root: roots,
+    activeCamera: false,
+    activeEffects: false,
+  }));
   const seen = new WeakSet<object>();
   const ids = new Set<string>();
+  const equationTrees = new Set<number>();
+  const composedTrees = new Set<number>();
   let count = 0;
   while (pending.length) {
     const entry = pending.pop()!;
@@ -217,12 +288,24 @@ function preflight(values: readonly unknown[], roots: boolean): void {
     const id = nonempty(node.id, "Shape group node ID");
     if (ids.has(id)) throw new TypeError("Duplicate shape group node IDs.");
     ids.add(id);
+    if (node.kind === "equation") equationTrees.add(entry.tree);
+    if (node.kind === "equation" && (entry.activeCamera || entry.activeEffects))
+      throw new TypeError("Equations under active group effects or 3D are unsupported.");
     if (node.kind !== "shapeGroup") continue;
+    const groupEffects = normalizeShapeGroupEffects(node.groupEffects);
+    const activeEffects =
+      entry.activeEffects ||
+      SHAPE_GROUP_EFFECT_CATEGORIES.some((key) => groupEffects?.[key]?.kind === "value");
     const group3d = normalizeShapeGroup3d(node.group3d);
     const ownsCamera = group3d?.rotation3d.kind === "value";
     if (entry.activeCamera && ownsCamera)
       throw new TypeError("Simultaneous nested shape group 3D cameras are unsupported.");
     const activeCamera = entry.activeCamera || ownsCamera;
+    if (
+      ownsCamera ||
+      SHAPE_GROUP_EFFECT_CATEGORIES.some((key) => groupEffects?.[key]?.kind === "value")
+    )
+      composedTrees.add(entry.tree);
     const members = readPictureDataArray(
       node.members as readonly unknown[],
       "shape group members",
@@ -236,8 +319,22 @@ function preflight(values: readonly unknown[], roots: boolean): void {
     if (count + pending.length + members.length > MAX_SHAPE_GROUP_NODES)
       throw new RangeError("Shape group node budget exceeded.");
     for (let index = members.length - 1; index >= 0; index--)
-      pending.push({ value: members[index], depth: entry.depth + 1, root: false, activeCamera });
+      pending.push({
+        value: members[index],
+        tree: entry.tree,
+        depth: entry.depth + 1,
+        root: false,
+        activeCamera,
+        activeEffects,
+      });
   }
+  // Any active nested owner currently invokes the root-wide body compositor.
+  // A disjoint Equation sibling is equally unsupported until native math composition exists.
+  for (const tree of equationTrees)
+    if (composedTrees.has(tree))
+      throw new TypeError(
+        "Equations in shape-group trees with active effects or 3D are unsupported.",
+      );
 }
 
 export function normalizeShapeGroupLocalRect(value: ShapeGroupLocalRect): ShapeGroupLocalRect {
@@ -279,6 +376,34 @@ function normalizeChildUnchecked(value: ShapeGroupChild): ShapeGroupChild {
       groupFrame,
       members: (source.members as ShapeGroupChild[]).map(normalizeChildUnchecked),
     };
+  if (isSheetGroupedEquationDrawing(value)) {
+    // Descriptor values collected above retain every permitted non-enumerable own field.
+    // Only placement changes; the dedicated root validator still owns complete math admission.
+    const mathDescriptors: PropertyDescriptorMap = Object.create(null);
+    for (const key of equationLeafKeys)
+      if (key !== "groupFrame" && Object.hasOwn(source, key))
+        mathDescriptors[key] = {
+          value: source[key],
+          enumerable: true,
+          writable: true,
+          configurable: true,
+        };
+    mathDescriptors.rotation = {
+      value: normalizePictureAngle(source.rotation as number),
+      enumerable: true,
+    };
+    mathDescriptors.shapeFrame = {
+      value: {
+        kind: "shape-frame-v1",
+        anchor: { mode: "fixed", x: 0, y: 0, size: { width: 1, height: 1 } },
+      },
+      enumerable: true,
+    };
+    const mathSource: SheetFramedEquationDrawing = Object.create(null, mathDescriptors);
+    const normalized = normalizeSheetDrawing(mathSource);
+    const { shapeFrame: _rootFrame, ...math } = normalized;
+    return { ...math, groupFrame };
+  }
   const shapeProperties = normalizeShapeObjectProperties(source.shapeProperties);
   // Existing graphic validators retain their geometry, text, font and paint contracts.
   // This temporary view is never persisted and never creates a picture/source model.
@@ -317,6 +442,15 @@ export function normalizeShapeGroup(value: ShapeGroupDrawing): ShapeGroupDrawing
 export function normalizeShapeGroupChild(value: ShapeGroupChild): ShapeGroupChild {
   preflight([value], false);
   return normalizeChildUnchecked(value);
+}
+/** Dedicated Equation admission keeps the shape/text-box leaf guard and contract separate. */
+export function normalizeSheetGroupedEquationDrawing(
+  value: SheetGroupedEquationDrawing,
+): SheetGroupedEquationDrawing {
+  const normalized = normalizeShapeGroupChild(value);
+  if (!isSheetGroupedEquationDrawing(normalized))
+    throw new TypeError("Expected a dedicated owned Equation drawing.");
+  return normalized;
 }
 /** Collection preflight checks shared ownership and IDs across every owned tree. */
 export function normalizeShapeGroupCollection(
@@ -379,7 +513,7 @@ export function collectShapeGroupNodeIds(value: ShapeGroupDrawing): Set<string> 
 export function collectShapeGroupAssetIds(value: ShapeGroupDrawing): Set<string> {
   const ids = new Set<string>();
   for (const { node } of traverseShapeGroup(value)) {
-    if (node.kind === "shapeGroup") continue;
+    if (node.kind === "shapeGroup" || node.kind === "equation") continue;
     for (const id of getShapeStyleAssetIds(node.shapeStyle)) ids.add(id);
     for (const id of getShapeTextAssetIds(node.shapeText, node.text)) ids.add(id);
   }

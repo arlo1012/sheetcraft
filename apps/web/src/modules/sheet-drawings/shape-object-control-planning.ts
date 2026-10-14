@@ -9,13 +9,13 @@ import {
   MAX_SHAPE_GROUP_DEPTH,
   MAX_SHAPE_GROUP_NODES,
   traverseShapeGroup,
-  type ShapeGroupChild,
   type ShapeGroupNode,
   type ShapeGroupPath,
 } from "@sheetcraft/core/shape-group";
 import {
   assertShapeDrawingForestLayouts,
   normalizeShapeDrawingForest,
+  planFlipShapeDrawingNodes,
 } from "@sheetcraft/core/shape-group-planning";
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "@sheetcraft/core/workbook";
@@ -27,7 +27,6 @@ import type {
 export type { ShapeObjectControlAction } from "./shape-object-controls-contract";
 
 type Target = { node: SheetDrawing | ShapeGroupNode; path: ShapeGroupPath };
-type FlipAxis = "shapeFlipX" | "shapeFlipY";
 
 function dataArray<T>(
   value: readonly T[],
@@ -202,51 +201,6 @@ function reorder<T extends { id: string }>(
   return next;
 }
 
-function assertFlippable(node: SheetDrawing | ShapeGroupNode, reflectedMember = false): void {
-  if (node.kind === "shapeGroup") {
-    for (const member of node.members) assertFlippable(member, true);
-    return;
-  }
-  if (node.kind !== "shape" && node.kind !== "textBox")
-    throw new TypeError("Shape flips require a shape or text box.");
-  if (node.kind === "shape" && node.shapeConnector && !reflectedMember)
-    throw new TypeError("A live connector cannot use ordinary shape flip geometry.");
-}
-
-function toggleFlip(node: SheetDrawing | ShapeGroupNode, axis: FlipAxis): void {
-  if (node.kind !== "shape" && node.kind !== "textBox")
-    throw new TypeError("Only shape or text box leaves have flip flags.");
-  if (node[axis]) delete node[axis];
-  else node[axis] = true;
-}
-
-/**
- * F R(a) = R(-a) F. Reflect each local center, negate each relative
- * member angle, then recurse with the same reflection into nested owners.
- * Diagonal owner scaling commutes with F, so dimensions remain orthogonal
- * even in nonuniformly scaled, rotated groups. No world AABB or shear is
- * persisted. Ungroup retains this world visual result rather than changing
- * the reflected member angle back. Connector descendants keep ordered site
- * identities and free ratios. Their reflected carrier/flags project free tips;
- * bound tips resolve the actual target site, even outside this selected owner.
- * The complete forest resolver validates the resulting route before commit.
- */
-function reflectMember(member: ShapeGroupChild, axis: FlipAxis): void {
-  const rect = member.groupFrame.rect;
-  member.groupFrame = {
-    ...member.groupFrame,
-    rect: {
-      ...rect,
-      ...(axis === "shapeFlipX"
-        ? { xRatio: 1 - rect.xRatio - rect.widthRatio }
-        : { yRatio: 1 - rect.yRatio - rect.heightRatio }),
-    },
-  };
-  member.rotation = normalizePictureAngle(-member.rotation);
-  if (member.kind === "shapeGroup") for (const child of member.members) reflectMember(child, axis);
-  else toggleFlip(member, axis);
-}
-
 /** Pure complete-forest plan; caller routes a changed collection through Core history. */
 export function planShapeObjectControlAction(
   values: readonly SheetDrawing[],
@@ -280,6 +234,7 @@ export function planShapeObjectControlAction(
       !samePath(target.path, path) ||
       (target.node.kind !== "shape" &&
         target.node.kind !== "textBox" &&
+        target.node.kind !== "equation" &&
         target.node.kind !== "shapeGroup")
     )
       throw new TypeError("Shape object target is missing, stale, reparented or ineligible.");
@@ -298,13 +253,12 @@ export function planShapeObjectControlAction(
       owner.members = reorder(owner.members, selected, action);
     }
   } else if (action === "flip-horizontal" || action === "flip-vertical") {
-    // Validate every selected subtree before applying any edit.
-    for (const { node } of targets) assertFlippable(node);
-    const axis = action === "flip-horizontal" ? "shapeFlipX" : "shapeFlipY";
-    for (const { node } of targets)
-      if (node.kind === "shapeGroup")
-        for (const member of node.members) reflectMember(member, axis);
-      else toggleFlip(node, axis);
+    return planFlipShapeDrawingNodes(
+      roots,
+      paths,
+      action === "flip-horizontal" ? "horizontal" : "vertical",
+      metrics,
+    );
   } else {
     for (const { node } of targets)
       if (node.kind === "shape" && node.shapeConnector)

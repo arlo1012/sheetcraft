@@ -1,3 +1,9 @@
+import { normalizeEquationFlipState, type EquationFlipState } from "./equation-flip.js";
+import {
+  normalizeEquationDocument,
+  serializeEquationDocument,
+  type EquationDocument,
+} from "./equation-document.js";
 import { normalizeShapeConnector, type ShapeConnector } from "./shape-connector.js";
 import { validateShapeConnectorReferences } from "./shape-connector-layout.js";
 import { readPictureDataArray } from "./picture-data-array.js";
@@ -72,6 +78,11 @@ type DrawingBase = {
 export type SheetShapeGeometry = ShapePresetParameters;
 export type SheetGraphicDrawing = DrawingBase & {
   kind: SheetGraphicKind;
+  /** Explicit structured math for kind=equation only; text is its exact generated LaTeX mirror. */
+  equationDocument?: EquationDocument;
+  /** Equation-only source identity; these never mirror a shape body. */
+  equationFlipX?: true;
+  equationFlipY?: true;
   /** Only kind=shape may carry this feature. Other drawing kinds retain their own contracts. */
   shapeGeometry?: SheetShapeGeometry;
   /** Bounded numeric free geometry; exclusive with standard shapeGeometry. */
@@ -115,13 +126,30 @@ export type SheetLegacyDrawing =
 /** Canonical source-free placement, never accompanied by legacy physical fields. */
 export type SheetFramedGraphicDrawing = Omit<
   SheetGraphicDrawing,
-  "anchor" | "offsetX" | "offsetY" | "width" | "height" | "kind"
+  "anchor" | "offsetX" | "offsetY" | "width" | "height" | "kind" | "equationFlipX" | "equationFlipY"
 > & {
   kind: "shape" | "textBox";
   shapeFrame: ShapeFrame;
   shapeProperties?: ShapeObjectProperties;
 };
-export type SheetDrawing = SheetLegacyDrawing | SheetFramedGraphicDrawing | ShapeGroupDrawing;
+/** Equation source and placement are independent of shape body/text formatting. */
+export type SheetFramedEquationDrawing = Omit<
+  DrawingBase,
+  "anchor" | "offsetX" | "offsetY" | "width" | "height"
+> &
+  EquationFlipState & {
+    kind: "equation";
+    /** Absence retains opaque legacy source; presence requires its exact generated text mirror. */
+    equationDocument?: EquationDocument;
+    hidden?: true;
+    shapeFrame: ShapeFrame;
+    shapeProperties?: ShapeObjectProperties;
+  };
+export type SheetDrawing =
+  | SheetLegacyDrawing
+  | SheetFramedGraphicDrawing
+  | SheetFramedEquationDrawing
+  | ShapeGroupDrawing;
 type DrawingAppearance =
   | Omit<SheetGraphicDrawing, "anchor" | "offsetX" | "offsetY" | "width" | "height">
   | Omit<SheetChartDrawing, "anchor" | "offsetX" | "offsetY" | "width" | "height">
@@ -132,11 +160,18 @@ export function isFramedShapeDrawing(value: SheetDrawing): value is SheetFramedG
   const kind: unknown = Object.getOwnPropertyDescriptor(value, "kind")?.value;
   return (kind === "shape" || kind === "textBox") && "shapeFrame" in value;
 }
+/** Placement only; Equation body and owned membership use separate contracts. */
+export function isFramedEquationDrawing(value: SheetDrawing): value is SheetFramedEquationDrawing {
+  const kind: unknown = Object.getOwnPropertyDescriptor(value, "kind")?.value;
+  return kind === "equation" && "shapeFrame" in value;
+}
 /** Root placement only. Containers do not have leaf geometry, text or paint. */
 export function hasShapeObjectFrame(
   value: SheetDrawing,
-): value is SheetFramedGraphicDrawing | ShapeGroupDrawing {
-  return isFramedShapeDrawing(value) || isShapeGroupDrawing(value);
+): value is SheetFramedGraphicDrawing | SheetFramedEquationDrawing | ShapeGroupDrawing {
+  return (
+    isFramedShapeDrawing(value) || isFramedEquationDrawing(value) || isShapeGroupDrawing(value)
+  );
 }
 /** Temporary consumer gate; it never drops a frame or invents legacy storage coordinates. */
 export function requireLegacySheetDrawing(value: SheetDrawing): SheetLegacyDrawing {
@@ -311,13 +346,20 @@ function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance
   };
   const shapeFlipX = normalizeFlip("shapeFlipX"),
     shapeFlipY = normalizeFlip("shapeFlipY");
+  const equationFlips =
+    "equationFlipX" in value || "equationFlipY" in value ? normalizeEquationFlipState(value) : {};
   const hiddenField = Object.getOwnPropertyDescriptor(value, "hidden");
   if (!hiddenField && "hidden" in value)
     throw new TypeError("Shape visibility must be an own data field.");
   if (hiddenField && !("value" in hiddenField))
     throw new TypeError("Shape visibility cannot be an accessor.");
-  if (hiddenField && value.kind !== "shape" && value.kind !== "textBox")
-    throw new TypeError("Only shapes or text boxes may carry shape visibility.");
+  if (
+    hiddenField &&
+    value.kind !== "shape" &&
+    value.kind !== "textBox" &&
+    (value.kind !== "equation" || !("shapeFrame" in value))
+  )
+    throw new TypeError("Only shapes, text boxes or framed equations may carry shape visibility.");
   if (hiddenField && typeof hiddenField.value !== "boolean")
     throw new TypeError("Shape visibility must be a boolean.");
   const hidden = hiddenField?.value === true;
@@ -346,6 +388,16 @@ function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance
   )
     throw new TypeError("Live connectors require canonical standard line geometry.");
   const shapeConnector = connectorField ? normalizeShapeConnector(connectorField.value) : undefined;
+  const equationField = Object.getOwnPropertyDescriptor(value, "equationDocument");
+  if (!equationField && "equationDocument" in value)
+    throw new TypeError("Equation documents must be own data fields.");
+  if (equationField && (!("value" in equationField) || value.kind !== "equation"))
+    throw new TypeError("Only equation drawings may own equation document data fields.");
+  const equationDocument = equationField
+    ? normalizeEquationDocument(equationField.value)
+    : undefined;
+  if (equationDocument && value.text !== serializeEquationDocument(equationDocument))
+    throw new TypeError("Equation drawing text must exactly mirror its generated document source.");
   const textField = Object.getOwnPropertyDescriptor(value, "shapeText");
   if (!textField && "shapeText" in value)
     throw new TypeError("Shape text must be an own data field.");
@@ -432,9 +484,11 @@ function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance
     ...(shapeConnector ? { shapeConnector } : {}),
     ...(shapeFlipX ? { shapeFlipX: true as const } : {}),
     ...(shapeFlipY ? { shapeFlipY: true as const } : {}),
+    ...equationFlips,
     ...(hidden ? { hidden: true as const } : {}),
     ...(shapeStyle ? { shapeStyle } : {}),
     ...(shapeText ? { shapeText } : {}),
+    ...(equationDocument ? { equationDocument } : {}),
     ...(textReference ? { textReference } : {}),
     ...(wordArtField ? { wordArt: true as const } : {}),
     ...(directionField ? { textDirection: "vertical" as const } : {}),
@@ -474,19 +528,109 @@ const shapeFrameFields = [
   "hidden",
   "shapeStyle",
   "shapeText",
+  "equationDocument",
   "textReference",
   "wordArt",
   "textDirection",
   "shapeFrame",
   "shapeProperties",
 ] as const;
+const equationFrameFields = [
+  "id",
+  "kind",
+  "name",
+  "text",
+  "shape",
+  "fill",
+  "stroke",
+  "strokeWidth",
+  "color",
+  "fontSize",
+  "bold",
+  "italic",
+  "rotation",
+  "equationDocument",
+  "equationFlipX",
+  "equationFlipY",
+  "hidden",
+  "shapeFrame",
+  "shapeProperties",
+] as const;
+
+/** Exact root-only record, validated before any Equation appearance/source read. */
+function normalizeFramedEquationDrawing(
+  value: SheetFramedEquationDrawing,
+): SheetFramedEquationDrawing {
+  const prototype: unknown = Object.getPrototypeOf(value);
+  if (prototype !== null && prototype !== Object.prototype)
+    throw new TypeError("Framed equations must be ordinary data records.");
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== "string" || !(equationFrameFields as readonly string[]).includes(key))
+      throw new TypeError("Unknown or conflicting canonical equation field.");
+    const field = Object.getOwnPropertyDescriptor(value, key)!;
+    if (!("value" in field) || field.value === undefined)
+      throw new TypeError("Canonical equations require defined own data fields, not accessors.");
+  }
+  for (const key of equationFrameFields) {
+    const field = Object.getOwnPropertyDescriptor(value, key);
+    if (
+      (!field &&
+        key !== "equationDocument" &&
+        key !== "equationFlipX" &&
+        key !== "equationFlipY" &&
+        key !== "hidden" &&
+        key !== "shapeProperties") ||
+      (!field && key in value)
+    )
+      throw new TypeError("Canonical equations require own source and placement data fields.");
+  }
+  const shapeFrame = normalizeShapeFrame(value.shapeFrame);
+  const shapeProperties = normalizeShapeObjectProperties(value.shapeProperties);
+  const appearance = normalizeDrawingAppearance(value);
+  if (appearance.kind !== "equation") throw new TypeError("Expected canonical Equation source.");
+  const mathDocument: EquationDocument | undefined = Object.getOwnPropertyDescriptor(
+    appearance,
+    "equationDocument",
+  )?.value;
+  const equationFlipX =
+    Object.getOwnPropertyDescriptor(appearance, "equationFlipX")?.value === true;
+  const equationFlipY =
+    Object.getOwnPropertyDescriptor(appearance, "equationFlipY")?.value === true;
+  const hidden = Object.getOwnPropertyDescriptor(appearance, "hidden")?.value === true;
+  return {
+    id: appearance.id,
+    kind: "equation",
+    name: appearance.name,
+    text: appearance.text,
+    shape: appearance.shape,
+    fill: appearance.fill,
+    stroke: appearance.stroke,
+    strokeWidth: appearance.strokeWidth,
+    color: appearance.color,
+    fontSize: appearance.fontSize,
+    bold: appearance.bold,
+    italic: appearance.italic,
+    rotation: appearance.rotation,
+    ...(mathDocument ? { equationDocument: mathDocument } : {}),
+    ...(equationFlipX ? { equationFlipX: true as const } : {}),
+    ...(equationFlipY ? { equationFlipY: true as const } : {}),
+    ...(hidden ? { hidden: true as const } : {}),
+    shapeFrame,
+    ...(shapeProperties ? { shapeProperties } : {}),
+  };
+}
+
 export function normalizeSheetDrawing(value: SheetFramedGraphicDrawing): SheetFramedGraphicDrawing;
+export function normalizeSheetDrawing(
+  value: SheetFramedEquationDrawing,
+): SheetFramedEquationDrawing;
 export function normalizeSheetDrawing(value: ShapeGroupDrawing): ShapeGroupDrawing;
 export function normalizeSheetDrawing(value: SheetLegacyDrawing): SheetLegacyDrawing;
 export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing;
 export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new RangeError("Invalid sheet drawing.");
+  if (isFramedEquationDrawing(value)) return normalizeFramedEquationDrawing(value);
   // Attributed or warped legacy drawings need the canonical descriptor-safe source fields.
   const textModelField = Object.getOwnPropertyDescriptor(value, "shapeText");
   const rawTextModel: unknown =
@@ -496,7 +640,16 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
   const hasTextWarp = !!rawTextModel && typeof rawTextModel === "object" && "warp" in rawTextModel;
   const hasWordArt = "wordArt" in value;
   const hasTextReference = "textReference" in value;
-  if (hasCharacterRuns || hasTextWarp || hasWordArt || hasTextReference)
+  const hasEquationDocument = "equationDocument" in value;
+  const hasEquationFlip = "equationFlipX" in value || "equationFlipY" in value;
+  if (
+    hasCharacterRuns ||
+    hasTextWarp ||
+    hasWordArt ||
+    hasTextReference ||
+    hasEquationDocument ||
+    hasEquationFlip
+  )
     for (const key of [
       "id",
       "kind",
@@ -535,6 +688,8 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
   const hasNewControls =
     hasTextBoxBodyStyle ||
     hasTextReference ||
+    hasEquationDocument ||
+    hasEquationFlip ||
     "hidden" in value ||
     (("shapeFlipX" in value || "shapeFlipY" in value) &&
       (ownKind?.value === "textBox" ||
@@ -549,7 +704,9 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
     if (prototype !== null && prototype !== Object.prototype)
       throw new TypeError("Shape controls require ordinary records with own data fields.");
     const fields: readonly string[] = [
-      ...shapeFrameFields.filter((key) => key !== "shapeFrame" && key !== "shapeProperties"),
+      ...(ownKind?.value === "equation" ? equationFrameFields : shapeFrameFields).filter(
+        (key) => key !== "shapeFrame" && key !== "shapeProperties",
+      ),
       "anchor",
       "offsetX",
       "offsetY",
@@ -562,10 +719,10 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
       const field = Object.getOwnPropertyDescriptor(value, key)!;
       if (!("value" in field))
         throw new TypeError("Shape controls require own data fields, not accessors.");
-      if (hasTextReference && field.value === undefined)
+      if ((hasTextReference || hasEquationDocument) && field.value === undefined)
         throw new TypeError("Linked text box fields cannot be undefined.");
     }
-    if (hasTextBoxBodyStyle || hasTextReference) {
+    if (hasTextBoxBodyStyle || hasTextReference || hasEquationDocument || hasEquationFlip) {
       for (const key of [
         "id",
         "kind",
@@ -596,7 +753,7 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
       const anchorPrototype = Object.getPrototypeOf(anchor);
       if (anchorPrototype !== null && anchorPrototype !== Object.prototype)
         throw new TypeError("Text box body anchors must be ordinary data records.");
-      if (hasTextReference)
+      if (hasTextReference || hasEquationDocument)
         for (const key of Reflect.ownKeys(anchor)) {
           const field = Object.getOwnPropertyDescriptor(anchor, key)!;
           if ((key !== "row" && key !== "column") || !("value" in field))
@@ -618,7 +775,9 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
   if ("groupEffects" in value)
     throw new TypeError("Container effects require a genuine shape group owner.");
   if ("shapeFrame" in value && !isFramedShapeDrawing(value))
-    throw new TypeError("Only shapes, text boxes or shape groups may use canonical shape frames.");
+    throw new TypeError(
+      "Only shapes, text boxes, equations or shape groups may use canonical shape frames.",
+    );
   if (isFramedShapeDrawing(value)) {
     const prototype = Object.getPrototypeOf(value);
     if (prototype !== null && prototype !== Object.prototype)
@@ -673,7 +832,9 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
   const appearance = normalizeDrawingAppearance(value);
   return {
     ...appearance,
-    anchor: { ...value.anchor },
+    anchor: hasEquationDocument
+      ? { row: value.anchor.row, column: value.anchor.column }
+      : { ...value.anchor },
     offsetX: value.offsetX,
     offsetY: value.offsetY,
     width: value.width,
@@ -719,8 +880,15 @@ export function isSheetDrawingVisible(value: SheetDrawing): boolean {
   }
   if (!("value" in field)) throw new TypeError("Shape visibility cannot be an accessor.");
   const kind = Object.getOwnPropertyDescriptor(value, "kind")?.value;
-  if (kind !== "shape" && kind !== "textBox" && kind !== "shapeGroup")
-    throw new TypeError("Only shapes, text boxes or shape groups may carry shape visibility.");
+  if (
+    kind !== "shape" &&
+    kind !== "textBox" &&
+    kind !== "shapeGroup" &&
+    !isFramedEquationDrawing(value)
+  )
+    throw new TypeError(
+      "Only shapes, text boxes, framed equations or shape groups may carry shape visibility.",
+    );
   if (typeof field.value !== "boolean") throw new TypeError("Shape visibility must be a boolean.");
   return field.value !== true;
 }

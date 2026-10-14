@@ -335,7 +335,8 @@ describe("real group scene release pixels and history", () => {
       },
     };
     for (const member of root.members) {
-      if (member.kind === "shapeGroup") throw new Error("Unexpected owner");
+      if (member.kind !== "shape" && member.kind !== "textBox")
+        throw new Error("Expected graphic member");
       member.shapeStyle = {
         format3d: format,
         rotation3d: { kind: "value", value: { ...camera, xDeg: 12 } },

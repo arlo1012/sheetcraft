@@ -195,7 +195,7 @@ describe("real preparation of captured clipboard geometry", () => {
         group = f.sheet.drawings![0]!;
       if (group.kind !== "shapeGroup") throw Error("Expected group");
       const first = group.members[0]!;
-      if (first.kind === "shapeGroup") throw Error("Expected leaf");
+      if (first.kind !== "shape" && first.kind !== "textBox") throw Error("Expected graphic leaf");
       if (resource === "font") first.shapeText!.fontFamily = `SheetcraftLocal_${"0".repeat(64)}`;
       else first.shapeText!.style!.fill = { kind: "value", value: texture("unavailable-texture") };
       const before = structuredClone(f.sheet.drawings!);
@@ -217,7 +217,8 @@ describe("real preparation of captured clipboard geometry", () => {
     const f = fixture(),
       source = captureShapeClipboardSelection(f.sheet.drawings!, [["group", "first"]], f.metrics)
         .roots[0]!;
-    if (source.kind === "shapeGroup" || !("shapeFrame" in source)) throw Error("Expected leaf");
+    if ((source.kind !== "shape" && source.kind !== "textBox") || !("shapeFrame" in source))
+      throw Error("Expected framed graphic leaf");
     const rect = resolveShapeRootLayout(source, f.metrics).rect,
       candidate: SheetDrawing = {
         ...source,

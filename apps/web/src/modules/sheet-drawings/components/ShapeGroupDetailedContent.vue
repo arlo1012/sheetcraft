@@ -207,6 +207,8 @@ async function render(): Promise<void> {
     const urls = new Set<string>();
     for (const { node, visible } of visits) {
       if (!visible || node.kind === "shapeGroup" || !paintableIds.has(node.id)) continue;
+      if (node.kind === "equation")
+        throw new TypeError("Mathematical members cannot enter the body compositor.");
       visibleIds.add(node.id);
       for (const asset of [
         ...getShapeStyleAssetIds(node.shapeStyle),

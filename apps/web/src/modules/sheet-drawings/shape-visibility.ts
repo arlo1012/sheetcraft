@@ -18,7 +18,8 @@ export function getVisibleShapeNodeIds(forest: readonly SheetDrawing[]): Readonl
       }
     } else {
       const visible = isSheetDrawingVisible(root);
-      if (root.kind === "shape" || root.kind === "textBox") void root.hidden;
+      if (root.kind === "shape" || root.kind === "textBox" || root.kind === "equation")
+        void root.hidden;
       if (visible) ids.add(root.id);
     }
   }

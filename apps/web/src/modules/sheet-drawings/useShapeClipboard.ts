@@ -324,6 +324,7 @@ export function useShapeClipboard(options: ShapeClipboardOptions) {
             sheet: target.sheet,
             expected: target.expected,
             next: plan.targetForest,
+            equationSources: plan.equationSources,
             metrics: target.metrics,
           },
         ] as const;

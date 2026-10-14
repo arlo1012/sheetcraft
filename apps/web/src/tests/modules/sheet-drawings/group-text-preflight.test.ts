@@ -377,7 +377,7 @@ test("explicit owned member text editing honors AutoFit and pins its world local
   const f = fixture(),
     candidate = structuredClone(f.root);
   const member = candidate.members[0]!;
-  if (member.kind === "shapeGroup") throw Error("not leaf");
+  if (member.kind !== "shape" && member.kind !== "textBox") throw Error("not graphic leaf");
   member.text = "One\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten";
   const before = resolveShapeGroupProjection(candidate, f.metrics).leaves[0]!;
   const prepared = prepareShapeTextUpdate(
@@ -395,6 +395,8 @@ test("explicit owned member text editing honors AutoFit and pins its world local
   const b = pictureFrameLocalToWorld(after.layout!.rect, after.layout!.angleDeg, { x: 0, y: 0 });
   expect(b.x).toBeCloseTo(a.x);
   expect(b.y).toBeCloseTo(a.y);
+  if (after.sourceNode.kind !== "shape" && after.sourceNode.kind !== "textBox")
+    throw Error("Expected graphic leaf");
   expect(after.sourceNode.shapeText!.layout.autoFit).toBe("resize-shape");
   expect(prepared.members[1]).toEqual(candidate.members[1]);
   expect(candidate.members[0]).toEqual(member);
@@ -413,7 +415,7 @@ test("manual owned member height change disables its AutoFit without touching ot
   );
   if (prepared.kind !== "shapeGroup") throw Error("not group");
   const member = prepared.members[0]!;
-  if (member.kind === "shapeGroup") throw Error("not leaf");
+  if (member.kind !== "shape" && member.kind !== "textBox") throw Error("not graphic leaf");
   expect(member.shapeText!.layout.autoFit).toBe("none");
   expect(prepared.members[1]).toEqual(candidate.members[1]);
 });
@@ -421,7 +423,7 @@ test("manual owned member height change disables its AutoFit without touching ot
 test("owned member E/W width edit reflows AutoFit without fitting the whole group", () => {
   const f = fixture();
   const member = f.root.members[0]!;
-  if (member.kind === "shapeGroup") throw Error("not leaf");
+  if (member.kind !== "shape" && member.kind !== "textBox") throw Error("not graphic leaf");
   member.text = "One two three four five six seven eight nine ten eleven twelve";
   const candidate = structuredClone(f.root);
   candidate.members[0]!.groupFrame.rect.widthRatio *= 0.3;
@@ -438,6 +440,8 @@ test("owned member E/W width edit reflows AutoFit without fitting the whole grou
   const after = resolveShapeGroupProjection(result, f.metrics).leaves[0]!;
   expect(after.layout!.rect.height).toBeGreaterThan(before.layout!.rect.height);
   expect(after.layout!.rect.width).toBeCloseTo(before.layout!.rect.width);
+  if (after.sourceNode.kind !== "shape" && after.sourceNode.kind !== "textBox")
+    throw Error("Expected graphic leaf");
   expect(after.sourceNode.shapeText!.layout.autoFit).toBe("resize-shape");
   expect(result.members[1]).toEqual(candidate.members[1]);
 });

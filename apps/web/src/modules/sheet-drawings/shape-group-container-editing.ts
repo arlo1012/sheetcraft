@@ -1,4 +1,4 @@
-import { isFramedShapeDrawing } from "@sheetcraft/core/sheet-drawings";
+import { isFramedShapeDrawing, isFramedEquationDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import {
   normalizeShapeGroup,
@@ -81,7 +81,11 @@ export function ungroupOwnedShapeContainer(
       root.shapeProperties,
       target.node.hidden,
     );
-    if (released.kind !== "shapeGroup" && !isFramedShapeDrawing(released))
+    if (
+      released.kind !== "shapeGroup" &&
+      !isFramedShapeDrawing(released) &&
+      !isFramedEquationDrawing(released)
+    )
       throw new TypeError("Invalid released shape member.");
     const { shapeFrame: _frame, ...appearance } = released;
     const placement = placeShapeGroupChild(parent.layout!, child.layout);

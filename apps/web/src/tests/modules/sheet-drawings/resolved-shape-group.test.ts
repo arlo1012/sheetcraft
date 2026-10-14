@@ -374,6 +374,8 @@ describe("inverse owned shape leaf edits", () => {
     };
     const next = updateResolvedShapeGroupLeaf(projected, nextView, f.metrics);
     const actual = target(next, f.metrics);
+    if (actual.sourceNode.kind !== "shape" && actual.sourceNode.kind !== "textBox")
+      throw new Error("Expected graphic test target.");
     const expected = rectOf(nextView, f.metrics);
     for (const key of ["x", "y", "width", "height"] as const)
       expect(actual.layout!.rect[key]).toBeCloseTo(expected[key], 9);
@@ -406,6 +408,8 @@ describe("inverse owned shape leaf edits", () => {
     };
     const next = updateResolvedShapeGroupLeaf(projected, nextView, f.metrics);
     const updated = target(next, f.metrics);
+    if (updated.sourceNode.kind !== "shape" && updated.sourceNode.kind !== "textBox")
+      throw new Error("Expected graphic test target.");
     expect(updated.sourceNode.shapeGeometry).toEqual(nextView.shapeGeometry);
     expect(updated.sourceNode.shapeStyle).toEqual(nextView.shapeStyle);
     expect(updated.sourceNode.shapeStyle).not.toBe(nextView.shapeStyle);
@@ -435,6 +439,8 @@ describe("inverse owned shape leaf edits", () => {
     expect(projected.lease.node).toEqual(f.a);
     const next = updateResolvedShapeGroupLeaf(projected, view, f.metrics);
     const updated = target(next, f.metrics);
+    if (updated.sourceNode.kind !== "shape" && updated.sourceNode.kind !== "textBox")
+      throw new Error("Expected graphic test target.");
     expect(updated.layout!.rect.x).toBeCloseTo(originalLayout!.rect.x + 25, 9);
     expect(updated.layout!.rect.width).toBeCloseTo(originalLayout!.rect.width + 10, 9);
     expect(updated.sourceNode.shapeText!.layout.wrap).toBe(false);

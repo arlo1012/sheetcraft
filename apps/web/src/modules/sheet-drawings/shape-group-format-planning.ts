@@ -216,7 +216,11 @@ export function resolveShapeGroupFormatContext(
   const owner =
     projection.owners.find((entry) => samePath(entry.path, targetLease.path)) ??
     projection.leaves.find((entry) => samePath(entry.path, targetLease.path));
-  if (!owner || (owner.sourceNode.kind === "shape" && owner.sourceNode.shapeConnector))
+  if (
+    !owner ||
+    owner.sourceNode.kind === "equation" ||
+    (owner.sourceNode.kind === "shape" && owner.sourceNode.shapeConnector)
+  )
     throw new TypeError("Shape formatting requires an exact container or ordinary leaf path.");
   const rootLease = path.length === 1 ? targetLease : leaseShapeGroupNode(root, [root.id]);
   const context: ShapeGroupFormatContext = {
@@ -275,7 +279,13 @@ function isLine(view: SheetGraphicDrawing): boolean {
   );
 }
 function hasText(leaf: ResolvedShapeGroupLeaf): boolean {
-  if (!leaf.view || leaf.collapsed || leaf.sourceNode.shapeConnector) return false;
+  if (
+    !leaf.view ||
+    leaf.collapsed ||
+    leaf.sourceNode.kind === "equation" ||
+    leaf.sourceNode.shapeConnector
+  )
+    return false;
   const rect = getDrawingShapeTextRect(leaf.view);
   return (
     !!rect &&
@@ -528,7 +538,7 @@ function batchPlan(
     const owner = visit?.parentPath && canonical.get(JSON.stringify(visit.parentPath))?.node;
     if (
       !visit ||
-      visit.node.kind === "shapeGroup" ||
+      (visit.node.kind !== "shape" && visit.node.kind !== "textBox") ||
       !owner ||
       owner.kind !== "shapeGroup" ||
       !leaf.view
@@ -584,13 +594,13 @@ export function planShapeGroupFormatIntent(
         // disabled choice. Both leave dormant descendant camera values intact.
         const owner = findShapeGroupNode(edited.root, edited.ownerPath)!.node;
         if (owner.kind === "shapeGroup") delete owner.group3d;
-        else {
+        else if (owner.kind === "shape" || owner.kind === "textBox") {
           const style = { ...owner.shapeStyle };
           delete style.rotation3d;
           const normalized = normalizeShapeStyle(style);
           if (normalized) owner.shapeStyle = normalized;
           else delete owner.shapeStyle;
-        }
+        } else throw new TypeError("Mathematical equations do not own a shape 3D camera.");
       }
       const result = checkedResult(context, edited.root, edited.affectedLeafPaths);
       return { ...result, descendantCount: edited.affectedLeafPaths.length };
@@ -805,22 +815,47 @@ export function aggregateShapeGroupFormatSnapshot(
   if (shape.style.rotation3d) glyph.style.rotation3d = shape.style.rotation3d;
   const independentTextCameraCount = context.rotation3dSource.affectedLeafPaths.filter((path) => {
     const node = findShapeGroupNode(context.sourceRoot, path)?.node;
-    return node?.kind !== "shapeGroup" && node?.shapeText?.style?.rotation3d?.kind === "value";
+    return (
+      node &&
+      node.kind !== "shapeGroup" &&
+      node.kind !== "equation" &&
+      node.shapeText?.style?.rotation3d?.kind === "value"
+    );
   }).length;
   const lineLeaves = getShapeGroupLineEligibleLeaves(context);
   const ends: ShapeLineEnds = {};
   const mixedLineEnds: ("begin" | "end")[] = [];
   for (const endpoint of ["begin", "end"] as const) {
-    const first = lineLeaves[0]?.sourceNode.shapeLineEnds?.[endpoint];
-    if (lineLeaves.some((leaf) => !sameValue(leaf.sourceNode.shapeLineEnds?.[endpoint], first)))
+    const first =
+      lineLeaves[0]?.sourceNode.kind === "shape"
+        ? lineLeaves[0].sourceNode.shapeLineEnds?.[endpoint]
+        : undefined;
+    if (
+      lineLeaves.some(
+        (leaf) =>
+          !sameValue(
+            leaf.sourceNode.kind === "shape"
+              ? leaf.sourceNode.shapeLineEnds?.[endpoint]
+              : undefined,
+            first,
+          ),
+      )
+    )
       mixedLineEnds.push(endpoint);
     else if (first) ends[endpoint] = first;
   }
   const lineEnds = normalizeShapeLineEnds(ends);
   const warpLeaves = getShapeGroupTextWarpEligibleLeaves(context);
-  const firstWarp = warpLeaves[0]?.sourceNode.shapeText?.warp;
+  const firstWarp =
+    warpLeaves[0]?.sourceNode.kind !== "equation"
+      ? warpLeaves[0]?.sourceNode.shapeText?.warp
+      : undefined;
   const mixedTextWarp = warpLeaves.some(
-    (leaf) => !sameValue(leaf.sourceNode.shapeText?.warp, firstWarp),
+    (leaf) =>
+      !sameValue(
+        leaf.sourceNode.kind !== "equation" ? leaf.sourceNode.shapeText?.warp : undefined,
+        firstWarp,
+      ),
   );
   const wordArtLeaves = getShapeGroupWordArtStyleEligibleLeaves(context);
   const wordArtStyles = wordArtLeaves.map((leaf) => {

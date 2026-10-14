@@ -1,4 +1,10 @@
 import { computed, ref } from "vue";
+import {
+  assertEquationSourcePreserved,
+  assertEquationForestSourcesPreserved,
+  assertEquationForestGeometryPreserved,
+  assertEquationGeometryPreserved,
+} from "./equation/equation-source-ownership";
 import { createGraphicDrawing } from "./drawing-defaults";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { canUseSheetPermission } from "@sheetcraft/core";
@@ -11,6 +17,7 @@ import {
   type SheetGraphicKind,
   normalizeSheetDrawings,
   normalizeSheetDrawing,
+  isFramedEquationDrawing,
 } from "@sheetcraft/core/sheet-drawings";
 import {
   canEditShapeObject,
@@ -27,7 +34,10 @@ import {
   resolveShapeForestForRender,
   type ResolvedShapeForestForRender,
 } from "./resolved-shape-render-source";
-import { normalizeShapeDrawingForest } from "@sheetcraft/core/shape-group-planning";
+import {
+  normalizeShapeDrawingForest,
+  promoteEquationRootFrame,
+} from "@sheetcraft/core/shape-group-planning";
 import { planDeleteShapeGroupNodes } from "@sheetcraft/core/shape-group-delete";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import { frameShapeView } from "./shape-view-layout";
@@ -46,7 +56,13 @@ import type { Workbook, Sheet, CellAddress } from "@sheetcraft/core/workbook";
 import type { ShapeTextPreparationMode } from "./prepare-shape-text-update";
 /** Strip only the newly owned visibility metadata from already normalized trees. */
 function withoutShapeVisibility(node: SheetDrawing | ShapeGroupNode): unknown {
-  if (node.kind !== "shape" && node.kind !== "textBox" && node.kind !== "shapeGroup") return node;
+  if (
+    node.kind !== "shape" &&
+    node.kind !== "textBox" &&
+    node.kind !== "equation" &&
+    node.kind !== "shapeGroup"
+  )
+    return node;
   const { hidden: _hidden, ...source } = node;
   return node.kind === "shapeGroup"
     ? { ...source, members: node.members.map(withoutShapeVisibility) }
@@ -280,6 +296,7 @@ export function useDrawingActions(options: {
     binding: CollectionBinding,
     visibilityOnly = false,
     preparationMode?: ShapeTextPreparationMode,
+    rawEquationEditorOwner?: SheetDrawing,
   ): boolean {
     if (replacing) return false;
     replacing = true;
@@ -292,12 +309,29 @@ export function useDrawingActions(options: {
         return false;
       // Equal canonical data is a legitimate no-op, including a detached clone.
       const proposed = [...next];
-      if (
-        visibilityOnly &&
-        JSON.stringify(normalizeShapeDrawingForest(proposed).map(withoutShapeVisibility)) !==
-          JSON.stringify(normalizeShapeDrawingForest(binding.expected).map(withoutShapeVisibility))
-      )
-        return false;
+      assertEquationForestSourcesPreserved(binding.expected, proposed, rawEquationEditorOwner);
+      if (visibilityOnly) {
+        const nextVisibility = normalizeShapeDrawingForest(proposed);
+        const oldVisibility = normalizeShapeDrawingForest(binding.expected).map((root, index) => {
+          const nextRoot = nextVisibility[index];
+          if (
+            root.kind === "equation" &&
+            !isFramedEquationDrawing(root) &&
+            nextRoot?.id === root.id &&
+            isFramedEquationDrawing(nextRoot)
+          ) {
+            if (!binding.metrics)
+              throw new TypeError("Equation visibility promotion requires current metrics.");
+            return promoteEquationRootFrame(root, binding.metrics);
+          }
+          return root;
+        });
+        if (
+          JSON.stringify(nextVisibility.map(withoutShapeVisibility)) !==
+          JSON.stringify(oldVisibility.map(withoutShapeVisibility))
+        )
+          return false;
+      }
 
       if (
         JSON.stringify(normalizeSheetDrawings(proposed)) ===
@@ -317,6 +351,8 @@ export function useDrawingActions(options: {
         const id = drawing.id,
           kind = drawing.kind;
         const owner = owners.get(id);
+        if (owner && owner !== rawEquationEditorOwner)
+          assertEquationSourcePreserved(owner, drawing);
         const unchanged =
           !!owner &&
           (drawing === owner ||
@@ -328,8 +364,10 @@ export function useDrawingActions(options: {
               : options.prepareDrawing?.(drawing, owner, proposed)) ?? drawing);
         if (candidate.id !== id || candidate.kind !== kind || !currentCollection(binding))
           return false;
+        assertEquationGeometryPreserved(drawing, candidate);
         prepared.push(candidate);
       }
+      assertEquationForestGeometryPreserved(proposed, prepared);
       const command = createSetSheetDrawingsCommand(binding.sheet.id, prepared);
       const connected = command.drawings.some((root) =>
         isShapeGroupDrawing(root)
@@ -490,6 +528,14 @@ export function useDrawingActions(options: {
           ? current.map((item) => (item === currentTarget.existing ? candidate : item))
           : [...current, candidate],
         binding,
+        false,
+        undefined,
+        currentTarget.existing?.kind === "equation" &&
+          drawing.kind === "equation" &&
+          !currentTarget.existing.equationDocument &&
+          !drawing.equationDocument
+          ? currentTarget.existing
+          : undefined,
       );
       if (accepted) close(currentTarget);
     });

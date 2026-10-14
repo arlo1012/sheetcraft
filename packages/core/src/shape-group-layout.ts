@@ -19,6 +19,7 @@ import {
   type ShapeGroupLocalFrame,
   type ShapeGroupPath,
   type SheetGroupedGraphicDrawing,
+  type SheetGroupedEquationDrawing,
 } from "./shape-group.js";
 
 export type ShapeGroupParentLayout = Pick<ResolvedShapeFrame, "rect" | "angleDeg">;
@@ -39,12 +40,16 @@ type ResolvedGroupNode<T> = {
 export type ResolvedSheetGroupedGraphicDrawing = ResolvedGroupNode<SheetGroupedGraphicDrawing> & {
   layout: ResolvedShapeFrame | null;
 };
+export type ResolvedSheetGroupedEquationDrawing = ResolvedGroupNode<SheetGroupedEquationDrawing> & {
+  layout: ResolvedShapeFrame | null;
+};
 export type ResolvedShapeGroupedGroup = ResolvedGroupNode<ShapeGroupedGroup> & {
   layout: ResolvedShapeFrame | null;
   members: ResolvedShapeGroupChild[];
 };
 export type ResolvedShapeGroupChild =
   | ResolvedSheetGroupedGraphicDrawing
+  | ResolvedSheetGroupedEquationDrawing
   | ResolvedShapeGroupedGroup;
 export type ResolvedShapeGroup = ResolvedGroupNode<ShapeGroupDrawing> & {
   layout: ResolvedShapeFrame;
@@ -91,6 +96,7 @@ function resolveChild(
   const path = [...parentPath, node.id];
   const layout = parent ? resolveShapeGroupChildLayout(parent, node) : null;
   const visible = ancestorVisible && layout !== null;
+  if (node.kind === "equation") return { node, path, visible, layout };
   if (node.kind !== "shapeGroup") return { node, path, visible, layout };
   return {
     node,

@@ -1,3 +1,4 @@
+import { equationMessagesZhCN } from "../../../modules/sheet-drawings/equation/equation-messages.zh-CN";
 import { symbolsZhCN } from "../../../modules/insert-tools/symbol-messages.zh-CN";
 import { pivotsZhCN } from "../../../modules/pivot-tables/pivot-messages.zh-CN";
 import { controlsZhCN } from "../../../modules/form-controls/control-messages.zh-CN";
@@ -24,6 +25,7 @@ import { tablesZhCN } from "../../../modules/table-styles/table-messages.zh-CN";
 import { pictureFormatZhCN } from "../../../modules/sheet-images/picture-format-messages.zh-CN";
 
 export const zhCN = {
+  equation: equationMessagesZhCN,
   ...symbolsZhCN,
   ...pivotsZhCN,
   ...controlsZhCN,

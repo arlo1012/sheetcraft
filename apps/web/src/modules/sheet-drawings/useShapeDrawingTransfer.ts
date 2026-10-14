@@ -9,6 +9,12 @@ import { canEditSheetDrawingCollection } from "@sheetcraft/core/shape-protection
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { Sheet, Workbook } from "@sheetcraft/core/workbook";
 import {
+  assertEquationForestSourcesPreserved,
+  assertEquationGeometryPreserved,
+  assertEquationSourcePreserved,
+  type EquationSourceCarrier,
+} from "./equation/equation-source-ownership";
+import {
   resolveShapeForestForRender,
   type ResolvedShapeForestForRender,
 } from "./resolved-shape-render-source";
@@ -18,6 +24,7 @@ export type ShapeDrawingTransferCollection = {
   expected: readonly SheetDrawing[];
   next: readonly SheetDrawing[];
   metrics: PictureSheetMetrics;
+  equationSources?: readonly { sourceId: string; targetId: string }[];
 };
 
 /** Both sheets are admitted against their own geometry before one Core command. */
@@ -72,8 +79,44 @@ export function useShapeDrawingTransfer(options: {
           );
         });
       if (!current()) return false;
-      const prepared = leases.map((lease) => {
+      const nodes = (forest: readonly SheetDrawing[]): Map<string, EquationSourceCarrier> => {
+        const result = new Map<string, EquationSourceCarrier>();
+        for (const root of forest)
+          for (const node of root.kind === "shapeGroup"
+            ? traverseShapeGroup(root).map((visit) => visit.node)
+            : [root]) {
+            if (result.has(node.id)) throw new TypeError("Duplicate drawing identity.");
+            result.set(node.id, node);
+          }
+        return result;
+      };
+      const prepared = leases.map((lease, index) => {
         const proposed = normalizeShapeDrawingForest(lease.next);
+        assertEquationForestSourcesPreserved(lease.expected, proposed);
+        const priorNodes = nodes(lease.expected),
+          incoming = nodes(proposed);
+        const sourceNodes = nodes(leases[1 - index]!.expected);
+        const transferred = new Set<string>();
+        for (const pair of lease.equationSources ?? []) {
+          const source = sourceNodes.get(pair.sourceId),
+            target = incoming.get(pair.targetId);
+          if (
+            source?.kind !== "equation" ||
+            !target ||
+            priorNodes.has(pair.targetId) ||
+            transferred.has(pair.targetId)
+          )
+            throw new TypeError("A mathematical transfer requires its exact source provenance.");
+          assertEquationGeometryPreserved(source, target);
+          transferred.add(pair.targetId);
+        }
+        for (const [id, node] of incoming)
+          if (
+            node.kind === "equation" &&
+            priorNodes.get(id)?.kind !== "equation" &&
+            !transferred.has(id)
+          )
+            throw new TypeError("A new mathematical transfer identity has no captured source.");
         if (!canEditSheetDrawingCollection(lease.sheet, proposed) || !current())
           throw new Error("The transfer owner or permissions changed.");
         const owners = new Map(lease.expected.map((root) => [root.id, root]));
@@ -86,14 +129,25 @@ export function useShapeDrawingTransfer(options: {
         const drawings = proposed.map((drawing) => {
           if (!current()) throw new Error("The transfer owner changed.");
           const owner = owners.get(drawing.id);
+          if (owner) assertEquationSourcePreserved(owner, drawing);
           const candidate =
             owner && fingerprints.get(drawing.id) === JSON.stringify(drawing)
               ? owner
               : options.prepareDrawing(lease.sheet, lease.metrics, drawing, owner, proposed);
           if (candidate.id !== drawing.id || candidate.kind !== drawing.kind || !current())
             throw new Error("The transfer changed an object identity.");
+          assertEquationSourcePreserved(drawing, candidate);
           return candidate;
         });
+        assertEquationForestSourcesPreserved(proposed, drawings);
+        const preparedNodes = nodes(drawings);
+        for (const [id, node] of incoming)
+          if (node.kind === "equation") {
+            const preparedNode = preparedNodes.get(id);
+            if (!preparedNode)
+              throw new TypeError("A prepared mathematical transfer lost its source.");
+            assertEquationGeometryPreserved(node, preparedNode);
+          }
         const pass = resolveShapeForestForRender({ drawings, metrics: lease.metrics, revision });
         const connected = drawings.some((root) =>
           isShapeGroupDrawing(root)

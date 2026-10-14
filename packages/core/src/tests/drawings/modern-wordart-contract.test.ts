@@ -79,7 +79,7 @@ function deepLeaf(value: ShapeGroupDrawing) {
   const owner = value.members[0]!;
   if (owner.kind !== "shapeGroup") throw Error("Expected inner owner");
   const child = owner.members[0]!;
-  if (child.kind === "shapeGroup") throw Error("Expected leaf");
+  if (child.kind !== "shape" && child.kind !== "textBox") throw Error("Expected leaf");
   return child;
 }
 
@@ -159,7 +159,7 @@ describe("modern WordArt and local glyph appearance contract", () => {
     for (const invalid of [
       { fill: undefined },
       { line: undefined },
-      { shadow: { kind: "none" } },
+      { softEdges: { kind: "none" } },
       { fill: { kind: "value", value: { ...gradient(), unknown: true } } },
       { line: { kind: "value", value: { ...line(), widthPt: Infinity } } },
       { fill: { kind: "inherit" } },

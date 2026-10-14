@@ -1,6 +1,8 @@
 import {
   requireLegacySheetDrawing,
   isFramedShapeDrawing,
+  isFramedEquationDrawing,
+  normalizeSheetDrawing,
   type SheetDrawing,
   type SheetGraphicDrawing,
 } from "@sheetcraft/core/sheet-drawings";
@@ -154,6 +156,16 @@ export function prepareShapeTextUpdate(
   mode: ShapeTextPreparationMode = "edit",
 ): SheetDrawing {
   assertConnectorTextUnchanged(candidate, source, forestContext?.sourceForest);
+  if (candidate.kind === "equation") {
+    // Geometry/clipboard math never enters the shape-text or legacy-placement
+    // consumer. The host separately guards its exact mathematical source.
+    const normalized = normalizeSheetDrawing(candidate);
+    if (isFramedEquationDrawing(normalized)) {
+      if (!metrics) throw new Error("Equation placement requires current worksheet metrics.");
+      resolveShapeDrawing(normalized, metrics);
+    }
+    return normalized;
+  }
   if (isShapeGroupDrawing(candidate)) {
     if (!metrics) throw new Error("Shape group editing requires current worksheet metrics.");
     const prepared =
@@ -247,6 +259,7 @@ function prepareOwnedGroupTextEdits(
       d = leaf.view,
       owner = old?.view;
     if (
+      leaf.sourceNode.kind === "equation" ||
       "shapeConnector" in leaf.sourceNode ||
       !d ||
       !owner ||
@@ -350,6 +363,7 @@ function preflightShapeGroupText(
   for (const leaf of projection.leaves) {
     const drawing = leaf.view;
     if (
+      leaf.sourceNode.kind === "equation" ||
       "shapeConnector" in leaf.sourceNode ||
       !drawing ||
       leaf.collapsed ||

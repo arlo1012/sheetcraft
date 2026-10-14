@@ -1,3 +1,4 @@
+import type { EquationDocument } from "./equation-document.js";
 import { resolveShapeGroup3dSource } from "./shape-group-3d.js";
 import type { Choice, PictureRotation3d } from "./picture-detailed-style.js";
 import { normalizeShapeStyle } from "./shape-style.js";
@@ -14,7 +15,9 @@ import {
   normalizeShapeGroup3d,
   normalizeShapeGroupChild,
   traverseShapeGroup,
+  isSheetGroupedEquationDrawing,
   type ShapeGroupChild,
+  type SheetGroupedEquationDrawing,
   type ShapeGroupDrawing,
   type ShapeGroupNode,
   type ShapeGroupPath,
@@ -227,6 +230,14 @@ export function applyShapeGroupChildWorldEdit(
     if (replacement.id !== target.node.id || replacement.kind !== target.node.kind)
       throw new TypeError("A shape child replacement must retain its kind and ID.");
     if (
+      replacement.kind === "equation" &&
+      target.node.kind === "equation" &&
+      equationSourceSnapshot(replacement) !== equationSourceSnapshot(target.node)
+    )
+      throw new TypeError(
+        "Use the dedicated Equation source or flip action; world replacements must preserve math source and flip identity.",
+      );
+    if (
       replacement.kind === "shapeGroup" &&
       target.node.kind === "shapeGroup" &&
       JSON.stringify(replacement.members) !== JSON.stringify(target.node.members)
@@ -350,10 +361,80 @@ export function applyShapeGroup3dRotationEdit(
     );
   const owner = findShapeGroupNode(root, ownerPath)!.node;
   if (owner.kind === "shapeGroup") owner.group3d = { rotation3d };
+  else if (owner.kind === "equation") throw new TypeError("Equation 3D editing is unsupported.");
   else owner.shapeStyle = normalizeShapeStyle({ ...owner.shapeStyle, rotation3d });
   return {
     root: normalizeShapeGroup(root),
     ownerPath: [...ownerPath],
     affectedLeafPaths: effective.affectedLeafPaths.map((path) => [...path]),
   };
+}
+
+export type ShapeGroupEquationSourceEdit = {
+  text: string;
+  /** Absence explicitly selects opaque source; presence requires its exact generated mirror. */
+  equationDocument?: EquationDocument;
+  fontSize?: number;
+  color?: string;
+  bold?: boolean;
+  italic?: boolean;
+};
+function equationSourceSnapshot(node: SheetGroupedEquationDrawing): string {
+  return JSON.stringify({
+    text: node.text,
+    equationDocument: node.equationDocument,
+    fontSize: node.fontSize,
+    color: node.color,
+    bold: node.bold,
+    italic: node.italic,
+    equationFlipX: node.equationFlipX,
+    equationFlipY: node.equationFlipY,
+  });
+}
+/** Exact-lease math-only edit. Ownership, placement, identity and flip flags cannot change. */
+export function applyShapeGroupEquationSourceEdit(
+  value: ShapeGroupDrawing,
+  leaseValue: ShapeGroupNodeLease,
+  content: ShapeGroupEquationSourceEdit,
+): ShapeGroupDrawing {
+  const root = normalizeShapeGroup(value);
+  const lease = readLease(leaseValue);
+  const target = findShapeGroupNode(root, lease.path);
+  if (!target || !sameLease(nodeLease(root, target.path), lease))
+    throw new TypeError("Equation source edit lease is stale, missing or reparented.");
+  if (lease.path.length < 2 || !isSheetGroupedEquationDrawing(target.node))
+    throw new TypeError("An Equation source edit requires a current owned Equation leaf.");
+  const contentKeys = ["text", "equationDocument", "fontSize", "color", "bold", "italic"] as const;
+  const fields = record(content, contentKeys, "Equation source edit");
+  // The original content record owns source-mode and typography; inherited optionals are not omission.
+  for (const key of contentKeys) {
+    if (!(key in content)) continue;
+    const field = Object.getOwnPropertyDescriptor(content, key);
+    if (!field || !("value" in field) || field.value === undefined)
+      throw new TypeError(
+        "Equation source edit fields require defined own data, not inherited values or accessors.",
+      );
+  }
+  if (typeof fields.text !== "string")
+    throw new TypeError("Equation source text must be a string.");
+  for (const key of Object.keys(fields))
+    if (fields[key] === undefined)
+      throw new TypeError("Equation source edits require defined data fields.");
+  const { equationDocument: _previousMath, ...preserved } = target.node;
+  const next = normalizeShapeGroupChild({
+    ...preserved,
+    text: fields.text,
+    ...(Object.hasOwn(fields, "equationDocument")
+      ? { equationDocument: fields.equationDocument as EquationDocument }
+      : {}),
+    ...(Object.hasOwn(fields, "fontSize") ? { fontSize: fields.fontSize as number } : {}),
+    ...(Object.hasOwn(fields, "color") ? { color: fields.color as string } : {}),
+    ...(Object.hasOwn(fields, "bold") ? { bold: fields.bold as boolean } : {}),
+    ...(Object.hasOwn(fields, "italic") ? { italic: fields.italic as boolean } : {}),
+  });
+  const owner = findShapeGroupNode(root, lease.path.slice(0, -1))?.node;
+  if (!owner || owner.kind !== "shapeGroup")
+    throw new TypeError("Equation source edit requires its exact immediate owner.");
+  owner.members[owner.members.findIndex((child) => child.id === target.node.id)] = next;
+  return normalizeShapeGroup(root);
 }

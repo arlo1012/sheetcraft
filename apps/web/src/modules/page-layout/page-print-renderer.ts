@@ -1,4 +1,11 @@
 import { requireLegacyPictures } from "../sheet-images/picture-document-support";
+import {
+  assertEquationPrintConsumer,
+  capturePrintEquationPass,
+  getPrintEquationContentExtent,
+  type PrintEquationPass,
+} from "./page-print-equations";
+import { createPrintEquationPixels } from "./page-print-equation-pixels";
 import { getPrintablePictureRoots } from "./page-print-pictures";
 import {
   assertPrintShapeRenderPass,
@@ -76,6 +83,7 @@ export type PrintPreviewDocument = {
   rows: ReturnType<typeof createRowVisibilityIndex>;
   shapeMetrics: ReturnType<typeof createPrintShapeMetrics>;
   shapeRenderPass: ResolvedShapeForestForRender;
+  equationPrintPass?: PrintEquationPass;
   sheetName: string;
   fileName: string;
   locale: string;
@@ -219,7 +227,10 @@ export function createPrintPreviewDocument(options: {
   shapePaintResources?: PicturePaintResources;
   requireReadyGroupPaint?: boolean;
   textBoxReferenceResolver?: TextBoxReferenceResolver;
+  /** Requires the actual native consumer; rendering still refuses pending/failed math. */
+  nativeEquationConsumer?: boolean;
 }): PrintPreviewDocument {
+  assertEquationPrintConsumer(options.sheet, options.nativeEquationConsumer);
   requireLegacyPictures(getPrintablePictureRoots(options.sheet));
   const requested = pageSetupForPrint(
     options.sheet,
@@ -274,16 +285,24 @@ export function createPrintPreviewDocument(options: {
     options.requireReadyGroupPaint,
     shapeRenderPass,
   );
+  const equationPrintPass = options.nativeEquationConsumer
+    ? capturePrintEquationPass(options.sheet, shapeMetrics, shapeRenderPass)
+    : undefined;
+  const equationExtent = equationPrintPass
+    ? getPrintEquationContentExtent(equationPrintPass, shapeMetrics)
+    : { rowCount: 0, columnCount: 0 };
   const contentRowCount = Math.max(
     1,
     display.contentExtent.rowCount,
     shapeExtent.rowCount,
+    equationExtent.rowCount,
     (requested.printArea?.end.row ?? -1) + 1,
   );
   const contentColumnCount = Math.max(
     1,
     display.contentExtent.columnCount,
     shapeExtent.columnCount,
+    equationExtent.columnCount,
     (requested.printArea?.end.column ?? -1) + 1,
   );
   const rowCount = Math.max(contentRowCount, (requested.printTitles?.rows?.end ?? -1) + 1);
@@ -357,6 +376,7 @@ export function createPrintPreviewDocument(options: {
     rows,
     shapeMetrics,
     shapeRenderPass,
+    equationPrintPass,
     sheetName: options.sheetName ?? options.sheet.name,
     fileName: options.fileName ?? "workbook.xlsx",
     locale: options.locale ?? "en-US",
@@ -557,10 +577,14 @@ function drawPrintHeadings(
 }
 
 /** Creates a browser-only canvas renderer shared by thumbnail and final print output. */
-export function createPrintPreviewRenderer(onImageLoad?: () => void) {
+export function createPrintPreviewRenderer(
+  onImageLoad?: () => void,
+  onEquationInvalidated?: () => void,
+) {
   const presentationCache = createCellPresentationCache(browserCellTextMeasurer);
   const images = createCanvasImageCache(() => onImageLoad?.());
   const floatingImages = createFloatingImageCanvasCache(() => onImageLoad?.());
+  const equationPixels = createPrintEquationPixels({ onInvalidate: onEquationInvalidated });
   function render(options: {
     canvas: HTMLCanvasElement;
     document: PrintPreviewDocument;
@@ -576,6 +600,10 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
     const previewScale = options.scale ?? 1;
     const density = options.density ?? window.devicePixelRatio ?? 1;
     const { document, page, canvas } = options;
+    const equationPass = document.equationPrintPass;
+    const equationDensity = document.pagination.printScale * previewScale * density;
+    if (equationPass && !equationPixels.isReady(equationPass, equationDensity))
+      throw new Error("Mathematical print layout and fonts are not ready.");
     const paperWidth =
       document.pagination.paperSize.width * document.pagination.printScale * previewScale;
     const paperHeight =
@@ -586,7 +614,7 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
     canvas.style.height = `${paperHeight}px`;
     const context = canvas.getContext("2d");
     if (!context) {
-      if (getPrintableShapeRoots(document.sheet).length)
+      if (getPrintableShapeRoots(document.sheet).length || equationPass?.entries.length)
         throw new Error("Shape print canvas is unavailable.");
       return;
     }
@@ -721,19 +749,54 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
           effects: getDrawingThemeEffects(options.theme),
           theme: options.theme,
         });
+      const viewport = {
+        x: document.geometry.getColumnOffset(columns.start),
+        y: document.rows.getBoundaryOffset(rows.start) ?? 0,
+        ...viewportSize,
+      };
+      let equationIndex = 0;
+      const paintEquationsBefore = (rootOrder: number) => {
+        if (!equationPass) return;
+        while (
+          equationIndex < equationPass.entries.length &&
+          equationPass.entries[equationIndex]!.order < rootOrder
+        ) {
+          const entry = equationPass.entries[equationIndex++]!;
+          if (entry.root !== entry.sourceNode)
+            throw new Error("A native Equation group leaf was not painted at its source position.");
+          equationPixels.paint(context, equationPass, entry, viewport, equationDensity);
+        }
+      };
+      const rootOrder = new Map(
+        getPrintShapeSourceDrawings(document.sheet).map((root, index) => [root, index]),
+      );
       paintPrintShapes(context, {
         sheet: document.sheet,
         metrics: document.shapeMetrics,
         renderPass: document.shapeRenderPass,
-        viewport: {
-          x: document.geometry.getColumnOffset(columns.start),
-          y: document.rows.getBoundaryOffset(rows.start) ?? 0,
-          ...viewportSize,
+        viewport,
+        beforeRoot: (root) => paintEquationsBefore(rootOrder.get(root)!),
+        paintEquationLeaf: (leaf) => {
+          const entry = equationPass?.entries[equationIndex];
+          if (
+            !equationPass ||
+            !entry ||
+            entry.root !== leaf.sourceRoot ||
+            entry.sourceNode !== leaf.sourceNode ||
+            entry.path.length !== leaf.path.length ||
+            entry.path.some((id, index) => id !== leaf.path[index])
+          )
+            throw new Error(
+              "A native Equation print leaf does not match its captured source order.",
+            );
+          equationPixels.paint(context, equationPass, entry, viewport, equationDensity);
+          equationIndex++;
         },
         theme: options.theme,
         assetUrls: options.imageAssetUrls,
         images,
       });
+      paintEquationsBefore(Infinity);
       context.restore();
     };
     if (page.titleRows && page.titleColumns) paintFragment(page.titleRows, page.titleColumns, 0, 0);
@@ -744,10 +807,12 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
     context.restore();
     drawWatermark(context, document, options.imageAssetUrls, images);
     context.restore();
+    assertShapeDocumentCurrent(document);
   }
   function dispose(): void {
     images.dispose();
     floatingImages.dispose();
+    equationPixels.dispose();
   }
   function assertShapeDocumentCurrent(document: PrintPreviewDocument): void {
     assertPrintShapeRenderPass(
@@ -772,8 +837,32 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
     await preparePrintShapeFonts(document.sheet, document.shapeMetrics, document.shapeRenderPass);
     assertShapeDocumentCurrent(document);
   }
+  async function prepareEquations(preview: PrintPreviewDocument, owner: { isCurrent(): boolean }) {
+    assertShapeDocumentCurrent(preview);
+    if (preview.equationPrintPass)
+      await equationPixels.prepare(
+        preview.equationPrintPass,
+        preview.pagination.printScale * 2,
+        owner,
+      );
+    assertShapeDocumentCurrent(preview);
+  }
+  function equationsReady(preview: PrintPreviewDocument) {
+    return (
+      !preview.equationPrintPass ||
+      equationPixels.isReady(preview.equationPrintPass, preview.pagination.printScale * 2)
+    );
+  }
   function getShapePaintResources(theme?: WorkbookTheme, urls?: ReadonlyMap<string, string>) {
     return createPicturePaintResources(theme, urls, images);
   }
-  return { render, prepareImages, prepareShapes, getShapePaintResources, dispose };
+  return {
+    render,
+    prepareImages,
+    prepareShapes,
+    prepareEquations,
+    equationsReady,
+    getShapePaintResources,
+    dispose,
+  };
 }

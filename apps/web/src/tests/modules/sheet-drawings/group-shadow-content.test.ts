@@ -283,7 +283,7 @@ describe("owned group Shadow component presentation", () => {
   test("hidden owner subtrees retain canonical resources while loading only visible sibling fonts and assets", async () => {
     const source = root(),
       child = source.members[0]!;
-    if (child.kind === "shapeGroup") throw Error("Expected graphic member");
+    if (child.kind !== "shape" && child.kind !== "textBox") throw Error("Expected graphic member");
     child.text = "Missing hidden font";
     child.shapeStyle = {
       fill: {
@@ -524,7 +524,7 @@ describe("owned group Shadow component presentation", () => {
   test("waits for all real-leaf fonts and assets; replacing owner cancels stale asynchronous resource completion", async () => {
     const source = root("old");
     const leaf = source.members[0]!;
-    if (leaf.kind === "shapeGroup") throw new Error("Expected leaf.");
+    if (leaf.kind !== "shape" && leaf.kind !== "textBox") throw new Error("Expected graphic leaf.");
     leaf.text = "old text";
     leaf.shapeStyle = {
       fill: {
@@ -628,7 +628,7 @@ describe("owned group Shadow component presentation", () => {
   test("a missing group asset fails before raster allocation and keeps an accessible owner surface", async () => {
     const source = root(),
       leaf = source.members[0]!;
-    if (leaf.kind === "shapeGroup") throw new Error("Expected leaf.");
+    if (leaf.kind !== "shape" && leaf.kind !== "textBox") throw new Error("Expected graphic leaf.");
     leaf.shapeStyle = {
       fill: {
         kind: "value",
@@ -679,7 +679,7 @@ describe("owned group Shadow component presentation", () => {
   test("unmount while a font is pending never creates a group raster or publishes stale ownership", async () => {
     const source = root(),
       leaf = source.members[0]!;
-    if (leaf.kind === "shapeGroup") throw new Error("Expected leaf.");
+    if (leaf.kind !== "shape" && leaf.kind !== "textBox") throw new Error("Expected graphic leaf.");
     leaf.text = "pending";
     const pending = deferred();
     boundary.font.mockReturnValue(pending.promise);

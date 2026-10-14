@@ -56,7 +56,7 @@ describe("shape forest internal clipboard clone", () => {
     const source = root.members[0]!;
     if (source.kind !== "shapeGroup") throw Error("Expected source owner");
     const a = inner.members[0]!;
-    if (a.kind === "shapeGroup") throw Error("Expected leaf");
+    if (a.kind !== "shape" && a.kind !== "textBox") throw Error("Expected leaf");
     a.shapeText!.layout.marginsPt.leftPt = 999;
     expect((source.members[0] as ReturnType<typeof leaf>).shapeText!.layout.marginsPt.leftPt).toBe(
       1,

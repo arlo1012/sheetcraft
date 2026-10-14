@@ -332,6 +332,14 @@
       "types": "./dist/shape-group-copy.d.ts",
       "import": "./dist/shape-group-copy.js"
     },
+    "./equation-flip": {
+      "types": "./dist/equation-flip.d.ts",
+      "import": "./dist/equation-flip.js"
+    },
+    "./equation-document": {
+      "types": "./dist/equation-document.d.ts",
+      "import": "./dist/equation-document.js"
+    },
     "./text-box-reference": {
       "types": "./dist/text-box-reference.d.ts",
       "import": "./dist/text-box-reference.js"

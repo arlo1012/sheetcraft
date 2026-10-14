@@ -111,6 +111,7 @@ import { createPicturePaintAssetSource } from "../modules/sheet-images/picture-p
 import type { PictureFormatLabelKey } from "../modules/sheet-images/picture-format-pane-model";
 import { usePictureToolbarOwner } from "../modules/sheet-images/usePictureToolbarOwner";
 import {
+  normalizeSheetDrawing,
   type SheetFramedGraphicDrawing,
   type SheetDrawing,
   type SheetGraphicDrawing,
@@ -173,6 +174,8 @@ import type { ShapeCanvasTextEditRequest } from "../modules/sheet-drawings/shape
 import { preflightShapeConnectorPaint } from "../modules/sheet-drawings/shape-connector-paint-preflight";
 import {
   isShapeGroupDrawing,
+  findShapeGroupNode,
+  isSheetGroupedEquationDrawing,
   traverseShapeGroup,
   type ShapeGroupDrawing,
   type ShapeGroupPath,
@@ -187,6 +190,18 @@ import type { ShapeClipboardFailure } from "../modules/sheet-drawings/shape-clip
 import { useShapeTextCharacterFormatPane } from "../modules/sheet-drawings/useShapeTextCharacterFormatPane";
 import { useOwnedShapeFormatPane } from "../modules/sheet-drawings/useOwnedShapeFormatPane";
 import { createShapePaintAssetSource } from "../modules/sheet-drawings/shape-paint-asset-source";
+import EquationTools from "../modules/sheet-drawings/equation/EquationTools.vue";
+import {
+  useEquationEditSession,
+  type EquationRootEditSource,
+} from "../modules/sheet-drawings/equation/useEquationEditSession";
+import {
+  createEquationPreset,
+  createEquationTemplate,
+  type EquationPresetId,
+  type EquationSymbolInsertion,
+} from "../modules/sheet-drawings/equation/equation-catalog";
+import type { EquationDraftAction } from "../modules/sheet-drawings/equation/equation-draft";
 import InsertToolbar from "../modules/insert-tools/components/InsertToolbar.vue";
 import PageWatermarkMenu from "../modules/page-decorations/components/PageWatermarkMenu.vue";
 import WatermarkDialog from "../modules/page-decorations/components/WatermarkDialog.vue";
@@ -1602,6 +1617,7 @@ function insertPivot(chart: boolean): void {
   else if (!activePivot.value) pivotActions.open(chart);
 }
 function editSheetDrawing(drawing: SheetDrawing): void {
+  if (drawing.kind !== "equation") equationOpenRequest++;
   if (drawing.kind === "shapeGroup") {
     openShapeGroupFormat(drawing, [drawing.id]);
     return;
@@ -1610,6 +1626,7 @@ function editSheetDrawing(drawing: SheetDrawing): void {
   else if (drawing.kind === "control") controlActions.open(drawing);
   else if (drawing.kind === "attachment") attachmentActions.viewing.value = drawing;
   else if (drawing.kind === "camera") cameraActions.open(drawing);
+  else if (drawing.kind === "equation") beginEquationEdit(drawing);
   else drawingActions.edit(drawing);
 }
 const symbolDialog = shallowRef<{
@@ -2008,6 +2025,185 @@ function startShapeTextEdit(request: ShapeCanvasTextEditRequest): boolean {
   drawingActions.close();
   return true;
 }
+const equationEdit = useEquationEditSession({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  getAddress: () => activeAddress.value,
+  getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  flush: () =>
+    sheetGridRef.value
+      ? sheetGridRef.value.flushPendingShapeTextEdit() && sheetGridRef.value.flushPendingCellEdit()
+      : cellEditSession.finish(),
+  execute: executeCommand,
+  name: () => t("equation.equation"),
+  openInserted: (source) => beginPreparedEquation(++equationOpenRequest, source, undefined, true),
+});
+const equationPlaceholdersHidden = ref(false);
+let equationOpenRequest = 0;
+/** A completed source edit replaces all roots. Let the grid consume that revision
+ * before taking its exact geometry lease, and reject any intervening owner change. */
+function beginPreparedEquation(
+  request: number,
+  root: SheetDrawing,
+  path: ShapeGroupPath | undefined,
+  afterCommit: boolean,
+): boolean {
+  const sheet = activeSheet.value,
+    workbook = session.workbook,
+    generation = workbookGeneration.value,
+    revision = workbookRevision.value,
+    fingerprint = JSON.stringify(normalizeSheetDrawing(root));
+  const open = () => {
+    try {
+      if (
+        request !== equationOpenRequest ||
+        activeSheet.value !== sheet ||
+        session.workbook !== workbook ||
+        workbookGeneration.value !== generation ||
+        workbookRevision.value !== revision ||
+        !sheet.drawings?.includes(root) ||
+        JSON.stringify(normalizeSheetDrawing(root)) !== fingerprint
+      )
+        return false;
+      const opened = path
+        ? isShapeGroupDrawing(root) && equationEdit.beginOwned(root, path)
+        : root.kind === "equation" && equationEdit.begin(root);
+      if (!opened) return false;
+      drawingActions.close();
+      shapeFormatPane.close();
+      shapeGroupFormatPane.close();
+      shapeConnectorFormatPane.close();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  if (afterCommit) {
+    void nextTick(open);
+    return true;
+  }
+  return open();
+}
+function beginEquationEdit(drawing: EquationRootEditSource): boolean {
+  const request = ++equationOpenRequest,
+    sheet = activeSheet.value,
+    workbook = session.workbook,
+    generation = workbookGeneration.value,
+    revision = workbookRevision.value;
+  if (!sheet.drawings?.includes(drawing)) return false;
+  const fingerprint = JSON.stringify(normalizeSheetDrawing(drawing));
+  const current = equationEdit.snapshot.value;
+  if (current && current.source !== drawing && !equationEdit.callbacks.value?.commit())
+    return false;
+  // Finishing a sibling normalizes the full collection and replaces untouched root instances too.
+  const target = sheet.drawings?.find((root) => root.id === drawing.id);
+  if (
+    activeSheet.value !== sheet ||
+    session.workbook !== workbook ||
+    workbookGeneration.value !== generation ||
+    target?.kind !== "equation" ||
+    JSON.stringify(normalizeSheetDrawing(target)) !== fingerprint
+  )
+    return false;
+  return beginPreparedEquation(request, target, undefined, workbookRevision.value !== revision);
+}
+function editOwnedDrawing(root: ShapeGroupDrawing, path: ShapeGroupPath): boolean {
+  const request = ++equationOpenRequest;
+  const node = findShapeGroupNode(root, path)?.node;
+  if (!isSheetGroupedEquationDrawing(node)) return drawingActions.editGroupLeaf(root, path);
+  const sheet = activeSheet.value,
+    workbook = session.workbook,
+    generation = workbookGeneration.value,
+    revision = workbookRevision.value,
+    fingerprint = JSON.stringify(node);
+  if (!sheet.drawings?.includes(root)) return false;
+  const current = equationEdit.snapshot.value;
+  if (
+    current &&
+    (current.root !== root || current.source !== node) &&
+    !equationEdit.callbacks.value?.commit()
+  )
+    return false;
+  // Finishing another mathematical leaf may replace this same outer owner.
+  const owner = sheet.drawings?.find((drawing) => drawing.id === root.id);
+  if (
+    activeSheet.value !== sheet ||
+    session.workbook !== workbook ||
+    workbookGeneration.value !== generation ||
+    !isShapeGroupDrawing(owner) ||
+    JSON.stringify(findShapeGroupNode(owner, path)?.node) !== fingerprint
+  )
+    return false;
+  return beginPreparedEquation(request, owner, [...path], workbookRevision.value !== revision);
+}
+const equationInsertHandler = computed(() => {
+  const workbook = session.workbook,
+    sheet = activeSheet.value,
+    generation = workbookGeneration.value;
+  const revision = workbookRevision.value;
+  return (preset: EquationPresetId | null): boolean => {
+    if (
+      session.workbook !== workbook ||
+      activeSheet.value !== sheet ||
+      workbookGeneration.value !== generation ||
+      workbookRevision.value !== revision
+    )
+      return false;
+    if (equationEdit.snapshot.value && !equationEdit.callbacks.value?.commit()) return false;
+    const textDocument = preset
+      ? createEquationPreset(preset, equationEdit.createId)
+      : {
+          kind: "equation-document-v1" as const,
+          body: { kind: "sequence" as const, id: equationEdit.createId(), children: [] },
+        };
+    return equationEdit.insert(textDocument);
+  };
+});
+const equationMatrixCell = computed(() => {
+  const state = equationEdit.snapshot.value,
+    node = equationEdit.selectedStructure.value;
+  if (!state?.draft || node?.kind !== "matrix") return { row: 0, column: 0 };
+  for (let row = 0; row < node.rows.length; row++)
+    for (let column = 0; column < node.rows[row]!.length; column++) {
+      if (node.rows[row]![column]!.id === state.draft.selection.slotId) return { row, column };
+    }
+  return { row: 0, column: 0 };
+});
+function insertEquationTemplate(id: string): boolean {
+  const state = equationEdit.snapshot.value;
+  if (!state?.draft || state.mode !== "structured") return false;
+  try {
+    return (
+      equationEdit.callbacks.value?.action({
+        type: "insert-nodes",
+        selection: state.draft.selection,
+        nodes: [createEquationTemplate(id, equationEdit.createId)],
+      }) === true
+    );
+  } catch {
+    return false;
+  }
+}
+function insertEquationSymbol(payload: EquationSymbolInsertion): boolean {
+  const state = equationEdit.snapshot.value;
+  if (!state?.draft || state.mode !== "structured") return false;
+  return (
+    equationEdit.callbacks.value?.action({
+      type: "insert-nodes",
+      selection: state.draft.selection,
+      nodes: [{ kind: payload.kind, id: equationEdit.createId(), value: payload.value }],
+    }) === true
+  );
+}
+function insertEquationNormalText(): boolean {
+  return equationEdit.callbacks.value?.toggleNormalText() === true;
+}
+function editEquationMathOption(action: EquationDraftAction): boolean {
+  return equationEdit.callbacks.value?.action(action) === true;
+}
 const textBoxReferenceActions = useTextBoxReference({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -2121,7 +2317,7 @@ watch(
     const retained = new Set<string>();
     const groupText = group
       ? traverseShapeGroup(group).flatMap((visit) =>
-          visit.node.kind !== "shapeGroup" ? [visit.node] : [],
+          visit.node.kind === "shape" || visit.node.kind === "textBox" ? [visit.node] : [],
         )
       : [];
     for (const textOwner of [selected, edited, draft, ...groupText])
@@ -3584,6 +3780,21 @@ function setShowFormulaBar(visible: boolean): void {
 }
 
 function onWorkspaceShapeTextOutsideAction(event: PointerEvent | MouseEvent): void {
+  equationOpenRequest++;
+  const math = equationEdit.snapshot.value;
+  if (
+    math &&
+    !(
+      event.target instanceof Element &&
+      event.target.closest(`[data-equation-session="${math.sessionId}"]`)
+    )
+  ) {
+    if (sheetGridRef.value?.flushPendingEquationEdit() === false) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
+  }
   const current = shapeTextEdit.snapshot.value;
   if (
     !current ||
@@ -3624,6 +3835,52 @@ function onWorkspaceNativeTextCopy(event: ClipboardEvent): void {
   });
 }
 function onWorkspaceKeydown(event: KeyboardEvent): void {
+  const math = equationEdit.snapshot.value;
+  if (
+    math &&
+    event.target instanceof Element &&
+    event.target.closest(`[data-equation-session="${math.sessionId}"]`)
+  )
+    return;
+  if (
+    math &&
+    !event.defaultPrevented &&
+    !event.isComposing &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey &&
+    (event.key === "F2" || event.key === "Enter") &&
+    event.target instanceof Element &&
+    !event.target.closest("input, textarea, [contenteditable]")
+  ) {
+    const id = event.target.closest<HTMLElement>("[data-sheet-drawing-id]")?.dataset.sheetDrawingId;
+    if (id)
+      for (const root of activeSheet.value.drawings ?? []) {
+        if (isShapeGroupDrawing(root)) {
+          const visit = traverseShapeGroup(root).find(
+            ({ node }) => node.id === id && isSheetGroupedEquationDrawing(node),
+          );
+          if (!visit) continue;
+          // Commit may replace the outer root and invalidate the original Layer
+          // view before this captured keystroke reaches its target handler.
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          editOwnedDrawing(root, visit.path);
+          return;
+        }
+        if (root.id === id && root.kind === "equation") {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          beginEquationEdit(root);
+          return;
+        }
+      }
+  }
+  if (math && sheetGridRef.value?.flushPendingEquationEdit() === false) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
+  }
   const currentShapeTextEdit = shapeTextEdit.snapshot.value;
   if (
     event.target instanceof Element &&
@@ -3875,6 +4132,7 @@ watch(
     <SpreadsheetRibbon
       :has-image="!!selectedPicture"
       :has-shape="!!shapeObjectControls.snapshot.value?.paths.length"
+      :has-equation="!!equationEdit.snapshot.value"
       :pivot-id="activePivot?.id"
       :hyperlink-disabled="
         loading ||
@@ -4028,6 +4286,53 @@ watch(
               @delete="tableActions.deletePivotStyle"
           /></template>
         </PivotDesignToolbar>
+      </template>
+      <template #equation-tools>
+        <EquationTools
+          v-if="equationEdit.snapshot.value"
+          :owner-id="equationEdit.snapshot.value.ownerId"
+          :session-id="equationEdit.snapshot.value.sessionId"
+          :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
+          :disabled="loading || fileBusy || xlsxBusy || equationEdit.snapshot.value.composing"
+          :restore-structured-available="!!equationEdit.snapshot.value.draft"
+          :normal-text-active="equationEdit.snapshot.value.normalText"
+          :source-mode="equationEdit.snapshot.value.mode"
+          :selected-structure="equationEdit.selectedStructure.value"
+          :selected-matrix-row="equationMatrixCell.row"
+          :selected-matrix-column="equationMatrixCell.column"
+          :placeholders-hidden="equationPlaceholdersHidden"
+          :insert-template="insertEquationTemplate"
+          :insert-symbol="insertEquationSymbol"
+          :convert-fraction="
+            (intent) => editEquationMathOption({ type: 'fraction-style', ...intent })
+          "
+          :edit-matrix="editEquationMathOption"
+          :edit-source="() => equationEdit.callbacks.value?.sourceMode() ?? false"
+          :edit-normal-text="insertEquationNormalText"
+          :reload-structured="() => equationEdit.callbacks.value?.reloadStructured() ?? false"
+          :hide-placeholders="
+            (hidden) => {
+              equationPlaceholdersHidden = hidden;
+              return true;
+            }
+          "
+          :finish="() => equationEdit.callbacks.value?.commit() ?? false"
+        />
+        <div
+          v-if="equationEdit.snapshot.value?.sourceWarning"
+          role="alert"
+          data-equation-source-warning
+          :data-equation-session="equationEdit.snapshot.value.sessionId"
+          class="spreadsheet-workspace__equation-warning"
+        >
+          <p>{{ t("equation.sourceNotice") }}</p>
+          <button type="button" @click="equationEdit.callbacks.value?.confirmSourceMode()">
+            {{ t("equation.source") }}
+          </button>
+          <button type="button" @click="equationEdit.callbacks.value?.dismissSourceWarning()">
+            {{ t("equation.cancel") }}
+          </button>
+        </div>
       </template>
       <template #shape-tools>
         <ShapeToolsToolbar
@@ -4218,6 +4523,7 @@ watch(
           @insert-drawing="drawingActions.insert"
           :insert-shape-handler="shapeInsertHandler"
           :insert-word-art-handler="wordArtInsertHandler"
+          :insert-equation-handler="equationInsertHandler"
           :shape-owner-id="`${workbookGeneration}:${activeSheet.id}:${workbookRevision}`"
           @insert-camera="cameraActions.open()"
           @insert-chart="chartActions.insert"
@@ -5318,6 +5624,9 @@ watch(
             }
           "
           :shape-creation-request="shapeCreation.request.value"
+          :equation-edit-snapshot="equationEdit.snapshot.value"
+          :equation-edit-callbacks="equationEdit.callbacks.value"
+          :equation-placeholders-hidden="equationPlaceholdersHidden"
           :shape-text-edit-snapshot="shapeTextEdit.snapshot.value"
           :shape-text-edit-callbacks="shapeTextEditCallbacks"
           :shape-text-edit-start="startShapeTextEdit"
@@ -5337,7 +5646,7 @@ watch(
           @update-drawing="drawingActions.update"
           @delete-drawing="drawingActions.remove"
           @edit-drawing="editSheetDrawing"
-          @edit-owned-shape="drawingActions.editGroupLeaf"
+          @edit-owned-shape="editOwnedDrawing"
           @format-drawing="openShapeFormat"
           @format-shape-group="openShapeGroupFormat"
           @selected-shape-group-change="selectedShapeGroupChanged"

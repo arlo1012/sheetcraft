@@ -122,7 +122,8 @@ describe("standard text-warp Core commands and history", () => {
       const copiedTarget =
         copy.kind === "shapeGroup"
           ? traverseShapeGroup(copy).find(
-              ({ node }) => node.kind !== "shapeGroup" && node.shapeText?.warp,
+              ({ node }) =>
+                (node.kind === "shape" || node.kind === "textBox") && node.shapeText?.warp,
             )!.node
           : copy;
       if (copiedTarget.kind !== "shape" && copiedTarget.kind !== "textBox")

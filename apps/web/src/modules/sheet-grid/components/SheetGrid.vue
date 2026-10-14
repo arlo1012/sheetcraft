@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import type {
+  EquationEditSnapshot,
+  EquationEditCallbacks,
+} from "../../sheet-drawings/equation/useEquationEditSession";
 import type { PictureContextSourceAction } from "../../sheet-images/picture-context-source-action";
 import { captureCellPictureSourcePresentation } from "../../sheet-images/cell-picture-presentation";
 import { isFramedCellImage } from "@sheetcraft/core/cell-picture-frame";
@@ -331,6 +335,9 @@ const props = withDefaults(
     pasteShapeObjects?: () => boolean;
     canPasteShapeObjects?: boolean;
     captureClipboardCopy?: () => () => void;
+    equationPlaceholdersHidden?: boolean;
+    equationEditSnapshot?: EquationEditSnapshot;
+    equationEditCallbacks?: EquationEditCallbacks;
     shapeTextEditSnapshot?: ShapeTextEditSnapshot | null;
     shapeTextEditCallbacks?: ShapeTextEditCallbacks;
     shapeTextEditStart?: (request: ShapeCanvasTextEditRequest) => boolean;
@@ -1950,6 +1957,11 @@ function isRulerPoint(point: { x: number; y: number }): boolean {
   return inset > 0 && (point.x < inset || point.y < inset);
 }
 function onSurfacePointerDown(event: PointerEvent): void {
+  if (!flushPendingEquationEdit()) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
   if (
     props.shapeTextEditSnapshot &&
     props.shapeTextEditCallbacks?.isActive() &&
@@ -2690,7 +2702,10 @@ function convertSelectedFloatingImageToCell(id: string, path?: PictureGroupPath)
 }
 
 function onImageCopy(event: ClipboardEvent): void {
-  if (event.target instanceof Element && event.target.closest("[data-shape-canvas-text-editor]"))
+  if (
+    event.target instanceof Element &&
+    event.target.closest("[data-shape-canvas-text-editor], [data-equation-session]")
+  )
     return;
   if (pictureCrop.active.value && !finishPictureCrop()) {
     event.preventDefault();
@@ -2711,7 +2726,10 @@ function onImageCopy(event: ClipboardEvent): void {
 }
 
 function onImageCut(event: ClipboardEvent): void {
-  if (event.target instanceof Element && event.target.closest("[data-shape-canvas-text-editor]"))
+  if (
+    event.target instanceof Element &&
+    event.target.closest("[data-shape-canvas-text-editor], [data-equation-session]")
+  )
     return;
   if (pictureCrop.active.value && !finishPictureCrop()) {
     event.preventDefault();
@@ -2756,7 +2774,10 @@ async function requestFloatingImagePaste(id: string): Promise<void> {
 }
 
 function onImagePaste(event: ClipboardEvent): void {
-  if (event.target instanceof Element && event.target.closest("[data-shape-canvas-text-editor]"))
+  if (
+    event.target instanceof Element &&
+    event.target.closest("[data-shape-canvas-text-editor], [data-equation-session]")
+  )
     return;
   if (pictureCrop.active.value && !finishPictureCrop()) {
     event.preventDefault();
@@ -3286,7 +3307,10 @@ function onDimensionResizeStart(
 }
 
 function onGridKeydown(event: KeyboardEvent): void {
-  if (event.target instanceof Element && event.target.closest("[data-shape-canvas-text-editor]"))
+  if (
+    event.target instanceof Element &&
+    event.target.closest("[data-shape-canvas-text-editor], [data-equation-session]")
+  )
     return;
   if (pictureCrop.active.value) {
     onPictureCropKeydown(event);
@@ -4139,8 +4163,13 @@ function flushPendingShapeTextEdit(): boolean {
   return true;
 }
 
+function flushPendingEquationEdit(): boolean {
+  if (props.equationEditSnapshot && props.equationEditCallbacks?.isActive())
+    return props.equationEditCallbacks.commit();
+  return true;
+}
 function flushPendingEdit(): boolean {
-  return flushPendingShapeTextEdit() && flushPendingCellEdit();
+  return flushPendingEquationEdit() && flushPendingShapeTextEdit() && flushPendingCellEdit();
 }
 
 function flushPendingCellEdit(): boolean {
@@ -4156,6 +4185,7 @@ function flushPendingCellEdit(): boolean {
 
 function hasPendingEdit(): boolean {
   return (
+    !!props.equationEditSnapshot ||
     !!props.shapeTextEditSnapshot ||
     pictureCrop.active.value ||
     isComposing.value ||
@@ -4285,6 +4315,7 @@ defineExpose({
   flushPendingEdit,
   flushPendingCellEdit,
   flushPendingShapeTextEdit,
+  flushPendingEquationEdit,
   focusGrid: focusEditor,
   handleReferenceKeydown,
   hasPendingEdit,
@@ -4620,6 +4651,9 @@ defineExpose({
         :cut-objects="cutShapeObjects"
         :paste-objects="pasteShapeObjects"
         :can-paste-objects="canPasteShapeObjects"
+        :equation-placeholders-hidden="equationPlaceholdersHidden"
+        :equation-edit-snapshot="equationEditSnapshot"
+        :equation-edit-callbacks="equationEditCallbacks"
         :text-edit-snapshot="shapeTextEditSnapshot"
         :text-edit-callbacks="shapeTextEditCallbacks"
         :start-text-edit="shapeTextEditStart"

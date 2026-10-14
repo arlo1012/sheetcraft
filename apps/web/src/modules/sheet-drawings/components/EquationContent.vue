@@ -1,21 +1,16 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import katex from "katex";
 import "katex/dist/katex.min.css";
+import { renderEquationSource } from "../equation/equation-render";
 const props = defineProps<{ source: string }>();
-// KaTeX escapes source text and disallows HTML / URLs with trust disabled.
-const html = computed(() =>
-  katex.renderToString(props.source, {
-    throwOnError: false,
-    trust: false,
-    strict: "ignore",
-    output: "htmlAndMathml",
-    maxExpand: 1000,
-    maxSize: 20,
-  }),
-);
+const result = computed(() => renderEquationSource(props.source));
 </script>
-<template><div class="equation-content" v-html="html" /></template>
+<template>
+  <div v-if="result.status === 'ready'" class="equation-content" v-html="result.html" />
+  <div v-else class="equation-content equation-content--error" role="status">
+    <span class="katex-error" :title="result.message">{{ source }}</span>
+  </div>
+</template>
 <style scoped lang="scss">
 .equation-content {
   display: flex;

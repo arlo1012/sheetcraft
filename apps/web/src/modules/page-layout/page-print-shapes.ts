@@ -12,6 +12,7 @@ import {
   type ShapeGroupDrawing,
   type ShapeGroupPath,
   type SheetGroupedGraphicDrawing,
+  type SheetGroupedEquationDrawing,
 } from "@sheetcraft/core/shape-group";
 import {
   type PictureAxisMetrics,
@@ -117,6 +118,25 @@ export function getPrintableShapeRoots(sheet: Pick<Sheet, "drawings">): Printabl
   );
 }
 
+/** Native math remains a real ownership leaf and never enters body/text planners. */
+export type PrintableEquationLeaf = Readonly<{
+  sourceRoot: ShapeGroupDrawing;
+  sourceNode: SheetGroupedEquationDrawing;
+  path: ShapeGroupPath;
+}>;
+
+/** Print policy belongs to the outer real root; visibility follows all owners.
+ * Retained member properties never override the group's effective root policy. */
+export function getPrintableShapeGroupLeafIds(root: ShapeGroupDrawing): ReadonlySet<string> {
+  const visits = checked(root.id, () => traverseShapeGroupVisibility(root));
+  if (!getShapeObjectProperties(root.shapeProperties).printObject) return new Set();
+  return new Set(
+    visits
+      .filter(({ node, visible }) => visible && node.kind !== "shapeGroup")
+      .map(({ node }) => node.id),
+  );
+}
+
 export type PrintableShapeLeaf = {
   sourceRoot: PrintableShape;
   sourceNode: PrintableShape | SheetGroupedGraphicDrawing;
@@ -129,6 +149,11 @@ export type PrintableShapeLeaf = {
   /** Exact whole-sheet Core route; the source/path identity remains the real carrier. */
   connectorRoute?: ReadyShapeConnectorRoute;
 };
+type PrintableLeaf = PrintableShapeLeaf | PrintableEquationLeaf;
+function isPrintableEquationLeaf(leaf: PrintableLeaf): leaf is PrintableEquationLeaf {
+  return leaf.sourceNode.kind === "equation";
+}
+
 const groupedPrintIdentities = new WeakMap<
   ShapeGroupDrawing,
   WeakMap<SheetGroupedGraphicDrawing, { pathKey: string; identity: object }>
@@ -165,7 +190,8 @@ export function* getPrintableShapeLeaves(
 ): Generator<PrintableShapeLeaf> {
   assertPrintShapeRenderPass(sheet, metrics, renderPass);
   for (const sourceRoot of getPrintableShapeRoots(sheet))
-    yield* printableShapeLeavesForRoot(sourceRoot, metrics, renderPass);
+    for (const leaf of printableLeavesForRoot(sourceRoot, metrics, renderPass))
+      if (!isPrintableEquationLeaf(leaf)) yield leaf;
 }
 
 /** Every pass includes nonprinting relation targets. Never resolve a filtered owner subset. */
@@ -198,17 +224,13 @@ function requireLinkedTextPaint(
   // must still be checked before culling. Its canonical carrier remains intact.
   return leaf.paintView;
 }
-function* printableShapeLeavesForRoot(
+function* printableLeavesForRoot(
   sourceRoot: PrintableShape,
   metrics: PictureSheetMetrics,
   renderPass?: ResolvedShapeForestForRender,
-): Generator<PrintableShapeLeaf> {
+): Generator<PrintableLeaf> {
   if (sourceRoot.kind === "shapeGroup") {
-    const visibleIds = new Set(
-      checked(sourceRoot.id, () => traverseShapeGroupVisibility(sourceRoot))
-        .filter(({ visible }) => visible)
-        .map(({ node }) => node.id),
-    );
+    const visibleIds = getPrintableShapeGroupLeafIds(sourceRoot);
     const projection = checked(sourceRoot.id, () => {
       const result = renderPass
         ? renderPass.getGroup(sourceRoot.id)
@@ -218,11 +240,17 @@ function* printableShapeLeavesForRoot(
       return result;
     });
     for (const leaf of projection.leaves) {
+      const sourceNode = leaf.sourceNode;
       // Hidden members remain valid relation targets, but never enter connector/font/paint preflight.
-      if (!visibleIds.has(leaf.sourceNode.id)) continue;
-      const passLeaf = renderPass?.getLeaf(leaf.sourceNode.id);
+      if (!visibleIds.has(sourceNode.id)) continue;
+      if (sourceNode.kind === "equation") {
+        if (leaf.collapsed || !leaf.view || !leaf.layout) continue;
+        yield { sourceRoot, sourceNode, path: leaf.path };
+        continue;
+      }
+      const passLeaf = renderPass?.getLeaf(sourceNode.id);
       const textPaint = checked(leaf.path.join("/"), () =>
-        requireLinkedTextPaint(leaf.sourceNode, passLeaf),
+        requireLinkedTextPaint(sourceNode, passLeaf),
       );
       const connector = passLeaf?.connector;
       if (connector?.status === "suspended" || connector?.status === "degenerate") continue;
@@ -230,9 +258,9 @@ function* printableShapeLeavesForRoot(
       if (!paint && (leaf.collapsed || !leaf.view || !leaf.layout)) continue;
       yield {
         sourceRoot,
-        sourceNode: leaf.sourceNode,
+        sourceNode,
         sourceIdentity:
-          passLeaf?.paintIdentity ?? groupedPrintIdentity(sourceRoot, leaf.sourceNode, leaf.path),
+          passLeaf?.paintIdentity ?? groupedPrintIdentity(sourceRoot, sourceNode, leaf.path),
         path: leaf.path,
         drawingId: leaf.path.join("/"),
         drawing: paint?.paintView ?? textPaint ?? leaf.view!,
@@ -274,11 +302,17 @@ function* printablePaintEntries(
   assertPrintShapeRenderPass(sheet, metrics, renderPass);
   for (const root of getPrintableShapeRoots(sheet)) {
     if (root.kind === "shapeGroup" && checked(root.id, () => requiresShapeGroupPaint(root))) {
-      if ([...printableShapeLeavesForRoot(root, metrics, renderPass)].length)
-        yield { kind: "group" as const, root };
+      const leaves = [...printableLeavesForRoot(root, metrics, renderPass)];
+      if (leaves.some((leaf) => leaf.sourceNode.kind === "equation"))
+        throw new ShapePrintError(
+          root.id,
+          new Error("Equation group effects are unavailable for printing."),
+        );
+      if (leaves.length) yield { kind: "group" as const, root };
     } else {
-      for (const leaf of printableShapeLeavesForRoot(root, metrics, renderPass))
-        yield { kind: "leaf" as const, leaf };
+      for (const leaf of printableLeavesForRoot(root, metrics, renderPass))
+        if (isPrintableEquationLeaf(leaf)) yield { kind: "equation" as const, leaf };
+        else yield { kind: "leaf" as const, leaf };
     }
   }
 }
@@ -537,6 +571,11 @@ export function paintPrintShapes(
     images: CanvasImageCache;
     density?: number;
     renderPass?: ResolvedShapeForestForRender;
+    /** Called before the first paint entry of each real root, retaining mixed
+     * equation/shape z-order without filtering relation targets from the pass. */
+    beforeRoot?: (root: SheetDrawing) => void;
+    /** Native math dispatch at its exact bottom-to-top DFS leaf position. */
+    paintEquationLeaf?: (leaf: PrintableEquationLeaf) => void;
   },
 ): void {
   const resources = createPicturePaintResources(options.theme, options.assetUrls, options.images);
@@ -546,7 +585,22 @@ export function paintPrintShapes(
     context.beginPath();
     context.rect(0, 0, options.viewport.width, options.viewport.height);
     context.clip();
+    let previousRoot: SheetDrawing | undefined;
     for (const entry of printablePaintEntries(options.sheet, options.metrics, options.renderPass)) {
+      const root = entry.kind === "group" ? entry.root : entry.leaf.sourceRoot;
+      if (root !== previousRoot) {
+        options.beforeRoot?.(root);
+        previousRoot = root;
+      }
+      if (entry.kind === "equation") {
+        if (!options.paintEquationLeaf)
+          throw new ShapePrintError(
+            root.id,
+            new Error("A native Equation print consumer is required."),
+          );
+        options.paintEquationLeaf(entry.leaf);
+        continue;
+      }
       if (entry.kind === "group") {
         checked(entry.root.id, () => {
           const result = prepareShapeGroupPaint({
@@ -684,6 +738,7 @@ export function paintPrintShapes(
         }
       });
     }
+    assertPrintShapeRenderPass(options.sheet, options.metrics, options.renderPass);
   } finally {
     context.restore();
   }

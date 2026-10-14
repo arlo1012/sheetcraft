@@ -213,7 +213,8 @@ function fixture(initial = group(), preservingWriter = true) {
     traverseShapeGroup(source()).find((entry) => entry.node.id === id)!.node;
   const graphic = (id: string) => {
     const value = node(id);
-    if (value.kind === "shapeGroup") throw new Error("Expected actual leaf");
+    if (value.kind !== "shape" && value.kind !== "textBox")
+      throw new Error("Expected actual graphic leaf");
     return value;
   };
   const intent = (body: Record<string, unknown>): ShapeFormatIntent =>
@@ -1504,9 +1505,10 @@ test("WordArt recipe root batch and owned Clear preserve genuine member frames, 
   for (const id of ["a", "b"]) {
     const current = f.graphic(id);
     const old = traverseShapeGroup(initial).find(({ node }) => node.id === id)!.node;
+    if (old.kind !== "shape" && old.kind !== "textBox") throw Error("Expected old graphic leaf");
     expect({
       ...current,
-      shapeText: old.kind !== "shapeGroup" ? old.shapeText : undefined,
+      shapeText: old.shapeText,
     }).toEqual(old);
     expect(current.shapeText!.characterRuns).toEqual([
       { start: 0, end: 6, fontSize: 24, bold: false, italic: true },

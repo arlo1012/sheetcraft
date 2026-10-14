@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import EquationCanvasEditor from "../equation/EquationCanvasEditor.vue";
+import type {
+  EquationEditSnapshot,
+  EquationEditCallbacks,
+} from "../equation/useEquationEditSession";
 import {
   computed,
   nextTick,
@@ -88,12 +93,14 @@ import { createContextMenuPoint, useContextMenu } from "../../../shared/menu/use
 import SheetShapeSelectionToolbar from "./SheetShapeSelectionToolbar.vue";
 import ShapeGroupSelection from "./ShapeGroupSelection.vue";
 import { canEditShapeObject } from "@sheetcraft/core/shape-protection";
+import { isDrawingClipboardEligibleRoot } from "../drawing-clipboard-eligibility";
 import { getShapeObjectProperties } from "@sheetcraft/core/shape-object-properties";
 import { resolveShapeDrawing, updateResolvedShapeDrawing } from "../resolved-shape-drawing";
 import { shapeViewLayout, shapeViewAtRect } from "../shape-view-layout";
 import { cellTextFontRevision } from "../../../shared/cell-text/text-metrics";
 import {
   isFramedShapeDrawing,
+  hasShapeObjectFrame,
   type SheetLegacyDrawing as SheetDrawing,
   type SheetDrawing as SourceSheetDrawing,
   type SheetGraphicDrawing,
@@ -189,6 +196,9 @@ const props = defineProps<{
   cutObjects?: (paths: readonly ShapeGroupPath[]) => boolean;
   pasteObjects?: () => boolean;
   canPasteObjects?: boolean;
+  equationPlaceholdersHidden?: boolean;
+  equationEditSnapshot?: EquationEditSnapshot;
+  equationEditCallbacks?: EquationEditCallbacks;
   textEditSnapshot?: ShapeTextEditSnapshot | null;
   textEditCallbacks?: ShapeTextEditCallbacks;
   startTextEdit?: (request: ShapeCanvasTextEditRequest) => boolean;
@@ -358,7 +368,7 @@ const resolvedDrawings = computed<DrawingProjection[]>(() => {
           : [],
       );
     }
-    if (isFramedShapeDrawing(source) && !currentMetrics)
+    if (hasShapeObjectFrame(source) && !currentMetrics)
       throw new Error("Shape placement requires current worksheet metrics.");
     return [
       currentMetrics
@@ -438,8 +448,7 @@ function projectionById(drawing: SheetDrawing) {
 function canonicalOwner(drawing: SheetDrawing): boolean {
   const item = projectionById(drawing);
   return (
-    !!item &&
-    (!!item.renderLeaf?.connector || !!item.groupLeaf || isFramedShapeDrawing(item.source))
+    !!item && (!!item.renderLeaf?.connector || !!item.groupLeaf || hasShapeObjectFrame(item.source))
   );
 }
 function hasContinuousView(drawing: SheetDrawing): boolean {
@@ -553,7 +562,7 @@ function moveView(drawing: SheetDrawing, delta: { x: number; y: number }) {
   const resolved = resolvedOwner(drawing);
   if (
     resolved &&
-    (isFramedShapeDrawing(resolved.source) || !!resolved.groupLeaf) &&
+    (hasShapeObjectFrame(resolved.source) || !!resolved.groupLeaf) &&
     resolved.metrics &&
     resolved.rect
   )
@@ -573,7 +582,7 @@ function resizeView(
   const resolved = resolvedOwner(drawing);
   if (
     resolved &&
-    (isFramedShapeDrawing(resolved.source) || !!resolved.groupLeaf) &&
+    (hasShapeObjectFrame(resolved.source) || !!resolved.groupLeaf) &&
     resolved.metrics &&
     resolved.rect
   ) {
@@ -584,7 +593,7 @@ function resizeView(
       delta,
       getShapeObjectProperties(
         resolved.groupLeaf?.sourceNode.shapeProperties ??
-          (isFramedShapeDrawing(resolved.source) ? resolved.source.shapeProperties : undefined),
+          (hasShapeObjectFrame(resolved.source) ? resolved.source.shapeProperties : undefined),
       ).lockAspectRatio || shift,
       1,
       true,
@@ -990,6 +999,23 @@ function beginCanvasText(drawing: SheetDrawing, selection: "all" | "end", text?:
   emit("select");
   return true;
 }
+const equationEditorFragmentKey = computed(() => {
+  const state = props.equationEditSnapshot;
+  if (!state || !props.equationEditCallbacks?.isActive()) return;
+  const candidate = fragments.value
+    .filter((f) => f.drawing.id === state.ownerId && sourceOwner(f.drawing) === state.root)
+    .sort(
+      (a, b) =>
+        b.clippedRect.width * b.clippedRect.height - a.clippedRect.width * a.clippedRect.height,
+    )[0];
+  return candidate && `${candidate.drawing.id}-${candidate.pageKey ?? candidate.paneId}`;
+});
+function equationPaintView(drawing: SheetDrawing): SheetDrawing {
+  const state = props.equationEditSnapshot;
+  return state && drawing.id === state.ownerId && sourceOwner(drawing) === state.root
+    ? state.view
+    : drawing;
+}
 const canvasTextEditor = ref<InstanceType<typeof ShapeCanvasTextEditor>>();
 const canvasTextPlacement = computed(() => {
   const state = props.textEditSnapshot;
@@ -1180,7 +1206,9 @@ function objectSelectionPaths(): ShapeGroupPath[] {
     }
   }
   return selectedRoots.value
-    .filter((id) => props.drawings.some((node) => node.id === id && isShapeGroupEligibleRoot(node)))
+    .filter((id) =>
+      props.drawings.some((node) => node.id === id && isDrawingClipboardEligibleRoot(node)),
+    )
     .map((id) => [id]);
 }
 watch(
@@ -1197,7 +1225,7 @@ function selectObjectPaths(pathValues: readonly ShapeGroupPath[]): boolean {
       roots.some(
         (root) =>
           !root ||
-          !isShapeGroupEligibleRoot(root) ||
+          !isDrawingClipboardEligibleRoot(root) ||
           (props.sheet && !canEditShapeObject(props.sheet, root)),
       )
     )
@@ -2160,6 +2188,15 @@ function start(
   index?: number,
   freePoint?: FreeShapePointDescriptor,
 ): void {
+  if (
+    props.equationEditSnapshot &&
+    props.equationEditCallbacks?.isActive() &&
+    !props.equationEditCallbacks.commit()
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
   if (props.textEditSnapshot && !finishCanvasText()) {
     event.preventDefault();
     event.stopPropagation();
@@ -3342,11 +3379,23 @@ watch(
     >
       <div class="sheet-drawing-layer__clip">
         <div class="sheet-drawing-layer__content" :style="contentStyle(fragment)">
+          <EquationCanvasEditor
+            v-if="
+              equationEditSnapshot &&
+              equationEditCallbacks &&
+              equationEditorFragmentKey ===
+                `${fragment.drawing.id}-${fragment.pageKey ?? fragment.paneId}`
+            "
+            :snapshot="equationEditSnapshot"
+            :callbacks="equationEditCallbacks"
+            :hide-placeholders="equationPlaceholdersHidden"
+            :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
+          />
           <DrawingContent
-            v-if="!groupPaintEntry(fragment.drawing)"
+            v-else-if="!groupPaintEntry(fragment.drawing)"
             @detailed-paint="acceptDetailedPaint(fragment, $event)"
             @control-change="emit('controlChange', fragment.drawing.id, $event)"
-            :drawing="fragment.drawing"
+            :drawing="equationPaintView(fragment.drawing)"
             :paint-drawing="displayedRenderPass?.getLeaf(fragment.drawing.id)?.paintView"
             :text-reference-unavailable="
               displayedRenderPass?.getLeaf(fragment.drawing.id)?.textReference?.status ===

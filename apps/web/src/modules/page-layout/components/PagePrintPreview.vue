@@ -12,6 +12,7 @@ import {
   type TextBoxReferenceResolver,
 } from "../../sheet-drawings/textbox-reference-display";
 import { ShapePrintError } from "../page-print-shapes";
+import { EquationPrintUnavailableError } from "../page-print-equations";
 import type { SheetPageSetup } from "@sheetcraft/core/page-setup";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import { useAppI18n } from "../../../shared/i18n";
@@ -42,18 +43,27 @@ const { t } = useAppI18n();
 const selected = ref(0);
 const printing = ref(false);
 const renderFailure = ref<string>();
+const equationFailure = ref<string>();
 const thumbnailCanvases = new Map<number, HTMLCanvasElement>();
 const pageCanvas = ref<HTMLCanvasElement>();
 const repaint = ref(0);
+const equationResourceRevision = ref(0);
 const thumbnailWindowSize = 9;
-const renderer = createPrintPreviewRenderer(() => {
-  repaint.value += 1;
-});
+const renderer = createPrintPreviewRenderer(
+  () => {
+    repaint.value += 1;
+  },
+  () => {
+    equationResourceRevision.value += 1;
+    repaint.value += 1;
+  },
+);
 
 const previewResult = computed<{
   document?: PrintPreviewDocument;
   errorKey?:
     | "pagePrint.unsupportedPictures"
+    | "pagePrint.unsupportedEquations"
     | "pagePrint.invalidRange"
     | "drawing.textBoxReferenceUnavailable";
 }>(() => {
@@ -71,26 +81,34 @@ const previewResult = computed<{
       revision: props.workbookRevision,
       textBoxReferenceResolver: props.textBoxReferenceResolver,
       shapePaintResources: renderer.getShapePaintResources(props.theme, props.imageAssetUrls),
+      nativeEquationConsumer: true,
     });
     return { document: result };
   } catch (error) {
     return {
       errorKey:
-        error instanceof UnsupportedPictureDocumentError
-          ? "pagePrint.unsupportedPictures"
-          : error instanceof ShapePrintError &&
-              error.cause instanceof TextBoxReferenceUnavailableError
-            ? "drawing.textBoxReferenceUnavailable"
-            : "pagePrint.invalidRange",
+        error instanceof EquationPrintUnavailableError
+          ? "pagePrint.unsupportedEquations"
+          : error instanceof UnsupportedPictureDocumentError
+            ? "pagePrint.unsupportedPictures"
+            : error instanceof ShapePrintError &&
+                error.cause instanceof TextBoxReferenceUnavailableError
+              ? "drawing.textBoxReferenceUnavailable"
+              : "pagePrint.invalidRange",
     };
   }
 });
 const documentPreview = computed(() => previewResult.value.document);
+const equationPreparing = computed(() => {
+  void repaint.value;
+  return Boolean(documentPreview.value && !renderer.equationsReady(documentPreview.value));
+});
 const pages = computed(() => documentPreview.value?.pages ?? []);
 const activePage = computed(() => pages.value[selected.value] ?? pages.value[0]);
 const canPrevious = computed(() => selected.value > 0);
 const canNext = computed(() => selected.value < pages.value.length - 1);
 const thumbnailPages = computed(() => {
+  if (equationPreparing.value || equationFailure.value) return [];
   const count = pages.value.length;
   const start = Math.max(
     0,
@@ -103,6 +121,7 @@ const thumbnailPages = computed(() => {
 });
 
 function render(): void {
+  if (equationPreparing.value) return;
   renderFailure.value = undefined;
   try {
     renderPages();
@@ -146,7 +165,8 @@ function close(): void {
   emit("update:visible", false);
 }
 async function print(): Promise<void> {
-  if (printing.value || !documentPreview.value) return;
+  if (printing.value || !documentPreview.value || equationPreparing.value || renderFailure.value)
+    return;
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
     void MessagePlugin.error(t("pagePrint.popupBlocked"));
@@ -166,6 +186,19 @@ async function print(): Promise<void> {
       locale = props.locale,
       dateSystem = props.dateSystem,
       textBoxReferenceResolver = props.textBoxReferenceResolver;
+    const isCurrent = () =>
+      props.visible &&
+      !printWindow.closed &&
+      props.sheet === sheet &&
+      props.workbookRevision === revision &&
+      props.setup === setup &&
+      props.evaluator === evaluator &&
+      props.theme === theme &&
+      props.imageAssetUrls === assetUrls &&
+      props.fileName === fileName &&
+      props.locale === locale &&
+      props.dateSystem === dateSystem &&
+      props.textBoxReferenceResolver === textBoxReferenceResolver;
     const assetIds = getPrintPictureAssetIds(
       document.sheet,
       document.shapeMetrics,
@@ -207,7 +240,13 @@ async function print(): Promise<void> {
       shapePaintResources: renderer.getShapePaintResources(theme, assetUrls),
       requireReadyGroupPaint: true,
       textBoxReferenceResolver,
+      nativeEquationConsumer: true,
     });
+    await renderer.prepareEquations(document, { isCurrent });
+    if (!isCurrent()) {
+      printWindow.close();
+      return;
+    }
     const images = document.pages.map((page) => {
       const canvas = window.document.createElement("canvas");
       renderer.render({
@@ -282,12 +321,17 @@ watch(
     props.textBoxReferenceResolver,
     props.locale,
     props.dateSystem,
+    props.setup,
+    props.fileName,
+    equationResourceRevision.value,
   ],
   async () => {
     const request = ++resourceGeneration;
     if (!props.visible) return;
     const document = documentPreview.value;
     if (!document) return;
+    equationFailure.value = undefined;
+    const isCurrent = () => request === resourceGeneration && props.visible;
     try {
       const urls = [
         ...getPrintPictureAssetIds(document.sheet, document.shapeMetrics, document.shapeRenderPass),
@@ -297,10 +341,14 @@ watch(
         renderer.prepareImages(urls as string[], document),
         renderer.prepareShapes(document),
       ]);
+      if (!isCurrent()) return;
+      await renderer.prepareEquations(document, { isCurrent });
       if (request === resourceGeneration && props.visible) repaint.value++;
     } catch (error) {
-      if (request === resourceGeneration && props.visible)
+      if (request === resourceGeneration && props.visible) {
         renderFailure.value = error instanceof Error ? error.message : String(error);
+        if (document.equationPrintPass?.entries.length) equationFailure.value = renderFailure.value;
+      }
     }
   },
   { immediate: true },
@@ -340,8 +388,16 @@ onBeforeUnmount(() => {
         <p v-if="!documentPreview" role="alert">
           {{ t(previewResult.errorKey ?? "pagePrint.invalidRange") }}
         </p>
+        <p v-else-if="equationPreparing && !equationFailure" role="status">
+          {{ t("pagePrint.preparingEquations") }}
+        </p>
+        <p v-else-if="equationFailure" role="alert">
+          {{ t("pagePrint.unsupportedEquations") }} {{ equationFailure }}
+        </p>
         <canvas v-else ref="pageCanvas" />
-        <p v-if="renderFailure" role="alert">{{ t("pagePrint.failed") }} {{ renderFailure }}</p>
+        <p v-if="renderFailure && !equationFailure" role="alert">
+          {{ t("pagePrint.failed") }} {{ renderFailure }}
+        </p>
         <p v-if="activePage">
           {{ t("pagePrint.pageOf", { page: activePage.pageNumber, count: pages.length }) }}
         </p>
@@ -357,7 +413,11 @@ onBeforeUnmount(() => {
         /></TButton>
         <span />
         <TButton variant="outline" @click="close">{{ t("pagePrint.close") }}</TButton>
-        <TButton theme="primary" :loading="printing" :disabled="!documentPreview" @click="print"
+        <TButton
+          theme="primary"
+          :loading="printing"
+          :disabled="!documentPreview || equationPreparing || Boolean(renderFailure)"
+          @click="print"
           ><Printer :size="15" aria-hidden="true" />{{ t("pagePrint.print") }}</TButton
         >
       </div>

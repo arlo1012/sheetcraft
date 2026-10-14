@@ -1174,7 +1174,7 @@ test("real Workspace group Text Glow controls update actual member glyph styles 
   await flushPromises();
   const owner = getActiveSheet(state.session.workbook).drawings!.find(isShapeGroupDrawing)!;
   for (const leaf of owner.members) {
-    if (leaf.kind === "shapeGroup") throw Error("Expected actual text leaf");
+    if (leaf.kind !== "shape" && leaf.kind !== "textBox") throw Error("Expected actual text leaf");
     expect(leaf.shapeText?.style?.glow).toMatchObject({
       kind: "value",
       value: { sizePt: 11, opacity: 0.4 },

@@ -13,6 +13,21 @@ import {
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { Workbook } from "@sheetcraft/core/workbook";
 
+/** Stage gate until every owned/native math consumer is checked together. */
+const equationGroupAndFlipConsumersEnabled = true;
+function assertEquationGroupAndFlipConsumers(drawings: readonly SheetDrawing[] | undefined): void {
+  if (equationGroupAndFlipConsumersEnabled) return;
+  for (const root of drawings ?? []) {
+    if (root.kind === "equation" && (root.equationFlipX || root.equationFlipY))
+      throw new TypeError("Equation flip consumers are not yet enabled. The source is preserved.");
+    if (
+      root.kind === "shapeGroup" &&
+      traverseShapeGroup(root).some(({ node }) => node.kind === "equation")
+    )
+      throw new TypeError("Owned Equation consumers are not yet enabled. The source is preserved.");
+  }
+}
+
 /** Kept for old recovery diagnostics; canonical shapes now have live consumers. */
 export class UnsupportedShapeFrameDocumentError extends Error {
   readonly code = "unsupported-shape-frame";
@@ -60,6 +75,7 @@ export function assertSupportedShapeGroupScenes(
   sheetId: string,
   drawings: readonly SheetDrawing[] | undefined,
 ): void {
+  assertEquationGroupAndFlipConsumers(drawings);
   const affected = new Set<string>();
   const connectors: (SheetDrawing | SheetGroupedGraphicDrawing)[] = [];
   for (const root of drawings ?? []) {
@@ -82,6 +98,7 @@ export function assertSupportedShapeGroupScenes(
       if (active) affected.add(node.id);
       if (
         node.kind !== "shapeGroup" &&
+        node.kind !== "equation" &&
         !node.shapeConnector &&
         node.shapeStyle?.rotation3d?.kind === "value"
       )

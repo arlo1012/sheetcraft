@@ -178,7 +178,8 @@ test("real Workspace restores snapshot67 and applies shared-camera, depth, Keep 
     expect(
       newRoot.members.every(
         (member) =>
-          member.kind !== "shapeGroup" && member.shapeText?.style?.rotation3d === undefined,
+          (member.kind === "shape" || member.kind === "textBox") &&
+          member.shapeText?.style?.rotation3d === undefined,
       ),
     ).toBe(true);
     state.undo();
@@ -218,7 +219,9 @@ test("real Workspace restores snapshot67 and applies shared-camera, depth, Keep 
       layer = wrapper.getComponent(SheetDrawingLayer);
     expect(
       (sheet.drawings![0] as ShapeGroupDrawing).members.every(
-        (member) => member.kind !== "shapeGroup" && member.shapeStyle?.format3d?.kind === "value",
+        (member) =>
+          (member.kind === "shape" || member.kind === "textBox") &&
+          member.shapeStyle?.format3d?.kind === "value",
       ),
     ).toBe(true);
     // The other visible Effects mode edits glyph depth, never body depth or

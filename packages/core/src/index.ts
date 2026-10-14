@@ -52,3 +52,49 @@ export * from "./picture-properties.js";
 export * from "./picture-protection.js";
 
 export * from "./text-box-reference.js";
+
+export { isFramedEquationDrawing, type SheetFramedEquationDrawing } from "./sheet-drawings.js";
+
+export {
+  EQUATION_DOCUMENT_LIMITS,
+  normalizeEquationDocument,
+  cloneEquationDocument,
+  serializeEquationDocument,
+  walkEquationDocument,
+  findEquationNode,
+  type EquationDocument,
+  type EquationNode,
+  type EquationSequence,
+  type EquationText,
+  type EquationLatex,
+  type EquationFraction,
+  type EquationFractionStyle,
+  type EquationScript,
+  type EquationRadical,
+  type EquationNary,
+  type EquationNaryOperator,
+  type EquationDelimiter,
+  type EquationDelimiterName,
+  type EquationFunction,
+  type EquationAccent,
+  type EquationAccentName,
+  type EquationLimit,
+  type EquationLimitName,
+  type EquationAnnotation,
+  type EquationBox,
+  type EquationMatrix,
+  type EquationMatrixBrackets,
+} from "./equation-document.js";
+
+export * from "./equation-flip.js";
+export {
+  isSheetGroupedEquationDrawing,
+  normalizeSheetGroupedEquationDrawing,
+  type SheetGroupedEquationDrawing,
+} from "./shape-group.js";
+export { type ResolvedSheetGroupedEquationDrawing } from "./shape-group-layout.js";
+export { planFlipShapeDrawingNodes } from "./shape-group-planning.js";
+export {
+  applyShapeGroupEquationSourceEdit,
+  type ShapeGroupEquationSourceEdit,
+} from "./shape-group-edit.js";

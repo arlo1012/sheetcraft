@@ -376,9 +376,12 @@ describe("shared body camera formatting", () => {
       field: "shapeKeepTextFlat",
       value: true,
     });
-    for (const entry of traverseShapeGroup(result.root))
-      if (entry.node.kind !== "shapeGroup")
-        expect(entry.node.shapeText?.layout.keepFlat).toBe(true);
+    for (const entry of traverseShapeGroup(result.root)) {
+      if (entry.node.kind === "shapeGroup") continue;
+      if (entry.node.kind !== "shape" && entry.node.kind !== "textBox")
+        throw Error("Expected graphic leaf");
+      expect(entry.node.shapeText?.layout.keepFlat).toBe(true);
+    }
     expect(result.root.group3d).toEqual(f.root.group3d);
     expect(result.root).not.toHaveProperty("shapeText");
   });

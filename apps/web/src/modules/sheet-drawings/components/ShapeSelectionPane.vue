@@ -9,6 +9,7 @@ import {
   MoveUp,
   SendToBack,
   Shapes,
+  Sigma,
   Type,
   X,
 } from "lucide-vue-next";
@@ -398,7 +399,7 @@ const renderedRows = computed(() => {
             <Group v-if="row.kind === 'shapeGroup'" :size="16" /><Type
               v-else-if="row.kind === 'textBox'"
               :size="16"
-            /><Shapes v-else :size="16" />
+            /><Sigma v-else-if="row.kind === 'equation'" :size="16" /><Shapes v-else :size="16" />
           </TButton>
           <TButton
             variant="text"

@@ -6,6 +6,7 @@ import type {
   SheetGraphicDrawing,
   SheetLegacyDrawing as SheetDrawing,
 } from "@sheetcraft/core/sheet-drawings";
+import { getEquationMathRotationDeg } from "@sheetcraft/core/equation-flip";
 import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
 import { useAppI18n } from "../../../shared/i18n";
 import ShapeLeafPixelContent from "./ShapeLeafPixelContent.vue";
@@ -71,6 +72,14 @@ const textStyle = computed(() => ({
     ? { transform: "rotate(180deg)", transformOrigin: "50% 50%" }
     : {}),
 }));
+const equationMathStyle = computed(() =>
+  paintSource.value.kind === "equation"
+    ? {
+        transform: `rotate(${getEquationMathRotationDeg(paintSource.value)}deg)`,
+        transformOrigin: "50% 50%",
+      }
+    : undefined,
+);
 const legacyBodyTransform = computed(() =>
   paintSource.value.kind === "shape"
     ? standardShapeSvgTransform({
@@ -207,8 +216,8 @@ const legacyBodyTransform = computed(() =>
     />
     <EquationContent
       v-else-if="drawing.kind === 'equation'"
-      :source="drawing.text"
-      :style="textStyle"
+      :source="paintSource.text"
+      :style="[textStyle, equationMathStyle]"
     />
     <div
       v-else

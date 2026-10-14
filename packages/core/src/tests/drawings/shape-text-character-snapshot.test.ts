@@ -52,7 +52,7 @@ function tree(): ShapeGroupDrawing {
 }
 function richLeaf(root: ShapeGroupDrawing) {
   const result = traverseShapeGroup(root).find(({ node }) => node.id === "rich")!.node;
-  if (result.kind === "shapeGroup") throw Error("Expected leaf");
+  if (result.kind !== "shape" && result.kind !== "textBox") throw Error("Expected leaf");
   return result;
 }
 
@@ -223,9 +223,10 @@ describe("conditional V66 attributed shape internal persistence", () => {
       createId: () => `copy-${++id}`,
     })[0] as ShapeGroupDrawing;
     const copiedLeaf = traverseShapeGroup(copied).find(
-      ({ node }) => node.kind !== "shapeGroup" && node.shapeText?.characterRuns,
+      ({ node }) =>
+        (node.kind === "shape" || node.kind === "textBox") && node.shapeText?.characterRuns,
     )?.node;
-    if (!copiedLeaf || copiedLeaf.kind === "shapeGroup")
+    if (!copiedLeaf || (copiedLeaf.kind !== "shape" && copiedLeaf.kind !== "textBox"))
       throw Error("Expected copied attributed leaf");
     copiedLeaf.shapeText!.characterRuns![0]!.italic = false;
     expect(serializeWorkbook(session.workbook)).toEqual(after);

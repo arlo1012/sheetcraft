@@ -12,6 +12,7 @@ import {
 import { canEditShapeObject } from "@sheetcraft/core/shape-protection";
 import {
   normalizeShapeDrawingForest,
+  promoteEquationRootFrame,
   isShapeGroupEligibleRoot,
 } from "@sheetcraft/core/shape-group-planning";
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
@@ -41,7 +42,7 @@ function hasConnector(node: Node): boolean {
 function canFlip(node: Node, reflectedMember = false): boolean {
   return node.kind === "shapeGroup"
     ? node.members.every((member) => canFlip(member, true))
-    : (node.kind === "shape" || node.kind === "textBox") &&
+    : (node.kind === "shape" || node.kind === "textBox" || node.kind === "equation") &&
         (!(node.kind === "shape" && node.shapeConnector) || reflectedMember);
 }
 function renamed(node: Node, path: ShapeGroupPath, depth: number, name: string): Node {
@@ -60,33 +61,50 @@ function renamed(node: Node, path: ShapeGroupPath, depth: number, name: string):
   };
 }
 
-function visibilityChanged(node: Node, hidden: boolean): Node {
-  if (node.kind !== "shape" && node.kind !== "textBox" && node.kind !== "shapeGroup")
+function visibilityChanged(node: Node, hidden: boolean, metrics: PictureSheetMetrics): Node {
+  if (node.kind === "equation" && !("shapeFrame" in node) && !("groupFrame" in node)) {
+    if (!hidden) return node;
+    return { ...promoteEquationRootFrame(node, metrics), hidden: true };
+  }
+  if (
+    node.kind !== "shape" &&
+    node.kind !== "textBox" &&
+    node.kind !== "equation" &&
+    node.kind !== "shapeGroup"
+  )
     throw new TypeError("This object has no shape visibility state.");
   const { hidden: _hidden, ...source } = node;
   return hidden ? { ...source, hidden: true } : source;
 }
-function visibilityAt(node: Node, path: ShapeGroupPath, depth: number, hidden: boolean): Node {
+function visibilityAt(
+  node: Node,
+  path: ShapeGroupPath,
+  depth: number,
+  hidden: boolean,
+  metrics: PictureSheetMetrics,
+): Node {
   if (node.id !== path[depth]) throw new TypeError("The visibility owner has changed.");
-  if (depth === path.length - 1) return visibilityChanged(node, hidden);
+  if (depth === path.length - 1) return visibilityChanged(node, hidden, metrics);
   if (node.kind !== "shapeGroup" || !node.members.some((child) => child.id === path[depth + 1]))
     throw new TypeError("Missing visibility owner.");
   return {
     ...node,
     members: node.members.map((child) =>
       child.id === path[depth + 1]
-        ? (visibilityAt(child, path, depth + 1, hidden) as ShapeGroupChild)
+        ? (visibilityAt(child, path, depth + 1, hidden, metrics) as ShapeGroupChild)
         : child,
     ),
   };
 }
-function allVisibility(node: Node, hidden: boolean): Node {
-  const next = visibilityChanged(node, hidden);
+function allVisibility(node: Node, hidden: boolean, metrics: PictureSheetMetrics): Node {
+  const next = visibilityChanged(node, hidden, metrics);
   // Show All must also clear separately hidden descendants; Hide All needs only roots.
   return !hidden && next.kind === "shapeGroup"
     ? {
         ...next,
-        members: next.members.map((child) => allVisibility(child, false) as ShapeGroupChild),
+        members: next.members.map(
+          (child) => allVisibility(child, false, metrics) as ShapeGroupChild,
+        ),
       }
     : next;
 }
@@ -167,12 +185,14 @@ export function useShapeObjectControls(options: {
         root: SheetDrawing,
         inheritedHidden = false,
       ) => {
-        if (!isShapeGroupEligibleRoot(node as SheetDrawing)) return;
+        const kind = node.kind;
+        if (kind !== "shape" && kind !== "textBox" && kind !== "equation" && kind !== "shapeGroup")
+          return;
         rows.push(
           Object.freeze({
             path: Object.freeze(path),
             name: node.name,
-            kind: node.kind as ShapeSelectionPaneRow["kind"],
+            kind,
             depth,
             selected: selectedPaths.has(JSON.stringify(path)),
             canEdit: !options.isBusy() && canEditShapeObject(sheet, root),
@@ -228,6 +248,7 @@ export function useShapeObjectControls(options: {
       const formatAvailable =
         editable &&
         targets.length === 1 &&
+        targets[0]?.kind !== "equation" &&
         isShapeObjectPathVisible(
           expected.find((node) => node.id === paths[0]?.[0])!,
           paths[0]!,
@@ -287,7 +308,9 @@ export function useShapeObjectControls(options: {
               return false;
             return options.replaceVisibilityCollection(
               expected.map((node) =>
-                node === root ? (visibilityAt(root, path, 0, hidden) as SheetDrawing) : node,
+                node === root
+                  ? (visibilityAt(root, path, 0, hidden, metrics) as SheetDrawing)
+                  : node,
               ),
               expected,
               metrics,
@@ -311,7 +334,7 @@ export function useShapeObjectControls(options: {
             return options.replaceVisibilityCollection(
               expected.map((node) =>
                 isShapeGroupEligibleRoot(node)
-                  ? (allVisibility(node, hidden) as SheetDrawing)
+                  ? (allVisibility(node, hidden, metrics) as SheetDrawing)
                   : node,
               ),
               expected,

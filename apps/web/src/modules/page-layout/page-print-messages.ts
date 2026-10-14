@@ -5,6 +5,8 @@ export type PagePrintMessageSchema = {
     failed: string;
     invalidRange: string;
     unsupportedPictures: string;
+    unsupportedEquations: string;
+    preparingEquations: string;
     print: string;
     previous: string;
     next: string;

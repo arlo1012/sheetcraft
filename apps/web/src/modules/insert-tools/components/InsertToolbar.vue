@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import EquationInsertMenu from "../../sheet-drawings/equation/EquationInsertMenu.vue";
+import type { EquationPresetId } from "../../sheet-drawings/equation/equation-catalog";
 import SymbolInsertMenu from "./SymbolInsertMenu.vue";
 import type { SymbolInsertion } from "../symbols/symbol-preferences";
 import PivotInsertTools from "../../pivot-tables/components/PivotInsertTools.vue";
@@ -45,6 +47,7 @@ defineProps<{
   insertSymbolTextHandler?: (payload: SymbolInsertion) => boolean;
   insertShapeHandler?: (choice: ShapeGalleryChoice, continuous: boolean) => boolean;
   shapeOwnerId?: string | number;
+  insertEquationHandler?: (choice: EquationPresetId | null) => boolean | Promise<boolean>;
   insertWordArtHandler?: (choice: WordArtStylePreset) => boolean | Promise<boolean>;
 }>();
 const emit = defineEmits<{
@@ -68,7 +71,7 @@ const emit = defineEmits<{
   manageTable: [];
 }>();
 defineSlots<{ watermark(): unknown }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 </script>
 <template>
   <RibbonToolbar :label="t('ribbon.insertTools')" :data-cell-edit-session="editSessionId">
@@ -246,7 +249,16 @@ const { t } = useAppI18n();
         @activate="emit('insertCamera')"
         ><Camera
       /></RibbonButton>
+      <EquationInsertMenu
+        v-if="insertEquationHandler"
+        :handler="insertEquationHandler"
+        :disabled="imageDisabled"
+        :owner-id="shapeOwnerId"
+        :edit-session-id="editSessionId"
+        :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
+      />
       <RibbonButton
+        v-else
         variant="tall"
         :label="t('drawing.equation')"
         :text="t('drawing.equation')"
