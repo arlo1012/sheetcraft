@@ -90,7 +90,6 @@ onBeforeUnmount(() => generation++);
         class="wordart-insert-menu"
         :style="floatingStyles"
         :label="t('drawing.wordArt')"
-        :body-scrollable="false"
         :data-cell-edit-session="editSessionId"
       >
         <template #body>

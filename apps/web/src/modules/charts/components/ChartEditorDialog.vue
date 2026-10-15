@@ -468,7 +468,7 @@ const options = computed(() =>
     color: var(--sheetcraft-text-secondary);
   }
   &__error {
-    color: var(--sheetcraft-color-error);
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

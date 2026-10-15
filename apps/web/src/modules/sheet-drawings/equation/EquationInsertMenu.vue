@@ -27,8 +27,19 @@ const button = ref<InstanceType<typeof RibbonMenuButton>>();
 const surface = ref<InstanceType<typeof MenuSurface>>();
 const menuId = `equation-insert-${useId().replaceAll(":", "")}`;
 const pending = ref(false);
+const showPending = ref(false);
 const failure = ref(false);
 const generation = ref(0);
+watch(
+  pending,
+  (value, _previous, onCleanup) => {
+    showPending.value = false;
+    if (!value) return;
+    const timer = setTimeout(() => (showPending.value = true), 150);
+    onCleanup(() => clearTimeout(timer));
+  },
+  { flush: "sync" },
+);
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef: computed(() => button.value?.rootElement ?? null),
   menuSurfaceRef: computed(() => surface.value ?? null),
@@ -156,6 +167,14 @@ onBeforeUnmount(() => generation.value++);
           <MenuItem :disabled="disabled || pending" data-equation-new @select="selectNew">{{
             labels.newEquation
           }}</MenuItem>
+          <li
+            v-if="showPending"
+            class="equation-insert-menu__status"
+            role="status"
+            aria-live="polite"
+          >
+            {{ labels.applying }}
+          </li>
           <p v-if="failure" class="equation-insert-menu__error" role="alert">{{ labels.failed }}</p>
         </template>
       </MenuSurface>
@@ -194,12 +213,18 @@ onBeforeUnmount(() => generation.value++);
     overflow: hidden;
     font-size: 14px;
   }
+  &__status,
   &__error {
     margin: 0;
     padding: var(--sheetcraft-space-2) var(--sheetcraft-menu-item-padding-inline, 14px);
-    color: var(--sheetcraft-status-error);
     font-size: var(--sheetcraft-font-size-body-small);
     line-height: var(--sheetcraft-line-height-body-small);
+  }
+  &__status {
+    color: var(--sheetcraft-text-secondary);
+  }
+  &__error {
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

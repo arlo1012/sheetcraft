@@ -72,7 +72,17 @@ function confirm() {
     applyError.value = true;
   }
 }
+function setName(value: string | number) {
+  if (!props.disabled) draft.value.name = String(value);
+}
+function setShape(shape: DrawingShape) {
+  if (!props.disabled) draft.value.shape = shape;
+}
+function setGeometry(field: "width" | "rotation", value: number) {
+  if (!props.disabled) draft.value[field] = value;
+}
 function setHeight(height: number) {
+  if (props.disabled) return;
   const next = { ...draft.value, height };
   if (next.shapeText?.layout.autoFit === "resize-shape") {
     const text = materializeDrawingShapeText(next);
@@ -229,7 +239,14 @@ const shapes: DrawingShape[] = [
       </div>
       <div class="drawing-editor__fields">
         <p v-if="applyError" role="alert">{{ t("drawing.changeRejected") }}</p>
-        <label>{{ t("drawing.name") }}<Input v-model="draft.name" :maxlength="200" /></label>
+        <label
+          >{{ t("drawing.name")
+          }}<Input
+            :model-value="draft.name"
+            :disabled="disabled"
+            :maxlength="200"
+            @update:model-value="setName"
+        /></label>
         <div
           v-if="drawing.kind === 'icon'"
           class="drawing-editor__shapes"
@@ -240,9 +257,10 @@ const shapes: DrawingShape[] = [
             v-for="shape in shapes"
             :key="shape"
             type="button"
+            :disabled="disabled"
             :aria-label="t(`drawing.${shape}`)"
             :aria-pressed="draft.shape === shape"
-            @click="draft.shape = shape"
+            @click="setShape(shape)"
           >
             <DrawingContent :drawing="{ ...draft, shape, text: '', rotation: 0 }" />
           </button>
@@ -273,11 +291,13 @@ const shapes: DrawingShape[] = [
             }}<input
               type="color"
               :value="draft.fill === 'transparent' ? '#ffffff' : draft.fill"
+              :disabled="disabled"
               @input="setAppearance('fill', ($event.target as HTMLInputElement).value)"
           /></label>
           <Checkbox
             v-if="!lineGeometry"
             :checked="draft.fill === 'transparent'"
+            :disabled="disabled"
             @change="setAppearance('fill', $event ? 'transparent' : '#ffffff')"
             >{{ t("drawing.noFill") }}</Checkbox
           >
@@ -286,18 +306,23 @@ const shapes: DrawingShape[] = [
             }}<input
               :value="draft.stroke === 'transparent' ? '#000000' : draft.stroke"
               type="color"
+              :disabled="disabled"
               @input="setAppearance('stroke', ($event.target as HTMLInputElement).value)"
           /></label>
-          <label
-            >{{ t("drawing.strokeWidth")
-            }}<InputNumber
-              class="drawing-editor__number"
+          <div class="drawing-editor__field" role="group" :aria-label="t('drawing.strokeWidth')">
+            <span>{{ t("drawing.strokeWidth") }}</span>
+            <InputNumber
+              class="drawing-editor__number sheetcraft-input-number--persistent-controls"
               :model-value="draft.strokeWidth"
+              :disabled="disabled"
+              :aria-label="t('drawing.strokeWidth')"
               @change="typeof $event === 'number' && setAppearance('strokeWidth', $event)"
               :min="0"
               :max="32"
               size="small"
-          /></label>
+              theme="column"
+            />
+          </div>
         </div>
         <ShapeLineEndsControls
           v-if="strokeGeometry"
@@ -312,61 +337,82 @@ const shapes: DrawingShape[] = [
             }}<input
               :value="draft.color"
               type="color"
+              :disabled="disabled"
               @input="setTypography('textColor', ($event.target as HTMLInputElement).value)"
           /></label>
-          <label
-            >{{ t("drawing.fontSize")
-            }}<InputNumber
-              class="drawing-editor__number"
+          <div class="drawing-editor__field" role="group" :aria-label="t('drawing.fontSize')">
+            <span>{{ t("drawing.fontSize") }}</span>
+            <InputNumber
+              class="drawing-editor__number sheetcraft-input-number--persistent-controls"
               :model-value="draft.fontSize"
+              :disabled="disabled"
+              :aria-label="t('drawing.fontSize')"
               @update:model-value="
                 typeof $event === 'number' && setTypography('fontSizePt', $event * 0.75)
               "
               :min="1"
               :max="512"
               size="small"
-          /></label>
+              theme="column"
+            />
+          </div>
           <Checkbox
             v-if="drawing.kind !== 'equation'"
             :model-value="draft.bold"
+            :disabled="disabled"
             @update:model-value="setTypography('textBold', $event)"
             >{{ t("drawing.bold") }}</Checkbox
           ><Checkbox
             v-if="drawing.kind !== 'equation'"
             :model-value="draft.italic"
+            :disabled="disabled"
             @update:model-value="setTypography('textItalic', $event)"
             >{{ t("drawing.italic") }}</Checkbox
           >
         </div>
         <div class="drawing-editor__row">
-          <label
-            >{{ t("drawing.width")
-            }}<InputNumber
-              class="drawing-editor__number"
-              v-model="draft.width"
+          <div class="drawing-editor__field" role="group" :aria-label="t('drawing.width')">
+            <span>{{ t("drawing.width") }}</span>
+            <InputNumber
+              class="drawing-editor__number sheetcraft-input-number--persistent-controls"
+              :model-value="draft.width"
+              :disabled="disabled"
+              :aria-label="t('drawing.width')"
+              @update:model-value="setGeometry('width', $event)"
               :min="strokeGeometry ? 1 : 16"
               :max="16384"
               size="small"
-          /></label>
-          <label
-            >{{ t("drawing.height")
-            }}<InputNumber
-              class="drawing-editor__number"
+              theme="column"
+            />
+          </div>
+          <div class="drawing-editor__field" role="group" :aria-label="t('drawing.height')">
+            <span>{{ t("drawing.height") }}</span>
+            <InputNumber
+              class="drawing-editor__number sheetcraft-input-number--persistent-controls"
               :model-value="draft.height"
+              :disabled="disabled"
+              :aria-label="t('drawing.height')"
               @update:model-value="setHeight"
               :min="strokeGeometry ? 1 : 16"
               :max="16384"
               size="small"
-          /></label>
-          <label
-            >{{ t("drawing.rotation")
-            }}<InputNumber
-              class="drawing-editor__number"
-              v-model="draft.rotation"
+              theme="column"
+            />
+          </div>
+          <div class="drawing-editor__field" role="group" :aria-label="t('drawing.rotation')">
+            <span>{{ t("drawing.rotation") }}</span>
+            <InputNumber
+              class="drawing-editor__number sheetcraft-input-number--persistent-controls"
+              :model-value="draft.rotation"
+              :disabled="disabled"
+              :aria-label="t('drawing.rotation')"
+              @update:model-value="setGeometry('rotation', $event)"
               :min="-360"
               :max="360"
               size="small"
-          /></label>
+              theme="column"
+            />
+          </div>
         </div>
         <div class="drawing-editor__preview" :aria-label="t('drawing.preview')">
           <div
@@ -400,6 +446,8 @@ const shapes: DrawingShape[] = [
   </Dialog>
 </template>
 <style scoped lang="scss">
+@use "../../../shared/gallery/gallery-choice" as gallery;
+
 .drawing-editor {
   display: grid;
   gap: 16px;
@@ -414,10 +462,14 @@ const shapes: DrawingShape[] = [
   &__gallery {
     min-width: 0;
   }
-  label {
+  label,
+  &__field {
     display: flex;
     gap: 8px;
     align-items: center;
+  }
+  &__field > span {
+    white-space: nowrap;
   }
   &__row {
     display: flex;
@@ -438,16 +490,9 @@ const shapes: DrawingShape[] = [
     display: flex;
     gap: 8px;
     button {
+      @include gallery.choice(6px);
       width: 48px;
       height: 42px;
-      padding: 6px;
-      background: transparent;
-      border: 1px solid var(--sheetcraft-border-default);
-      cursor: pointer;
-      &[aria-pressed="true"] {
-        border-color: var(--sheetcraft-action-primary);
-        background: var(--sheetcraft-surface-hover);
-      }
     }
   }
   &__preview {

@@ -8,6 +8,7 @@ const mounted: VueWrapper[] = [];
 afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount();
   document.body.replaceChildren();
+  vi.useRealTimers();
 });
 function fixture(handler = vi.fn(() => true), extra: Record<string, unknown> = {}) {
   const wrapper = mount(EquationInsertMenu, {
@@ -98,5 +99,48 @@ describe("Insert Equation gallery", () => {
     await flushPromises();
     expect(document.querySelectorAll("[data-equation-preset]")).toHaveLength(13);
     expect(item(".equation-insert-menu").getAttribute("data-cell-edit-session")).toBe("cell-2");
+  });
+  test("slow insertion announces progress after a short delay and clears it for retry", async () => {
+    vi.useFakeTimers();
+    let resolve!: (accepted: boolean) => void;
+    const handler = vi.fn(
+      () =>
+        new Promise<boolean>((done) => {
+          resolve = done;
+        }),
+    );
+    const { wrapper } = fixture(handler as never, { locale: "zh-CN" });
+    await wrapper.get("[data-insert-tool='equation']").trigger("click");
+    item("[data-equation-preset='average']").click();
+    await nextTick();
+    expect(item(".equation-insert-menu").getAttribute("aria-busy")).toBe("true");
+    expect(document.querySelector(".equation-insert-menu__status")).toBeNull();
+    await vi.advanceTimersByTimeAsync(150);
+    expect(item(".equation-insert-menu__status").textContent).toContain("正在应用公式修改");
+    resolve(false);
+    await nextTick();
+    await nextTick();
+    expect(document.querySelector(".equation-insert-menu__status")).toBeNull();
+    expect(item(".equation-insert-menu").getAttribute("aria-busy")).toBe("false");
+    expect(item("[role='alert']").textContent).toContain("未能应用公式修改");
+    expect(item("[data-equation-preset='average']").hasAttribute("disabled")).toBe(false);
+  });
+  test("fast completion and dismissal never leave a delayed progress message", async () => {
+    vi.useFakeTimers();
+    const { wrapper } = fixture(vi.fn(() => false));
+    await wrapper.get("[data-insert-tool='equation']").trigger("click");
+    item("[data-equation-preset='average']").click();
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(150);
+    expect(document.querySelector(".equation-insert-menu__status")).toBeNull();
+    await wrapper.setProps({ handler: () => new Promise<boolean>(() => {}) });
+    await wrapper.get("[data-insert-tool='equation']").trigger("click");
+    item("[data-equation-preset='average']").click();
+    await nextTick();
+    await wrapper.get("[data-insert-tool='equation']").trigger("click");
+    await vi.advanceTimersByTimeAsync(150);
+    expect(document.querySelector(".equation-insert-menu")).toBeNull();
+    await wrapper.get("[data-insert-tool='equation']").trigger("click");
+    expect(document.querySelector(".equation-insert-menu__status")).toBeNull();
   });
 });

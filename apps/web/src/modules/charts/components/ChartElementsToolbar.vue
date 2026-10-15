@@ -695,7 +695,7 @@ onBeforeUnmount(() => {
   &__error {
     align-self: center;
     margin: 8px 0 0;
-    color: var(--sheetcraft-color-error);
+    color: var(--sheetcraft-status-error);
     font-size: var(--sheetcraft-font-size-body-small);
     line-height: var(--sheetcraft-line-height-body-small);
   }
