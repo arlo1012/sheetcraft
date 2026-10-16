@@ -61,6 +61,9 @@ test.each([
     true,
   );
   const input = wrapper.get<HTMLInputElement>('input[role="combobox"]');
+  const inputId = input.element.id;
+  expect(inputId).not.toBe("");
+  expect(input.attributes("data-panel-select-control")).toBe("readonly-combobox");
   expect(input.element.readOnly).toBe(true); // Select-only text stays native readonly, while its picker is interactive.
   input.element.focus();
   await settle();
@@ -84,6 +87,7 @@ test.each([
   );
   await settle();
   expect(wrapper.get('input[role="combobox"]').attributes("aria-expanded")).toBe("false");
+  expect(wrapper.get('input[role="combobox"]').element.id).toBe(inputId);
   expect(document.activeElement).toBe(wrapper.get('input[role="combobox"]').element);
 });
 test("a real native click opens, disabled refuses click/keyboard, and IME Enter is inert", async () => {
@@ -92,6 +96,7 @@ test("a real native click opens, disabled refuses click/keyboard, and IME Enter 
   input.element.focus();
   await settle();
   await input.trigger("compositionstart");
+  expect(input.attributes("data-panel-select-control")).toBeUndefined();
   await input.trigger("keydown", { key: "Enter", code: "Enter", isComposing: true });
   await settle();
   expect(wrapper.get("input").attributes("aria-expanded")).toBe("false");
@@ -99,6 +104,7 @@ test("a real native click opens, disabled refuses click/keyboard, and IME Enter 
   await settle();
   expect(wrapper.get("input").attributes("aria-expanded")).toBe("false");
   await input.trigger("compositionend");
+  expect(input.attributes("data-panel-select-control")).toBe("readonly-combobox");
   await input.trigger("mousedown");
   await input.trigger("mouseup");
   await input.trigger("click");
@@ -113,3 +119,37 @@ test("a real native click opens, disabled refuses click/keyboard, and IME Enter 
   await settle();
   expect(wrapper.get("input").attributes("aria-expanded")).toBe("false");
 });
+
+test.each(["trigger", "content"] as const)(
+  "%s-width panel bounds its first rendered fixed popup to available viewport space",
+  async (panelWidth) => {
+    vi.spyOn(window, "innerHeight", "get").mockReturnValue(757);
+    const wrapper = fixture();
+    await wrapper.setProps({ panelWidth });
+    const selectInput = wrapper.findComponent({ name: "TSelectInput" });
+    const popup = selectInput.props("popupProps");
+    expect(popup.popperOptions).toEqual({
+      strategy: "fixed",
+      modifiers: [
+        { name: "flip", options: { padding: 8 } },
+        { name: "preventOverflow", options: { padding: 8, altAxis: true } },
+      ],
+    });
+    const trigger = document.createElement("div");
+    Object.defineProperty(trigger, "offsetWidth", { value: 132 });
+    vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue(new DOMRect(1038, 244, 132, 28));
+    // Public overlayStyle is evaluated during render, before TDesign's delayed
+    // overlayInnerStyle update. The inherit row and gallery share this scroll box.
+    expect(popup.overlayStyle(trigger)).toEqual({
+      position: "fixed",
+      width: panelWidth === "content" ? "max-content" : "132px",
+      maxWidth: "calc(100vw - 16px)",
+      maxHeight: "469px",
+      overflow: "auto",
+      overscrollBehavior: "contain",
+    });
+    vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue(new DOMRect(1038, 700, 132, 28));
+    expect(popup.overlayStyle(trigger).maxHeight).toBe("684px");
+    expect(popup.overlayInnerStyle).toEqual({ padding: "0" });
+  },
+);

@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, useId, watch } from "vue";
+import { useNativePopupOwnership } from "../../../../shared/floating/useNativePopupOwnership";
+import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Plus, Minus } from "lucide-vue-next";
@@ -30,6 +32,27 @@ const props = defineProps<{
   t: PictureFormatTranslate;
   onCommit: (paint: PictureGradientPaint) => boolean;
 }>();
+const root = ref<HTMLElement>();
+const kindPopup = useNativePopupOwnership({
+  owner: () => props.ownerKey,
+  disabled: () => !!props.disabled,
+  root: () => root.value,
+});
+const kindPopupHost = kindPopup.host;
+const kindInputId = `picture-gradient-kind-${useId()}`;
+const kindNativeControl = computed(() => ({
+  attributes: {
+    id: kindInputId,
+    role: "combobox",
+    "aria-label": props.t("gradientKind"),
+    "aria-expanded": String(kindPopup.visible.value),
+    "data-format-pane-history-control": "readonly-combobox",
+  },
+}));
+let active = true;
+onBeforeUnmount(() => {
+  active = false;
+});
 const selected = ref(0),
   theme = useWorkbookTheme();
 watch(
@@ -79,10 +102,25 @@ function remove() {
   const next = removePictureGradientStop(props.value, selected.value);
   if (update(next.gradient)) selected.value = next.selectedIndex;
 }
-function kind(value: unknown) {
-  if (value === "linear" || value === "radial" || value === "rectangular")
-    update(changePictureGradientKind(props.value, value));
-}
+const kind = computed(() => {
+  const owner = props.ownerKey,
+    apply = props.onCommit,
+    current = props.value;
+  return (value: unknown) => {
+    if (
+      !active ||
+      props.disabled ||
+      owner !== props.ownerKey ||
+      apply !== props.onCommit ||
+      current !== props.value
+    )
+      return false;
+    return (
+      (value === "linear" || value === "radial" || value === "rectangular") &&
+      apply(changePictureGradientKind(current, value))
+    );
+  };
+});
 function numberProps(
   label: Parameters<PictureFormatTranslate>[0],
   value: number,
@@ -105,9 +143,14 @@ function numberProps(
 }
 </script>
 <template>
-  <div class="picture-gradient-editor">
+  <div ref="root" class="picture-gradient-editor">
+    <Teleport to="body"><div ref="kindPopupHost" data-picture-gradient-kind-popup /></Teleport>
     <PictureFormatField :label="t('gradientKind')"
       ><TSelect
+        v-native-control="kindNativeControl"
+        :popup-visible="kindPopup.visible.value"
+        :popup-props="kindPopup.popupProps"
+        @popup-visible-change="kindPopup.onVisibleChange.value"
         :model-value="value.kind"
         :options="kinds"
         :disabled="disabled"

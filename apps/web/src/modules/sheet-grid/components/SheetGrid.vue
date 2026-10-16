@@ -603,9 +603,30 @@ const tableFilters = computed<SheetFilterControl[]>(() =>
     })),
 );
 
-const outlineHiddenRows = computed(() =>
-  createSheetHiddenRowIntervals(props.sheet, sheetEvaluator.value),
-);
+const outlineHiddenRowSnapshot = computed<{
+  sheet: Sheet;
+  generation: number | undefined;
+  intervals: ReturnType<typeof createSheetHiddenRowIntervals>;
+}>((previous) => {
+  const sheet = props.sheet;
+  const generation = props.pictureOwnerGeneration;
+  const intervals = createSheetHiddenRowIntervals(sheet, sheetEvaluator.value);
+  // Evaluator refreshes must not invalidate immutable geometry leases when the
+  // normalized visible-row union has not changed.
+  if (
+    previous?.sheet === sheet &&
+    previous.generation === generation &&
+    previous.intervals.length === intervals.length &&
+    intervals.every(
+      (interval, index) =>
+        interval.start === previous.intervals[index]!.start &&
+        interval.end === previous.intervals[index]!.end,
+    )
+  )
+    return previous;
+  return { sheet, generation, intervals };
+});
+const outlineHiddenRows = computed(() => outlineHiddenRowSnapshot.value.intervals);
 const outlineHiddenColumns = computed(() => createSheetHiddenColumnIntervals(props.sheet));
 const outlineHiddenColumnSet = computed(() => {
   const hidden = new Set(props.sheet.hiddenColumns ?? []);
@@ -1049,14 +1070,30 @@ const automaticRowHeights = computed(() => {
   });
 });
 
-const effectiveRowHeights = computed(() => {
+const effectiveRowHeightSnapshot = computed<{
+  sheet: Sheet;
+  generation: number | undefined;
+  heights: Map<number, number>;
+}>((previous) => {
+  const sheet = props.sheet;
+  const generation = props.pictureOwnerGeneration;
   const rowHeights = mergeRowHeightOverrides(automaticRowHeights.value, props.sheet.rowHeights);
   const resize = dimensionResize.value;
   if (resize?.axis === "row") {
     rowHeights.set(resize.index, resize.previewSize);
   }
-  return rowHeights;
+  // Reconciliation can allocate an equal Map after a drawing-only revision.
+  // Retain the immutable effective geometry, not the document/evaluator lease.
+  if (
+    previous?.sheet === sheet &&
+    previous.generation === generation &&
+    previous.heights.size === rowHeights.size &&
+    [...rowHeights].every(([row, height]) => previous.heights.get(row) === height)
+  )
+    return previous;
+  return { sheet, generation, heights: rowHeights };
 });
+const effectiveRowHeights = computed(() => effectiveRowHeightSnapshot.value.heights);
 startGeometryWatch();
 
 const activeCell = computed(() => selection.value.active);
@@ -3832,10 +3869,32 @@ function handleHistoryShortcut(event: KeyboardEvent): boolean {
     allowEditableTarget: true,
   });
   if (!action) return false;
+  const pictureTarget =
+    event.target instanceof Element
+      ? event.target.closest<HTMLElement>("[data-owned-picture-selected]")
+      : null;
+  const focusedPicture = pictureTarget?.contains(document.activeElement) ? pictureTarget : null;
+  const owner = props.sheet,
+    generation = props.pictureOwnerGeneration;
   event.preventDefault();
   clearPendingClipboard();
   if (action === "undo") emit("undo");
   else emit("redo");
+  if (focusedPicture)
+    void nextTick(() => {
+      // Undoing Group removes its selected overlay. Keep the next shortcut in
+      // Grid without stealing focus from a newer control or text editor.
+      if (
+        props.sheet === owner &&
+        props.pictureOwnerGeneration === generation &&
+        !focusedPicture.isConnected &&
+        document.activeElement === document.body &&
+        !isEditing.value &&
+        !isComposing.value &&
+        rootRef.value?.isConnected
+      )
+        focusEditor();
+    });
   return true;
 }
 
@@ -4303,6 +4362,16 @@ defineExpose({
     selectedImageId.value =
       [...ids].reverse().find((id) => selectedImageIds.value.includes(id)) ?? null;
   },
+  focusOwnedPictureSelection: (ids: readonly string[], owner: Sheet) => {
+    if (
+      props.sheet === owner &&
+      !isEditing.value &&
+      !isComposing.value &&
+      ids.length === selectedImageIds.value.length &&
+      ids.every((id, index) => selectedImageIds.value[index] === id)
+    )
+      ownedImageLayerRef.value?.focusSelected();
+  },
   arrangePictures: (
     ids: string[],
     action: Parameters<NonNullable<typeof imageLayerRef.value>["arrangeImages"]>[1],
@@ -4694,6 +4763,8 @@ defineExpose({
         :selected-drawing-id="selectedShapeDrawingId"
         :theme="theme"
         :image-asset-urls="imageAssetUrls"
+        :loading-image-asset-ids="loadingImageAssetIds"
+        :missing-image-asset-ids="missingImageAssetIds"
         :locale="locale"
         :date-system="dateSystem"
         :sheet="sheet"

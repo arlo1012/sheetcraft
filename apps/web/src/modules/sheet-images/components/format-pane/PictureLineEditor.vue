@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { PictureTextureId } from "../../picture-texture";
-import { computed } from "vue";
+import { computed, onBeforeUnmount, ref, useId } from "vue";
+import { useNativePopupOwnership } from "../../../../shared/floating/useNativePopupOwnership";
+import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { Choice, PictureLine, PicturePaint } from "@sheetcraft/core/picture-detailed-style";
 import type {
@@ -13,6 +15,7 @@ import PicturePaintEditor from "./PicturePaintEditor.vue";
 import PicturePaintNumber from "./PicturePaintNumber.vue";
 const props = defineProps<{
   ownerKey: string;
+  focusOwnerKey?: string;
   value?: Choice<PictureLine>;
   mixed?: boolean;
   disabled?: boolean;
@@ -27,14 +30,57 @@ const paint = computed(() =>
     ? { kind: "value" as const, value: props.value.value.paint }
     : props.value,
 );
-function applyPaint(value: Choice<PicturePaint> | undefined) {
-  return value?.kind === "value"
-    ? props.onCommit({
-        kind: "value",
-        value: { ...(line.value ?? createPictureLine()), paint: value.value },
-      })
-    : props.onCommit(value);
+let active = true;
+onBeforeUnmount(() => {
+  active = false;
+});
+const root = ref<HTMLElement>();
+function linePopup() {
+  return useNativePopupOwnership({
+    owner: () => props.ownerKey,
+    disabled: () => !!props.disabled || !line.value,
+    root: () => root.value,
+  });
 }
+const compoundPopup = linePopup();
+const dashPopup = linePopup();
+const capPopup = linePopup();
+const joinPopup = linePopup();
+const compoundHost = compoundPopup.host;
+const dashHost = dashPopup.host;
+const capHost = capPopup.host;
+const joinHost = joinPopup.host;
+const fieldId = `picture-line-${useId()}`;
+function nativeControl(field: string, popup: ReturnType<typeof linePopup>) {
+  return computed(() => ({
+    attributes: {
+      id: `${fieldId}-${field}`,
+      role: "combobox",
+      "aria-label": props.t(field as PictureFormatLabelKey),
+      "aria-expanded": String(popup.visible.value),
+      "data-format-pane-history-control": "readonly-combobox",
+    },
+  }));
+}
+const compoundNative = nativeControl("lineCompound", compoundPopup);
+const dashNative = nativeControl("lineDash", dashPopup);
+const capNative = nativeControl("lineCap", capPopup);
+const joinNative = nativeControl("lineJoin", joinPopup);
+const applyPaint = computed(() => {
+  const key = props.ownerKey,
+    apply = props.onCommit,
+    currentLine = line.value;
+  return (value: Choice<PicturePaint> | undefined) => {
+    if (!active || props.disabled || key !== props.ownerKey || apply !== props.onCommit)
+      return false;
+    return value?.kind === "value"
+      ? apply({
+          kind: "value",
+          value: { ...(currentLine ?? createPictureLine()), paint: value.value },
+        })
+      : apply(value);
+  };
+});
 function update(patch: Partial<PictureLine>) {
   return (
     !!line.value &&
@@ -88,20 +134,50 @@ const joins = computed(() => [
   { value: "bevel", label: props.t("joinBevel") },
   { value: "miter", label: props.t("joinMiter") },
 ]);
-function select<K extends "compound" | "dash" | "cap" | "join">(
+function selectAction<K extends "compound" | "dash" | "cap" | "join">(
   field: K,
-  value: unknown,
-  choices: readonly { value: string }[],
+  choices: () => readonly { value: string }[],
 ) {
-  if (typeof value === "string" && choices.some((item) => item.value === value))
-    update({ [field]: value as PictureLine[K] });
+  return computed(() => {
+    const key = props.ownerKey,
+      apply = props.onCommit,
+      currentLine = line.value,
+      options = choices();
+    return (value: unknown) => {
+      if (
+        !active ||
+        props.disabled ||
+        key !== props.ownerKey ||
+        apply !== props.onCommit ||
+        !currentLine ||
+        currentLine !== line.value
+      )
+        return false;
+      return (
+        typeof value === "string" &&
+        options.some((item) => item.value === value) &&
+        apply({ kind: "value", value: { ...currentLine, [field]: value as PictureLine[K] } })
+      );
+    };
+  });
 }
+const changeCompound = selectAction("compound", () => compound.value);
+const changeDash = selectAction("dash", () => dash.value);
+const changeCap = selectAction("cap", () => caps.value);
+const changeJoin = selectAction("join", () => joins.value);
 </script>
 <template>
-  <div class="picture-line-editor">
+  <div ref="root" class="picture-line-editor">
+    <Teleport to="body">
+      <div ref="compoundHost" data-picture-line-popup="compound" />
+      <div ref="dashHost" data-picture-line-popup="dash" />
+      <div ref="capHost" data-picture-line-popup="cap" />
+      <div ref="joinHost" data-picture-line-popup="join" />
+    </Teleport>
     <PicturePaintEditor
       paint-role="line"
       :owner-key="ownerKey"
+      :focus-owner-key="focusOwnerKey"
       :value="paint"
       :mixed="mixed"
       :disabled="disabled"
@@ -118,39 +194,55 @@ function select<K extends "compound" | "dash" | "cap" | "join">(
       />
       <PictureFormatField :label="t('lineCompound')"
         ><TSelect
+          v-native-control="compoundNative"
+          :popup-visible="compoundPopup.visible.value"
+          :popup-props="compoundPopup.popupProps"
+          @popup-visible-change="compoundPopup.onVisibleChange.value"
           :model-value="line.compound"
           :options="compound"
           :disabled="disabled"
           size="small"
           :aria-label="t('lineCompound')"
-          @change="select('compound', $event, compound)"
+          @change="changeCompound"
       /></PictureFormatField>
       <PictureFormatField :label="t('lineDash')"
         ><TSelect
+          v-native-control="dashNative"
+          :popup-visible="dashPopup.visible.value"
+          :popup-props="dashPopup.popupProps"
+          @popup-visible-change="dashPopup.onVisibleChange.value"
           :model-value="line.dash"
           :options="dash"
           :disabled="disabled"
           size="small"
           :aria-label="t('lineDash')"
-          @change="select('dash', $event, dash)"
+          @change="changeDash"
       /></PictureFormatField>
       <PictureFormatField :label="t('lineCap')"
         ><TSelect
+          v-native-control="capNative"
+          :popup-visible="capPopup.visible.value"
+          :popup-props="capPopup.popupProps"
+          @popup-visible-change="capPopup.onVisibleChange.value"
           :model-value="line.cap"
           :options="caps"
           :disabled="disabled"
           size="small"
           :aria-label="t('lineCap')"
-          @change="select('cap', $event, caps)"
+          @change="changeCap"
       /></PictureFormatField>
       <PictureFormatField :label="t('lineJoin')"
         ><TSelect
+          v-native-control="joinNative"
+          :popup-visible="joinPopup.visible.value"
+          :popup-props="joinPopup.popupProps"
+          @popup-visible-change="joinPopup.onVisibleChange.value"
           :model-value="line.join"
           :options="joins"
           :disabled="disabled"
           size="small"
           :aria-label="t('lineJoin')"
-          @change="select('join', $event, joins)"
+          @change="changeJoin"
       /></PictureFormatField>
       <PicturePaintNumber
         v-if="line.join === 'miter'"

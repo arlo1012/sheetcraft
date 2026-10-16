@@ -64,14 +64,16 @@ const spec = computed<NumericFieldSpec>(() => {
     displayPrecision: geometry && unit === "in" ? 2 : 4,
     toDisplay: geometry ? (value) => pictureFormatPointsToUnit(value, unit) : undefined,
     fromDisplay: geometry ? (value) => pictureFormatUnitToPoints(value, unit) : undefined,
-    // Geometry previously had no step contract; do not invent one for physical units.
+    // Keep paired size/scale controls on the same existing step contract.
+    // Other geometry fields have no step contract; do not invent one.
     displayStep:
-      field === "sizeHeightPt"
+      field === "sizeHeightPt" || field === "sizeWidthPt"
         ? { in: 0.1, pt: 1, cm: 0.1 }[unit]
         : field === "lineWidthPt"
           ? 0.25
           : field === "rotationDeg" ||
               field === "scaleHeightPercent" ||
+              field === "scaleWidthPercent" ||
               field === "lineTransparencyPercent"
             ? 1
             : (field === "shadowBlurPt" || field === "shadowDistancePt") && enabledShadow

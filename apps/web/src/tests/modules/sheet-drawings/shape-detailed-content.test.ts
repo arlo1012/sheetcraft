@@ -207,6 +207,40 @@ afterEach(() => {
 });
 
 describe("detailed shape component raster lifecycle", () => {
+  test.each(["ready", "missing", "decode-error"] as const)(
+    "texture URL preparation stays loading until %s settles",
+    async (outcome) => {
+      boundary.prepare.mockImplementation(unavailable);
+      const wrapper = render({ ...drawing(), shapeStyle: texture() });
+      await wrapper.setProps({ loadingAssetIds: new Set(["texture"]) });
+      await settlePaint();
+      expect(wrapper.get('[role="status"]').text()).toBe("Preparing image…");
+      expect(latestPaint(wrapper)).toBeUndefined();
+
+      if (outcome === "missing") {
+        // A failed read may be marked missing before the loader's batch finishes.
+        await wrapper.setProps({ missingAssetIds: new Set(["texture"]) });
+      } else {
+        const url = "blob:prepared-texture";
+        images[0]!.states.set(url, outcome === "ready" ? "ready" : "error");
+        if (outcome === "ready") boundary.prepare.mockImplementation(ready);
+        await wrapper.setProps({
+          assetUrls: new Map([["texture", url]]),
+          // Loader pending must not hide an already failed browser decode.
+          loadingAssetIds: new Set(["texture"]),
+        });
+      }
+      await settlePaint();
+      if (outcome === "ready") {
+        expect(wrapper.find('[role="status"]').exists()).toBe(false);
+        expect(latestPaint(wrapper)).toBeDefined();
+      } else {
+        expect(wrapper.get('[role="status"]').text()).toBe("The image file is unavailable.");
+        expect(latestPaint(wrapper)).toBeUndefined();
+      }
+    },
+  );
+
   test("batch 33 evicts the first shared raster during nextTick without losing its owned pixels", async () => {
     const shared = new Map<string, ShapeDetailedPaintRaster>();
     let evicted: HTMLCanvasElement | undefined;

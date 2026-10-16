@@ -153,9 +153,9 @@ onBeforeUnmount(() => observer?.disconnect());
 @use "../../../shared/option-list/option-list" as option-list;
 .symbol-dialog__grid {
   @include option-list.surface;
-  height: 180px;
+  height: clamp(144px, 28dvh, 222px);
   min-height: 108px;
-  flex: 1 0 180px;
+  flex: none;
   overscroll-behavior: contain;
 }
 .symbol-grid__canvas {

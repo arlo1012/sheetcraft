@@ -399,6 +399,19 @@
   padding: 0;
 }
 
+// The chart source frame bounds its height; only its body scrolls.
+.chart-source-dialog-frame {
+  > .t-dialog__header,
+  > .t-dialog__footer {
+    flex: none;
+  }
+
+  > .t-dialog__body {
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
 // TDesign's outline variant removes spacing for connected radio buttons.
 // Ordinary vertical radios retain the standard gap even with that default variant.
 .t-radio-group.t-radio-group--vertical:has(> .t-radio) {

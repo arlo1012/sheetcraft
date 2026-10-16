@@ -4,6 +4,7 @@ import { Input } from "tdesign-vue-next/es/input";
 import { Select } from "tdesign-vue-next/es/select";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import ChartFormatPane from "../../../modules/charts/components/ChartFormatPane.vue";
+import NumericField from "../../../shared/numeric-field/NumericField.vue";
 import type {
   ChartFormatIntent,
   ChartFormatTarget,
@@ -492,5 +493,231 @@ describe("percentage chart format pane", () => {
       { drawing: drawing({ type: "line", presentation: { lineMarkers: false } }) },
     );
     expect(checkbox(wrapper, "Show markers").props("checked")).toBe(false);
+  });
+});
+
+describe("shared chart style numbers", () => {
+  test("explicit px values use shared column controls with bounded fine steps", async () => {
+    const { wrapper, apply } = fixture(
+      { kind: "valueAxis" },
+      {
+        drawing: drawing({
+          format: { valueAxis: { text: { fontSize: 12 }, line: { strokeWidth: 1.5 } } },
+        }),
+      },
+    );
+    const font = input(wrapper, "fontSize"),
+      width = input(wrapper, "strokeWidth");
+    expect(font.attributes()).toMatchObject({
+      role: "spinbutton",
+      "aria-valuemin": "1",
+      "aria-valuemax": "256",
+      "aria-valuetext": "12 px",
+    });
+    expect(width.attributes()).toMatchObject({
+      role: "spinbutton",
+      "aria-valuemin": "0",
+      "aria-valuemax": "32",
+      "aria-valuetext": "1.5 px",
+    });
+    expect(wrapper.findAllComponents(NumericField)).toHaveLength(2);
+    await wrapper.get('button[aria-label="Font size (px) +"]').trigger("click");
+    expect(apply).toHaveBeenLastCalledWith({
+      kind: "valueAxis",
+      format: { text: { fontSize: 13 }, line: { strokeWidth: 1.5 } },
+    });
+    await wrapper.get('button[aria-label="Line width (px) +"]').trigger("click");
+    expect(apply).toHaveBeenLastCalledWith({
+      kind: "valueAxis",
+      format: { text: { fontSize: 12 }, line: { strokeWidth: 1.75 } },
+    });
+    expect(apply).toHaveBeenCalledTimes(2);
+  });
+
+  test("auto stays blank without a made-up step value and clearing removes only the field", async () => {
+    const { wrapper, apply } = fixture({ kind: "title" });
+    const field = input(wrapper, "fontSize");
+    expect(field.element.value).toBe("");
+    expect(field.attributes("placeholder")).toBe("Auto");
+    expect(
+      wrapper.get('button[aria-label="Font size (px) +"]').attributes("disabled"),
+    ).toBeDefined();
+    await wrapper.get('button[aria-label="Font size (px) +"]').trigger("click");
+    expect(apply).not.toHaveBeenCalled();
+    await wrapper.setProps({
+      drawing: drawing({ format: { title: { fontSize: 12, italic: true } } }),
+    });
+    await field.setValue("");
+    await field.trigger("keydown", { key: "Enter" });
+    expect(apply).toHaveBeenCalledExactlyOnceWith({ kind: "title", format: { italic: true } });
+    field.element.blur();
+    await flushPromises();
+    expect(apply).toHaveBeenCalledTimes(1);
+  });
+
+  test("invalid and rejected drafts survive source updates and explicit retry merges the current format", async () => {
+    const reject = vi.fn((_intent: ChartFormatIntent) => false);
+    const { wrapper } = fixture(
+      { kind: "title" },
+      { apply: reject, drawing: drawing({ format: { title: { fontSize: 12 } } }) },
+    );
+    const field = input(wrapper, "fontSize"),
+      node = field.element;
+    await field.setValue("257");
+    await field.trigger("keydown", { key: "Enter" });
+    expect(reject).not.toHaveBeenCalled();
+    expect(field.element.value).toBe("257");
+    await field.setValue("1e");
+    await field.trigger("keydown", { key: "Enter" });
+    expect(field.element.value).toBe("1e");
+    await field.setValue("18.25");
+    await field.trigger("keydown", { key: "Enter" });
+    expect(reject).toHaveBeenCalledTimes(1);
+    await wrapper.setProps({
+      drawing: drawing({ format: { title: { fontSize: 14, bold: true } } }),
+    });
+    expect(field.element).toBe(node);
+    expect(field.element.value).toBe("18.25");
+    reject.mockReturnValue(true);
+    await field.trigger("keydown", { key: "Enter" });
+    expect(reject).toHaveBeenLastCalledWith({
+      kind: "title",
+      format: { fontSize: 18.25, bold: true },
+    });
+    field.element.blur();
+    await flushPromises();
+    expect(reject).toHaveBeenCalledTimes(2);
+  });
+
+  test("callback replacement rejects old drafts and drawing or target changes clear them", async () => {
+    const { wrapper, apply } = fixture({ kind: "title" });
+    const field = input(wrapper, "fontSize");
+    await field.setValue("20");
+    const oldCommit = wrapper.getComponent(NumericField).props("onCommit");
+    const replacement = vi.fn((_intent: ChartFormatIntent) => true);
+    await wrapper.setProps({ apply: replacement });
+    await field.trigger("keydown", { key: "Enter" });
+    expect(field.element.value).toBe("20");
+    expect(
+      oldCommit(
+        { kind: "value", value: 21 },
+        { ownerKey: "chart-one/title/fontSize", sessionId: "old", source: "enter" },
+      ).accepted,
+    ).toBe(false);
+    expect(replacement).not.toHaveBeenCalled();
+    expect(apply).not.toHaveBeenCalled();
+    await field.trigger("keydown", { key: "Escape" });
+    await field.setValue("22");
+    await field.trigger("keydown", { key: "Enter" });
+    expect(replacement).toHaveBeenCalledExactlyOnceWith({
+      kind: "title",
+      format: { fontSize: 22 },
+    });
+    await field.setValue("23");
+    await wrapper.setProps({ drawing: drawing({}, "chart-two") });
+    expect(input(wrapper, "fontSize").element.value).toBe("");
+    await input(wrapper, "fontSize").setValue("24");
+    await wrapper.setProps({ target: { kind: "valueAxis" } });
+    expect(input(wrapper, "fontSize").element.value).toBe("");
+    const currentCommit = wrapper.getComponent(NumericField).props("onCommit");
+    wrapper.unmount();
+    wrappers.splice(wrappers.indexOf(wrapper), 1);
+    expect(
+      currentCommit(
+        { kind: "value", value: 25 },
+        { ownerKey: "chart-two/valueAxis/fontSize", sessionId: "closed", source: "enter" },
+      ).accepted,
+    ).toBe(false);
+    expect(replacement).toHaveBeenCalledTimes(1);
+  });
+
+  test("composition blocks other pane actions until shared numeric composition ends", async () => {
+    const { wrapper, apply } = fixture({ kind: "valueAxis" });
+    const field = input(wrapper, "fontSize");
+    field.element.focus();
+    await field.trigger("compositionstart");
+    await field.setValue("18");
+    await field.trigger("keydown", { key: "Enter", isComposing: true });
+    checkbox(wrapper, "Reverse order").vm.$emit("change", true);
+    select(wrapper, "Chart element").vm.$emit("change", "title");
+    await flushPromises();
+    expect(apply).not.toHaveBeenCalled();
+    expect(wrapper.emitted("update:target")).toBeUndefined();
+    expect(wrapper.get('[role="alert"]').text()).toContain("Finish composing");
+    await field.trigger("compositionend");
+    await field.trigger("keydown", { key: "Enter" });
+    expect(apply).toHaveBeenCalledExactlyOnceWith({
+      kind: "valueAxis",
+      format: { text: { fontSize: 18 } },
+    });
+    expect(wrapper.text()).not.toContain("Finish composing");
+  });
+
+  test("field and element resets skip intermediate blur writes and rejected resets keep exact text", async () => {
+    const { wrapper, apply } = fixture(
+      { kind: "title" },
+      { drawing: drawing({ format: { title: { fontSize: 12, bold: true } } }) },
+    );
+    const field = input(wrapper, "fontSize");
+    field.element.focus();
+    await field.setValue("18.");
+    const reset = wrapper.get('[data-chart-format-reset="fontSize"]');
+    await reset.trigger("pointerdown");
+    (reset.element as HTMLButtonElement).focus();
+    await flushPromises();
+    expect(apply).not.toHaveBeenCalled();
+    await reset.trigger("click");
+    expect(apply).toHaveBeenCalledExactlyOnceWith({ kind: "title", format: { bold: true } });
+    expect(field.element.value).toBe("");
+    expect(reset.attributes("disabled")).toBeDefined();
+    await wrapper.setProps({
+      drawing: drawing({ format: { title: { fontSize: 14, bold: true } } }),
+    });
+    field.element.focus();
+    await field.setValue("19.");
+    apply.mockReturnValue(false);
+    await reset.trigger("pointerdown");
+    (reset.element as HTMLButtonElement).focus();
+    await flushPromises();
+    await reset.trigger("click");
+    expect(field.element.value).toBe("19.");
+    expect(apply).toHaveBeenCalledTimes(2);
+    expect(wrapper.text()).toContain("draft is retained");
+    apply.mockReturnValue(true);
+    field.element.focus();
+    const elementReset = wrapper.get('[data-chart-format-reset="element"]');
+    await elementReset.trigger("pointerdown");
+    (elementReset.element as HTMLButtonElement).focus();
+    await flushPromises();
+    expect(apply).toHaveBeenCalledTimes(2);
+    await elementReset.trigger("click");
+    expect(apply).toHaveBeenLastCalledWith({ kind: "title", format: undefined });
+    expect(apply).toHaveBeenCalledTimes(3);
+  });
+
+  test("line width permits zero, rejects over-limit text, and disabled series cannot edit", async () => {
+    const { wrapper, apply } = fixture(
+      { kind: "series", seriesId: "apples" },
+      {
+        drawing: drawing({ type: "line", format: { series: [{ id: "apples", strokeWidth: 1 }] } }),
+      },
+    );
+    const field = input(wrapper, "strokeWidth");
+    await field.setValue("32.25");
+    await field.trigger("keydown", { key: "Enter" });
+    expect(field.element.value).toBe("32.25");
+    expect(apply).not.toHaveBeenCalled();
+    await field.setValue("0");
+    await field.trigger("keydown", { key: "Enter" });
+    expect(apply).toHaveBeenCalledExactlyOnceWith({
+      kind: "series",
+      seriesId: "apples",
+      format: { strokeWidth: 0 },
+    });
+    await wrapper.setProps({ disabled: true });
+    expect(field.element.disabled).toBe(true);
+    await wrapper.getComponent(NumericField).vm.edit("2");
+    wrapper.getComponent(NumericField).vm.commit("external");
+    expect(apply).toHaveBeenCalledTimes(1);
   });
 });

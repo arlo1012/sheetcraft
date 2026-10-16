@@ -1,6 +1,7 @@
 import { defineComponent, h, nextTick, ref } from "vue";
 import { mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, expect, test, vi } from "vitest";
+import PicturePresetChoices from "../../../../modules/sheet-images/components/format-pane/PicturePresetChoices.vue";
 import PicturePresetGallery from "../../../../modules/sheet-images/components/format-pane/PicturePresetGallery.vue";
 import PictureTextureGallery from "../../../../modules/sheet-images/components/format-pane/PictureTextureGallery.vue";
 import PictureFormat3dEditor from "../../../../modules/sheet-images/components/format-pane/PictureFormat3dEditor.vue";
@@ -105,6 +106,20 @@ test.each(["reopen", "owner", "callback", "disabled", "unmount"] as const)(
 test("gallery arrows move within real enabled buttons without inserting or leaving the bounds", async () => {
   const { wrapper, onSelect } = gallery();
   await wrapper.get(".gallery-trigger").trigger("click");
+  const choices = wrapper.getComponent(PicturePresetChoices);
+  expect(choices.props("scrollable")).toBe(false);
+  expect(choices.classes()).not.toContain("picture-preset-choices--scrollable");
+  const standalone = mount(PicturePresetChoices, {
+    props: {
+      ownerKey: "standalone",
+      groups: getPictureEffectPresetGroups("shadow"),
+      t: (key) => key,
+      onSelect,
+    },
+  });
+  wrappers.push(standalone);
+  expect(standalone.props("scrollable")).toBe(true);
+  expect(standalone.classes()).toContain("picture-preset-choices--scrollable");
   const buttons = wrapper.findAll<HTMLButtonElement>(".gallery-panel button");
   buttons[0]!.element.focus();
   await buttons[0]!.trigger("keydown", { key: "ArrowDown" });
@@ -179,3 +194,44 @@ test("a narrow selected preset keeps its complete label available without wrappi
   expect(wrapper.getComponent(panelStub).props("valueLabel")).toBe("Reflection 5");
   expect(wrapper.get(".picture-preset-gallery__selected").attributes("alt")).toBe("");
 });
+
+test("optional inheritance action is absent by default and closes only after its own accepted command", async () => {
+  const f = gallery();
+  await f.wrapper.get(".gallery-trigger").trigger("click");
+  expect(f.wrapper.find("[data-picture-preset-inherit]").exists()).toBe(false);
+  const inherit = vi.fn(() => false);
+  await f.wrapper.setProps({ onInherit: inherit });
+  await f.wrapper.get(".gallery-trigger").trigger("click");
+  await f.wrapper.get("[data-picture-preset-inherit]").trigger("click");
+  expect(inherit).toHaveBeenCalledTimes(1);
+  expect(f.onSelect).not.toHaveBeenCalled();
+  expect(f.wrapper.find(".gallery-panel").exists()).toBe(true);
+  inherit.mockReturnValue(true);
+  await f.wrapper.get("[data-picture-preset-inherit]").trigger("click");
+  expect(inherit).toHaveBeenCalledTimes(2);
+  expect(f.wrapper.find(".gallery-panel").exists()).toBe(false);
+});
+test.each(["reopen", "owner", "callback", "disabled", "unmount"] as const)(
+  "old optional inheritance action is rejected after %s",
+  async (boundary) => {
+    const f = gallery(),
+      inherit = vi.fn(() => true),
+      replacement = vi.fn(() => true);
+    await f.wrapper.setProps({ onInherit: inherit });
+    await f.wrapper.get(".gallery-trigger").trigger("click");
+    const old = f.wrapper.get("[data-picture-preset-inherit]").element;
+    if (boundary === "reopen") {
+      await f.wrapper.get(".gallery-trigger").trigger("click");
+      await f.wrapper.get(".gallery-trigger").trigger("click");
+    }
+    if (boundary === "owner") await f.wrapper.setProps({ ownerKey: "replacement" });
+    if (boundary === "callback") await f.wrapper.setProps({ onInherit: replacement });
+    if (boundary === "disabled") await f.wrapper.setProps({ disabled: true });
+    if (boundary === "unmount") f.wrapper.unmount();
+    old.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await nextTick();
+    expect(inherit).not.toHaveBeenCalled();
+    expect(replacement).not.toHaveBeenCalled();
+    expect(f.onSelect).not.toHaveBeenCalled();
+  },
+);

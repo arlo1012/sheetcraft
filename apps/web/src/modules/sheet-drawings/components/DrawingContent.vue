@@ -39,6 +39,8 @@ const props = defineProps<{
   revision?: number;
   theme?: WorkbookTheme;
   imageAssetUrls?: ReadonlyMap<string, string>;
+  loadingImageAssetIds?: ReadonlySet<string>;
+  missingImageAssetIds?: ReadonlySet<string>;
   locale?: string;
   dateSystem?: "1900" | "1904";
   density?: number;
@@ -124,6 +126,8 @@ const legacyBodyTransform = computed(() =>
       :connector-route="connectorRoute"
       :theme="theme"
       :asset-urls="imageAssetUrls"
+      :loading-asset-ids="loadingImageAssetIds"
+      :missing-asset-ids="missingImageAssetIds"
       :density="density"
       :hide-text="hideText"
       @paint="emit('detailedPaint', $event)"

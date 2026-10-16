@@ -61,6 +61,44 @@ afterEach(() => {
   wrappers.splice(0).forEach((w) => w.unmount());
   vi.restoreAllMocks();
 });
+test.each(["ready", "missing"] as const)(
+  "text texture URL preparation stays loading until %s settles",
+  async (outcome) => {
+    native.paint.mockReturnValue({
+      kind: "unavailable",
+      reason: "asset-unavailable",
+      missingAssetIds: ["texture"],
+    });
+    const drawing = {
+      ...createGraphicDrawing("text-texture", "shape", "", { row: 0, column: 0 }),
+      text: "texture",
+    };
+    const w = mount(ShapeTextContent, {
+      props: { drawing, loadingAssetIds: new Set(["texture"]) },
+      global: { plugins: [createAppI18n("en-US")] },
+    });
+    wrappers.push(w);
+    await flushPromises();
+    expect(w.get('[role="status"]').text()).toBe("Preparing text…");
+    if (outcome === "ready") {
+      native.paint.mockReturnValue({ kind: "ready", actualDensity: 1, dispose: native.dispose });
+      await w.setProps({ assetUrls: new Map([["texture", "blob:text-texture"]]) });
+    } else {
+      await w.setProps({ missingAssetIds: new Set(["texture"]) });
+    }
+    await flushPromises();
+    if (outcome === "ready") {
+      expect(w.find('[role="status"]').exists()).toBe(false);
+      expect(w.emitted("paint")?.at(-1)?.[0]).toBeDefined();
+    } else {
+      expect(w.get('[role="status"]').text()).toBe(
+        "Text cannot be displayed with the current font, resources or effects. The content is preserved.",
+      );
+      expect(w.emitted("paint")?.at(-1)?.[0]).toBeUndefined();
+    }
+  },
+);
+
 test("deep reactive editor text/font/width/3D changes repaint; every owned raster is disposed", async () => {
   const drawing = reactive({
     ...createGraphicDrawing("d", "shape", "", { row: 0, column: 0 }),

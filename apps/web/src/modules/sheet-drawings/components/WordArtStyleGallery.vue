@@ -16,6 +16,8 @@ const props = withDefaults(
     selectedId?: string;
     locale?: WordArtStyleLocale;
     disabled?: boolean;
+    /** The host already owns the section title and content inset. */
+    inline?: boolean;
     /** Invalidate pending results when the document/object owner changes. */
     ownerId?: string | number;
     /** The owner performs insertion/reapply; only true signals success/closure. */
@@ -162,12 +164,13 @@ defineExpose({
   <div
     ref="root"
     class="wordart-style-gallery"
+    :class="{ 'wordart-style-gallery--inline': inline }"
     role="group"
     :aria-label="labels.gallery"
     :aria-busy="!!pendingId"
     @keydown="onKeydown"
   >
-    <GallerySection :title="labels.gallery">
+    <GallerySection :title="labels.gallery" :inline="inline">
       <div class="wordart-style-gallery__grid">
         <button
           v-for="choice in WORDART_STYLE_PRESETS"
@@ -213,6 +216,10 @@ defineExpose({
   max-width: 100%;
   min-width: 0;
 
+  &--inline {
+    width: 100%;
+  }
+
   &__grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(48px, 100%), 1fr));
@@ -244,6 +251,10 @@ defineExpose({
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+
+  &--inline &__status {
+    padding-inline: 0;
   }
 }
 </style>

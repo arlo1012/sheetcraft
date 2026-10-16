@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from "vue";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import type { PictureFormatTranslate } from "../../picture-format-pane-model";
 import { useWorkbookTheme } from "../../../../shared/color/workbook-theme-context";
 import PanelSelect from "../../../../shared/panel-select/PanelSelect.vue";
@@ -18,6 +19,8 @@ const props = withDefaults(
     disabled?: boolean;
     t: PictureFormatTranslate;
     onSelect: (id: string) => boolean;
+    /** Optional explicit theme inheritance, separate from the concrete preset model. */
+    onInherit?: () => boolean;
     columns?: number;
     label?: string;
     emptyLabel?: string;
@@ -69,6 +72,25 @@ function selectionAction(id: string, close: () => void) {
     return true;
   };
 }
+function inheritanceAction(close: () => void) {
+  const key = props.ownerKey,
+    token = generation,
+    handler = props.onInherit;
+  return () => {
+    if (
+      !handler ||
+      props.disabled ||
+      opening.value !== key ||
+      props.ownerKey !== key ||
+      generation !== token ||
+      props.onInherit !== handler
+    )
+      return false;
+    if (handler() !== true) return false;
+    close();
+    return true;
+  };
+}
 watch(
   () => props.ownerKey,
   () => {
@@ -78,7 +100,7 @@ watch(
   },
 );
 watch(
-  () => props.onSelect,
+  () => [props.onSelect, props.onInherit] as const,
   () => {
     generation++;
     callbackGeneration.value++;
@@ -124,7 +146,18 @@ function open(value: boolean) {
         ></template
       >
       <template #panel="{ close }">
+        <div v-if="onInherit" class="picture-preset-gallery__actions">
+          <TButton
+            variant="text"
+            size="small"
+            :disabled="disabled"
+            data-picture-preset-inherit
+            :onClick="inheritanceAction(close)"
+            >{{ t("effectInherit") }}</TButton
+          >
+        </div>
         <PicturePresetChoices
+          :scrollable="false"
           :owner-key="`${ownerKey}:${callbackGeneration}`"
           :groups="groups"
           :selected-id="selectedId"
@@ -138,6 +171,11 @@ function open(value: boolean) {
   </PictureFormatField>
 </template>
 <style scoped lang="scss">
+.picture-preset-gallery__actions {
+  display: flex;
+  padding: 6px;
+}
+
 .picture-preset-gallery__value {
   flex: 1 1 auto;
   min-width: 0;

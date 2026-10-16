@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, useId } from "vue";
+import { useNativePopupOwnership } from "../../../../shared/floating/useNativePopupOwnership";
+import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import PictureFormatField from "../../../sheet-images/components/format-pane/PictureFormatField.vue";
 import {
@@ -19,6 +21,26 @@ const props = defineProps<{
   category: Exclude<ShapeFormatStyleCategory, "fill" | "line">;
 }>();
 const capability = computed(() => props.controller.styleCapability(props.target, props.category));
+const root = ref<HTMLElement>();
+const popup = useNativePopupOwnership({
+  owner: () =>
+    props.controller.props.snapshot
+      ? `${props.controller.ownerKey.value}:${props.target}:${props.category}:mixed`
+      : undefined,
+  disabled: () => !capability.value.enabled,
+  root: () => root.value,
+});
+const popupHost = popup.host;
+const inputId = `shape-mixed-effect-${useId()}`;
+const nativeControl = computed(() => ({
+  attributes: {
+    id: inputId,
+    role: "combobox",
+    "aria-label": props.controller.s.value("mixedEffectSetting"),
+    "aria-expanded": String(popup.visible.value),
+    "data-format-pane-history-control": "readonly-combobox",
+  },
+}));
 const options = computed(() => [
   { value: "none", label: props.controller.s.value("mixedEffectNone") },
   { value: "inherit", label: props.controller.s.value("mixedEffectInherit") },
@@ -55,10 +77,15 @@ const action = computed(() => {
 });
 </script>
 <template>
-  <div :data-shape-format-mixed-style="category">
+  <div ref="root" :data-shape-format-mixed-style="category">
+    <Teleport to="body"><div ref="popupHost" :data-shape-mixed-effect-popup="category" /></Teleport>
     <p class="shape-format-mixed-effect__notice">{{ controller.s.value("mixedStyleNotice") }}</p>
     <PictureFormatField :label="controller.s.value('mixedEffectSetting')">
       <TSelect
+        v-native-control="nativeControl"
+        :popup-visible="popup.visible.value"
+        :popup-props="popup.popupProps"
+        @popup-visible-change="popup.onVisibleChange.value"
         model-value=""
         :placeholder="controller.s.value('mixedValues')"
         :options="options"

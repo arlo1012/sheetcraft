@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, useId } from "vue";
+import { useNativePopupOwnership } from "../../../../shared/floating/useNativePopupOwnership";
+import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import FormatSection from "../../../../shared/format-pane/FormatSection.vue";
 import PictureFormatField from "../../../sheet-images/components/format-pane/PictureFormatField.vue";
@@ -34,6 +36,24 @@ const marginsCapability = computed(() => {
   }
   return { enabled: true, reason: undefined };
 });
+const root = ref<HTMLElement>();
+const marginsPopup = useNativePopupOwnership({
+  owner: () =>
+    props.controller.props.snapshot ? `${props.controller.ownerKey.value}:margins` : undefined,
+  disabled: () => !marginsCapability.value.enabled,
+  root: () => root.value,
+});
+const marginsPopupHost = marginsPopup.host;
+const marginInputId = `shape-format-margins-${useId()}`;
+const marginNativeControl = computed(() => ({
+  attributes: {
+    id: marginInputId,
+    role: "combobox",
+    "aria-label": props.controller.s.value("textMargins"),
+    "aria-expanded": String(marginsPopup.visible.value),
+    "data-format-pane-history-control": "readonly-combobox",
+  },
+}));
 const selectedPreset = computed(() => {
   if (marginFields.some((field) => props.controller.isMixedField(field))) return undefined;
   const values = props.controller.props.snapshot?.values;
@@ -62,7 +82,8 @@ const action = computed(() => {
 });
 </script>
 <template>
-  <div class="shape-format-text-box">
+  <div ref="root" class="shape-format-text-box">
+    <Teleport to="body"><div ref="marginsPopupHost" data-shape-format-margins-popup /></Teleport>
     <FormatSection :title="controller.s.value('textBox')" initially-open>
       <ShapeFormatChoiceField :controller="controller" field="textVerticalAlignment" />
       <ShapeFormatChoiceField :controller="controller" field="textDirection" />
@@ -80,6 +101,10 @@ const action = computed(() => {
         data-shape-format-margins
       >
         <TSelect
+          v-native-control="marginNativeControl"
+          :popup-visible="marginsPopup.visible.value"
+          :popup-props="marginsPopup.popupProps"
+          @popup-visible-change="marginsPopup.onVisibleChange.value"
           :model-value="selectedPreset ?? ''"
           :placeholder="
             selectedPreset === undefined ? controller.s.value('mixedValues') : undefined

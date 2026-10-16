@@ -24,6 +24,8 @@ const props = defineProps<{
   connectorRoute?: ReadyShapeConnectorRoute;
   theme?: WorkbookTheme;
   assetUrls?: ReadonlyMap<string, string>;
+  loadingAssetIds?: ReadonlySet<string>;
+  missingAssetIds?: ReadonlySet<string>;
   density?: number;
   hideText?: boolean;
 }>();
@@ -94,6 +96,8 @@ const textStyle = computed<CSSProperties | undefined>(() => {
         :connector-route="connectorRoute"
         :theme="theme"
         :asset-urls="assetUrls"
+        :loading-asset-ids="loadingAssetIds"
+        :missing-asset-ids="missingAssetIds"
         :density="density"
         @paint="bodyPaint = $event"
       />
@@ -142,6 +146,8 @@ const textStyle = computed<CSSProperties | undefined>(() => {
         :drawing="drawing"
         :theme="theme"
         :asset-urls="assetUrls"
+        :loading-asset-ids="loadingAssetIds"
+        :missing-asset-ids="missingAssetIds"
         :density="density"
         @paint="textPaint = $event"
       />

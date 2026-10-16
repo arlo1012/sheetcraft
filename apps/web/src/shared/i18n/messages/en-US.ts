@@ -1818,6 +1818,8 @@ export const enUS = {
     selectAll: "Select all pictures",
     noPictures: "No floating pictures on this sheet.",
     name: "Picture name",
+    nameRequired: "Enter a picture name.",
+    renameRejected: "Couldn't rename this picture. Your edit is kept.",
     show: "Show picture",
     hide: "Hide picture",
     style: "Picture style",

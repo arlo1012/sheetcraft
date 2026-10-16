@@ -36,6 +36,18 @@ const categorizedBinding = computed(() => {
   }
 });
 const binding = computed(() => categorizedBinding.value.binding);
+// No-op snapshot/value refreshes do not replace a live gallery's action.
+// Keep the original guarded apply: it validates its captured owner and onIntent,
+// while constructing an accepted same-owner command against the current revision.
+const inheritBinding = computed(
+  (previous: { ownerKey: string; apply: () => boolean } | undefined) => {
+    const source = categorizedBinding.value.binding;
+    return previous?.ownerKey === source.ownerKey
+      ? previous
+      : { ownerKey: source.ownerKey, apply: () => source.apply(undefined) };
+  },
+);
+const inheritAction = computed(() => inheritBinding.value.apply);
 const groups = computed(() => getPictureEffectPresetGroups(props.category));
 const selected = computed(() => findPictureEffectPresetId(props.category, binding.value.value));
 function select(id: string): boolean {
@@ -77,6 +89,7 @@ function select(id: string): boolean {
     :error="binding.error"
     :t="controller.t"
     :on-select="select"
+    :on-inherit="category === 'shadow' ? inheritAction : undefined"
     :columns="category === 'glow' ? 6 : category === 'rotation3d' ? 4 : 3"
     :empty-label="
       binding.value === undefined ? controller.t('effectInherit') : controller.t('effectCustom')

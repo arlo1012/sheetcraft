@@ -1,7 +1,10 @@
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { afterEach, expect, test, vi } from "vitest";
 import WordArtStyleGallery from "../../../modules/sheet-drawings/components/WordArtStyleGallery.vue";
-import { WORDART_STYLE_PRESETS } from "../../../modules/sheet-drawings/wordart-style-presets";
+import {
+  WORDART_STYLE_GALLERY_LABELS,
+  WORDART_STYLE_PRESETS,
+} from "../../../modules/sheet-drawings/wordart-style-presets";
 
 vi.mock("../../../modules/sheet-drawings/components/WordArtStylePreview.vue", () => ({
   default: {
@@ -39,6 +42,17 @@ test("gallery exposes 25 labelled choices with controlled selection and immediat
   await wrapper.setProps({ selectedId: WORDART_STYLE_PRESETS[4]!.id });
   expect(choice(wrapper, 2).element).toBe(node);
   expect(choice(wrapper, 4).attributes("aria-pressed")).toBe("true");
+});
+
+test("inline gallery leaves the heading and inset to its host while standalone keeps them", () => {
+  const standalone = gallery();
+  expect(standalone.find(".sheetcraft-gallery-section__title").exists()).toBe(true);
+  expect(standalone.find(".sheetcraft-gallery-section--content-inset").exists()).toBe(true);
+  const inline = gallery({ inline: true, locale: "zh-CN" });
+  expect(inline.classes()).toContain("wordart-style-gallery--inline");
+  expect(inline.find(".sheetcraft-gallery-section").exists()).toBe(false);
+  expect(inline.attributes("aria-label")).toBe(WORDART_STYLE_GALLERY_LABELS["zh-CN"].gallery);
+  expect(inline.findAll("button[data-wordart-style-choice]")).toHaveLength(25);
 });
 
 test("native choice grid uses one tab stop and spatial ten-column arrows including the short last row", async () => {

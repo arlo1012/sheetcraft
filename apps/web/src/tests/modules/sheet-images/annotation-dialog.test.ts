@@ -2,7 +2,9 @@ import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, expect, test, vi } from "vitest";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
 import { Input } from "tdesign-vue-next/es/input";
+import { SelectInput } from "tdesign-vue-next/es/select-input";
 import { RadioGroup } from "tdesign-vue-next/es/radio";
+import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import { isPictureGroup } from "@sheetcraft/core/picture-group";
 import type { PictureObject, StandalonePictureObject } from "@sheetcraft/core/picture-object";
 import type { FloatingImage } from "@sheetcraft/core/workbook";
@@ -142,8 +144,37 @@ test.each(["busy", "confirming"])(
     else await confirm();
     await wrapper.vm.$nextTick();
     for (const number of numbers) expect(number.props("disabled")).toBe(true);
-    expect(wrapper.getComponent(Input).props("disabled")).toBe(true);
-    expect((document.querySelector('input[type="color"]') as HTMLInputElement).disabled).toBe(true);
+    expect(wrapper.findAllComponents(Input).some((input) => input.props("disabled") === true)).toBe(
+      true,
+    );
+    expect(wrapper.getComponent(ColorPaletteSelect).props("disabled")).toBe(true);
+    expect(
+      wrapper.getComponent(ColorPaletteSelect).get("input").attributes("disabled"),
+    ).toBeDefined();
     expect(wrapper.getComponent(RadioGroup).props("disabled")).toBe(true);
   },
 );
+
+test("shared palette picks an opaque RGB color for the next annotation", async () => {
+  const f = await fixture();
+  const control = f.wrapper.getComponent(ColorPaletteSelect);
+  expect(control.props("showDefault")).toBe(false);
+  const input = control.getComponent(SelectInput).getComponent(Input);
+  const trigger = input.get<HTMLInputElement>("input");
+  Object.defineProperties(input.element, {
+    getBoundingClientRect: { value: () => new DOMRect(0, 0, 120, 28) },
+    offsetWidth: { value: 120 },
+  });
+  trigger.element.focus();
+  await trigger.trigger("keydown", { key: "Enter", code: "Enter" });
+  await new Promise((resolve) => window.setTimeout(resolve));
+  await flushPromises();
+  const palette = new DOMWrapper(document.body).get(".color-palette");
+  expect(palette.find('[data-color-action="default"]').exists()).toBe(false);
+  await palette.get('[data-color-swatch="#4472c4"]').trigger("click");
+  pointer(f.canvas, "pointerdown", 40, 20);
+  pointer(window, "pointerup", 80, 60);
+  await confirm();
+  const result = requireStandalone(f.wrapper.emitted("confirm")![0]![0] as FloatingImage);
+  expect(result.transform?.annotations?.[1]?.color).toBe("#4472C4");
+});

@@ -124,6 +124,8 @@ function keydown(event: KeyboardEvent) {
   ></PictureFormatField>
 </template>
 <style scoped lang="scss">
+@use "../../../../shared/gallery/gallery-choice" as gallery;
+
 .picture-texture-gallery {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -133,21 +135,12 @@ function keydown(event: KeyboardEvent) {
   max-height: 55vh;
   overflow: auto;
   button {
+    // Preserve the preview inset after the shared choice removes the 1px border.
+    @include gallery.choice(4px);
+
     width: 40px;
     max-width: 100%;
     height: 40px;
-    padding: 3px;
-    border: 1px solid var(--sheetcraft-border-subtle);
-    border-radius: var(--sheetcraft-radius-small);
-    background: var(--sheetcraft-surface-panel);
-    cursor: pointer;
-  }
-  button:hover:not(:disabled) {
-    background: var(--sheetcraft-surface-hover);
-  }
-  button[aria-pressed="true"] {
-    outline: 2px solid var(--sheetcraft-text-primary);
-    outline-offset: -2px;
   }
 }
 </style>

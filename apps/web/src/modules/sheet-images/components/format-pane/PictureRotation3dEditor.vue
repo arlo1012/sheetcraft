@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onBeforeUnmount, ref, useId } from "vue";
+import { useNativePopupOwnership } from "../../../../shared/floating/useNativePopupOwnership";
+import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import type { Choice, PictureRotation3d } from "@sheetcraft/core/picture-detailed-style";
@@ -34,6 +36,27 @@ const mode = computed(() =>
       ? "none"
       : props.value.value.projection,
 );
+const root = ref<HTMLElement>();
+const modePopup = useNativePopupOwnership({
+  owner: () => `${props.ownerKey}:rotation3d:mode`,
+  disabled: () => !!props.disabled,
+  root: () => root.value,
+});
+const modeHost = modePopup.host;
+const modeInputId = `picture-rotation3d-mode-${useId()}`;
+const modeNative = computed(() => ({
+  attributes: {
+    id: modeInputId,
+    role: "combobox",
+    "aria-label": props.t("rotation3dSection"),
+    "aria-expanded": String(modePopup.visible.value),
+    "data-format-pane-history-control": "readonly-combobox",
+  },
+}));
+let active = true;
+onBeforeUnmount(() => {
+  active = false;
+});
 const modes = computed(() => [
   { value: "inherit", label: props.t("effectInherit") },
   { value: "none", label: props.t("effectNone") },
@@ -41,16 +64,30 @@ const modes = computed(() => [
   { value: "perspective", label: props.t("projectionPerspective"), disabled: props.valueDisabled },
   { value: "oblique", label: props.t("projectionOblique"), disabled: props.valueDisabled },
 ]);
-function choose(value: unknown) {
-  if (props.disabled) return;
-  if (value === "inherit") props.onCommit(undefined);
-  else if (value === "none") props.onCommit({ kind: "none" });
-  else if (
-    !props.valueDisabled &&
-    (value === "parallel" || value === "perspective" || value === "oblique")
-  )
-    props.onCommit({ kind: "value", value: createPictureRotation3d(value, rotation.value) });
-}
+const choose = computed(() => {
+  const owner = props.ownerKey,
+    apply = props.onCommit,
+    current = rotation.value,
+    valuesDisabled = props.valueDisabled;
+  return (value: unknown) => {
+    if (
+      !active ||
+      props.disabled ||
+      owner !== props.ownerKey ||
+      apply !== props.onCommit ||
+      current !== rotation.value ||
+      valuesDisabled !== props.valueDisabled
+    )
+      return false;
+    if (value === "inherit") return apply(undefined);
+    if (value === "none") return apply({ kind: "none" });
+    return (
+      !props.valueDisabled &&
+      (value === "parallel" || value === "perspective" || value === "oblique") &&
+      apply({ kind: "value", value: createPictureRotation3d(value, current) })
+    );
+  };
+});
 function update(patch: Partial<PictureRotation3d>) {
   return (
     !!rotation.value &&
@@ -86,7 +123,10 @@ function selectPreset(id: string) {
 }
 </script>
 <template>
-  <div class="picture-rotation3d-editor">
+  <div ref="root" class="picture-rotation3d-editor">
+    <Teleport to="body"
+      ><div ref="modeHost" data-picture-effect-mode-popup="rotation3d"
+    /></Teleport>
     <PicturePresetGallery
       v-if="!hidePreset"
       :owner-key="ownerKey"
@@ -100,6 +140,10 @@ function selectPreset(id: string) {
     />
     <PictureFormatField :label="t('projectionMode')"
       ><TSelect
+        v-native-control="modeNative"
+        :popup-visible="modePopup.visible.value"
+        :popup-props="modePopup.popupProps"
+        @popup-visible-change="modePopup.onVisibleChange.value"
         :model-value="mode"
         :options="modes"
         :disabled="disabled"

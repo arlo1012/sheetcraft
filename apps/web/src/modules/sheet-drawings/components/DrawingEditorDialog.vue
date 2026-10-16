@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input } from "tdesign-vue-next/es/input";
 import { Textarea } from "tdesign-vue-next/es/textarea";
@@ -11,6 +11,7 @@ import {
   type DrawingShape,
 } from "@sheetcraft/core/sheet-drawings";
 import { useAppI18n } from "../../../shared/i18n";
+import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import DrawingContent from "./DrawingContent.vue";
 import type { TextBoxReferenceResolver } from "../textbox-reference-display";
 import ShapeGallery from "./ShapeGallery.vue";
@@ -43,6 +44,11 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ confirm: [drawing: SheetGraphicDrawing]; close: [] }>();
 const { t, locale } = useAppI18n();
+const sourceDrawing = props.drawing;
+let disposed = false;
+onBeforeUnmount(() => {
+  disposed = true;
+});
 const draft = ref<SheetGraphicDrawing>(
   props.normalizeDrawing
     ? props.normalizeDrawing(props.drawing)
@@ -92,6 +98,18 @@ function setHeight(height: number) {
 }
 function setAppearance(field: "fill" | "stroke" | "strokeWidth", value: string | number) {
   if (!props.disabled) draft.value = editShapeBasicAppearance(draft.value, field, value);
+}
+function selectColor(field: "fill" | "stroke" | "textColor", value: string | null): void {
+  if (
+    disposed ||
+    props.disabled ||
+    props.drawing !== sourceDrawing ||
+    !value ||
+    !/^#[0-9a-f]{6}$/i.test(value)
+  )
+    return;
+  if (field === "textColor") setTypography(field, value);
+  else setAppearance(field, value);
 }
 function setText(value: string) {
   if (props.disabled || draft.value.textReference) return;
@@ -286,14 +304,23 @@ const shapes: DrawingShape[] = [
           v-if="drawing.kind !== 'wordArt' && drawing.kind !== 'equation'"
           class="drawing-editor__row"
         >
-          <label v-if="!lineGeometry"
-            >{{ t("drawing.fill")
-            }}<input
-              type="color"
-              :value="draft.fill === 'transparent' ? '#ffffff' : draft.fill"
-              :disabled="disabled"
-              @input="setAppearance('fill', ($event.target as HTMLInputElement).value)"
-          /></label>
+          <div
+            v-if="!lineGeometry"
+            class="drawing-editor__field"
+            role="group"
+            :aria-label="t('drawing.fill')"
+          >
+            <span>{{ t("drawing.fill") }}</span>
+            <div class="drawing-editor__color">
+              <ColorPaletteSelect
+                :model-value="draft.fill"
+                :label="t('drawing.fill')"
+                :show-default="false"
+                :disabled="disabled"
+                @select="selectColor('fill', $event)"
+              />
+            </div>
+          </div>
           <Checkbox
             v-if="!lineGeometry"
             :checked="draft.fill === 'transparent'"
@@ -301,14 +328,18 @@ const shapes: DrawingShape[] = [
             @change="setAppearance('fill', $event ? 'transparent' : '#ffffff')"
             >{{ t("drawing.noFill") }}</Checkbox
           >
-          <label
-            >{{ t("drawing.stroke")
-            }}<input
-              :value="draft.stroke === 'transparent' ? '#000000' : draft.stroke"
-              type="color"
-              :disabled="disabled"
-              @input="setAppearance('stroke', ($event.target as HTMLInputElement).value)"
-          /></label>
+          <div class="drawing-editor__field" role="group" :aria-label="t('drawing.stroke')">
+            <span>{{ t("drawing.stroke") }}</span>
+            <div class="drawing-editor__color">
+              <ColorPaletteSelect
+                :model-value="draft.stroke"
+                :label="t('drawing.stroke')"
+                :show-default="false"
+                :disabled="disabled"
+                @select="selectColor('stroke', $event)"
+              />
+            </div>
+          </div>
           <div class="drawing-editor__field" role="group" :aria-label="t('drawing.strokeWidth')">
             <span>{{ t("drawing.strokeWidth") }}</span>
             <InputNumber
@@ -332,14 +363,18 @@ const shapes: DrawingShape[] = [
           :handler="lineEndsHandler"
         />
         <div v-if="!lineGeometry" class="drawing-editor__row">
-          <label
-            >{{ t("drawing.color")
-            }}<input
-              :value="draft.color"
-              type="color"
-              :disabled="disabled"
-              @input="setTypography('textColor', ($event.target as HTMLInputElement).value)"
-          /></label>
+          <div class="drawing-editor__field" role="group" :aria-label="t('drawing.color')">
+            <span>{{ t("drawing.color") }}</span>
+            <div class="drawing-editor__color">
+              <ColorPaletteSelect
+                :model-value="draft.color"
+                :label="t('drawing.color')"
+                :show-default="false"
+                :disabled="disabled"
+                @select="selectColor('textColor', $event)"
+              />
+            </div>
+          </div>
           <div class="drawing-editor__field" role="group" :aria-label="t('drawing.fontSize')">
             <span>{{ t("drawing.fontSize") }}</span>
             <InputNumber
@@ -471,6 +506,10 @@ const shapes: DrawingShape[] = [
   &__field > span {
     white-space: nowrap;
   }
+  &__color {
+    width: 64px;
+    flex: none;
+  }
   &__row {
     display: flex;
     gap: 12px;
@@ -478,12 +517,6 @@ const shapes: DrawingShape[] = [
     flex-wrap: wrap;
     .drawing-editor__number {
       width: 90px;
-    }
-    input[type="color"] {
-      width: 32px;
-      height: 28px;
-      padding: 0;
-      border: 0;
     }
   }
   &__shapes {

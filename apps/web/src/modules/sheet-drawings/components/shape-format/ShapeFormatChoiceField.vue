@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, useId } from "vue";
+import { useNativePopupOwnership } from "../../../../shared/floating/useNativePopupOwnership";
+import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import PictureFormatField from "../../../sheet-images/components/format-pane/PictureFormatField.vue";
 import type {
@@ -10,6 +12,26 @@ import type {
 import type { ShapeFormatController } from "./useShapeFormatPane";
 const props = defineProps<{ controller: ShapeFormatController; field: ShapeFormatChoiceField }>();
 const capability = computed(() => props.controller.fieldCapability(props.field));
+const root = ref<InstanceType<typeof PictureFormatField>>();
+const popup = useNativePopupOwnership({
+  owner: () =>
+    props.controller.props.snapshot
+      ? `${props.controller.ownerKey.value}:${props.field}`
+      : undefined,
+  disabled: () => !capability.value.enabled,
+  root: () => root.value?.$el,
+});
+const popupHost = popup.host;
+const inputId = `shape-format-choice-${useId()}`;
+const nativeControl = computed(() => ({
+  attributes: {
+    id: inputId,
+    role: "combobox",
+    "aria-label": props.controller.fieldLabel(props.field),
+    "aria-expanded": String(popup.visible.value),
+    "data-format-pane-history-control": "readonly-combobox",
+  },
+}));
 const options = computed<readonly ShapeFormatOption[]>(() => {
   const c = props.controller,
     s = c.s.value;
@@ -82,11 +104,17 @@ const action = computed(() => {
 </script>
 <template>
   <PictureFormatField
+    ref="root"
     :label="controller.fieldLabel(field)"
     :reason="capability.enabled ? undefined : capability.reason"
     :data-shape-format-field="field"
   >
+    <Teleport to="body"><div ref="popupHost" :data-shape-format-choice-popup="field" /></Teleport>
     <TSelect
+      v-native-control="nativeControl"
+      :popup-visible="popup.visible.value"
+      :popup-props="popup.popupProps"
+      @popup-visible-change="popup.onVisibleChange.value"
       :model-value="
         controller.isMixedField(field) ? '' : (controller.props.snapshot?.values[field] ?? '')
       "

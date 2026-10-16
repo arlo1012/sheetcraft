@@ -7,6 +7,7 @@ import { Tabs as TTabs, TabPanel as TTabPanel } from "tdesign-vue-next/es/tabs";
 import { X } from "lucide-vue-next";
 import {
   type PictureFormatCapabilities,
+  type PictureFormatField,
   type PictureFormatIntentHandler,
   type PictureFormatLengthUnit,
   type PictureFormatOptions,
@@ -39,14 +40,111 @@ const props = withDefaults(
   }>(),
   { initialTab: "size-properties", initialUnit: "pt" },
 );
+const tab = ref<PictureFormatTab>(props.initialPaint ? "fill-line" : props.initialTab);
+// Feedback follows the controls on the active page, including the actual
+// detailed/legacy editor branch. Other pages must not suppress local reasons.
+const pageFields: Record<PictureFormatTab, readonly PictureFormatField[]> = {
+  "size-properties": [
+    "sizeHeightPt",
+    "sizeWidthPt",
+    "rotationDeg",
+    "scaleHeightPercent",
+    "scaleWidthPercent",
+    "lockAspectRatio",
+    "relativeToOriginalSize",
+    "anchor",
+    "printObject",
+    "locked",
+    "altTitle",
+    "altDescription",
+  ],
+  picture: [
+    "sourceWidthPt",
+    "sourceHeightPt",
+    "sourceOffsetXPt",
+    "sourceOffsetYPt",
+    "cropWidthPt",
+    "cropHeightPt",
+    "cropLeftPt",
+    "cropTopPt",
+  ],
+  "fill-line": [
+    "fillMode",
+    "fillColor",
+    "fillTransparencyPercent",
+    "fillGradientPreset",
+    "lineMode",
+    "lineColor",
+    "lineTransparencyPercent",
+    "lineWidthPt",
+    "lineGradientPreset",
+    "lineCompound",
+    "lineDash",
+    "lineCap",
+    "lineJoin",
+  ],
+  effects: [
+    "shadowPreset",
+    "shadowColor",
+    "shadowTransparencyPercent",
+    "shadowSizePercent",
+    "shadowBlurPt",
+    "shadowDistancePt",
+    "shadowAngleDeg",
+    "reflectionPreset",
+    "reflectionSizePercent",
+    "reflectionTransparencyPercent",
+    "reflectionBlurPt",
+    "reflectionDistancePt",
+    "glowPreset",
+    "glowColor",
+    "glowSizePt",
+    "glowTransparencyPercent",
+    "softEdgePreset",
+    "softEdgeSizePt",
+    "depthColor",
+    "depthSizePt",
+    "contourColor",
+    "contourSizePt",
+    "material",
+    "lighting",
+    "lightingAngleDeg",
+    "rotation3dPreset",
+    "rotation3dXDeg",
+    "rotation3dYDeg",
+    "rotation3dZDeg",
+    "perspectiveDeg",
+    "distanceFromGroundPt",
+  ],
+};
 const commonReasons = computed<ReadonlySet<string>>(() => {
   const counts = new Map<string, number>();
-  const capabilities = [
-    ...Object.values(props.capabilities.fields),
-    ...Object.values(props.capabilities.detailed ?? {}),
-    ...Object.values(props.capabilities.resets ?? {}),
-    props.capabilities.cropShape,
-  ];
+  const detailed = props.capabilities.detailed;
+  const capabilities =
+    detailed && tab.value === "fill-line"
+      ? [detailed.fill, detailed.line]
+      : detailed && tab.value === "effects"
+        ? [
+            detailed.shadow,
+            detailed.reflection,
+            detailed.glow,
+            detailed.softEdges,
+            detailed.format3d,
+            detailed.rotation3d,
+          ]
+        : pageFields[tab.value].map((field) => props.capabilities.fields[field]);
+  if (tab.value === "size-properties") capabilities.push(props.capabilities.resets?.["reset-size"]);
+  else if (tab.value === "picture")
+    capabilities.push(
+      props.capabilities.cropShape,
+      props.capabilities.resets?.["reset-crop"],
+      props.capabilities.resets?.["reset-picture"],
+    );
+  else if (tab.value === "effects" && !detailed)
+    capabilities.push(
+      props.capabilities.resets?.["reset-3d-format"],
+      props.capabilities.resets?.["reset-3d-rotation"],
+    );
   for (const capability of capabilities) {
     const reason = capability?.enabled === false ? capability.reason : undefined;
     if (reason) counts.set(reason, (counts.get(reason) ?? 0) + 1);
@@ -56,7 +154,6 @@ const commonReasons = computed<ReadonlySet<string>>(() => {
 provide(pictureFormatCommonReasons, commonReasons);
 const emit = defineEmits<{ close: []; cancel: [] }>();
 const controller = usePictureFormatPane(props);
-const tab = ref<PictureFormatTab>(props.initialPaint ? "fill-line" : props.initialTab);
 const fillLineRef = ref<InstanceType<typeof PictureFormatFillLine> | null>(null);
 const unit = ref<PictureFormatLengthUnit>(props.initialUnit);
 const paneId = `picture-format-pane-${useId()}`;

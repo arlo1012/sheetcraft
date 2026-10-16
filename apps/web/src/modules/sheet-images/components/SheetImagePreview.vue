@@ -206,9 +206,7 @@ onBeforeUnmount(() => {
     v-if="visible && presentationError"
     :visible="true"
     :header="t('image.preview')"
-    :confirm-btn="t('picture.close')"
-    :cancel-btn="null"
-    @confirm="emit('close')"
+    :footer="false"
     @close="emit('close')"
     >{{ t("image.assetUnavailable") }}</TDialog
   >

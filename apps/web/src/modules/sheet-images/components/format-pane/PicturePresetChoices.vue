@@ -17,10 +17,12 @@ const props = withDefaults(
     disabled?: boolean;
     columns?: number;
     showLabels?: boolean;
+    /** A bounded popup can own scrolling for the complete gallery and its actions. */
+    scrollable?: boolean;
     t: PictureFormatTranslate;
     onSelect: (id: string) => boolean;
   }>(),
-  { columns: 3 },
+  { columns: 3, scrollable: true },
 );
 const root = ref<HTMLElement>();
 const theme = useWorkbookTheme();
@@ -111,7 +113,10 @@ defineExpose({
   <div
     ref="root"
     class="picture-preset-choices"
-    :class="{ 'picture-preset-choices--labels': showLabels }"
+    :class="{
+      'picture-preset-choices--labels': showLabels,
+      'picture-preset-choices--scrollable': scrollable,
+    }"
     :style="{
       '--picture-preset-columns': columns,
       '--picture-preset-width': `${Math.max(228, columns * 58 + 12)}px`,
@@ -144,9 +149,11 @@ defineExpose({
 .picture-preset-choices {
   width: var(--picture-preset-width);
   max-width: calc(100vw - 24px);
-  max-height: min(480px, 65vh);
-  overflow: auto;
-  overscroll-behavior: contain;
+  &--scrollable {
+    max-height: min(480px, 65vh);
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
   &--labels &__grid button {
     display: flex;
     justify-content: flex-start;

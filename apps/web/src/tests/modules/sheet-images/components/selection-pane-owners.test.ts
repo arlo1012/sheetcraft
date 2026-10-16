@@ -39,6 +39,7 @@ function handler(component: Pick<VueWrapper, "vm">, key: string): (...args: unkn
 describe("selection pane source and owner callbacks", () => {
   test("captures detached complete group source and doesn't mutate it after rejection", () => {
     const f = fixture();
+    f.wrapper.getComponent(Input).vm.$emit("change", "new name");
     f.wrapper.getComponent(Input).vm.$emit("blur", "new name");
     expect(f.renameHandler).toHaveBeenCalledWith(f.image, "new name");
     const source = f.renameHandler.mock.calls[0]?.[0];
@@ -70,6 +71,7 @@ describe("selection pane source and owner callbacks", () => {
     expect(f.renameHandler).not.toHaveBeenCalled();
     expect(f.visibilityHandler).not.toHaveBeenCalled();
     expect(f.selectHandler).not.toHaveBeenCalled();
+    f.wrapper.getComponent(Input).vm.$emit("change", "fresh");
     f.wrapper.getComponent(Input).vm.$emit("blur", "fresh");
     expect(newer.renameHandler).toHaveBeenCalledOnce();
   });
@@ -99,6 +101,7 @@ describe("selection pane source and owner callbacks", () => {
   test("disabled metadata edits are refused without fallback events", async () => {
     const f = fixture();
     await f.wrapper.setProps({ disabled: true });
+    f.wrapper.getComponent(Input).vm.$emit("change", "blocked");
     f.wrapper.getComponent(Input).vm.$emit("blur", "blocked");
     const visibility = f.wrapper
       .findAllComponents(Button)

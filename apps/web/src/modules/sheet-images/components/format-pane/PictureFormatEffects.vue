@@ -38,6 +38,7 @@ const rotation3d = computed(() => props.controller.detailed("rotation3d"));
       <template v-if="controller.hasDetailedCapabilities.value">
         <PictureShadowEditor
           hide-preset
+          hide-mode
           :owner-key="shadow.ownerKey"
           :value="shadow.value"
           :disabled="shadow.disabled"

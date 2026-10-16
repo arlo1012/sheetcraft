@@ -11,7 +11,10 @@ import {
 import { imageAssetFeedback } from "../../../image-assets/imageAssetFeedback";
 import { useAppI18n } from "../../../../shared/i18n";
 import PictureTextureGallery from "./PictureTextureGallery.vue";
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onUnmounted, ref, useId, watch } from "vue";
+import type { PopupVisibleChangeContext } from "tdesign-vue-next/es/popup";
+import { useNativePopupOwnership } from "../../../../shared/floating/useNativePopupOwnership";
+import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
@@ -37,6 +40,8 @@ import PicturePaintNumber from "./PicturePaintNumber.vue";
 import PictureGradientEditor from "./PictureGradientEditor.vue";
 const props = defineProps<{
   ownerKey: string;
+  /** Stable semantic owner for focus handoff after an accepted choice remounts its trigger. */
+  focusOwnerKey?: string;
   value?: Choice<PicturePaint>;
   mixed?: boolean;
   disabled?: boolean;
@@ -64,7 +69,38 @@ const mode = computed(() =>
 const busy = ref(false),
   sourceError = ref<string>(),
   fileInput = ref<HTMLInputElement>();
+const editorRoot = ref<HTMLElement>();
+const modeInput = ref<HTMLInputElement>();
+const modeInputId = `picture-paint-mode-${useId()}`;
+const modePopup = useNativePopupOwnership({
+  owner: () => props.ownerKey,
+  disabled: () => !!props.disabled || busy.value,
+  root: () => editorRoot.value,
+});
+const modePopupHost = modePopup.host;
+const modePopupProps = modePopup.popupProps;
+const modePopupVisible = modePopup.visible;
+let active = true;
 let request = 0;
+let focusRequest = 0;
+let acceptedModeChoice: { owner: string; generation: number } | undefined;
+let cancelPendingModeFocus: (() => void) | undefined;
+watch(
+  () => props.focusOwnerKey ?? props.ownerKey,
+  () => {
+    focusRequest++;
+    acceptedModeChoice = undefined;
+    cancelPendingModeFocus?.();
+  },
+  { flush: "sync" },
+);
+watch(
+  () => props.disabled,
+  (disabled) => {
+    if (disabled) cancelPendingModeFocus?.();
+  },
+  { flush: "sync" },
+);
 watch(
   () => props.ownerKey,
   () => {
@@ -72,11 +108,83 @@ watch(
     busy.value = false;
     sourceError.value = undefined;
   },
+  { flush: "sync" },
 );
 onUnmounted(() => {
+  active = false;
+  cancelPendingModeFocus?.();
+  focusRequest++;
+  acceptedModeChoice = undefined;
   request++;
 });
 const disabled = computed(() => props.disabled || busy.value);
+const imageInputPrefix = `picture-paint-image-${useId()}`;
+const imageLayoutPopup = useNativePopupOwnership({
+  owner: () => `${props.ownerKey}:picture:layout`,
+  focus: {
+    owner: () => props.focusOwnerKey ?? props.ownerKey,
+    input: () =>
+      editorRoot.value?.querySelector<HTMLInputElement>(`input[id="${imageInputPrefix}-layout"]`),
+  },
+  disabled: () => !!disabled.value || paint.value?.kind !== "picture",
+  root: () => editorRoot.value,
+});
+const tileAlignPopup = useNativePopupOwnership({
+  owner: () => `${props.ownerKey}:picture:tile-align`,
+  focus: {
+    owner: () => props.focusOwnerKey ?? props.ownerKey,
+    input: () =>
+      editorRoot.value?.querySelector<HTMLInputElement>(
+        `input[id="${imageInputPrefix}-alignment"]`,
+      ),
+  },
+  disabled: () =>
+    !!disabled.value || paint.value?.kind !== "picture" || paint.value.layout.kind !== "tile",
+  root: () => editorRoot.value,
+});
+const mirrorPopup = useNativePopupOwnership({
+  owner: () => `${props.ownerKey}:picture:mirror`,
+  focus: {
+    owner: () => props.focusOwnerKey ?? props.ownerKey,
+    input: () =>
+      editorRoot.value?.querySelector<HTMLInputElement>(`input[id="${imageInputPrefix}-mirror"]`),
+  },
+  disabled: () =>
+    !!disabled.value || paint.value?.kind !== "picture" || paint.value.layout.kind !== "tile",
+  root: () => editorRoot.value,
+});
+const imageLayoutHost = imageLayoutPopup.host,
+  tileAlignHost = tileAlignPopup.host,
+  mirrorHost = mirrorPopup.host;
+const imageNative = computed(() => ({
+  layout: {
+    attributes: {
+      id: `${imageInputPrefix}-layout`,
+      role: "combobox",
+      "aria-label": props.t("paintLayout"),
+      "aria-expanded": String(imageLayoutPopup.visible.value),
+      "data-format-pane-history-control": "readonly-combobox",
+    },
+  },
+  alignment: {
+    attributes: {
+      id: `${imageInputPrefix}-alignment`,
+      role: "combobox",
+      "aria-label": props.t("paintAlignment"),
+      "aria-expanded": String(tileAlignPopup.visible.value),
+      "data-format-pane-history-control": "readonly-combobox",
+    },
+  },
+  mirror: {
+    attributes: {
+      id: `${imageInputPrefix}-mirror`,
+      role: "combobox",
+      "aria-label": props.t("paintMirror"),
+      "aria-expanded": String(mirrorPopup.visible.value),
+      "data-format-pane-history-control": "readonly-combobox",
+    },
+  },
+}));
 const modes = computed(() => [
   ...(props.mixed ? [{ value: "mixed", label: props.t("paintMixed"), disabled: true }] : []),
   { value: "inherit", label: props.t("paintInherit") },
@@ -125,27 +233,147 @@ function picture(assetId: string): Extract<PicturePaint, { kind: "picture" }> {
     layout: { kind: "stretch", offsetXRatio: 0, offsetYRatio: 0, widthRatio: 1, heightRatio: 1 },
   };
 }
-function changeMode(value: unknown) {
-  if (disabled.value) return;
-  if (value === "inherit") props.onCommit(undefined);
-  else if (value === "none") props.onCommit({ kind: "none" });
-  else if (value === "solid") commit(createPictureSolidPaint());
-  else if (value === "gradient") commit(createPictureGradientPaint());
-  else if (value === "pattern")
-    commit({
-      kind: "pattern",
-      preset: "pct50",
-      foreground: { kind: "rgb", rgb: "#000000" },
-      background: { kind: "rgb", rgb: "#FFFFFF" },
-      opacity: 1,
-      rotateWithShape: true,
-    });
-  else if (value === "picture") {
-    if (props.loadAsset) void texture("paper");
-    else if (props.sourceAssetId) commit(picture(props.sourceAssetId));
-    else fileInput.value?.click();
-  }
+// Keep a retired native popup callback bound to its original command lease.
+const changeMode = computed(() => {
+  const key = props.ownerKey,
+    handler = props.onCommit,
+    focusOwner = props.focusOwnerKey ?? key;
+  return (value: unknown) => {
+    if (!active || disabled.value || key !== props.ownerKey || handler !== props.onCommit) return;
+    cancelPendingModeFocus?.();
+    const apply = (choice: Choice<PicturePaint> | undefined) => {
+      const generation = focusRequest;
+      const accepted = handler(choice);
+      acceptedModeChoice = accepted ? { owner: focusOwner, generation } : undefined;
+      return accepted;
+    };
+    if (value === "inherit") apply(undefined);
+    else if (value === "none") apply({ kind: "none" });
+    else if (value === "solid") apply({ kind: "value", value: createPictureSolidPaint() });
+    else if (value === "gradient") apply({ kind: "value", value: createPictureGradientPaint() });
+    else if (value === "pattern")
+      apply({
+        kind: "value",
+        value: {
+          kind: "pattern",
+          preset: "pct50",
+          foreground: { kind: "rgb", rgb: "#000000" },
+          background: { kind: "rgb", rgb: "#FFFFFF" },
+          opacity: 1,
+          rotateWithShape: true,
+        },
+      });
+    else if (value === "picture") {
+      if (props.loadAsset) loadModeTexture(focusOwner);
+      else if (props.sourceAssetId) apply({ kind: "value", value: picture(props.sourceAssetId) });
+      else fileInput.value?.click();
+    }
+  };
+});
+const modeNativeControl = computed(() => {
+  const key = props.ownerKey;
+  return {
+    attributes: {
+      id: modeInputId,
+      role: "combobox",
+      "aria-label": props.t(props.paintRole === "line" ? "lineMode" : "paintMode"),
+      "aria-expanded": String(modePopupVisible.value),
+      "data-format-pane-history-control": "readonly-combobox",
+    },
+    onElement: (element: HTMLInputElement | HTMLTextAreaElement | null) => {
+      if (key === props.ownerKey)
+        modeInput.value = element instanceof HTMLInputElement ? element : undefined;
+    },
+  };
+});
+function restoreModeFocus(choice: { owner: string; generation: number }) {
+  const activeBefore = document.activeElement;
+  let moved = false;
+  const focusMoved = (event: FocusEvent) => {
+    if (event.target !== activeBefore && event.target !== document.body) moved = true;
+  };
+  const pointerMoved = () => {
+    moved = true;
+  };
+  document.addEventListener("focusin", focusMoved);
+  document.addEventListener("pointerdown", pointerMoved);
+  void nextTick(() => {
+    try {
+      const focused = document.activeElement,
+        input = modeInput.value;
+      if (
+        !active ||
+        moved ||
+        choice.generation !== focusRequest ||
+        choice.owner !== (props.focusOwnerKey ?? props.ownerKey) ||
+        disabled.value ||
+        modePopupVisible.value ||
+        !input?.isConnected ||
+        !input.readOnly ||
+        input.disabled ||
+        (focused !== activeBefore && focused !== document.body && focused !== null)
+      )
+        return;
+      input.focus({ preventScroll: true });
+    } finally {
+      document.removeEventListener("focusin", focusMoved);
+      document.removeEventListener("pointerdown", pointerMoved);
+    }
+  });
 }
+// Only a mode choice owns this deferred handoff. Explicit file/texture actions
+// keep their own focus, and interaction during the decode cancels this request.
+function loadModeTexture(focusOwner: string): void {
+  const choice = { owner: focusOwner, generation: focusRequest };
+  const originalInput = modeInput.value;
+  let cancelled = false;
+  const release = () => {
+    document.removeEventListener("focusin", focusMoved);
+    document.removeEventListener("pointerdown", cancel);
+    if (cancelPendingModeFocus === cancel) cancelPendingModeFocus = undefined;
+  };
+  const cancel = () => {
+    cancelled = true;
+    release();
+  };
+  const focusMoved = (event: FocusEvent) => {
+    if (
+      event.target !== originalInput &&
+      event.target !== modeInput.value &&
+      event.target !== document.body &&
+      !(event.target instanceof Node && modePopupHost.value?.contains(event.target))
+    )
+      cancel();
+  };
+  cancelPendingModeFocus = cancel;
+  document.addEventListener("focusin", focusMoved);
+  document.addEventListener("pointerdown", cancel);
+  void texture("paper").then((accepted) => {
+    const restore = accepted && !cancelled;
+    release();
+    // loadSource's finally has released busy before this continuation. Its
+    // captured opaque owner/callback, not this focus-only lease, made the edit.
+    if (restore) restoreModeFocus(choice);
+  });
+}
+const changeModePopupVisible = computed(() => {
+  const key = props.ownerKey,
+    changeVisible = modePopup.onVisibleChange.value;
+  return (visible: boolean, context: PopupVisibleChangeContext) => {
+    if (!active || key !== props.ownerKey) return;
+    const selected =
+      !visible &&
+      modePopupVisible.value &&
+      context.e?.target instanceof Node &&
+      !!modePopupHost.value?.contains(context.e.target);
+    if (!changeVisible(visible)) return;
+    const choice = acceptedModeChoice;
+    acceptedModeChoice = undefined;
+    if (selected && choice) restoreModeFocus(choice);
+  };
+});
+const containsModeTarget = modePopup.containsTarget;
+defineExpose({ containsModeTarget });
 function numberProps(
   label: Parameters<PictureFormatTranslate>[0],
   value: number,
@@ -165,28 +393,74 @@ function numberProps(
     rejectedMessage: props.t("applyRejected"),
   };
 }
-function layout(value: unknown) {
-  const current = paint.value;
-  if (current?.kind !== "picture") return;
-  if (value === "tile")
-    commit({
-      ...current,
-      layout: {
-        kind: "tile",
-        scaleX: 1,
-        scaleY: 1,
-        offsetXPt: 0,
-        offsetYPt: 0,
-        anchor: "center",
-        flip: "none",
-      },
-    });
-  else if (value === "stretch")
-    commit({
-      ...current,
-      layout: { kind: "stretch", offsetXRatio: 0, offsetYRatio: 0, widthRatio: 1, heightRatio: 1 },
-    });
-}
+const imageActions = computed(() => {
+  const key = props.ownerKey,
+    handler = props.onCommit,
+    current = paint.value;
+  const apply = (value: PicturePaint) =>
+    active &&
+    !disabled.value &&
+    key === props.ownerKey &&
+    handler === props.onCommit &&
+    current === paint.value &&
+    handler({ kind: "value", value });
+  return {
+    layout(value: unknown) {
+      if (current?.kind !== "picture") return false;
+      if (value === "tile")
+        return imageLayoutPopup.acceptChoice(() =>
+          apply({
+            ...current,
+            layout: {
+              kind: "tile",
+              scaleX: 1,
+              scaleY: 1,
+              offsetXPt: 0,
+              offsetYPt: 0,
+              anchor: "center",
+              flip: "none",
+            },
+          }),
+        );
+      return (
+        value === "stretch" &&
+        imageLayoutPopup.acceptChoice(() =>
+          apply({
+            ...current,
+            layout: {
+              kind: "stretch",
+              offsetXRatio: 0,
+              offsetYRatio: 0,
+              widthRatio: 1,
+              heightRatio: 1,
+            },
+          }),
+        )
+      );
+    },
+    alignment(value: unknown) {
+      return (
+        current?.kind === "picture" &&
+        current.layout.kind === "tile" &&
+        anchors.some((item) => item.value === value) &&
+        tileAlignPopup.acceptChoice(() =>
+          apply({ ...current, layout: { ...current.layout, anchor: value as PictureAnchor } }),
+        )
+      );
+    },
+    mirror(value: unknown) {
+      return (
+        current?.kind === "picture" &&
+        current.layout.kind === "tile" &&
+        (value === "none" || value === "x" || value === "y" || value === "xy") &&
+        mirrorPopup.acceptChoice(() =>
+          apply({ ...current, layout: { ...current.layout, flip: value } }),
+        )
+      );
+    },
+  };
+});
+
 function editTile(
   patch: Partial<Extract<Extract<PicturePaint, { kind: "picture" }>["layout"], { kind: "tile" }>>,
 ) {
@@ -207,7 +481,7 @@ function stretchSide(side: "left" | "right" | "top" | "bottom", value: number) {
   return current?.kind === "picture" && commit(editPictureStretchOffset(current, side, value));
 }
 async function loadSource(getBlob: () => Blob | Promise<Blob>, textureId?: PictureTextureId) {
-  if (disabled.value || !props.loadAsset) return;
+  if (disabled.value || !props.loadAsset) return false;
   const generation = ++request,
     key = props.ownerKey,
     loader = props.loadAsset,
@@ -228,12 +502,12 @@ async function loadSource(getBlob: () => Blob | Promise<Blob>, textureId?: Pictu
   sourceError.value = undefined;
   try {
     const blob = await getBlob();
-    if (!current()) return;
+    if (!current()) return false;
     const id = await loader(blob, textureId);
-    if (!current()) return;
+    if (!current()) return false;
     if (!id) {
       sourceError.value = props.t("applyRejected");
-      return;
+      return false;
     }
     const value = previous ? { ...previous, assetId: id } : picture(id);
     if (textureId && value.layout.kind !== "tile")
@@ -246,7 +520,9 @@ async function loadSource(getBlob: () => Blob | Promise<Blob>, textureId?: Pictu
         anchor: "center",
         flip: "none",
       };
-    if (!apply({ kind: "value", value })) sourceError.value = props.t("applyRejected");
+    const accepted = apply({ kind: "value", value }) === true;
+    if (!accepted) sourceError.value = props.t("applyRejected");
+    return accepted;
   } catch (error) {
     if (current()) {
       const feedback = imageAssetFeedback(error);
@@ -255,6 +531,7 @@ async function loadSource(getBlob: () => Blob | Promise<Blob>, textureId?: Pictu
   } finally {
     if (generation === request) busy.value = false;
   }
+  return false;
 }
 function chooseFile(event: Event) {
   const input = event.target as HTMLInputElement,
@@ -274,7 +551,7 @@ async function clipboard() {
   });
 }
 async function texture(id: PictureTextureId) {
-  await loadSource(() => createPictureTextureBlob(id), id);
+  return loadSource(() => createPictureTextureBlob(id), id);
 }
 const selectedTexture = computed(() =>
   paint.value?.kind === "picture" ? pictureTextureFromAssetId(paint.value.assetId) : undefined,
@@ -297,15 +574,26 @@ function patternPreview(preset: PicturePatternPreset) {
 }
 </script>
 <template>
-  <div class="picture-paint-editor">
+  <div ref="editorRoot" class="picture-paint-editor">
+    <Teleport to="body">
+      <div ref="modePopupHost" data-picture-paint-mode-popup />
+      <div ref="imageLayoutHost" data-picture-paint-image-popup="layout" />
+      <div ref="tileAlignHost" data-picture-paint-image-popup="alignment" />
+      <div ref="mirrorHost" data-picture-paint-image-popup="mirror" />
+    </Teleport>
     <PictureFormatField :label="t(paintRole === 'line' ? 'lineMode' : 'paintMode')"
       ><TSelect
+        v-native-control="modeNativeControl"
+        :key="ownerKey"
         :model-value="mode"
         :options="modes"
+        :popup-visible="modePopupVisible"
+        :popup-props="modePopupProps"
         :disabled="disabled"
         size="small"
         :aria-label="t(paintRole === 'line' ? 'lineMode' : 'paintMode')"
         @change="changeMode"
+        @popup-visible-change="changeModePopupVisible"
     /></PictureFormatField>
     <template v-if="paint">
       <p
@@ -391,6 +679,10 @@ function patternPreview(preset: PicturePatternPreset) {
         </div>
         <PictureFormatField :label="t('paintLayout')"
           ><TSelect
+            v-native-control="imageNative.layout"
+            :popup-visible="imageLayoutPopup.visible.value"
+            :popup-props="imageLayoutPopup.popupProps"
+            @popup-visible-change="imageLayoutPopup.onVisibleChange.value"
             :model-value="paint.layout.kind"
             :options="[
               { value: 'stretch', label: t('paintStretch') },
@@ -399,7 +691,7 @@ function patternPreview(preset: PicturePatternPreset) {
             :disabled="disabled"
             size="small"
             :aria-label="t('paintLayout')"
-            @change="layout"
+            @change="imageActions.layout"
         /></PictureFormatField>
         <template v-if="paint.layout.kind === 'tile'">
           <PicturePaintNumber
@@ -452,29 +744,29 @@ function patternPreview(preset: PicturePatternPreset) {
           />
           <PictureFormatField :label="t('paintAlignment')"
             ><TSelect
+              v-native-control="imageNative.alignment"
+              :popup-visible="tileAlignPopup.visible.value"
+              :popup-props="tileAlignPopup.popupProps"
+              @popup-visible-change="tileAlignPopup.onVisibleChange.value"
               :model-value="paint.layout.anchor"
               :options="anchorOptions"
               :disabled="disabled"
               size="small"
               :aria-label="t('paintAlignment')"
-              @change="
-                (value) =>
-                  anchors.some((item) => item.value === value) &&
-                  editTile({ anchor: value as PictureAnchor })
-              "
+              @change="imageActions.alignment"
           /></PictureFormatField>
           <PictureFormatField :label="t('paintMirror')"
             ><TSelect
+              v-native-control="imageNative.mirror"
+              :popup-visible="mirrorPopup.visible.value"
+              :popup-props="mirrorPopup.popupProps"
+              @popup-visible-change="mirrorPopup.onVisibleChange.value"
               :model-value="paint.layout.flip"
               :options="flipOptions"
               :disabled="disabled"
               size="small"
               :aria-label="t('paintMirror')"
-              @change="
-                (value) =>
-                  (value === 'none' || value === 'x' || value === 'y' || value === 'xy') &&
-                  editTile({ flip: value })
-              "
+              @change="imageActions.mirror"
           /></PictureFormatField>
         </template>
         <template v-else-if="stretch">
@@ -568,6 +860,8 @@ function patternPreview(preset: PicturePatternPreset) {
   </div>
 </template>
 <style scoped lang="scss">
+@use "../../../../shared/gallery/gallery-choice" as gallery;
+
 .picture-paint-editor {
   display: grid;
   gap: 10px;
@@ -581,21 +875,11 @@ function patternPreview(preset: PicturePatternPreset) {
     padding: 3px;
   }
   &__patterns button {
+    @include gallery.choice(2px);
+
     display: grid;
     place-items: center;
     height: 34px;
-    padding: 2px;
-    background: var(--sheetcraft-surface-panel);
-    border: 1px solid var(--sheetcraft-border-subtle);
-    border-radius: var(--sheetcraft-radius-small);
-    cursor: pointer;
-  }
-  &__patterns button:hover {
-    background: var(--sheetcraft-surface-hover);
-  }
-  &__patterns button[aria-pressed="true"] {
-    outline: 2px solid var(--sheetcraft-text-primary);
-    outline-offset: 1px;
   }
   &__patterns img {
     width: 28px;

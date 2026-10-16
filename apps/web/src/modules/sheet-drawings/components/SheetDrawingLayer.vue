@@ -195,6 +195,8 @@ const props = defineProps<{
   revision?: number;
   theme?: WorkbookTheme;
   imageAssetUrls?: ReadonlyMap<string, string>;
+  loadingImageAssetIds?: ReadonlySet<string>;
+  missingImageAssetIds?: ReadonlySet<string>;
   locale?: string;
   dateSystem?: "1900" | "1904";
   layout: SheetViewportLayout;
@@ -3537,6 +3539,8 @@ watch(
             :revision="revision"
             :theme="theme"
             :image-asset-urls="imageAssetUrls"
+            :loading-image-asset-ids="loadingImageAssetIds"
+            :missing-image-asset-ids="missingImageAssetIds"
             :locale="locale"
             :date-system="dateSystem"
           />

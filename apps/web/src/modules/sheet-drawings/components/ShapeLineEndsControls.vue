@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, onUnmounted, ref, useId, watch } from "vue";
+import { useNativePopupOwnership } from "../../../shared/floating/useNativePopupOwnership";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import {
   normalizeShapeLineEnds,
@@ -82,6 +84,10 @@ const SIZES: readonly SizeChoice[] = DIMENSIONS.flatMap((width) =>
 const props = withDefaults(
   defineProps<{
     ends?: ShapeLineEnds;
+    /** Exact pane lease; standalone dialogs retain their local instance contract. */
+    ownerKey?: string;
+    /** Complete stable owner/path used only after an accepted type choice. */
+    focusOwnerKey?: string;
     disabled?: boolean;
     locale?: "en-US" | "zh-CN";
     handler: (next: ShapeLineEnds | undefined) => boolean;
@@ -98,7 +104,52 @@ const labels = computed(() => LABELS[props.locale]);
 const typeOptions = computed(() =>
   END_TYPES.map((value) => ({ value, label: labels.value.types[value] })),
 );
-let generation = 0;
+const generation = ref(0);
+const root = ref<HTMLElement>();
+const instanceKey = `shape-line-ends-${useId()}`;
+const beginPopup = useNativePopupOwnership({
+  owner: () => `${props.ownerKey ?? instanceKey}:${generation.value}:begin`,
+  focus: {
+    owner: () => props.focusOwnerKey ?? props.ownerKey ?? instanceKey,
+    input: () => root.value?.querySelector<HTMLInputElement>(`input[id="${instanceKey}-begin"]`),
+    cancelOnChange: () => (props.ownerKey ? undefined : [props.handler, props.endpointHandler]),
+  },
+  disabled: () => props.disabled,
+  root: () => root.value,
+});
+const endPopup = useNativePopupOwnership({
+  owner: () => `${props.ownerKey ?? instanceKey}:${generation.value}:end`,
+  focus: {
+    owner: () => props.focusOwnerKey ?? props.ownerKey ?? instanceKey,
+    input: () => root.value?.querySelector<HTMLInputElement>(`input[id="${instanceKey}-end"]`),
+    cancelOnChange: () => (props.ownerKey ? undefined : [props.handler, props.endpointHandler]),
+  },
+  disabled: () => props.disabled,
+  root: () => root.value,
+});
+const beginHost = beginPopup.host,
+  endHost = endPopup.host;
+const popups = { begin: beginPopup, end: endPopup };
+const nativeTypes = computed(() => ({
+  begin: {
+    attributes: {
+      id: `${instanceKey}-begin`,
+      role: "combobox",
+      "aria-label": `${labels.value.begin} ${labels.value.type}`,
+      "aria-expanded": String(beginPopup.visible.value),
+      "data-format-pane-history-control": "readonly-combobox",
+    },
+  },
+  end: {
+    attributes: {
+      id: `${instanceKey}-end`,
+      role: "combobox",
+      "aria-label": `${labels.value.end} ${labels.value.type}`,
+      "aria-expanded": String(endPopup.visible.value),
+      "data-format-pane-history-control": "readonly-combobox",
+    },
+  },
+}));
 
 // The previews use the same bounded marker geometry as the drawing renderer.
 // These are product-owned sizes; no desktop numeric multipliers are implied.
@@ -164,7 +215,8 @@ function capture() {
     handler: props.handler,
     endpointHandler: props.endpointHandler,
     mixed: props.mixed,
-    generation,
+    generation: generation.value,
+    ownerKey: props.ownerKey,
     disabled: props.disabled,
   };
 }
@@ -173,15 +225,16 @@ function isCurrent(source: Captured): boolean {
   return (
     !source.disabled &&
     !props.disabled &&
-    source.generation === generation &&
+    source.generation === generation.value &&
+    source.ownerKey === props.ownerKey &&
     source.ends === props.ends &&
     source.handler === props.handler &&
     source.endpointHandler === props.endpointHandler &&
     source.mixed === props.mixed
   );
 }
-function apply(source: Captured, next: ShapeLineEnds, side: Endpoint): void {
-  if (!isCurrent(source)) return;
+function apply(source: Captured, next: ShapeLineEnds, side: Endpoint): boolean {
+  if (!isCurrent(source)) return false;
   let accepted = false;
   try {
     const normalized = normalizeShapeLineEnds(next);
@@ -193,6 +246,7 @@ function apply(source: Captured, next: ShapeLineEnds, side: Endpoint): void {
     // Rejection never changes the controlled values or the owner's draft.
   }
   if (isCurrent(source)) rejected.value = !accepted;
+  return accepted;
 }
 /** Rendered callbacks retain their exact source, rather than retargeting new props. */
 function typeAction(side: Endpoint) {
@@ -202,7 +256,7 @@ function typeAction(side: Endpoint) {
     const next = normalizeShapeLineEnds(source.value) ?? {};
     if (value === "none") delete next[side];
     else next[side] = { ...next[side], kind: value as ShapeLineEndKind };
-    apply(source, next, side);
+    return popups[side].acceptChoice(() => apply(source, next, side));
   };
 }
 function sizeAction(side: Endpoint, size: SizeChoice) {
@@ -258,25 +312,30 @@ function onGridKeydown(side: Endpoint, event: KeyboardEvent): void {
 watch(
   [
     () => props.ends,
+    () => props.ownerKey,
     () => props.handler,
     () => props.endpointHandler,
     () => props.mixed,
     () => props.disabled,
   ],
   () => {
-    generation++;
+    generation.value++;
     rejected.value = false;
     activeSize.value = { begin: null, end: null };
   },
   { flush: "sync" },
 );
 onUnmounted(() => {
-  generation++;
+  generation.value++;
 });
 </script>
 
 <template>
-  <div class="shape-line-ends" role="group" :aria-label="labels.group">
+  <div ref="root" class="shape-line-ends" role="group" :aria-label="labels.group">
+    <Teleport to="body">
+      <div ref="beginHost" data-shape-line-end-popup="begin" />
+      <div ref="endHost" data-shape-line-end-popup="end" />
+    </Teleport>
     <section
       v-for="side in ENDPOINTS"
       :key="side"
@@ -288,6 +347,10 @@ onUnmounted(() => {
       <div class="shape-line-ends__type">
         <span>{{ labels.type }}</span>
         <TSelect
+          v-native-control="nativeTypes[side]"
+          :popup-visible="popups[side].visible.value"
+          :popup-props="popups[side].popupProps"
+          @popup-visible-change="popups[side].onVisibleChange.value"
           :model-value="mixed?.includes(side) ? undefined : (current?.[side]?.kind ?? 'none')"
           :placeholder="mixed?.includes(side) ? labels.mixed : undefined"
           :options="typeOptions"

@@ -2,6 +2,8 @@
 import { computed, ref, useId, watch } from "vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
+import { provideNativePopupScope } from "../../../shared/floating/useNativePopupOwnership";
+import { useShapeTextFieldDraft } from "../shape-text-field-drafts";
 import { useMenu } from "../../../shared/menu/useMenu";
 import PicturePaintEditor from "../../sheet-images/components/format-pane/PicturePaintEditor.vue";
 import PictureLineEditor from "../../sheet-images/components/format-pane/PictureLineEditor.vue";
@@ -32,13 +34,39 @@ const disabled = computed(() => {
     );
   return !c.styleCapability(props.target, props.category).enabled;
 });
+const popupScopeActive = ref(false);
+const popups = provideNativePopupScope({
+  owner: () => (props.controller.props.snapshot ? props.controller.ownerKey.value : undefined),
+  active: () => popupScopeActive.value,
+});
+useShapeTextFieldDraft({
+  owner: () => props.controller.props.snapshot?.owner.sessionId,
+  flush: () => true,
+  focus: () => {},
+  containsTarget: (target) =>
+    popups.containsTarget(target) ||
+    (!!props.controller.props.snapshot &&
+      !disabled.value &&
+      target instanceof Node &&
+      target.isConnected &&
+      !!trigger.value?.rootElement?.isConnected &&
+      trigger.value.rootElement.contains(target)),
+});
 const menu = useMenu({
   triggerRef: computed(() => trigger.value?.rootElement ?? null),
   menuSurfaceRef: surface,
   disabled,
+  additionalInside: popups.popupElements,
   defaultFocus: "menu",
   placement: "bottom-start",
 });
+watch(
+  menu.open,
+  (value) => {
+    popupScopeActive.value = value;
+  },
+  { flush: "sync" },
+);
 watch(
   () => props.controller.ownerKey.value,
   () => menu.dismiss("programmatic", false),

@@ -17,6 +17,7 @@ import DrawingContent from "../../../modules/sheet-drawings/components/DrawingCo
 import DrawingEditorDialog from "../../../modules/sheet-drawings/components/DrawingEditorDialog.vue";
 import EquationContent from "../../../modules/sheet-drawings/components/EquationContent.vue";
 import { useDrawingActions } from "../../../modules/sheet-drawings/useDrawingActions";
+import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import { createAppI18n } from "../../../shared/i18n";
 
 const mounted: Array<{ unmount(): void }> = [];
@@ -70,7 +71,7 @@ describe("existing icon and equation objects", () => {
   test("equations hide unused fill and outline controls without deleting stored fields", async () => {
     const original = drawing("equation");
     const wrapper = editor(original);
-    expect(wrapper.findAll('input[type="color"]')).toHaveLength(1);
+    expect(wrapper.findAllComponents(ColorPaletteSelect)).toHaveLength(1);
     expect(wrapper.text()).not.toContain("No fill");
     expect(wrapper.text()).not.toContain("Line width");
     expect(wrapper.text()).not.toContain("Outline");
@@ -84,7 +85,7 @@ describe("existing icon and equation objects", () => {
     const original = drawing("icon");
     const wrapper = editor(original);
     expect(wrapper.findAll(".drawing-editor__shapes button")).toHaveLength(9);
-    expect(wrapper.findAll('input[type="color"]')).toHaveLength(3);
+    expect(wrapper.findAllComponents(ColorPaletteSelect)).toHaveLength(3);
     expect(wrapper.text()).toContain("Bold");
     expect(wrapper.text()).toContain("Italic");
     const rendered = mount(DrawingContent, {

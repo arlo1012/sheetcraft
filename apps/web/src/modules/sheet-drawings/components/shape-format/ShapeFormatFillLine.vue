@@ -10,7 +10,7 @@ import {
   WORDART_STYLE_APPLICATION_LABELS,
   wordArtStyleApplicationScope,
 } from "./wordart-style-application-labels";
-import type { ShapeFormatMode } from "../../shape-format-pane-model";
+import { shapeFormatOwnerKey, type ShapeFormatMode } from "../../shape-format-pane-model";
 import type { ShapeFormatController } from "./useShapeFormatPane";
 const props = withDefaults(
   defineProps<{ controller: ShapeFormatController; target?: ShapeFormatMode }>(),
@@ -29,6 +29,16 @@ const clearWordArtAction = computed(() => props.controller.session.clearWordArtE
 const wordArtLabels = computed(
   () => WORDART_STYLE_APPLICATION_LABELS[props.controller.props.locale ?? "en-US"],
 );
+const wordArtApplicationSummary = computed(() => {
+  const group = props.controller.props.snapshot?.drawing.kind === "shapeGroup";
+  return props.controller.props.locale === "zh-CN"
+    ? group
+      ? "预设应用详情"
+      : "应用于整个对象"
+    : group
+      ? "Preset application details"
+      : "Applies to the whole object";
+});
 const wordArtScope = computed(() => {
   const snapshot = props.controller.props.snapshot;
   return snapshot?.drawing.kind === "shapeGroup" && snapshot.wordArtStyleScope
@@ -71,13 +81,15 @@ defineExpose({
       initially-open
       data-wordart-style-section
     >
-      <p class="shape-format-fill-line__reason" data-wordart-style-help>
+      <p
+        v-if="controller.props.snapshot?.wordArtStyleEditingScope"
+        class="shape-format-fill-line__reason"
+        data-wordart-style-help
+      >
         {{
           controller.props.snapshot?.wordArtStyleEditingScope === "selection"
             ? wordArtLabels.selectionHelp
-            : controller.props.snapshot?.wordArtStyleEditingScope === "caret"
-              ? wordArtLabels.caretHelp
-              : wordArtLabels.reapplyHelp
+            : wordArtLabels.caretHelp
         }}
       </p>
       <p v-if="wordArtScope" class="shape-format-fill-line__reason" data-wordart-style-scope>
@@ -94,7 +106,7 @@ defineExpose({
             : wordArtLabels.mixed
         }}
       </p>
-      <WordArtStyleGallery v-bind="wordArtStyle" />
+      <WordArtStyleGallery v-bind="wordArtStyle" inline />
       <p
         v-if="!wordArtStyleCapability.enabled && wordArtStyleCapability.reason"
         class="shape-format-fill-line__reason"
@@ -102,6 +114,15 @@ defineExpose({
       >
         {{ wordArtStyleCapability.reason }}
       </p>
+      <details
+        v-if="!controller.props.snapshot?.wordArtStyleEditingScope"
+        class="shape-format-fill-line__application-details"
+      >
+        <summary>{{ wordArtApplicationSummary }}</summary>
+        <p class="shape-format-fill-line__reason" data-wordart-style-help>
+          {{ wordArtLabels.reapplyHelp }}
+        </p>
+      </details>
       <TButton
         variant="outline"
         size="small"
@@ -130,7 +151,16 @@ defineExpose({
       "
       initially-open
     >
-      <PicturePaintEditor v-bind="fill" :load-asset="fillAssetLoader" :show-context-help="false" />
+      <PicturePaintEditor
+        v-bind="fill"
+        :focus-owner-key="
+          controller.props.snapshot
+            ? shapeFormatOwnerKey(controller.props.snapshot.owner)
+            : undefined
+        "
+        :load-asset="fillAssetLoader"
+        :show-context-help="false"
+      />
       <p
         v-if="controller.isMixedStyle(target, 'fill')"
         class="shape-format-fill-line__reason"
@@ -152,7 +182,15 @@ defineExpose({
       "
       initially-open
     >
-      <PictureLineEditor v-bind="line" :load-asset="lineAssetLoader" />
+      <PictureLineEditor
+        v-bind="line"
+        :focus-owner-key="
+          controller.props.snapshot
+            ? shapeFormatOwnerKey(controller.props.snapshot.owner)
+            : undefined
+        "
+        :load-asset="lineAssetLoader"
+      />
       <p
         v-if="controller.isMixedStyle(target, 'line')"
         class="shape-format-fill-line__reason"
@@ -170,6 +208,12 @@ defineExpose({
         v-if="target === 'shape' && (leaf || group) && controller.props.capabilities.lineEnds"
       >
         <ShapeLineEndsControls
+          :owner-key="`${controller.ownerKey.value}:shape:line-ends`"
+          :focus-owner-key="
+            controller.props.snapshot
+              ? shapeFormatOwnerKey(controller.props.snapshot.owner)
+              : undefined
+          "
           :ends="ends"
           :mixed="group ? controller.props.snapshot?.mixedLineEnds : undefined"
           :endpoint-handler="group ? endpointAction : undefined"
@@ -188,6 +232,20 @@ defineExpose({
   </div>
 </template>
 <style scoped lang="scss">
+.shape-format-fill-line__application-details {
+  color: var(--sheetcraft-text-secondary);
+  font-size: var(--sheetcraft-font-size-body-small);
+  line-height: var(--sheetcraft-line-height-body-small);
+
+  > summary {
+    cursor: pointer;
+  }
+
+  &[open] > summary {
+    margin-bottom: var(--sheetcraft-space-1);
+  }
+}
+
 .shape-format-fill-line__reason {
   margin: 0;
   color: var(--sheetcraft-text-secondary);

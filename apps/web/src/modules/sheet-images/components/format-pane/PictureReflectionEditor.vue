@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onBeforeUnmount, ref, useId } from "vue";
+import { useNativePopupOwnership } from "../../../../shared/floating/useNativePopupOwnership";
+import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { Choice, PictureReflection } from "@sheetcraft/core/picture-detailed-style";
 import type {
@@ -25,18 +27,52 @@ const props = defineProps<{
 }>();
 const reflection = computed(() => (props.value?.kind === "value" ? props.value.value : undefined));
 const mode = computed(() => (props.value === undefined ? "inherit" : props.value.kind));
+const root = ref<HTMLElement>();
+const modePopup = useNativePopupOwnership({
+  owner: () => `${props.ownerKey}:reflection:mode`,
+  disabled: () => !!props.disabled,
+  root: () => root.value,
+});
+const modeHost = modePopup.host;
+const modeInputId = `picture-reflection-mode-${useId()}`;
+const modeNative = computed(() => ({
+  attributes: {
+    id: modeInputId,
+    role: "combobox",
+    "aria-label": props.t("reflectionSection"),
+    "aria-expanded": String(modePopup.visible.value),
+    "data-format-pane-history-control": "readonly-combobox",
+  },
+}));
+let active = true;
+onBeforeUnmount(() => {
+  active = false;
+});
 const modes = computed(() => [
   { value: "inherit", label: props.t("effectInherit") },
   { value: "none", label: props.t("effectNone") },
   { value: "value", label: props.t("effectCustom") },
 ]);
-function choose(value: unknown) {
-  if (props.disabled) return;
-  if (value === "inherit") props.onCommit(undefined);
-  else if (value === "none") props.onCommit({ kind: "none" });
-  else if (value === "value")
-    props.onCommit({ kind: "value", value: reflection.value ?? createPictureReflection() });
-}
+const choose = computed(() => {
+  const owner = props.ownerKey,
+    apply = props.onCommit,
+    current = reflection.value;
+  return (value: unknown) => {
+    if (
+      !active ||
+      props.disabled ||
+      owner !== props.ownerKey ||
+      apply !== props.onCommit ||
+      current !== reflection.value
+    )
+      return false;
+    if (value === "inherit") return apply(undefined);
+    if (value === "none") return apply({ kind: "none" });
+    return (
+      value === "value" && apply({ kind: "value", value: current ?? createPictureReflection() })
+    );
+  };
+});
 function update(patch: Partial<PictureReflection>) {
   return (
     !!reflection.value &&
@@ -71,7 +107,10 @@ function selectPreset(id: string) {
 }
 </script>
 <template>
-  <div class="picture-reflection-editor">
+  <div ref="root" class="picture-reflection-editor">
+    <Teleport to="body"
+      ><div ref="modeHost" data-picture-effect-mode-popup="reflection"
+    /></Teleport>
     <PicturePresetGallery
       v-if="!hidePreset"
       :owner-key="ownerKey"
@@ -85,6 +124,10 @@ function selectPreset(id: string) {
     />
     <PictureFormatField :label="t('effectMode')"
       ><TSelect
+        v-native-control="modeNative"
+        :popup-visible="modePopup.visible.value"
+        :popup-props="modePopup.popupProps"
+        @popup-visible-change="modePopup.onVisibleChange.value"
         :model-value="mode"
         :options="modes"
         :disabled="disabled"

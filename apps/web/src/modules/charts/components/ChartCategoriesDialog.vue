@@ -124,6 +124,9 @@ onBeforeUnmount(() => {
 
 <template>
   <Dialog
+    role="dialog"
+    aria-modal="true"
+    :aria-label="t('chart.sourceEditCategories')"
     :visible="!suspended"
     :header="t('chart.sourceEditCategories')"
     width="min(660px, calc(100vw - 32px))"

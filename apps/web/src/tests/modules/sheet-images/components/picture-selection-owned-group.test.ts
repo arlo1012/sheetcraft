@@ -31,7 +31,8 @@ describe("selection pane owned roots", () => {
     expect(wrapper.emitted("select")?.[1]).toEqual([[]]);
     const name = wrapper
       .findAllComponents(Input)
-      .find((entry) => entry.props("defaultValue") === "Owned group")!;
+      .find((entry) => entry.props("modelValue") === "Owned group")!;
+    name.vm.$emit("change", "Renamed owner");
     name.vm.$emit("blur", "Renamed owner");
     expect(wrapper.emitted("rename")).toEqual([[container, "Renamed owner"]]);
     const visibility = wrapper

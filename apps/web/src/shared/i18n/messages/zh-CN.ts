@@ -1774,6 +1774,8 @@ export const zhCN = {
     selectAll: "全选图片",
     noPictures: "工作表中没有浮动图片。",
     name: "图片名称",
+    nameRequired: "请输入图片名称。",
+    renameRejected: "无法重命名此图片，已保留你的编辑。",
     show: "显示图片",
     hide: "隐藏图片",
     style: "图片样式",

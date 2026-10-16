@@ -32,13 +32,13 @@ const menuLabels: Readonly<
   "en-US": {
     trigger: "Shapes",
     continuous: "Continuous drawing",
-    drawingHint: "Choose a shape, then drag on the sheet. Press Esc to stop drawing.",
+    drawingHint: "Drag on the sheet to draw. Esc to stop.",
     rejected: "This shape could not be selected. Try again.",
   },
   "zh-CN": {
     trigger: "形状",
     continuous: "连续绘制",
-    drawingHint: "选择形状后，在工作表中拖动绘制。按 Esc 退出绘制。",
+    drawingHint: "在工作表中拖动绘制，按 Esc 退出。",
     rejected: "暂时无法选择此形状，请重试。",
   },
 };
@@ -150,6 +150,7 @@ onBeforeUnmount(() => generation++);
           <div class="shape-insert-menu__content">
             <ShapeGallery
               ref="gallery"
+              compact
               :locale="locale"
               :disabled="disabled"
               :onChoose="selectionAction()"
@@ -162,7 +163,12 @@ onBeforeUnmount(() => generation++);
               labels.continuous
             }}</Checkbox>
             <p class="shape-insert-menu__hint">{{ labels.drawingHint }}</p>
-            <p v-if="rejected" class="shape-insert-menu__hint" role="status" aria-live="polite">
+            <p
+              v-if="rejected"
+              class="shape-insert-menu__hint shape-insert-menu__failure"
+              role="status"
+              aria-live="polite"
+            >
               {{ labels.rejected }}
             </p>
           </li>
@@ -182,7 +188,7 @@ onBeforeUnmount(() => generation++);
 .shape-insert-menu {
   width: 456px;
   max-width: calc(100vw - var(--sheetcraft-space-4) * 2);
-  max-height: min(560px, calc(100dvh - var(--sheetcraft-space-4) * 2));
+  max-height: min(600px, calc(100dvh - var(--sheetcraft-space-4) * 2));
   z-index: var(--sheetcraft-layer-menu);
 
   &__content {
@@ -190,14 +196,18 @@ onBeforeUnmount(() => generation++);
     grid-template-rows: minmax(0, 1fr);
     min-width: 0;
     min-height: 0;
-    padding: var(--sheetcraft-tool-panel-padding);
   }
 
   &__options {
     display: flex;
-    flex-direction: column;
-    gap: var(--sheetcraft-space-2);
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--sheetcraft-space-2) var(--sheetcraft-space-5);
     padding: var(--sheetcraft-space-2) var(--sheetcraft-tool-panel-padding);
+  }
+
+  &__failure {
+    flex-basis: 100%;
   }
 
   &__hint {

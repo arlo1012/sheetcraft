@@ -21,6 +21,14 @@ import {
 import type { CellNumberFormat, CellNumberFormatNegativeStyle } from "@sheetcraft/core/style";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import OptionList from "../../../shared/option-list/OptionList.vue";
+import NumericField from "../../../shared/numeric-field/NumericField.vue";
+import type {
+  NumericCandidate,
+  NumericCommitResult,
+  NumericDraftChange,
+  NumericFieldSpec,
+  NumericValue,
+} from "../../../shared/numeric-field/types";
 import FontFormatField from "../../../shared/cell-text/FontFormatField.vue";
 import FontSettingsAction from "../../../shared/cell-text/FontSettingsAction.vue";
 import { useFontCatalog } from "../../../shared/cell-text/useFontCatalog";
@@ -183,7 +191,83 @@ const numericFields: ChartFormatNumericField[] = [
   "gapWidth",
   "overlap",
 ];
-const draftFields = [...numericFields, "title", "axisTitle", "formatCode", "decimals"];
+type StyledNumericField = "fontSize" | "strokeWidth";
+const fontSizeControl = ref<InstanceType<typeof NumericField>>();
+const strokeWidthControl = ref<InstanceType<typeof NumericField>>();
+// NumericField owns these drafts. The pane only mirrors their interaction state
+// for its existing composition guard and reset action availability.
+const styledNumericDrafts = reactive<Partial<Record<StyledNumericField, NumericDraftChange>>>({});
+const styledNumericResetErrors = reactive<Partial<Record<StyledNumericField, string>>>({});
+// Echo an acknowledged Reset until the next source snapshot arrives. This is
+// committed presentation state, never a second editable draft or document writer.
+const styledNumericResets = reactive<Partial<Record<StyledNumericField, string>>>({});
+const draftFields = [
+  ...numericFields.filter((field) => field !== "fontSize" && field !== "strokeWidth"),
+  "title",
+  "axisTitle",
+  "formatCode",
+  "decimals",
+];
+const fontSizeSpec: NumericFieldSpec = {
+  displayUnit: "px",
+  displayStep: 1,
+  canonicalBounds: { min: 1, max: 256 },
+  allowAuto: true,
+  parsePolicy: { scientific: true },
+};
+const strokeWidthSpec: NumericFieldSpec = {
+  displayUnit: "px",
+  displayStep: 0.25,
+  canonicalBounds: { min: 0, max: 32 },
+  allowAuto: true,
+  parsePolicy: { scientific: true },
+};
+function styledNumericValue(field: StyledNumericField, previous?: NumericValue): NumericValue {
+  const value = styledNumericResets[field] === ownerKey.value ? undefined : numericValue(field);
+  if (value === undefined) return previous?.kind === "auto" ? previous : { kind: "auto" };
+  return previous?.kind === "value" && previous.value === value
+    ? previous
+    : { kind: "value", value };
+}
+const fontSizeNumericValue = computed<NumericValue>((previous) =>
+  styledNumericValue("fontSize", previous),
+);
+const strokeWidthNumericValue = computed<NumericValue>((previous) =>
+  styledNumericValue("strokeWidth", previous),
+);
+const fontSizeCommit = computed(() => styledNumericCommit("fontSize"));
+const strokeWidthCommit = computed(() => styledNumericCommit("strokeWidth"));
+function styledNumericCommit(field: StyledNumericField) {
+  const owner = ownerKey.value,
+    handler = props.apply;
+  return (candidate: NumericCandidate): NumericCommitResult => {
+    if (!live || owner !== ownerKey.value || handler !== props.apply || candidate.kind === "empty")
+      return { accepted: false, error: t("chart.formatApplyFailed") };
+    const intent = numericIntent(field, candidate.kind === "auto" ? undefined : candidate.value);
+    const accepted = !!intent && submit(intent, handler);
+    if (accepted) delete styledNumericResetErrors[field];
+    return accepted ? { accepted: true } : { accepted: false, error: t("chart.formatApplyFailed") };
+  };
+}
+function styledNumericDraftChange(field: StyledNumericField, draft: NumericDraftChange): void {
+  if (draft.ownerKey !== `${ownerKey.value}/${field}`) return;
+  const previous = styledNumericDrafts[field];
+  styledNumericDrafts[field] = draft;
+  if (draft.text !== previous?.text || !draft.dirty || (previous?.composing && !draft.composing)) {
+    delete styledNumericResetErrors[field];
+    fieldError.value = undefined;
+  }
+}
+function styledNumericFocusBoundary(field: StyledNumericField): Element[] {
+  return [
+    ...(root.value?.querySelectorAll(
+      `[data-chart-format-reset="${field}"], [data-chart-format-reset="element"]`,
+    ) ?? []),
+  ];
+}
+function styledNumericControl(field: StyledNumericField) {
+  return field === "fontSize" ? fontSizeControl.value : strokeWidthControl.value;
+}
 function numericValue(field: ChartFormatNumericField): number | undefined {
   switch (field) {
     case "min":
@@ -266,6 +350,14 @@ function committedValue(field: string): string | number | undefined {
 function resetDrafts(): void {
   for (const field of draftFields) drafts[field] = createChartFormatDraft(committedValue(field));
   draftHandlers.clear();
+  fontSizeControl.value?.cancel();
+  strokeWidthControl.value?.cancel();
+  delete styledNumericDrafts.fontSize;
+  delete styledNumericDrafts.strokeWidth;
+  delete styledNumericResetErrors.fontSize;
+  delete styledNumericResetErrors.strokeWidth;
+  delete styledNumericResets.fontSize;
+  delete styledNumericResets.strokeWidth;
   pendingResetField = undefined;
   fieldError.value = undefined;
 }
@@ -273,6 +365,8 @@ watch(() => `${props.drawing.id}/${targetKey.value}`, resetDrafts, { immediate: 
 watch(
   () => [chart.value, props.data] as const,
   () => {
+    delete styledNumericResets.fontSize;
+    delete styledNumericResets.strokeWidth;
     for (const field of draftFields) syncChartFormatDraft(drafts[field]!, committedValue(field));
   },
   { deep: true },
@@ -303,9 +397,13 @@ function endComposition(field: string, _value: string, context: { e: Composition
   delete drafts[field]!.error;
 }
 function composing(): boolean {
-  const field = Object.keys(drafts).find((key) => drafts[key]!.composing);
+  const styledField = (["fontSize", "strokeWidth"] as const).find(
+    (field) => styledNumericDrafts[field]?.composing,
+  );
+  const field = styledField ?? Object.keys(drafts).find((key) => drafts[key]!.composing);
   if (!field) return false;
-  drafts[field]!.error = "composition";
+  if (styledField) fieldError.value = "composition";
+  else drafts[field]!.error = "composition";
   root.value
     ?.querySelector<HTMLInputElement>(`[data-chart-format-field="${field}"] input`)
     ?.focus();
@@ -468,6 +566,26 @@ function commitNumber(
 function resetNumber(field: ChartFormatNumericField): void {
   if (props.disabled || composing()) return;
   pendingResetField = undefined;
+  if (field === "fontSize" || field === "strokeWidth") {
+    const control = styledNumericControl(field);
+    if (!control) return;
+    if (numericValue(field) === undefined) {
+      control.cancel();
+      delete styledNumericResetErrors[field];
+      fieldError.value = undefined;
+      return;
+    }
+    const intent = numericIntent(field, undefined);
+    if (intent && submit(intent)) {
+      control.cancel();
+      styledNumericResets[field] = ownerKey.value;
+    } else {
+      // Reset is a distinct action. A rejection must not edit, rebind, or lose
+      // the NumericField's existing draft (including a stale handler lease).
+      styledNumericResetErrors[field] = t("chart.formatApplyFailed");
+    }
+    return;
+  }
   // Discarding an invalid auto draft does not manufacture an unchanged workbook edit.
   if (numericValue(field) === undefined) {
     drafts[field] = createChartFormatDraft();
@@ -1187,25 +1305,32 @@ function escapeDraft(event: KeyboardEvent): void {
           <div class="chart-format-pane__field" data-chart-format-field="fontSize">
             <label :for="`${paneId}-font-size`">{{ t("chart.formatFontSize") }}</label>
             <div class="chart-format-pane__number">
-              <TInput
+              <NumericField
+                ref="fontSizeControl"
                 :id="`${paneId}-font-size`"
-                :value="drafts.fontSize!.text"
-                size="small"
-                :placeholder="t('chart.formatAuto')"
+                :owner-key="`${ownerKey}/fontSize`"
+                :value="fontSizeNumericValue"
+                :spec="fontSizeSpec"
+                :label="t('chart.formatFontSize')"
+                :auto-text="t('chart.formatAuto')"
                 :disabled="disabled"
-                :aria-label="t('chart.formatFontSize')"
-                :status="drafts.fontSize!.error ? 'error' : undefined"
-                :onChange="editAction('fontSize')"
-                :onCompositionstart="compositionStartAction('fontSize')"
-                :onCompositionend="compositionEndAction('fontSize')"
-                :onEnter="numberAction('fontSize')"
-                :onBlur="numberAction('fontSize')"
+                :invalid-message="t('chart.formatInvalidNumber')"
+                :rejected-message="t('chart.formatApplyFailed')"
+                :stale-message="t('chart.formatApplyFailed')"
+                :external-error="styledNumericResetErrors.fontSize"
+                :focus-boundary="() => styledNumericFocusBoundary('fontSize')"
+                :on-commit="fontSizeCommit"
+                presentation="inline-stepper"
+                :show-unit="false"
+                @draft-change="styledNumericDraftChange('fontSize', $event)"
+                @cancel="delete styledNumericResetErrors.fontSize"
               /><TButton
                 variant="text"
                 shape="square"
                 size="small"
                 :disabled="
-                  disabled || (textFormat.fontSize === undefined && !drafts.fontSize!.dirty)
+                  disabled ||
+                  (fontSizeNumericValue.kind === 'auto' && !styledNumericDrafts.fontSize?.dirty)
                 "
                 :aria-label="t('chart.formatReset')"
                 data-chart-format-reset="fontSize"
@@ -1291,25 +1416,33 @@ function escapeDraft(event: KeyboardEvent): void {
           <div class="chart-format-pane__field" data-chart-format-field="strokeWidth">
             <label :for="`${paneId}-line-width`">{{ t("chart.formatLineWidth") }}</label>
             <div class="chart-format-pane__number">
-              <TInput
+              <NumericField
+                ref="strokeWidthControl"
                 :id="`${paneId}-line-width`"
-                :value="drafts.strokeWidth!.text"
-                size="small"
-                :placeholder="t('chart.formatAuto')"
+                :owner-key="`${ownerKey}/strokeWidth`"
+                :value="strokeWidthNumericValue"
+                :spec="strokeWidthSpec"
+                :label="t('chart.formatLineWidth')"
+                :auto-text="t('chart.formatAuto')"
                 :disabled="disabled"
-                :aria-label="t('chart.formatLineWidth')"
-                :status="drafts.strokeWidth!.error ? 'error' : undefined"
-                :onChange="editAction('strokeWidth')"
-                :onCompositionstart="compositionStartAction('strokeWidth')"
-                :onCompositionend="compositionEndAction('strokeWidth')"
-                :onEnter="numberAction('strokeWidth')"
-                :onBlur="numberAction('strokeWidth')"
+                :invalid-message="t('chart.formatInvalidNumber')"
+                :rejected-message="t('chart.formatApplyFailed')"
+                :stale-message="t('chart.formatApplyFailed')"
+                :external-error="styledNumericResetErrors.strokeWidth"
+                :focus-boundary="() => styledNumericFocusBoundary('strokeWidth')"
+                :on-commit="strokeWidthCommit"
+                presentation="inline-stepper"
+                :show-unit="false"
+                @draft-change="styledNumericDraftChange('strokeWidth', $event)"
+                @cancel="delete styledNumericResetErrors.strokeWidth"
               /><TButton
                 variant="text"
                 shape="square"
                 size="small"
                 :disabled="
-                  disabled || (lineFormat.strokeWidth === undefined && !drafts.strokeWidth!.dirty)
+                  disabled ||
+                  (strokeWidthNumericValue.kind === 'auto' &&
+                    !styledNumericDrafts.strokeWidth?.dirty)
                 "
                 :aria-label="t('chart.formatReset')"
                 data-chart-format-reset="strokeWidth"
@@ -1475,25 +1608,33 @@ function escapeDraft(event: KeyboardEvent): void {
           >
             <label :for="`${paneId}-series-width`">{{ t("chart.formatLineWidth") }}</label>
             <div class="chart-format-pane__number">
-              <TInput
+              <NumericField
+                ref="strokeWidthControl"
                 :id="`${paneId}-series-width`"
-                :value="drafts.strokeWidth!.text"
-                size="small"
-                :placeholder="t('chart.formatAuto')"
+                :owner-key="`${ownerKey}/strokeWidth`"
+                :value="strokeWidthNumericValue"
+                :spec="strokeWidthSpec"
+                :label="t('chart.formatLineWidth')"
+                :auto-text="t('chart.formatAuto')"
                 :disabled="disabled"
-                :aria-label="t('chart.formatLineWidth')"
-                :status="drafts.strokeWidth!.error ? 'error' : undefined"
-                :onChange="editAction('strokeWidth')"
-                :onCompositionstart="compositionStartAction('strokeWidth')"
-                :onCompositionend="compositionEndAction('strokeWidth')"
-                :onEnter="numberAction('strokeWidth')"
-                :onBlur="numberAction('strokeWidth')"
+                :invalid-message="t('chart.formatInvalidNumber')"
+                :rejected-message="t('chart.formatApplyFailed')"
+                :stale-message="t('chart.formatApplyFailed')"
+                :external-error="styledNumericResetErrors.strokeWidth"
+                :focus-boundary="() => styledNumericFocusBoundary('strokeWidth')"
+                :on-commit="strokeWidthCommit"
+                presentation="inline-stepper"
+                :show-unit="false"
+                @draft-change="styledNumericDraftChange('strokeWidth', $event)"
+                @cancel="delete styledNumericResetErrors.strokeWidth"
               /><TButton
                 variant="text"
                 shape="square"
                 size="small"
                 :disabled="
-                  disabled || (series.strokeWidth === undefined && !drafts.strokeWidth!.dirty)
+                  disabled ||
+                  (strokeWidthNumericValue.kind === 'auto' &&
+                    !styledNumericDrafts.strokeWidth?.dirty)
                 "
                 :aria-label="t('chart.formatReset')"
                 data-chart-format-reset="strokeWidth"

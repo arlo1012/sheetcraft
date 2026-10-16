@@ -18,6 +18,7 @@ import {
   useSymbolPreferences,
   withCustomSymbol,
 } from "../../../modules/insert-tools/symbols/symbol-preferences";
+import { SYMBOL_VIEW_PREFERENCES_KEY } from "../../../modules/insert-tools/symbols/symbol-view-preferences";
 import * as localSource from "../../../shared/cell-text/local-font-source";
 import catalogData from "../../../modules/insert-tools/symbols/assets/unicode-catalog.json";
 const ensureFont = vi.hoisted(() => vi.fn(async (_family: string) => undefined));
@@ -28,6 +29,7 @@ vi.mock("../../../shared/cell-text/managed-fonts", async (original) => ({
 vi.mock("../../../shared/cell-text/font-resources", () => ({ retryCellFontResource: ensureFont }));
 const mounted: Array<{ unmount(): void }> = [];
 beforeEach(() => {
+  localStorage.removeItem(SYMBOL_VIEW_PREFERENCES_KEY);
   fontSettingsVisible.value = false;
   useSymbolPreferences().update(defaultSymbolPreferences());
   ensureFont.mockReset();
@@ -329,6 +331,100 @@ describe("complete Symbol dialog", () => {
     await wrapper.get('.symbol-dialog__custom-list input[type="checkbox"]').trigger("dblclick");
     expect(wrapper.emitted("insert")).toBeUndefined();
   });
+  test("first open with an unverified cell font browses the real bundled face and inserts that face", async () => {
+    const query = vi.spyOn(localSource, "requestSystemFontChoices");
+    const store = useSymbolPreferences();
+    const originalPayload = JSON.stringify(store.preferences.value);
+    const wrapper = await fixture(false, '"Inter","宋体"');
+    expect(wrapper.findAllComponents(Select)[0]!.props("modelValue")).toBe("noto-sans");
+    expect(wrapper.getComponent(SymbolCharacterGrid).props("family")).toBe("Noto Sans");
+    expect(wrapper.getComponent(SymbolCharacterGrid).props("points").includes(65)).toBe(true);
+    expect(wrapper.find(".symbol-dialog__coverage-warning").exists()).toBe(false);
+    expect(
+      (wrapper.get('.symbol-dialog__search input[type="checkbox"]').element as HTMLInputElement)
+        .checked,
+    ).toBe(false);
+    expect(localStorage.getItem(SYMBOL_VIEW_PREFERENCES_KEY)).toBeNull();
+    expect(JSON.stringify(store.preferences.value)).toBe(originalPayload);
+    expect(wrapper.props("defaultFontFamily")).toBe('"Inter","宋体"');
+    expect(query).not.toHaveBeenCalled();
+    await wrapper.get('[data-code-point="65"]').trigger("click");
+    mainDialog(wrapper).vm.$emit("confirm");
+    expect(wrapper.emitted("insert")?.[0]).toEqual([{ text: "A", fontFamily: "Noto Sans" }]);
+    expect(wrapper.getComponent(SymbolCharacterGrid).props("points").includes(0x4e00)).toBe(false);
+    const code = wrapper.findAllComponents(Input).find((input) => input.props("value") === "0041")!;
+    code.vm.$emit("change", "4E00");
+    await wrapper.vm.$nextTick();
+    mainDialog(wrapper).vm.$emit("confirm");
+    expect(wrapper.emitted("insert")).toHaveLength(1);
+    expect(wrapper.text()).toContain("previous character will not be inserted");
+  });
+  test("an explicit bundled browsing choice survives reopening without changing custom or recent payloads", async () => {
+    const payload = JSON.stringify(useSymbolPreferences().preferences.value);
+    const first = await fixture(false, "Example Cell Sans");
+    first.findAllComponents(Select)[0]!.vm.$emit("update:modelValue", "noto-math");
+    await flushPromises();
+    first.unmount();
+    const wrapper = await fixture(false, "Noto Sans");
+    expect(wrapper.findAllComponents(Select)[0]!.props("modelValue")).toBe("noto-math");
+    expect(wrapper.getComponent(SymbolCharacterGrid).props("family")).toBe("Noto Sans Math");
+    expect(JSON.stringify(useSymbolPreferences().preferences.value)).toBe(payload);
+  });
+  test("a saved unavailable local browsing font remains selected without invented coverage or OS access", async () => {
+    const id = "c".repeat(64);
+    localStorage.setItem(
+      SYMBOL_VIEW_PREFERENCES_KEY,
+      JSON.stringify({
+        version: 1,
+        fontId: `local:${id}`,
+        family: `SheetcraftLocal_${id}`,
+        label: "Missing Local Face",
+      }),
+    );
+    const restore = vi.spyOn(localSource, "ensureLocalSymbolFont").mockResolvedValue(undefined);
+    const query = vi.spyOn(localSource, "requestSystemFontChoices");
+    const wrapper = await fixture(false, "Noto Sans");
+    const select = wrapper.findAllComponents(Select)[0]!;
+    expect(select.props("modelValue")).toBe(`local:${id}`);
+    expect(select.props("options")).toContainEqual({
+      label: "Missing Local Face",
+      value: `local:${id}`,
+    });
+    expect(wrapper.get(".symbol-dialog__coverage-warning").text()).toContain("Missing Local Face");
+    expect(wrapper.findComponent(SymbolCharacterGrid).exists()).toBe(false);
+    expect(mainDialog(wrapper).props("confirmBtn")).toMatchObject({ disabled: true });
+    expect(restore).toHaveBeenCalledWith(`SheetcraftLocal_${id}`);
+    expect(query).not.toHaveBeenCalled();
+    expect(ensureFont).not.toHaveBeenCalled();
+  });
+  test.each([
+    "not json",
+    '{"version":2,"fontId":"noto-math"}',
+    '{"version":1,"fontId":"obsolete-face"}',
+  ])("an invalid or expired browsing preference falls back safely (%s)", async (raw) => {
+    localStorage.setItem(SYMBOL_VIEW_PREFERENCES_KEY, raw);
+    const wrapper = await fixture(false, "Example Cell Sans");
+    expect(wrapper.findAllComponents(Select)[0]!.props("modelValue")).toBe("noto-sans");
+    expect(wrapper.getComponent(SymbolCharacterGrid).props("family")).toBe("Noto Sans");
+  });
+  test("view preference read and write failures keep browsing usable and leave insertion preferences alone", async () => {
+    const payload = JSON.stringify(useSymbolPreferences().preferences.value);
+    vi.stubGlobal("localStorage", {
+      getItem: vi.fn(() => {
+        throw new Error("unavailable");
+      }),
+      setItem: vi.fn(() => {
+        throw new Error("quota");
+      }),
+    });
+    const wrapper = await fixture(false, "Example Cell Sans");
+    expect(wrapper.getComponent(SymbolCharacterGrid).props("family")).toBe("Noto Sans");
+    wrapper.findAllComponents(Select)[0]!.vm.$emit("update:modelValue", "noto-math");
+    await flushPromises();
+    expect(wrapper.getComponent(SymbolCharacterGrid).props("family")).toBe("Noto Sans Math");
+    expect(wrapper.text()).toContain("could not be saved");
+    expect(JSON.stringify(useSymbolPreferences().preferences.value)).toBe(payload);
+  });
   test("Normal text uses verified current-cell coverage and inherits its font", async () => {
     const query = vi.spyOn(localSource, "requestSystemFontChoices");
     const wrapper = await fixture(false, "Noto Sans Math");
@@ -342,14 +438,16 @@ describe("complete Symbol dialog", () => {
     mainDialog(wrapper).vm.$emit("confirm");
     expect(wrapper.emitted("insert")?.[0]).toEqual([{ text: "Ω" }]);
   });
-  test("an unverified Normal text family is explicit and never substitutes bundled coverage", async () => {
+  test("an explicitly selected unverified Normal text family never substitutes bundled coverage", async () => {
     const query = vi.spyOn(localSource, "requestSystemFontChoices");
     const wrapper = await fixture(false, "Example Cell Sans");
+    wrapper.findAllComponents(Select)[0]!.vm.$emit("update:modelValue", "normal-text");
+    await flushPromises();
     expect(wrapper.text()).toContain(
       "Character coverage for Example Cell Sans has not been verified",
     );
     expect(wrapper.findComponent(SymbolCharacterGrid).exists()).toBe(false);
-    expect(ensureFont).not.toHaveBeenCalled();
+    expect(ensureFont.mock.calls.map((call) => call[0])).toEqual(["Noto Sans"]);
     expect(query).not.toHaveBeenCalled();
     const literal = wrapper
       .findAllComponents(Input)
@@ -618,9 +716,15 @@ describe("complete Symbol dialog", () => {
     expect(rows[0]!.get(".symbol-dialog__list-glyph").attributes("title")).toBeTruthy();
   });
 
-  test("unknown font coverage remains in the primary view without requesting access or switching mode", async () => {
+  test("an explicit unknown Normal text choice survives reopening and keeps the coverage warning honest", async () => {
     const query = vi.spyOn(localSource, "requestSystemFontChoices");
+    const first = await fixture(false, "Example Cell Sans");
+    first.findAllComponents(Select)[0]!.vm.$emit("update:modelValue", "normal-text");
+    await flushPromises();
+    first.unmount();
+    ensureFont.mockClear();
     const wrapper = await fixture(false, "Example Cell Sans");
+    expect(wrapper.findAllComponents(Select)[0]!.props("modelValue")).toBe("normal-text");
     expect(wrapper.get(".symbol-dialog__coverage-warning").element.closest("details")).toBeNull();
     expect(wrapper.findComponent(SymbolCharacterGrid).exists()).toBe(false);
     const allUnicode = wrapper.get('.symbol-dialog__search input[type="checkbox"]');

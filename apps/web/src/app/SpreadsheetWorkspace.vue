@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import { routeRibbonHistoryShortcut } from "./ribbon-history-shortcuts";
+import {
+  isFormatPaneReadonlyHistoryControl,
+  routeFormatPaneHistoryShortcut,
+} from "./format-pane-history-shortcuts";
 import type { PictureEffectEdit } from "../modules/sheet-images/picture-effect-edit";
 import type { PictureContextSourceAction } from "../modules/sheet-images/picture-context-source-action";
 import { canEditPictureSelection } from "@sheetcraft/core/picture-protection";
@@ -2193,6 +2197,7 @@ const drawingActions = useDrawingActions({
     ),
 });
 const { dialog: drawingDialog, editing: editingDrawing } = drawingActions;
+const shapeObjectFormatPaneRef = ref<InstanceType<typeof ShapeFormatPane>>();
 const shapeFormatPane = useOwnedShapeFormatPane({
   getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
   getWorkbook: () => session.workbook,
@@ -2811,11 +2816,100 @@ function selectedShapeFieldLease(snapshot: NonNullable<typeof shapeRibbonFormat.
 }
 function ownsSelectedShapeFieldTarget(target: EventTarget | null): boolean {
   const snapshot = shapeRibbonFormat.snapshot.value;
-  if (!snapshot || !(target instanceof Node) || !target.isConnected) return false;
-  const lease = selectedShapeFieldLease(snapshot);
+  if (!(target instanceof Node) || !target.isConnected) return false;
+  if (snapshot) {
+    const lease = selectedShapeFieldLease(snapshot);
+    if (
+      lease.current() &&
+      shapeTextFieldDrafts.ownsTarget(lease.fieldOwner, target) &&
+      lease.current()
+    )
+      return true;
+  }
+  const paneLease = selectedShapePaneFieldLease(snapshot);
   return (
-    lease.current() && shapeTextFieldDrafts.ownsTarget(lease.fieldOwner, target) && lease.current()
+    !!paneLease &&
+    paneLease.current() &&
+    shapeTextFieldDrafts.ownsTarget(`shape-pane:${paneLease.pane.owner.sessionId}`, target) &&
+    paneLease.current()
   );
+}
+/** Connector selections intentionally have no ordinary Shape Ribbon session. */
+function selectedConnectorPaneFieldLease(
+  pane: NonNullable<typeof shapeConnectorFormatPane.snapshot.value>,
+) {
+  if (shapeConnectorFormatPane.snapshot.value !== pane) return;
+  const workbook = session.workbook,
+    sheet = activeSheet.value,
+    generation = workbookGeneration.value,
+    owner = shapeFormatOwnerKey(pane.owner),
+    paths = JSON.stringify(selectedShapeObjectPaths.value);
+  return {
+    current: () => {
+      const selected = shapeConnectorFormatPane.snapshot.value,
+        selectedPaths = selectedShapeObjectPaths.value;
+      return (
+        !shapeTextEdit.snapshot.value &&
+        session.workbook === workbook &&
+        activeSheet.value === sheet &&
+        workbookGeneration.value === generation &&
+        workbook.sheets.get(sheet.id) === sheet &&
+        selectedPaths.length === 1 &&
+        JSON.stringify(selectedPaths) === paths &&
+        JSON.stringify(shapeConnectorFormatPane.path.value) === JSON.stringify(selectedPaths[0]) &&
+        !!selected &&
+        selected.owner.workbookId === workbook.id &&
+        selected.owner.sheetId === sheet.id &&
+        shapeFormatOwnerKey(selected.owner) === owner
+      );
+    },
+  };
+}
+function selectedShapePaneFieldLease(snapshot = shapeRibbonFormat.snapshot.value) {
+  // The properties pane and Ribbon hold independent command sessions. A pane
+  // popup may retain only the same uniquely selected, complete object path.
+  const getPaneSnapshot = () =>
+    shapeConnectorFormatPane.snapshot.value ??
+    shapeGroupFormatPane.snapshot.value ??
+    shapeFormatPane.snapshot.value;
+  const getPanePath = () =>
+    shapeConnectorFormatPane.snapshot.value
+      ? shapeConnectorFormatPane.path.value
+      : shapeGroupFormatPane.snapshot.value
+        ? shapeGroupFormatPane.path.value
+        : shapeFormatPane.drawing.value
+          ? [shapeFormatPane.drawing.value.id]
+          : undefined;
+  const pane = getPaneSnapshot(),
+    element = shapeObjectFormatPaneRef.value?.$el;
+  if (!pane || !(element instanceof HTMLElement)) return;
+  const lease = snapshot
+    ? selectedShapeFieldLease(snapshot)
+    : selectedConnectorPaneFieldLease(pane);
+  if (!lease) return;
+  const comparison = snapshot ?? pane;
+  const owner = shapeFormatOwnerKey(pane.owner);
+  const current = () => {
+    const selectedPane = getPaneSnapshot(),
+      paths = selectedShapeObjectPaths.value,
+      style = getComputedStyle(element);
+    return (
+      lease.current() &&
+      shapeObjectFormatPaneRef.value?.$el === element &&
+      element.isConnected &&
+      !element.hidden &&
+      style.display !== "none" &&
+      style.visibility !== "hidden" &&
+      !!selectedPane &&
+      shapeFormatOwnerKey(selectedPane.owner) === owner &&
+      selectedPane.owner.workbookId === comparison.owner.workbookId &&
+      selectedPane.owner.sheetId === comparison.owner.sheetId &&
+      selectedPane.owner.drawingId === comparison.owner.drawingId &&
+      paths.length === 1 &&
+      JSON.stringify(getPanePath()) === JSON.stringify(paths[0])
+    );
+  };
+  return { pane, element, current };
 }
 function flushSelectedShapeFieldDrafts(snapshot = shapeRibbonFormat.snapshot.value): boolean {
   if (!snapshot) return true;
@@ -3155,9 +3249,45 @@ function performPictureGroup(
   owner = activeSheet.value,
 ): boolean {
   if (owner !== activeSheet.value || activeViewMode.value === "page-layout") return false;
+  const focusBeforeGrouping = document.activeElement;
   const accepted = pictureTools.group(ungroup, [...ids]);
-  if (accepted) sheetGridRef.value?.selectFloatingImages([...selectedPictureIds.value]);
-  else showImageFeedback("picture.operationFailed");
+  if (accepted) {
+    const selectedIds = [...selectedPictureIds.value];
+    // Keep the contextual Ribbon owned while Grid receives the replacement
+    // roots; its selection-change notification arrives on the following tick.
+    selectedPictureId.value =
+      selectedIds.find((id) => owner.floatingImages.some((root) => root.id === id)) ?? null;
+    const workbook = session.workbook,
+      generation = pictureOwnerGeneration.value,
+      revision = workbookRevision.value,
+      grid = sheetGridRef.value;
+    grid?.selectFloatingImages(selectedIds);
+    // The floating Group button disappears with the old multi-selection. Return
+    // keyboard ownership to its new group, after Grid has received the new roots.
+    if (!ungroup)
+      void nextTick(() => {
+        if (
+          session.workbook !== workbook ||
+          activeSheet.value !== owner ||
+          pictureOwnerGeneration.value !== generation ||
+          workbookRevision.value !== revision ||
+          sheetGridRef.value !== grid ||
+          selectedIds.length !== selectedPictureIds.value.length ||
+          selectedIds.some((id, index) => selectedPictureIds.value[index] !== id) ||
+          !selectedIds.every((id) =>
+            owner.floatingImages.some((root) => root.id === id && isPictureGroup(root)),
+          ) ||
+          (document.activeElement !== focusBeforeGrouping &&
+            !(
+              focusBeforeGrouping &&
+              !focusBeforeGrouping.isConnected &&
+              document.activeElement === document.body
+            ))
+        )
+          return;
+        grid?.focusOwnedPictureSelection(selectedIds, owner);
+      });
+  } else showImageFeedback("picture.operationFailed");
   return accepted;
 }
 function deleteOwnedPictures(paths: readonly PictureGroupPath[], owner: Sheet): boolean {
@@ -4390,21 +4520,103 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
   const effectsTrigger = effectsFocusReturn();
   const fromEffectsTrigger = event.target instanceof Node && effectsTrigger?.contains(event.target);
   const activeBeforeHistory = document.activeElement;
-  if (
-    routeRibbonHistoryShortcut(event, {
-      blocked: gridInert.value || imageBusy.value || !!activeRangePicker.value,
-      editing:
-        cellEditSession.state.active ||
-        cellEditSession.state.composing ||
-        !!shapeTextEdit.snapshot.value ||
-        !!equationEdit.snapshot.value,
-      cropping: sheetGridRef.value?.hasActivePictureCrop() ?? false,
-      undo,
-      redo,
-    })
-  ) {
+  const historyContext = {
+    blocked: gridInert.value || imageBusy.value || !!activeRangePicker.value,
+    editing:
+      cellEditSession.state.active ||
+      cellEditSession.state.composing ||
+      !!shapeTextEdit.snapshot.value ||
+      !!equationEdit.snapshot.value,
+    cropping: sheetGridRef.value?.hasActivePictureCrop() ?? false,
+    undo,
+    redo,
+  };
+  if (routeRibbonHistoryShortcut(event, historyContext)) {
     if (fromEffectsTrigger && effectsTrigger)
       restoreFocusAfterRemount(effectsTrigger, effectsFocusReturn, () => true, activeBeforeHistory);
+    return;
+  }
+  const paneHistory = selectedShapePaneFieldLease();
+  const paneFocusOwner = paneHistory
+    ? {
+        workbook: session.workbook,
+        sheet: activeSheet.value,
+        generation: workbookGeneration.value,
+        paths: JSON.stringify(selectedShapeObjectPaths.value),
+        owner: shapeFormatOwnerKey(paneHistory.pane.owner),
+      }
+    : undefined;
+  const galleryPaintEditor =
+    event.target instanceof HTMLInputElement &&
+    event.target.getAttribute("data-panel-select-control") === "readonly-combobox"
+      ? event.target.closest<HTMLElement>(".picture-paint-editor")
+      : null;
+  const galleryModeId =
+    galleryPaintEditor && paneHistory?.element.contains(galleryPaintEditor)
+      ? galleryPaintEditor.querySelector<HTMLInputElement>(
+          'input[id^="picture-paint-mode-"][data-format-pane-history-control="readonly-combobox"]',
+        )?.id
+      : undefined;
+  if (
+    routeFormatPaneHistoryShortcut(event, {
+      ...historyContext,
+      pane: paneHistory?.element,
+      current: () => paneHistory?.current() ?? false,
+    })
+  ) {
+    const input = event.target;
+    if (paneHistory && isFormatPaneReadonlyHistoryControl(input)) {
+      const id = input.id;
+      // Undo can legitimately refresh the Ribbon's independent session. Resolve
+      // the same semantic pane owner again without reviving its retired lease.
+      const currentFocusPane = () => {
+        const next = selectedShapePaneFieldLease();
+        return paneFocusOwner &&
+          next &&
+          session.workbook === paneFocusOwner.workbook &&
+          activeSheet.value === paneFocusOwner.sheet &&
+          workbookGeneration.value === paneFocusOwner.generation &&
+          JSON.stringify(selectedShapeObjectPaths.value) === paneFocusOwner.paths &&
+          next.element === paneHistory.element &&
+          shapeFormatOwnerKey(next.pane.owner) === paneFocusOwner.owner &&
+          next.current()
+          ? next
+          : undefined;
+      };
+      restoreFocusAfterRemount(
+        input,
+        () => {
+          const currentPane = currentFocusPane()?.element;
+          if (!currentPane) return;
+          const controls = [
+            ...currentPane.querySelectorAll<HTMLInputElement>(
+              "input[data-format-pane-history-control], input[data-panel-select-control]",
+            ),
+          ];
+          const original = controls.find(
+            (control) => control.id === id && isFormatPaneReadonlyHistoryControl(control),
+          );
+          if (original) return original;
+          // A picture-only gallery can disappear or replace its keyed trigger.
+          // Return only to the captured editor's own mode, never another editor.
+          if (
+            !galleryModeId ||
+            !galleryPaintEditor?.isConnected ||
+            !currentPane.contains(galleryPaintEditor) ||
+            galleryPaintEditor.closest("[data-shape-format-pane]") !== currentPane
+          )
+            return;
+          return controls.find(
+            (control) =>
+              control.id === galleryModeId &&
+              galleryPaintEditor.contains(control) &&
+              isFormatPaneReadonlyHistoryControl(control),
+          );
+        },
+        () => !!currentFocusPane(),
+        activeBeforeHistory,
+      );
+    }
     return;
   }
   const math = equationEdit.snapshot.value;
@@ -6417,6 +6629,7 @@ watch(
         "
       />
       <ShapeFormatPane
+        ref="shapeObjectFormatPaneRef"
         :key="
           shapeTextEdit.snapshot.value
             ? `character-${shapeTextEdit.snapshot.value.sessionId}`

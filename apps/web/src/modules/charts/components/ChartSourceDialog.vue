@@ -674,12 +674,27 @@ onBeforeUnmount(() => {
 
 <template>
   <Dialog
+    role="dialog"
+    aria-modal="true"
+    :aria-label="t('chart.selectData')"
     :visible="!suspended && !nested"
     :header="t('chart.selectData')"
     width="min(840px, calc(100vw - 32px))"
+    placement="center"
+    dialog-class-name="chart-source-dialog-frame"
+    :dialog-style="{
+      display: 'flex',
+      flexDirection: 'column',
+      maxHeight: 'calc(100dvh - 96px)',
+    }"
     :close-on-overlay-click="false"
-    :confirm-btn="{ content: t('picture.confirm'), disabled: blocked }"
-    :cancel-btn="t('picture.cancel')"
+    :confirm-btn="{
+      content: t('picture.confirm'),
+      theme: 'primary',
+      variant: 'base',
+      disabled: blocked,
+    }"
+    :cancel-btn="{ content: t('picture.cancel'), theme: 'default', variant: 'base' }"
     @confirm="confirm"
     @close="close"
   >
@@ -963,8 +978,6 @@ onBeforeUnmount(() => {
 .chart-source-editor {
   display: grid;
   gap: 16px;
-  max-height: calc(100vh - 180px);
-  overflow-y: auto;
   min-width: 0;
   &__label {
     white-space: nowrap;

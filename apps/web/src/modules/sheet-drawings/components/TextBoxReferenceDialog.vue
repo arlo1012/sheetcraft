@@ -116,7 +116,7 @@ function confirm() {
     line-height: 1.6;
   }
   &__warning {
-    color: var(--sheetcraft-warning-text, #a15b00);
+    color: var(--sheetcraft-status-warning-strong);
     line-height: 1.6;
   }
   &__preview {
@@ -128,7 +128,7 @@ function confirm() {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     padding: 12px;
-    background: var(--sheetcraft-bg-secondary);
+    background: var(--sheetcraft-surface-secondary);
     border-radius: 6px;
   }
 }

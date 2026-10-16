@@ -19,6 +19,8 @@ const props = defineProps<{
   drawing: SheetGraphicDrawing;
   theme?: WorkbookTheme;
   assetUrls?: ReadonlyMap<string, string>;
+  loadingAssetIds?: ReadonlySet<string>;
+  missingAssetIds?: ReadonlySet<string>;
   density?: number;
 }>();
 const emit = defineEmits<{ paint: [presentation: ShapeDetailedPresentation | undefined] }>();
@@ -60,12 +62,15 @@ async function render() {
       resources: createPicturePaintResources(props.theme, props.assetUrls, images),
     });
     if (result.kind !== "ready") {
-      status.value = result.missingAssetIds.every((id) => {
-        const url = props.assetUrls?.get(id);
-        return !!url && images.state?.(url) === "loading";
-      })
-        ? "loading"
-        : "unavailable";
+      status.value =
+        result.missingAssetIds.length > 0 &&
+        result.missingAssetIds.every((id) => {
+          if (!id || props.missingAssetIds?.has(id)) return false;
+          const url = props.assetUrls?.get(id);
+          return url ? images.state?.(url) === "loading" : !!props.loadingAssetIds?.has(id);
+        })
+          ? "loading"
+          : "unavailable";
       return;
     }
     try {
@@ -104,7 +109,15 @@ async function render() {
   }
 }
 watch(
-  () => [props.drawing, props.theme, props.assetUrls, props.density, cellTextFontRevision.value],
+  () => [
+    props.drawing,
+    props.theme,
+    props.assetUrls,
+    props.loadingAssetIds,
+    props.missingAssetIds,
+    props.density,
+    cellTextFontRevision.value,
+  ],
   () => void render(),
   { immediate: true, deep: true },
 );

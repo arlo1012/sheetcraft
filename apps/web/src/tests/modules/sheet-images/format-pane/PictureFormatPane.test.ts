@@ -7,6 +7,7 @@ import { Button } from "tdesign-vue-next/es/button";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import PictureFormatPane from "../../../../modules/sheet-images/components/format-pane/PictureFormatPane.vue";
 import PictureFormatNumberField from "../../../../modules/sheet-images/components/format-pane/PictureFormatNumberField.vue";
+import NumericField from "../../../../shared/numeric-field/NumericField.vue";
 import {
   type PictureFormatCapabilities,
   type PictureFormatIntent,
@@ -127,10 +128,108 @@ function input(wrapper: VueWrapper, field: NumberField) {
 }
 function reveal(wrapper: VueWrapper, label: string) {
   const button = wrapper
-    .findAll(".picture-format-section__heading")
+    .findAll(".format-section__heading")
     .find((item) => item.text() === label)!;
   return button.trigger("click");
 }
+describe("active-page picture format feedback", () => {
+  test("other pages cannot promote or hide a current single-field reason", () => {
+    const { wrapper } = fixture({
+      capabilities: {
+        ...capabilities,
+        fields: {
+          ...capabilities.fields,
+          sizeWidthPt: { enabled: false, reason: "Protected width" },
+          sourceWidthPt: { enabled: false, reason: "Protected width" },
+          lineColor: { enabled: false, reason: "Theme outline" },
+          lineWidthPt: { enabled: false, reason: "Theme outline" },
+        },
+      },
+    });
+    expect(wrapper.find(".picture-format-pane__status").exists()).toBe(false);
+    const feedback = number(wrapper, "sizeWidthPt").get(".field-feedback");
+    expect(feedback.text()).toBe("Protected width");
+    expect(feedback.classes()).not.toContain("field-feedback--description-only");
+    expect(input(wrapper, "sizeWidthPt").attributes("disabled")).toBeDefined();
+  });
+  test("switching pages aggregates only the actual detailed editor branch", async () => {
+    const { wrapper } = fixture({
+      capabilities: {
+        ...capabilities,
+        detailed: {
+          fill: { enabled: false, reason: "Paint unavailable" },
+          line: { enabled: false, reason: "Paint unavailable" },
+          shadow: { enabled: false, reason: "Effects protected" },
+          glow: { enabled: false, reason: "Effects protected" },
+        },
+        fields: {
+          ...capabilities.fields,
+          lineColor: { enabled: false, reason: "Legacy theme outline" },
+          lineWidthPt: { enabled: false, reason: "Legacy theme outline" },
+        },
+      },
+    });
+    expect(wrapper.find(".picture-format-pane__status").exists()).toBe(false);
+    wrapper.vm.showPaint("line");
+    await flushPromises();
+    expect(wrapper.get(".picture-format-pane__status").text()).toBe("Paint unavailable");
+    wrapper.vm.showEffects();
+    await flushPromises();
+    expect(wrapper.get(".picture-format-pane__status").text()).toBe("Effects protected");
+  });
+  test("current repeated protection stays visible and single unsupported feedback stays local", async () => {
+    const { wrapper } = fixture({
+      capabilities: {
+        ...capabilities,
+        fields: {
+          ...capabilities.fields,
+          sizeWidthPt: { enabled: false, reason: "Sheet is protected" },
+          sizeHeightPt: { enabled: false, reason: "Sheet is protected" },
+          altTitle: { enabled: false, reason: "Title is unsupported" },
+        },
+      },
+    });
+    expect(wrapper.get(".picture-format-pane__status").text()).toBe("Sheet is protected");
+    const width = input(wrapper, "sizeWidthPt");
+    expect(width.attributes("disabled")).toBeDefined();
+    expect(document.getElementById(width.attributes("aria-describedby"))?.textContent).toBe(
+      "Sheet is protected",
+    );
+    await reveal(wrapper, "altTextSection");
+    const title = wrapper.get('[data-picture-format-field="altTitle"]');
+    const feedback = title.element.closest(".picture-format-field")!.querySelector("p")!;
+    expect(feedback.textContent).toBe("Title is unsupported");
+    expect(feedback.classList.contains("is-shared")).toBe(false);
+  });
+});
+test("paired size and scale steppers retain decimal drafts and unit conversion", async () => {
+  const { wrapper, onIntent } = fixture();
+  for (const [unit, step, expected] of [
+    ["pt", 1, 2.125],
+    ["in", 0.1, 153],
+    ["cm", 0.1, (2.125 * 72) / 2.54],
+  ] as const) {
+    const chooser = wrapper
+      .findAllComponents(Select)
+      .find((select) => "data-picture-format-units" in select.attributes())!;
+    chooser.vm.$emit("change", unit);
+    await flushPromises();
+    for (const field of ["sizeWidthPt", "sizeHeightPt"] as const) {
+      expect(number(wrapper, field).getComponent(NumericField).props("spec").displayStep).toBe(
+        step,
+      );
+      await input(wrapper, field).setValue("2.125");
+      await input(wrapper, field).trigger("keydown", { key: "Enter" });
+      expect(onIntent.mock.calls.at(-1)?.[0]).toMatchObject({ field, value: expected });
+    }
+  }
+  for (const field of ["scaleWidthPercent", "scaleHeightPercent"] as const) {
+    expect(number(wrapper, field).getComponent(NumericField).props("spec").displayStep).toBe(1);
+    await input(wrapper, field).setValue("112.375");
+    await input(wrapper, field).trigger("keydown", { key: "Enter" });
+    expect(onIntent.mock.calls.at(-1)?.[0]).toMatchObject({ field, value: 112.375 });
+  }
+});
 describe("picture format pane concrete four-page form", () => {
   test("the supplied theme-inheritance line choice reaches the owner exactly once while disabled or unknown modes do not", async () => {
     const { wrapper, onIntent } = fixture({
@@ -625,7 +724,7 @@ test("paint quick entry expands the requested actual section and preserves an un
   ).toBe("true");
   expect(
     wrapper
-      .findAll(".picture-format-section__heading")
+      .findAll(".format-section__heading")
       .find((button) => button.text() === "fillSection")!
       .attributes("aria-expanded"),
   ).toBe("true");
@@ -643,7 +742,7 @@ test("first paint quick entry opens fill-line and fill immediately without a rem
   ).toBe("true");
   expect(
     wrapper
-      .findAll(".picture-format-section__heading")
+      .findAll(".format-section__heading")
       .find((button) => button.text() === "fillSection")!
       .attributes("aria-expanded"),
   ).toBe("true");

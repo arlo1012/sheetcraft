@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { describe, expect, test, vi } from "vitest";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -10,6 +10,7 @@ import { InputNumber } from "tdesign-vue-next/es/input-number";
 import { Textarea } from "tdesign-vue-next/es/textarea";
 import ShapeGallery from "../../../modules/sheet-drawings/components/ShapeGallery.vue";
 import { SHAPE_GALLERY } from "../../../modules/sheet-drawings/shape-gallery";
+import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import { createAppI18n } from "../../../shared/i18n";
 const shape: SheetGraphicDrawing = {
   id: "s",
@@ -222,7 +223,7 @@ test("retained free area exposes real text/fill controls alongside independent o
   delete source.shapeGeometry;
   const w = fixture(source);
   expect(w.findComponent(Textarea).exists()).toBe(true);
-  expect(w.findAll('input[type="color"]')).toHaveLength(3);
+  expect(w.findAllComponents(ColorPaletteSelect)).toHaveLength(3);
   const ends = { end: { kind: "triangle" as const } };
   expect(w.getComponent(ShapeLineEndsControls).props("handler")(ends)).toBe(true);
   w.getComponent(Dialog).vm.$emit("confirm");
@@ -233,4 +234,36 @@ test("retained free area exposes real text/fill controls alongside independent o
   expect(saved.shapePath?.openArea).toBe(true);
   expect(saved.shapeLineEnds).toEqual(ends);
   w.unmount();
+});
+
+test("standalone dialog line-end popup retains its default instance owner and applies a native type choice", async () => {
+  const w = fixture({ ...shape, shapeGeometry: { preset: "line" } });
+  try {
+    await flushPromises();
+    const controls = w.getComponent(ShapeLineEndsControls);
+    expect(controls.props("ownerKey")).toBeUndefined();
+    const select = controls.findAllComponents(Select)[0]!;
+    for (const target of select.findAll(".t-input__wrap, .t-input"))
+      vi.spyOn(target.element, "getBoundingClientRect").mockReturnValue(
+        new DOMRect(100, 100, 132, 28),
+      );
+    await select.get(".t-input").trigger("click");
+    await vi.waitFor(() => expect(select.props("popupVisible")).toBe(true));
+    const host = (select.props("popupProps") as { attach: () => HTMLElement }).attach();
+    expect(host.parentElement).toBe(document.body);
+    await vi.waitFor(() => expect(host.querySelector("li.t-select-option")).not.toBeNull());
+    const option = [...host.querySelectorAll<HTMLElement>("li.t-select-option")].find(
+      (item) => item.textContent?.trim() === "菱形箭头",
+    )!;
+    option.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0 }));
+    option.click();
+    await flushPromises();
+    w.getComponent(Dialog).vm.$emit("confirm");
+    expect(w.emitted("confirm")!.at(-1)![0]).toMatchObject({
+      shapeLineEnds: { begin: { kind: "diamond" } },
+    });
+  } finally {
+    w.unmount();
+    vi.restoreAllMocks();
+  }
 });

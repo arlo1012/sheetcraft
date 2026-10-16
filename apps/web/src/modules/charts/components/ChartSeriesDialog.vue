@@ -141,6 +141,9 @@ onBeforeUnmount(() => {
 
 <template>
   <Dialog
+    role="dialog"
+    aria-modal="true"
+    :aria-label="t(adding ? 'chart.sourceAddSeries' : 'chart.sourceEditSeries')"
     :visible="!suspended"
     :header="t(adding ? 'chart.sourceAddSeries' : 'chart.sourceEditSeries')"
     width="min(660px, calc(100vw - 32px))"

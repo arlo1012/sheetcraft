@@ -27,6 +27,8 @@ const control = ref<HTMLElement>();
 const panel = ref<HTMLElement>();
 const panelId = useId();
 const inputAttributes = computed(() => ({
+  id: `panel-select-${panelId}`,
+  "data-panel-select-control": composing.value ? undefined : "readonly-combobox",
   role: "combobox",
   "aria-label": `${props.label}: ${props.valueLabel}`,
   "aria-expanded": String(open.value),
@@ -35,10 +37,31 @@ const inputAttributes = computed(() => ({
 }));
 const popupProps = computed<PopupProps>(() => ({
   placement: "bottom-left",
-  overlayInnerStyle: (triggerElement) => ({
-    width: props.panelWidth === "content" ? "max-content" : `${triggerElement.offsetWidth}px`,
-    padding: "0",
-  }),
+  // Like shared floating surfaces, a body popup must not enlarge document scroll
+  // overflow. A transient scrollbar would resize the grid and revoke its owner lease.
+  popperOptions: {
+    strategy: "fixed",
+    modifiers: [
+      { name: "flip", options: { padding: 8 } },
+      { name: "preventOverflow", options: { padding: 8, altAxis: true } },
+    ],
+  },
+  // TDesign applies overlayInnerStyle after mounting. Bound the outer popup in
+  // its first render, before that delayed update can affect worksheet geometry.
+  overlayStyle: (triggerElement) => {
+    const rect = triggerElement.getBoundingClientRect();
+    const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+    const availableHeight = Math.max(rect.top, viewportHeight - rect.bottom) - 16;
+    return {
+      position: "fixed",
+      width: props.panelWidth === "content" ? "max-content" : `${triggerElement.offsetWidth}px`,
+      maxWidth: "calc(100vw - 16px)",
+      maxHeight: `${Math.max(0, availableHeight)}px`,
+      overflow: "auto",
+      overscrollBehavior: "contain",
+    };
+  },
+  overlayInnerStyle: { padding: "0" },
 }));
 
 // TDesign forwards extra inputProps attributes to the wrapper, not the input.

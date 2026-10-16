@@ -1,5 +1,7 @@
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { afterEach, expect, test, vi } from "vitest";
+import { Select as TSelect } from "tdesign-vue-next/es/select";
+import { triggerCanvasCell } from "../canvas-interaction";
 import { createWorkbook, createSheet, getActiveSheet } from "@sheetcraft/core/workbook";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import {
@@ -11,7 +13,6 @@ import { groupShapeRoots } from "@sheetcraft/core/shape-group-planning";
 import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import SheetDrawingLayer from "../../../modules/sheet-drawings/components/SheetDrawingLayer.vue";
-import ShapeToolsToolbar from "../../../modules/sheet-drawings/components/ShapeToolsToolbar.vue";
 import ShapeCanvasTextEditor from "../../../modules/sheet-drawings/components/ShapeCanvasTextEditor.vue";
 import ShapeFormatPane from "../../../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
 import ShapeFormatFillLine from "../../../modules/sheet-drawings/components/shape-format/ShapeFormatFillLine.vue";
@@ -205,7 +206,7 @@ async function openFormat(
 ) {
   expect(current.sheetGridRef.selectShapeObjects([owned ? ["group", "box"] : ["box"]])).toBe(true);
   await flushPromises();
-  const button = wrapper.getComponent(ShapeToolsToolbar).get('[data-shape-control="format"]');
+  const button = wrapper.get('[data-shape-control="format"]');
   expect(button.isVisible()).toBe(true);
   expect(button.attributes("disabled")).toBeUndefined();
   await button.trigger("click");
@@ -595,3 +596,166 @@ test("TextBox same-session pane keyboard keeps the private F2 draft and document
   await flushPromises();
   expect(serializeWorkbook(current.session.workbook)).toEqual(before);
 });
+
+async function openNativeFillMode(pane: VueWrapper) {
+  await pane.get('[role="tab"][id$="fill-line-tab"]').trigger("click");
+  const editor = fillLine(pane, "shape").getComponent(PicturePaintEditor);
+  const select = editor.findAllComponents(TSelect)[0]!;
+  for (const trigger of select.findAll(".t-input__wrap, .t-input"))
+    vi.spyOn(trigger.element, "getBoundingClientRect").mockReturnValue(
+      new DOMRect(100, 100, 128, 28),
+    );
+  await select.get(".t-input").trigger("click");
+  await vi.waitFor(() => {
+    expect(select.props("popupVisible")).toBe(true);
+    expect(
+      document.querySelector("[data-picture-paint-mode-popup] li.t-select-option"),
+    ).not.toBeNull();
+  });
+  const option = [
+    ...document.querySelectorAll<HTMLElement>("[data-picture-paint-mode-popup] li.t-select-option"),
+  ].find((item) => item.textContent?.trim() === "Pattern fill");
+  expect(option).toBeDefined();
+  return { select, option: option! };
+}
+
+test.each([false, true])(
+  "native pane fill mode pointer preserves its exact selected TextBox, applies once with Undo, and real grid clears selection (reopen=%s)",
+  async (reopen) => {
+    const { wrapper, current, before } = await fixture(workbook(false, true));
+    const pane = await openFormat(wrapper, current);
+    // Opening the same properties pane again advances its independent session,
+    // while the selected-object Ribbon keeps its original session.
+    if (reopen) {
+      await wrapper.get('[data-shape-control="format"]').trigger("click");
+      await flushPromises();
+    }
+    const { select, option } = await openNativeFillMode(pane);
+    const internal = (
+      wrapper.vm.$ as unknown as {
+        setupState: {
+          shapeRibbonFormat: { snapshot: { value: { owner: { sessionId: string } } } };
+        };
+      }
+    ).setupState;
+    expect(
+      pane.props("snapshot")!.owner.sessionId ===
+        internal.shapeRibbonFormat.snapshot.value.owner.sessionId,
+    ).toBe(!reopen);
+    expect(option.closest("[data-shape-format-pane]")).toBeNull();
+    option.dispatchEvent(
+      new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }),
+    );
+    await flushPromises();
+    expect(current.sheetGridRef.getSelectedShapeObjects()).toEqual([["box"]]);
+    expect(wrapper.getComponent(ShapeFormatPane).isVisible()).toBe(true);
+    const modeInput = select.get<HTMLInputElement>("input[data-format-pane-history-control]");
+    modeInput.element.focus();
+    modeInput.element.blur();
+    expect(document.activeElement).toBe(document.body);
+    option.click();
+    await flushPromises();
+    expect(document.activeElement?.id).toBe(modeInput.element.id);
+    expect((document.activeElement as HTMLInputElement).readOnly).toBe(true);
+    expect(document.activeElement?.getAttribute("aria-expanded")).toBe("false");
+    expect(target(current).shapeStyle?.fill).toMatchObject({
+      kind: "value",
+      value: { kind: "pattern", preset: "pct50" },
+    });
+    expect(current.sheetGridRef.getSelectedShapeObjects()).toEqual([["box"]]);
+    expect(wrapper.getComponent(ShapeFormatPane).isVisible()).toBe(true);
+    expect(current.session.history.undoStack).toHaveLength(1);
+    const undoKey = new KeyboardEvent("keydown", {
+      key: "z",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    document.activeElement!.dispatchEvent(undoKey);
+    await flushPromises();
+    expect(undoKey.defaultPrevented).toBe(true);
+    expect(serializeWorkbook(current.session.workbook)).toEqual(before);
+    expect(current.session.history.undoStack).toHaveLength(0);
+    expect(current.session.history.redoStack).toHaveLength(1);
+    expect(document.activeElement?.getAttribute("data-format-pane-history-control")).toBe(
+      "readonly-combobox",
+    );
+    const editable = pane
+      .findAll<HTMLInputElement>("input")
+      .find((field) => !field.element.readOnly && !field.element.disabled)!;
+    expect(editable).toBeDefined();
+    editable.element.focus();
+    const nativeUndo = new KeyboardEvent("keydown", {
+      key: "z",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    document.activeElement!.dispatchEvent(nativeUndo);
+    await flushPromises();
+    expect(nativeUndo.defaultPrevented).toBe(false);
+    expect(serializeWorkbook(current.session.workbook)).toEqual(before);
+    expect(current.session.history.redoStack).toHaveLength(1);
+    await triggerCanvasCell(wrapper, { row: 12, column: 6 }, "pointerdown", { button: 0 });
+    await flushPromises();
+    expect(current.sheetGridRef.getSelectedShapeObjects()).toEqual([]);
+    expect(wrapper.findComponent(ShapeFormatPane).exists()).toBe(false);
+  },
+  15_000,
+);
+
+test("retired native fill popup and callback cannot edit a replacement shape or worksheet owner", async () => {
+  const { wrapper, current } = await fixture(workbook(false, true));
+  const pane = await openFormat(wrapper, current);
+  const { select, option } = await openNativeFillMode(pane);
+  const change = select.vm.$.vnode.props!.onChange as (value: unknown) => void;
+  expect(current.sheetGridRef.selectShapeObjects([["sibling"]])).toBe(true);
+  await flushPromises();
+  await wrapper.get('[data-shape-control="format"]').trigger("click");
+  await flushPromises();
+  const replacement = serializeWorkbook(current.session.workbook);
+  option.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0 }));
+  option.click();
+  change("pattern");
+  await flushPromises();
+  expect(serializeWorkbook(current.session.workbook)).toEqual(replacement);
+  expect(current.session.history.undoStack).toHaveLength(0);
+  expect(current.sheetGridRef.getSelectedShapeObjects()).toEqual([["sibling"]]);
+  const other = createSheet("Other", "other-fill-sheet");
+  current.session.workbook.sheets.set(other.id, other);
+  current.selectSheet(other.id);
+  await flushPromises();
+  const switched = serializeWorkbook(current.session.workbook);
+  change("pattern");
+  await flushPromises();
+  expect(serializeWorkbook(current.session.workbook)).toEqual(switched);
+  expect(current.session.history.undoStack).toHaveLength(0);
+}, 15_000);
+
+test("pending native fill choice focus cannot follow a replacement owner or override new user focus", async () => {
+  const { wrapper, current } = await fixture(workbook(false, true));
+  const pane = await openFormat(wrapper, current);
+  const first = await openNativeFillMode(pane);
+  const oldInput = first.select.get<HTMLInputElement>("input").element;
+  oldInput.focus();
+  oldInput.blur();
+  const oldFocus = vi.spyOn(oldInput, "focus");
+  first.option.click();
+  expect(current.sheetGridRef.selectShapeObjects([["sibling"]])).toBe(true);
+  await flushPromises();
+  expect(oldFocus).not.toHaveBeenCalled();
+  expect(document.activeElement?.hasAttribute("data-format-pane-history-control")).not.toBe(true);
+  await wrapper.get('[data-shape-control="format"]').trigger("click");
+  await flushPromises();
+  const second = await openNativeFillMode(wrapper.getComponent(ShapeFormatPane));
+  const input = second.select.get<HTMLInputElement>("input").element;
+  input.focus();
+  input.blur();
+  second.option.click();
+  const elsewhere = document.createElement("button");
+  elsewhere.textContent = "New user focus";
+  document.body.append(elsewhere);
+  elsewhere.focus();
+  await flushPromises();
+  expect(document.activeElement).toBe(elsewhere);
+}, 15_000);

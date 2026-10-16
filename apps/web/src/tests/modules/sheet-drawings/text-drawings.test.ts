@@ -6,6 +6,7 @@ import { Input } from "tdesign-vue-next/es/input";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import DrawingContent from "../../../modules/sheet-drawings/components/DrawingContent.vue";
 import DrawingEditorDialog from "../../../modules/sheet-drawings/components/DrawingEditorDialog.vue";
+import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import { createAppI18n } from "../../../shared/i18n";
 
 const mounted: Array<{ unmount(): void }> = [];
@@ -47,7 +48,7 @@ describe("existing text box and WordArt contract", () => {
   test("WordArt hides unused appearance controls while preserving stored fields", async () => {
     const original = drawing("wordArt");
     const wrapper = editor(original);
-    expect(wrapper.findAll('input[type="color"]')).toHaveLength(1);
+    expect(wrapper.findAllComponents(ColorPaletteSelect)).toHaveLength(1);
     expect(wrapper.text()).not.toContain("No fill");
     expect(wrapper.text()).not.toContain("Line width");
     expect(wrapper.text()).not.toContain("Outline");
@@ -63,7 +64,7 @@ describe("existing text box and WordArt contract", () => {
   });
   test("text boxes retain their effective fill and border controls", () => {
     const wrapper = editor(drawing("textBox"));
-    expect(wrapper.findAll('input[type="color"]')).toHaveLength(3);
+    expect(wrapper.findAllComponents(ColorPaletteSelect)).toHaveLength(3);
     expect(wrapper.text()).toContain("No fill");
     expect(wrapper.text()).toContain("Line width");
     expect(wrapper.text()).toContain("Outline");

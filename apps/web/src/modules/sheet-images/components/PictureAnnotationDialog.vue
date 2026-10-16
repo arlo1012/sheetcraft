@@ -11,6 +11,7 @@ import { isGroupedPicture } from "@sheetcraft/core/picture-group";
 import { getDetailedPictureStyleAssetIds } from "@sheetcraft/core/picture-detailed-style";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import { useAppI18n } from "../../../shared/i18n";
+import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import { paintImagePresentation } from "../../../shared/images/imageAppearance";
 import { PicturePaintUnavailableError } from "../../../shared/images/picture-detailed-render";
 import { createPicturePaintResources } from "../../../shared/images/picture-paint-resources";
@@ -62,6 +63,17 @@ const annotationSourceIdentity = currentSourceIdentity();
 const sourceInvalid = ref(false);
 const tool = ref<ImageAnnotation["kind"]>("pen");
 const color = ref("#E53935");
+function selectColor(value: string | null): void {
+  if (
+    props.busy ||
+    confirming.value ||
+    sourceInvalid.value ||
+    !value ||
+    !/^#[0-9a-f]{6}$/i.test(value)
+  )
+    return;
+  color.value = value.toUpperCase();
+}
 const stroke = ref(3);
 const text = ref("");
 const fontSize = ref(24);
@@ -498,10 +510,20 @@ onBeforeUnmount(() => {
         <Radio value="text">{{ t("picture.text") }}</Radio>
       </RadioGroup>
       <div class="picture-annotation__options">
-        <label
-          >{{ t("picture.annotationColor")
-          }}<input v-model="color" type="color" :disabled="busy || confirming"
-        /></label>
+        <div
+          class="picture-annotation__field picture-annotation__field--color"
+          role="group"
+          :aria-label="t('picture.annotationColor')"
+        >
+          <span>{{ t("picture.annotationColor") }}</span>
+          <ColorPaletteSelect
+            :model-value="color"
+            :label="t('picture.annotationColor')"
+            :show-default="false"
+            :disabled="busy || confirming || sourceInvalid"
+            @select="selectColor"
+          />
+        </div>
         <div class="picture-annotation__field" role="group" :aria-label="t('picture.strokeWidth')">
           <span>{{ t("picture.strokeWidth") }}</span>
           <InputNumber
@@ -592,17 +614,19 @@ onBeforeUnmount(() => {
     align-items: center;
     flex-wrap: wrap;
     gap: 8px;
-    label,
     .picture-annotation__field {
       display: flex;
       align-items: center;
       gap: 6px;
-    }
-    input[type="color"] {
-      width: 32px;
-      height: 28px;
-      padding: 0;
-      border: 0;
+      > span {
+        flex: none;
+        white-space: nowrap;
+      }
+      &--color {
+        display: grid;
+        grid-template-columns: max-content 48px;
+        flex: none;
+      }
     }
   }
   &__views,

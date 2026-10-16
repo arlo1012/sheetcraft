@@ -44,6 +44,11 @@ import {
   type SymbolInsertion,
 } from "../symbols/symbol-preferences";
 import type { SymbolFont } from "../symbols/symbol-fonts";
+import {
+  parseSymbolViewPreferences,
+  SYMBOL_VIEW_PREFERENCES_KEY,
+  type SymbolViewPreferences,
+} from "../symbols/symbol-view-preferences";
 import { symbolUnicodeBlockLabel } from "../symbols/unicode-block-labels.zh-CN";
 import type {
   LocalSymbolFont,
@@ -63,14 +68,30 @@ const catalog = shallowRef<SymbolUnicodeCatalog>();
 const fonts = shallowRef<readonly SymbolFont[]>([]);
 const fontRestoreError = ref<LocalSymbolFontErrorCode>();
 const localFontLabels = shallowRef<Record<string, string>>({});
-const fontId = ref(props.defaultFontFamily ? "normal-text" : "noto-sans");
+const viewStorageError = ref(false);
+const savedView = shallowRef<SymbolViewPreferences>();
+try {
+  savedView.value = parseSymbolViewPreferences(
+    globalThis.localStorage?.getItem(SYMBOL_VIEW_PREFERENCES_KEY) ?? null,
+  );
+} catch {
+  viewStorageError.value = true;
+}
+const fontId = ref(
+  savedView.value?.fontId ?? (props.defaultFontFamily ? "normal-text" : "noto-sans"),
+);
 const font = computed(() => {
   if (fontId.value !== "normal-text") return fonts.value.find((entry) => entry.id === fontId.value);
   const family = props.defaultFontFamily?.toLocaleLowerCase("en-US");
   // A same-name file is not proof of the browser's current CSS face.
   return fonts.value.find((entry) => entry.family.toLocaleLowerCase("en-US") === family);
 });
-const normalCoverageUnknown = computed(() => fontId.value === "normal-text" && !font.value);
+const coverageUnknown = computed(() => !font.value);
+const unverifiedFontLabel = computed(() =>
+  fontId.value === "normal-text"
+    ? (props.defaultFontFamily ?? t("symbolTools.normalText"))
+    : (savedView.value?.label ?? savedView.value?.family ?? fontId.value),
+);
 const fontStates = shallowRef<Record<string, "loading" | "ready" | "error">>({});
 const fontRequests = new Map<string, Promise<boolean>>();
 const loading = ref(true);
@@ -144,8 +165,9 @@ async function load(): Promise<void> {
       const local = await import("../../../shared/cell-text/local-font-source");
       if (!mounted) return;
       for (const entry of local.useLocalSymbolFonts().fonts.value) registerLocalFont(entry, false);
-      if (props.defaultFontFamily?.startsWith("SheetcraftLocal_")) {
-        const restored = await local.ensureLocalSymbolFont(props.defaultFontFamily);
+      const restoreFamily = savedView.value?.family ?? props.defaultFontFamily;
+      if (restoreFamily?.startsWith("SheetcraftLocal_")) {
+        const restored = await local.ensureLocalSymbolFont(restoreFamily);
         if (mounted && restored) registerLocalFont(restored, false);
       }
     } catch (error) {
@@ -156,6 +178,9 @@ async function load(): Promise<void> {
             : "malformed";
       }
     }
+    // Only an untouched first view chooses a verified face. Explicit choices stay explicit,
+    // including unavailable Normal text or a local face that could not be restored.
+    if (!savedView.value && !font.value) fontId.value = "noto-sans";
     await loadFont();
   } catch {
     if (mounted) loadError.value = true;
@@ -277,13 +302,18 @@ const alreadyCustom = computed(
     ),
 );
 const fontOptions = computed(() => [
-  ...(props.defaultFontFamily
+  ...(props.defaultFontFamily || fontId.value === "normal-text"
     ? [
         {
-          label: `${t("symbolTools.normalText")} (${localFontLabels.value[props.defaultFontFamily] ?? props.defaultFontFamily})`,
+          label: props.defaultFontFamily
+            ? `${t("symbolTools.normalText")} (${localFontLabels.value[props.defaultFontFamily] ?? props.defaultFontFamily})`
+            : t("symbolTools.normalText"),
           value: "normal-text",
         },
       ]
+    : []),
+  ...(savedView.value?.family && !fonts.value.some((item) => item.id === savedView.value?.fontId)
+    ? [{ label: savedView.value.label ?? savedView.value.family, value: savedView.value.fontId }]
     : []),
   ...fonts.value.map((item) => ({
     label: localFontLabels.value[item.family]
@@ -304,6 +334,31 @@ const formatOptions = computed(() => [
   { label: t("symbolTools.latinDecimal"), value: "latin1-decimal" },
   { label: t("symbolTools.latinHex"), value: "latin1-hex" },
 ]);
+function rememberFontChoice(): void {
+  const choice = font.value;
+  savedView.value = {
+    version: 1,
+    fontId: fontId.value,
+    ...(choice?.source === "local"
+      ? { family: choice.family, label: localFontLabels.value[choice.family] ?? choice.family }
+      : savedView.value?.fontId === fontId.value && savedView.value.family
+        ? {
+            family: savedView.value.family,
+            ...(savedView.value.label ? { label: savedView.value.label } : {}),
+          }
+        : {}),
+  };
+  try {
+    globalThis.localStorage?.setItem(SYMBOL_VIEW_PREFERENCES_KEY, JSON.stringify(savedView.value));
+    viewStorageError.value = false;
+  } catch {
+    viewStorageError.value = true;
+  }
+}
+function chooseFont(value: unknown): void {
+  fontId.value = String(value);
+  rememberFontChoice();
+}
 function registerLocalFont(item: LocalSymbolFont, select = true): void {
   const entry: SymbolFont = {
     id: `local:${item.id}`,
@@ -318,6 +373,7 @@ function registerLocalFont(item: LocalSymbolFont, select = true): void {
     fontId.value = entry.id;
     tab.value = "symbols";
     allUnicode.value = false;
+    rememberFontChoice();
   }
 }
 function selectPoint(cp: number): void {
@@ -618,7 +674,8 @@ function onCustomListKey(event: KeyboardEvent): void {
               ><span>{{ t("symbolTools.font") }}</span
               ><Select
                 size="small"
-                v-model="fontId"
+                :model-value="fontId"
+                @update:model-value="chooseFont"
                 :options="fontOptions"
                 filterable
                 :disabled="loading"
@@ -653,11 +710,11 @@ function onCustomListKey(event: KeyboardEvent): void {
             }}</Button>
           </div>
           <div
-            v-else-if="normalCoverageUnknown && !allUnicode"
+            v-else-if="coverageUnknown && !allUnicode"
             class="symbol-dialog__coverage-warning"
             role="status"
           >
-            {{ t("symbolTools.unverifiedFont", { family: defaultFontFamily ?? "" }) }}
+            {{ t("symbolTools.unverifiedFont", { family: unverifiedFontLabel }) }}
           </div>
           <SymbolCharacterGrid
             v-else-if="catalog && filtered.length"
@@ -882,7 +939,7 @@ function onCustomListKey(event: KeyboardEvent): void {
         <p v-if="allUnicode && tab === 'symbols'" class="symbol-dialog__hint" role="status">
           {{ t("symbolTools.allCoverage") }}
         </p>
-        <div v-if="storageError" role="status" class="symbol-dialog__hint">
+        <div v-if="storageError || viewStorageError" role="status" class="symbol-dialog__hint">
           {{ t("symbolTools.storageError") }}
         </div>
         <span
@@ -987,21 +1044,18 @@ function onCustomListKey(event: KeyboardEvent): void {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    height: 380px;
     max-height: calc(100dvh - 190px);
-    min-height: 120px;
+    min-height: 0;
     overflow: auto;
     overscroll-behavior: contain;
   }
   &__page {
     display: flex;
-    flex: 1 1 auto;
+    flex: none;
     flex-direction: column;
     gap: 6px;
-    min-height: 120px;
+    min-height: 0;
     min-width: 0;
-    overflow: auto;
-    overscroll-behavior: contain;
     > * {
       flex-shrink: 0;
     }
@@ -1075,9 +1129,9 @@ function onCustomListKey(event: KeyboardEvent): void {
     }
   }
   &__special-list {
-    height: 300px;
+    height: clamp(180px, 38dvh, 320px);
     min-height: 120px;
-    flex: 1 1 120px;
+    flex: none;
   }
   &__custom-symbol {
     display: flex;
@@ -1085,9 +1139,9 @@ function onCustomListKey(event: KeyboardEvent): void {
     align-items: center;
   }
   &__custom-list {
-    height: 280px;
+    height: clamp(160px, 34dvh, 280px);
     min-height: 120px;
-    flex: 1 1 120px;
+    flex: none;
     overflow: hidden;
   }
   &__coverage-warning {

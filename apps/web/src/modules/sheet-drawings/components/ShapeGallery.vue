@@ -18,8 +18,9 @@ const props = withDefaults(
     locale?: ShapeGalleryLocale;
     disabled?: boolean;
     allowDrawingTools?: boolean;
+    compact?: boolean;
   }>(),
-  { locale: "en-US", disabled: false, allowDrawingTools: true },
+  { locale: "en-US", disabled: false, allowDrawingTools: true, compact: false },
 );
 const emit = defineEmits<{ choose: [choice: ShapeGalleryChoice] }>();
 const root = ref<HTMLElement | null>(null);
@@ -55,6 +56,10 @@ const selectedConnector = computed(
 );
 
 function title(choice: ShapeGalleryChoice): string {
+  if (props.compact && choice.kind === "drawingTool" && props.allowDrawingTools)
+    return `${choice.label[props.locale]}: ${labels.value.drawingToolHint}`;
+  if (props.compact && choice.kind === "line" && choice.preset !== "line")
+    return `${choice.label[props.locale]}: ${labels.value.connectorHint}`;
   return choice.kind === "drawingTool" && !props.allowDrawingTools
     ? `${choice.label[props.locale]}: ${props.locale === "zh-CN" ? "请从顶部形状菜单开始新绘制" : "Start a new drawing from the Shapes menu"}`
     : choice.label[props.locale];
@@ -162,7 +167,13 @@ defineExpose({
 </script>
 
 <template>
-  <div ref="root" class="shape-gallery" role="group" :aria-label="labels.gallery">
+  <div
+    ref="root"
+    class="shape-gallery"
+    :class="{ 'shape-gallery--compact': compact }"
+    role="group"
+    :aria-label="labels.gallery"
+  >
     <div class="shape-gallery__search">
       <Input
         v-model="query"
@@ -179,7 +190,12 @@ defineExpose({
       >
     </div>
     <div class="shape-gallery__scroll" @keydown="onGalleryKeydown">
-      <GallerySection v-for="group in groups" :key="group.id" :title="group.label[locale]">
+      <GallerySection
+        v-for="group in groups"
+        :key="group.id"
+        :title="group.label[locale]"
+        :content-inset="!compact"
+      >
         <template #actions>
           <span class="shape-gallery__category-count">{{ group.items.length }}</span>
         </template>
@@ -260,13 +276,20 @@ defineExpose({
       </GallerySection>
       <p v-if="!groups.length" class="shape-gallery__empty" role="status">{{ labels.noMatches }}</p>
     </div>
-    <div class="shape-gallery__feedback" role="status" aria-live="polite">
+    <div
+      v-if="!compact || selected"
+      class="shape-gallery__feedback"
+      role="status"
+      aria-live="polite"
+    >
       <span>{{
         selected ? `${labels.selected}: ${selected.label[locale]}` : labels.noSelection
       }}</span>
       <span v-if="selectedConnector">{{ labels.connectorHint }}</span>
     </div>
-    <p :id="toolHintId" class="shape-gallery__hint">{{ labels.drawingToolHint }}</p>
+    <p :id="toolHintId" class="shape-gallery__hint" :class="{ 'ui-visually-hidden': compact }">
+      {{ labels.drawingToolHint }}
+    </p>
   </div>
 </template>
 
@@ -348,6 +371,37 @@ defineExpose({
     color: var(--sheetcraft-text-secondary);
     font-size: var(--sheetcraft-font-size-body-small);
     line-height: var(--sheetcraft-line-height-body-small);
+  }
+
+  &--compact {
+    max-width: none;
+    min-height: 0;
+    gap: 0;
+  }
+
+  &--compact &__search {
+    padding: 0 var(--sheetcraft-tool-panel-padding) var(--sheetcraft-space-2);
+  }
+
+  &--compact &__scroll {
+    flex: 1 1 auto;
+    max-height: 460px;
+  }
+
+  &--compact &__grid {
+    grid-template-columns: repeat(auto-fill, minmax(24px, 1fr));
+    gap: var(--sheetcraft-space-1);
+    padding: var(--sheetcraft-space-2) var(--sheetcraft-tool-panel-padding);
+  }
+
+  &--compact &__choice {
+    height: 24px;
+    padding: var(--sheetcraft-space-1);
+
+    svg {
+      width: 20px;
+      height: 18px;
+    }
   }
 
   &__empty {

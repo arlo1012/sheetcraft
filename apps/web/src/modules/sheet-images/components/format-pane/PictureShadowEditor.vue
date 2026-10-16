@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onBeforeUnmount, ref, useId } from "vue";
+import { useNativePopupOwnership } from "../../../../shared/floating/useNativePopupOwnership";
+import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { Choice, PictureShadow, PictureAnchor } from "@sheetcraft/core/picture-detailed-style";
 import type {
@@ -19,6 +21,7 @@ import PicturePaintColor from "./PicturePaintColor.vue";
 const props = defineProps<{
   ownerKey: string;
   hidePreset?: boolean;
+  hideMode?: boolean;
   value?: Choice<PictureShadow>;
   disabled?: boolean;
   t: PictureFormatTranslate;
@@ -32,6 +35,37 @@ const mode = computed(() =>
       ? "none"
       : props.value.value.kind,
 );
+const root = ref<HTMLElement>();
+const modePopup = useNativePopupOwnership({
+  owner: () => `${props.ownerKey}:shadow-mode`,
+  disabled: () => !!props.disabled || !!props.hideMode,
+  root: () => root.value,
+});
+const anchorPopup = useNativePopupOwnership({
+  owner: () => `${props.ownerKey}:shadow-anchor`,
+  disabled: () => !!props.disabled || !shadow.value,
+  root: () => root.value,
+});
+const modeHost = modePopup.host,
+  anchorHost = anchorPopup.host;
+const fieldId = `picture-shadow-${useId()}`;
+function nativeControl(field: "mode" | "anchor", popup: typeof modePopup) {
+  return computed(() => ({
+    attributes: {
+      id: `${fieldId}-${field}`,
+      role: "combobox",
+      "aria-label": props.t(field === "mode" ? "shadowSection" : "shadowAnchor"),
+      "aria-expanded": String(popup.visible.value),
+      "data-format-pane-history-control": "readonly-combobox",
+    },
+  }));
+}
+const modeNative = nativeControl("mode", modePopup),
+  anchorNative = nativeControl("anchor", anchorPopup);
+let active = true;
+onBeforeUnmount(() => {
+  active = false;
+});
 const modes = computed(() => [
   { value: "inherit", label: props.t("effectInherit") },
   { value: "none", label: props.t("effectNone") },
@@ -53,13 +87,41 @@ const anchors: readonly { value: PictureAnchor; key: PictureFormatLabelKey }[] =
 const anchorOptions = computed(() =>
   anchors.map(({ value, key }) => ({ value, label: props.t(key) })),
 );
-function choose(value: unknown) {
-  if (props.disabled) return;
-  if (value === "inherit") props.onCommit(undefined);
-  else if (value === "none") props.onCommit({ kind: "none" });
-  else if (value === "outer" || value === "inner" || value === "perspective")
-    props.onCommit({ kind: "value", value: createPictureShadow(value, shadow.value) });
-}
+const choose = computed(() => {
+  const owner = props.ownerKey,
+    apply = props.onCommit,
+    current = shadow.value;
+  return (value: unknown) => {
+    if (
+      !active ||
+      props.disabled ||
+      owner !== props.ownerKey ||
+      apply !== props.onCommit ||
+      current !== shadow.value
+    )
+      return false;
+    if (value === "inherit") return apply(undefined);
+    if (value === "none") return apply({ kind: "none" });
+    return (
+      (value === "outer" || value === "inner" || value === "perspective") &&
+      apply({ kind: "value", value: createPictureShadow(value, current) })
+    );
+  };
+});
+const changeAnchor = computed(() => {
+  const owner = props.ownerKey,
+    apply = props.onCommit,
+    current = shadow.value;
+  return (value: unknown) =>
+    !props.disabled &&
+    active &&
+    owner === props.ownerKey &&
+    apply === props.onCommit &&
+    !!current &&
+    current === shadow.value &&
+    anchors.some((item) => item.value === value) &&
+    apply({ kind: "value", value: { ...current, anchor: value as PictureAnchor } });
+});
 function update(patch: Partial<PictureShadow>) {
   return (
     !!shadow.value &&
@@ -94,7 +156,11 @@ function selectPreset(id: string) {
 }
 </script>
 <template>
-  <div class="picture-shadow-editor">
+  <div ref="root" class="picture-shadow-editor">
+    <Teleport to="body">
+      <div ref="modeHost" data-picture-shadow-popup="mode" />
+      <div ref="anchorHost" data-picture-shadow-popup="anchor" />
+    </Teleport>
     <PicturePresetGallery
       v-if="!hidePreset"
       :owner-key="ownerKey"
@@ -106,8 +172,12 @@ function selectPreset(id: string) {
       :columns="3"
       :empty-label="mode === 'inherit' ? t('effectInherit') : t('effectCustom')"
     />
-    <PictureFormatField :label="t('effectMode')"
+    <PictureFormatField v-if="!hideMode" :label="t('effectMode')"
       ><TSelect
+        v-native-control="modeNative"
+        :popup-visible="modePopup.visible.value"
+        :popup-props="modePopup.popupProps"
+        @popup-visible-change="modePopup.onVisibleChange.value"
         :model-value="mode"
         :options="modes"
         :disabled="disabled"
@@ -178,16 +248,16 @@ function selectPreset(id: string) {
       />
       <PictureFormatField :label="t('shadowAnchor')"
         ><TSelect
+          v-native-control="anchorNative"
+          :popup-visible="anchorPopup.visible.value"
+          :popup-props="anchorPopup.popupProps"
+          @popup-visible-change="anchorPopup.onVisibleChange.value"
           :model-value="shadow.anchor"
           :options="anchorOptions"
           :disabled="disabled"
           size="small"
           :aria-label="t('shadowAnchor')"
-          @change="
-            (value) =>
-              anchors.some((item) => item.value === value) &&
-              update({ anchor: value as PictureAnchor })
-          "
+          @change="changeAnchor"
       /></PictureFormatField>
       <template v-if="shadow.kind === 'perspective'">
         <PicturePaintNumber

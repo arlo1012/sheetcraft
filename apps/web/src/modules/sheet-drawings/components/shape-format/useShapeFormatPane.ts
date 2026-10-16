@@ -135,10 +135,13 @@ export function useShapeFormatPane(props: ShapeFormatPaneInput) {
   function styleBinding<K extends ShapeFormatStyleCategory>(target: ShapeFormatMode, category: K) {
     const capability = styleCapability(target, category);
     const base = props.t;
-    const t: PictureFormatTranslate = (key) =>
-      key === "paintBehindSourceHelp"
-        ? s.value(target === "shape" ? "shapeFillHelp" : "textFillHelp")
-        : base(key);
+    const t: PictureFormatTranslate = (key) => {
+      if (key === "paintBehindSourceHelp")
+        return s.value(target === "shape" ? "shapeFillHelp" : "textFillHelp");
+      if (key === "paintRotate") return s.value(target === "shape" ? "shapeRotate" : "textRotate");
+      if (key === "applyRejected") return s.value("applyRejected");
+      return base(key);
+    };
     return {
       ownerKey: `${ownerKey.value}:${target}:${category}`,
       value: isMixedStyle(target, category) ? undefined : style(target)?.[category],

@@ -36,7 +36,6 @@ function select(value: string | null, reference?: ThemeColorReference) {
       :label="label"
       :default-label="automaticLabel"
       :disabled="disabled"
-      show-value
       @select="select"
     />
   </PictureFormatField>

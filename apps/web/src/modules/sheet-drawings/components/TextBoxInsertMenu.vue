@@ -105,26 +105,27 @@ onBeforeUnmount(() => generation.value++);
         <template #items>
           <MenuItem
             :disabled="disabled"
+            :title="t('drawing.textBoxDrawingHint')"
+            :aria-description="t('drawing.textBoxDrawingHint')"
             data-text-box-direction="horizontal"
             @select="choose.horizontal"
           >
-            <template #icon><TextCursorInput :size="15" /></template>
+            <template #icon><TextCursorInput /></template>
             {{ choices.horizontal.label[language] }}
           </MenuItem>
           <MenuItem
             :disabled="disabled"
+            :title="t('drawing.textBoxDrawingHint')"
+            :aria-description="t('drawing.textBoxDrawingHint')"
             data-text-box-direction="vertical"
             @select="choose.vertical"
           >
-            <template #icon><Type :size="15" style="transform: rotate(90deg)" /></template>
+            <template #icon><Type style="transform: rotate(90deg)" /></template>
             {{ choices.vertical.label[language] }}
           </MenuItem>
         </template>
-        <template #footer>
-          <li class="text-box-insert-menu__hint" role="none">
-            {{ t("drawing.textBoxDrawingHint") }}
-          </li>
-          <li v-if="rejected" class="text-box-insert-menu__hint" role="status" aria-live="polite">
+        <template v-if="rejected" #footer>
+          <li class="text-box-insert-menu__hint" role="status" aria-live="polite">
             {{ t("drawing.textBoxSelectionRejected") }}
           </li>
         </template>
@@ -138,14 +139,13 @@ onBeforeUnmount(() => generation.value++);
   @include ribbon.tool;
 }
 .text-box-insert-menu {
-  width: 280px;
   max-width: calc(100vw - var(--sheetcraft-space-4) * 2);
   z-index: var(--sheetcraft-layer-menu);
   &__hint {
     padding: var(--sheetcraft-space-2) var(--sheetcraft-tool-panel-padding);
     color: var(--sheetcraft-text-secondary);
     font-size: var(--sheetcraft-font-size-body-small);
-    line-height: 1.5;
+    line-height: var(--sheetcraft-line-height-body-small);
     list-style: none;
   }
 }

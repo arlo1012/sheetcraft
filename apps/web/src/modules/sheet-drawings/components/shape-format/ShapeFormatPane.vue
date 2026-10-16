@@ -8,6 +8,11 @@ import { PaintBucket, Ruler, Sparkles, Type, X } from "lucide-vue-next";
 import type { PictureFormatLengthUnit } from "../../../sheet-images/picture-format-pane-model";
 import type { ShapeFormatMode, ShapeFormatTab } from "../../shape-format-pane-model";
 import { useShapeFormatPane, type ShapeFormatPaneInput } from "./useShapeFormatPane";
+import {
+  provideNativePopupScope,
+  useNativePopupOwnership,
+} from "../../../../shared/floating/useNativePopupOwnership";
+import { useShapeTextFieldDraft } from "../../shape-text-field-drafts";
 import ShapeFormatFillLine from "./ShapeFormatFillLine.vue";
 import ShapeFormatEffects from "./ShapeFormatEffects.vue";
 import ShapeFormatSizeProperties from "./ShapeFormatSizeProperties.vue";
@@ -52,7 +57,29 @@ const tab = computed({
     else textTab.value = value;
   },
 });
+const popups = provideNativePopupScope({
+  owner: () =>
+    props.snapshot ? `${controller.ownerKey.value}:${mode.value}:${tab.value}` : undefined,
+});
+useShapeTextFieldDraft({
+  owner: () => (props.snapshot ? `shape-pane:${props.snapshot.owner.sessionId}` : undefined),
+  flush: () => true,
+  focus: () => {},
+  containsTarget: popups.containsTarget,
+});
 const unit = ref<PictureFormatLengthUnit>(props.initialUnit);
+const paneRoot = ref<HTMLElement>();
+const unitsPopup = useNativePopupOwnership({
+  owner: () => (props.snapshot ? `${controller.ownerKey.value}:units` : undefined),
+  disabled: () => !props.snapshot || controller.hasActiveNumericDraft.value,
+  root: () => paneRoot.value,
+  scope: popups,
+});
+const unitsPopupHost = unitsPopup.host;
+const changeUnitAction = computed(() => {
+  const owner = controller.ownerKey.value;
+  return (value: unknown) => owner === controller.ownerKey.value && changeUnit(value);
+});
 const paneId = `shape-format-pane-${useId()}`;
 const shapeFillRef = ref<InstanceType<typeof ShapeFormatFillLine>>(),
   textFillRef = ref<InstanceType<typeof ShapeFormatFillLine>>();
@@ -173,6 +200,7 @@ defineExpose({
 </script>
 <template>
   <aside
+    ref="paneRoot"
     data-shape-format-pane
     class="shape-format-pane"
     :aria-label="controller.s.value(controller.isGroup.value ? 'groupPaneTitle' : 'paneTitle')"
@@ -266,16 +294,20 @@ defineExpose({
         </TTabPanel>
       </TTabs>
     </div>
+    <Teleport to="body"><div ref="unitsPopupHost" data-shape-format-units-popup /></Teleport>
     <div v-if="snapshot" class="shape-format-pane__units">
       <span>{{ t("units") }}</span
       ><TSelect
         :model-value="unit"
+        :popup-visible="unitsPopup.visible.value"
+        :popup-props="unitsPopup.popupProps"
+        @popup-visible-change="unitsPopup.onVisibleChange.value"
         :options="unitOptions"
         :disabled="controller.hasActiveNumericDraft.value"
         size="small"
         :aria-label="t('units')"
         data-shape-format-units
-        @change="changeUnit"
+        @change="changeUnitAction"
       />
     </div>
     <div class="shape-format-pane__body">
