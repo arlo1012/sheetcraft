@@ -1,0 +1,9 @@
+{
+  "file": "textbox-mixed-wps-reference.xlsx",
+  "sha256": "da79b5cb58730e8d0f6227f427d40b34fcd9d0ed21eb3031b905d7f6cfa2f748",
+  "bytes": 15832,
+  "provenance": "Synthetic Sheetcraft legend product workbook edited and saved in WPS GUI on 2026-10-16. Original whole WPS package copied without any ZIP or XML rewriting.",
+  "objects": "Two ordinary column charts, one Liberation Sans 11pt textbox containing first paragraph and second paragraph, and one plain 200x200 PNG. Textbox has no fill or line, no autofit, clipped overflow, wrapping and top alignment.",
+  "imageSha256": "4d7fd68b0059ef07e2b4189aa68707f12c41a9664fbf2ca98e90c6836da7e4e5",
+  "scope": "Whole-package decode, snapshot, native export and decode preserve bounded textbox content and styles, both charts and picture bytes. Theme/font descriptor materialization and separate picture paint-order collection require explicit compatibility warnings; this is not an assertion of complete package fidelity."
+}

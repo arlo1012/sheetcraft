@@ -1,3 +1,5 @@
+import { hasShapeObjectFrame } from "@sheetcraft/core/sheet-drawings";
+import { getNativeTextBoxUnsupportedPath } from "./textbox-capabilities.js";
 import { getSheetChartData } from "@sheetcraft/core/sheet-charts";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { SheetPivotTable } from "@sheetcraft/core/pivot-tables";
@@ -88,6 +90,12 @@ export function writeXlsxPivotCharts(
 ): void {
   for (const sheet of workbook.sheets.values()) {
     for (const drawing of sheet.drawings ?? []) {
+      if (
+        drawing.kind === "textBox" &&
+        hasShapeObjectFrame(drawing) &&
+        getNativeTextBoxUnsupportedPath(drawing, sheet) === undefined
+      )
+        continue;
       if (drawing.kind === "chart" && drawing.chart.pivotTableId === undefined) continue;
       const issuePath = `${sheet.name}.drawings[${JSON.stringify(drawing.id)}]`;
       const pivot =

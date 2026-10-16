@@ -1,3 +1,5 @@
+import { writeXlsxTextBoxes } from "./native-textboxes.js";
+import { reorderNativeDrawingAnchors } from "./drawing-parts.js";
 import type { SheetPivotTable } from "@sheetcraft/core/pivot-tables";
 import { writeXlsxPivotTables } from "./pivot-tables.js";
 import { writeXlsxPivotCharts } from "./pivot-charts.js";
@@ -195,6 +197,8 @@ export function finalizeXlsxExport(
     );
     writeXlsxPivotCharts(entries, workbook, nativePivots, filename, report);
     writeXlsxColumnCharts(entries, workbook, report);
+    writeXlsxTextBoxes(entries, workbook);
+    reorderNativeDrawingAnchors(entries, workbook);
   }
   const files: Zippable = {};
   for (const [name, content] of Object.entries(entries)) {

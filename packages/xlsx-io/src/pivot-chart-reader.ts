@@ -19,6 +19,7 @@ export function readXlsxPivotCharts(
   parts: readonly NativeChartPart[],
   pivots: readonly ImportedPivotTable[],
   report: CompatibilityReportBuilder,
+  onDrawing?: (source: NativeChartPart, drawing: SheetChartDrawing) => void,
 ): void {
   const sheets = [...workbook.sheets.values()];
   for (const [index, part] of parts.entries()) {
@@ -147,6 +148,7 @@ export function readXlsxPivotCharts(
         rotation: 0,
       }) as SheetChartDrawing;
       (sheet.drawings ??= []).push(drawing);
+      onDrawing?.(part, drawing);
       report.add("style-omitted", "warning", `${part.chartPart}.nativePresentation`);
       if (geometry.approximated) report.add("dimension-approximated", "warning", part.drawingPart);
     } catch {

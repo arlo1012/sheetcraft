@@ -198,6 +198,7 @@ export function readXlsxColumnCharts(
   workbook: Workbook,
   parts: readonly NativeChartPart[],
   report: CompatibilityReportBuilder,
+  onDrawing?: (source: NativeChartPart, drawing: SheetChartDrawing) => void,
 ): void {
   const sheets = [...workbook.sheets.values()];
   for (const [index, part] of parts.entries()) {
@@ -303,6 +304,7 @@ export function readXlsxColumnCharts(
         rotation: 0,
       }) as SheetChartDrawing;
       (sheet.drawings ??= []).push(drawing);
+      onDrawing?.(part, drawing);
       // Element positions are retained; native fonts, colors and strokes remain approximate.
       report.add("style-omitted", "warning", part.chartPart);
       if (normalized) report.add("chart-cache-normalized", "warning", part.chartPart);

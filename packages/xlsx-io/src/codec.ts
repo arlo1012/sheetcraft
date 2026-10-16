@@ -1,7 +1,9 @@
+import { readXlsxTextBoxes } from "./textbox-reader.js";
+import { assertSupportedNativeTextBox } from "./textbox-capabilities.js";
 import { unsupportedNativeChartStyles } from "./native-chart-style-capabilities.js";
 import { isNativePictureThemeSuppression } from "./picture-capabilities.js";
 import { reportUnsupportedNativeChartElements } from "./native-chart-elements.js";
-import { hasShapeObjectFrame } from "@sheetcraft/core/sheet-drawings";
+import { hasShapeObjectFrame, type SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import { validateImportedCalculatedColumns } from "./table-calculated-columns.js";
 import { readXlsxPivotTables } from "./pivot-tables.js";
@@ -996,9 +998,22 @@ export async function decodeWithNativeXlsx(bytes: Uint8Array): Promise<XlsxDecod
   validateImportedCalculatedColumns(workbook, report);
   const pivots = readXlsxPivotTables(bytes, workbook, report);
   const nativeCharts = await collectNativeChartParts(archive, async (part) => archive[part]);
-  readXlsxPivotCharts(workbook, nativeCharts.charts, pivots, report);
-  readXlsxColumnCharts(workbook, nativeCharts.charts, report);
+  const drawingOrder = new Map<SheetDrawing, number>();
+  const rememberDrawing = (source: { drawingOrder?: number }, drawing: SheetDrawing) => {
+    if (source.drawingOrder !== undefined) drawingOrder.set(drawing, source.drawingOrder);
+  };
+  readXlsxPivotCharts(workbook, nativeCharts.charts, pivots, report, rememberDrawing);
+  readXlsxColumnCharts(workbook, nativeCharts.charts, report, rememberDrawing);
   readXlsxPictures(workbook, nativeCharts.pictures, nativeCharts.backgrounds, report);
+  readXlsxTextBoxes(workbook, nativeCharts.textBoxes, report, rememberDrawing);
+  for (const sheet of workbook.sheets.values())
+    sheet.drawings?.sort(
+      (a, b) =>
+        (drawingOrder.get(a) ?? Number.MAX_SAFE_INTEGER) -
+        (drawingOrder.get(b) ?? Number.MAX_SAFE_INTEGER),
+    );
+  for (const part of nativeCharts.pictureObjectOrderWarnings)
+    report.add("feature-omitted", "warning", `${part}.pictureObjectOrder`);
   return {
     workbook,
     report: report.build(),
@@ -1255,6 +1270,14 @@ export async function encodeWithNativeXlsx(
     throw new RangeError("The XLSX active sheet must identify a visible worksheet.");
   for (const sheet of sheets) {
     for (const drawing of sheet.drawings ?? []) {
+      if (drawing.kind === "textBox" && hasShapeObjectFrame(drawing)) {
+        assertSupportedNativeTextBox(
+          drawing,
+          sheet,
+          `${sheet.name}.drawings[${JSON.stringify(drawing.id)}]`,
+        );
+        continue;
+      }
       if (!hasShapeObjectFrame(drawing)) {
         if (
           (drawing.kind === "shape" || drawing.kind === "textBox") &&

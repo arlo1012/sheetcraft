@@ -1,3 +1,10 @@
+import {
+  inspectNativeTextBox,
+  readNativeTextBoxTheme,
+  MAX_XLSX_TEXT_BOXES,
+  type NativeTextBox,
+} from "./textbox-reader.js";
+import { nativeTextBoxElementNamespace } from "./textbox-namespaces.js";
 import { isIdentityNativePictureGeometry } from "./picture-frame-geometry.js";
 import { assertNativePictureSourceOrientation } from "./picture-source-orientation.js";
 import { XMLParser } from "fast-xml-parser";
@@ -353,6 +360,18 @@ function inspectStrictRoot(
       // WPS materializes visible ordinary column/bar label settings per series.
       // This admits only its observed inert extension, never the c15 namespace generally.
       const path = ancestors.join("/");
+      const textBoxNode =
+        namespace === DRAWING_NS &&
+        ancestors[0] === "wsDr" &&
+        ["oneCellAnchor", "twoCellAnchor", "absoluteAnchor"].includes(ancestors[1] ?? "") &&
+        (ancestors[2] === "sp" || (ancestors.length === 2 && localName === "sp"));
+      if (textBoxNode) {
+        const relativePath = [...ancestors.slice(2), localName!].join("/");
+        if (nativeTextBoxElementNamespace(relativePath) !== ns) reject();
+        const text = typeof entry === "string" ? entry : node["#text"];
+        if (localName !== "t" && text !== undefined && String(text).trim()) reject();
+      }
+
       const ordinary =
         namespace === CHART_NS && child(local, "chartSpace").pivotSource === undefined;
       const empty =
@@ -430,17 +449,21 @@ function inspectStrictRoot(
           !(namespace === CHART_NS && localName === "style" && ns === C14_NS) &&
           !inertLabelLeaf) ||
         (namespace === DRAWING_NS &&
+          !textBoxNode &&
           drawingElements.has(localName!) &&
           ns !== DRAWING_NS &&
           !(localName === "xfrm" && parent === "spPr" && ns === ART_NS)) ||
         (namespace === DRAWING_NS &&
+          !textBoxNode &&
           ns === DRAWING_NS &&
           !drawingElements.has(localName!) &&
           localName !== "ext") ||
         (namespace === DRAWING_NS &&
+          !textBoxNode &&
           ["graphic", "graphicData", "off"].includes(localName!) &&
           ns !== ART_NS) ||
         (namespace === DRAWING_NS &&
+          !textBoxNode &&
           localName === "ext" &&
           ns !==
             (["oneCellAnchor", "absoluteAnchor"].includes(parent)
@@ -449,9 +472,11 @@ function inspectStrictRoot(
                 ? ART_NS
                 : "")) ||
         (namespace === DRAWING_NS &&
+          !textBoxNode &&
           ns === ART_NS &&
           !["graphic", "graphicData", ...pictureArtElements].includes(localName!)) ||
         (namespace === DRAWING_NS &&
+          !textBoxNode &&
           pictureArtElements.has(localName!) &&
           !["xfrm", "off", "ext"].includes(localName!) &&
           ns !== ART_NS) ||
@@ -492,8 +517,18 @@ function inspectStrictRoot(
       for (const attribute of Object.keys(node)) {
         if (!attribute.startsWith("@_") || attribute.startsWith("@_xmlns")) continue;
         const rawName = attribute.slice(2);
+        if (textBoxNode && localName === "t" && !rawName.includes(":")) reject();
         if (!rawName.includes(":")) continue;
         const attributeNs = bindings.get(rawName.split(":")[0]!);
+        if (
+          textBoxNode &&
+          !(
+            attributeNs === "http://www.w3.org/XML/1998/namespace" &&
+            localName === "t" &&
+            rawName.split(":")[1] === "space"
+          )
+        )
+          reject();
         if (
           attributeNs !== "http://www.w3.org/XML/1998/namespace" &&
           (!relationshipIds ||
@@ -507,7 +542,7 @@ function inspectStrictRoot(
           walk(childKey, content, bindings, false, localName, [...ancestors, localName!]);
     }
   };
-  walk(roots[0]!, raw[roots[0]!], new Map(), true);
+  walk(roots[0]!, raw[roots[0]!], new Map([["xml", "http://www.w3.org/XML/1998/namespace"]]), true);
   return single(local, name);
 }
 
@@ -557,11 +592,14 @@ export type NativeChartPart = {
   frame: XmlNode;
   chartSpace: XmlNode;
   wpsChartProperties: boolean;
+  drawingOrder?: number;
 };
 export type NativeChartPackage = {
   parts: ReadonlySet<string>;
   charts: readonly NativeChartPart[];
   pictures: readonly NativePicture[];
+  textBoxes: readonly (NativeTextBox & { sheetIndex: number; drawingOrder?: number })[];
+  pictureObjectOrderWarnings: readonly string[];
   backgrounds: readonly NativePictureBackground[];
   images: readonly XlsxImportedImage[];
 };
@@ -575,6 +613,8 @@ export async function collectNativeChartParts(
   const parts = new Set<string>();
   const charts: NativeChartPart[] = [];
   const pictures: NativePicture[] = [];
+  const textBoxes: (NativeTextBox & { sheetIndex: number; drawingOrder?: number })[] = [];
+  const pictureObjectOrderWarnings: string[] = [];
   const backgrounds: NativePictureBackground[] = [];
   const images: XlsxImportedImage[] = [];
   const media = new Map<string, XlsxImportedImage>();
@@ -594,7 +634,7 @@ export async function collectNativeChartParts(
   if (!hasDrawing) {
     if (archiveNames.some((name) => /^xl\/media\//i.test(name) && !name.endsWith("/")))
       rejectNativePicture("xl/media");
-    return { parts, charts, pictures, backgrounds, images };
+    return { parts, charts, pictures, textBoxes, pictureObjectOrderWarnings, backgrounds, images };
   }
   const read = async (part: string): Promise<Uint8Array> => {
     const bytes = await readPart(part);
@@ -685,6 +725,25 @@ export async function collectNativeChartParts(
   };
   const workbook = child(parseXml(await read("xl/workbook.xml")), "workbook");
   const workbookRels = await rels("xl/workbook.xml");
+  let textBoxTheme: ReturnType<typeof readNativeTextBoxTheme> | undefined;
+  const getTextBoxTheme = async () => {
+    if (textBoxTheme) return textBoxTheme;
+    const themes = [...workbookRels.values()].filter(
+      (relation) => relation.type === `${REL_NS}/theme`,
+    );
+    if (themes.length > 1) reject();
+    const themePart = themes[0]?.target;
+    if (
+      themePart &&
+      types.get(themePart.toLowerCase()) !==
+        "application/vnd.openxmlformats-officedocument.theme+xml"
+    )
+      reject();
+    const bytes = themePart ? await read(themePart) : undefined;
+    if (themePart && (await rels(themePart)).size) reject();
+    textBoxTheme = readNativeTextBoxTheme(bytes, themePart);
+    return textBoxTheme;
+  };
   const claimed = new Set<string>();
   for (const [sheetIndex, sheet] of nodes(child(workbook, "sheets").sheet).entries()) {
     const sheetRelation = workbookRels.get(attr(sheet, "id"));
@@ -752,7 +811,21 @@ export async function collectNativeChartParts(
     )
       reject();
     if (!anchors.length) reject();
-    for (const { anchorKind, anchor } of anchors) {
+    for (const [drawingOrder, { anchorKind, anchor }] of anchors.entries()) {
+      if (anchor.sp !== undefined) {
+        if (textBoxes.length >= MAX_XLSX_TEXT_BOXES)
+          rejectNativePicture(`${drawingPart}.textBoxes`, true);
+        const textBox = inspectNativeTextBox(
+          anchorKind,
+          anchor,
+          `${drawingPart}.textBoxes[${textBoxes.length + 1}]`,
+          await getTextBoxTheme(),
+        );
+        if (objectIds.has(String(textBox.objectId))) rejectNativePicture(drawingPart);
+        objectIds.add(String(textBox.objectId));
+        textBoxes.push({ ...textBox, sheetIndex, drawingOrder });
+        continue;
+      }
       if (anchor.pic !== undefined) {
         if (pictures.length >= MAX_XLSX_PICTURE_OBJECTS) rejectNativePicture(drawingPart, true);
         const picture = inspectNativePicture(
@@ -1030,8 +1103,14 @@ export async function collectNativeChartParts(
         frame,
         chartSpace,
         wpsChartProperties: nativeChart.extLst !== undefined,
+        drawingOrder,
       });
     }
+    if (
+      anchors.some(({ anchor }) => anchor.sp !== undefined) &&
+      anchors.some(({ anchor }) => anchor.pic !== undefined)
+    )
+      pictureObjectOrderWarnings.push(drawingPart);
     if (used.size !== drawingRelations.size) reject();
     admit(drawingPart, DRAWING_MIME);
     if (entries[relationshipPath(drawingPart)])
@@ -1060,5 +1139,5 @@ export async function collectNativeChartParts(
       )
         rejectNativePicture(`${part}#${attr(relation, "Id")}`);
   }
-  return { parts, charts, pictures, backgrounds, images };
+  return { parts, charts, pictures, textBoxes, pictureObjectOrderWarnings, backgrounds, images };
 }
