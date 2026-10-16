@@ -9,7 +9,7 @@ import PicturePaintEditor from "../../../../modules/sheet-images/components/form
 import PictureGradientEditor from "../../../../modules/sheet-images/components/format-pane/PictureGradientEditor.vue";
 import PicturePaintNumber from "../../../../modules/sheet-images/components/format-pane/PicturePaintNumber.vue";
 import PicturePaintColor from "../../../../modules/sheet-images/components/format-pane/PicturePaintColor.vue";
-import PictureShadowEditor from "../../../../modules/sheet-images/components/format-pane/PictureShadowEditor.vue";
+import PictureEffectPresetField from "../../../../modules/sheet-images/components/format-pane/PictureEffectPresetField.vue";
 import PicturePresetGallery from "../../../../modules/sheet-images/components/format-pane/PicturePresetGallery.vue";
 import PictureFormat3dEditor from "../../../../modules/sheet-images/components/format-pane/PictureFormat3dEditor.vue";
 import PictureRotation3dEditor from "../../../../modules/sheet-images/components/format-pane/PictureRotation3dEditor.vue";
@@ -35,7 +35,7 @@ const paletteStub = {
   emits: ["select"],
   template: '<button :aria-label="label" :disabled="disabled" />',
 };
-function mountOwner() {
+function mountOwner(initialTab: "fill-line" | "effects" = "fill-line") {
   const f = appearanceOwnerFixture();
   const host = defineComponent({
     setup: () => () =>
@@ -44,9 +44,11 @@ function mountOwner() {
         capabilities: f.pane.capabilities.value,
         onIntent: f.pane.onIntent,
         t: (key) => key,
+        initialTab,
       }),
   });
   const wrapper = mount(host, {
+    attachTo: document.body,
     global: { plugins: [createAppI18n("en-US")], stubs: { ColorPaletteSelect: paletteStub } },
   });
   wrappers.push(wrapper);
@@ -97,15 +99,18 @@ test("failed Enter followed by blur is a single attempted transaction and preser
   f.refuse();
   const before = appearanceCheckpoint(f);
   f.execute.mockClear();
-  await input.get("input").setValue("37");
-  input.vm.$emit("enter", "37", { e: new KeyboardEvent("keydown", { key: "Enter" }) });
-  input.vm.$emit("blur", "37", { e: new FocusEvent("blur") });
+  const nativeInput = input.get<HTMLInputElement>("input");
+  nativeInput.element.focus();
+  await nativeInput.setValue("37");
+  await nativeInput.trigger("keydown", { key: "Enter", code: "Enter" });
+  nativeInput.element.blur();
   await flushPromises();
   expect(f.execute).toHaveBeenCalledTimes(1);
   expect(input.get<HTMLInputElement>("input").element.value).toBe("37");
   expect(field.text()).toContain("applyRejected");
   expectAppearanceUnchanged(f, before);
-  input.vm.$emit("keydown", "37", { e: new KeyboardEvent("keydown", { key: "Escape" }) });
+  nativeInput.element.focus();
+  await nativeInput.trigger("keydown", { key: "Escape", code: "Escape" });
   await flushPromises();
   expect(input.get<HTMLInputElement>("input").element.value).toBe("0");
   expect(f.execute).toHaveBeenCalledTimes(1);
@@ -183,9 +188,28 @@ test.each(["callback", "close"] as const)(
   },
 );
 test("shadow, material and real camera controls use detailed transactions instead of inert legacy fields", async () => {
-  const { f, wrapper } = mountOwner(),
-    shadow = wrapper.getComponent(PictureShadowEditor);
-  await select(shadow, "shadowSection", "inner");
+  const { f, wrapper } = mountOwner("effects");
+  const shadow = wrapper
+    .findAllComponents(PictureEffectPresetField)
+    .find((field) => field.props("category") === "shadow");
+  expect(shadow).toBeDefined();
+  const historyBefore = f.session.history.undoStack.length;
+  f.execute.mockClear();
+  for (const trigger of shadow!.findAll(".t-input__wrap, .t-input, .t-select-input")) {
+    trigger.element.getBoundingClientRect = () => new DOMRect(100, 100, 132, 28);
+  }
+  const headerInput = shadow!.get<HTMLInputElement>('input[role="combobox"]');
+  headerInput.element.focus();
+  await headerInput.trigger("keydown", { key: "ArrowDown", code: "ArrowDown", keyCode: 40 });
+  await vi.waitFor(() => expect(headerInput.attributes("aria-expanded")).toBe("true"));
+  const inner = document.querySelector<HTMLButtonElement>(
+    '[role="group"][aria-label="shadowInner"] button',
+  );
+  expect(inner).not.toBeNull();
+  inner!.click();
+  await flushPromises();
+  expect(f.execute).toHaveBeenCalledTimes(1);
+  expect(f.session.history.undoStack).toHaveLength(historyBefore + 1);
   expect(selectedNode(f).transform?.appearance?.detailedStyle?.shadow).toMatchObject({
     kind: "value",
     value: { kind: "inner" },
@@ -271,17 +295,47 @@ test("slider gestures keep intermediate numbers local and submit once on release
     slider = field.findComponent(Slider);
   expect(slider.exists()).toBe(true);
   f.execute.mockClear();
-  slider.vm.$emit("change", 10);
-  slider.vm.$emit("change", 20);
+  const historyBefore = f.session.history.undoStack.length;
+  const rail = field.get<HTMLElement>(".t-slider__rail");
+  Object.defineProperty(rail.element, "clientWidth", { configurable: true, value: 100 });
+  rail.element.getBoundingClientRect = () => new DOMRect(0, 0, 100, 6);
+  await field
+    .get(".t-slider__button-wrapper")
+    .trigger("mousedown", { button: 0, clientX: 0, clientY: 0 });
+  window.dispatchEvent(new MouseEvent("mousemove", { clientX: 10, clientY: 0, bubbles: true }));
   await flushPromises();
+  expect(field.get<HTMLInputElement>("input").element.value).toBe("10");
+  window.dispatchEvent(new MouseEvent("mousemove", { clientX: 20, clientY: 0, bubbles: true }));
+  await flushPromises();
+  expect(field.get<HTMLInputElement>("input").element.value).toBe("20");
   expect(f.execute).not.toHaveBeenCalled();
-  slider.vm.$emit("changeEnd", 20);
+  expect(f.session.history.undoStack).toHaveLength(historyBefore);
+  window.dispatchEvent(new MouseEvent("mouseup", { clientX: 20, clientY: 0, bubbles: true }));
+  await vi.waitFor(() => expect(f.execute).toHaveBeenCalledTimes(1));
   await flushPromises();
+  expect(f.session.history.undoStack).toHaveLength(historyBefore + 1);
   expect(f.execute).toHaveBeenCalledTimes(1);
   expect(selectedNode(f).transform?.appearance?.detailedStyle?.fill).toMatchObject({
     kind: "value",
     value: { opacity: 0.8 },
   });
+});
+
+test("slider controlled change echoes without a native gesture never edit the owner", async () => {
+  const { f, wrapper } = mountOwner();
+  const editor = wrapper.findAllComponents(PicturePaintEditor)[0]!;
+  await select(editor, "paintMode", "solid");
+  const field = number(editor, "paintOpacity");
+  const slider = field.getComponent(Slider);
+  const before = appearanceCheckpoint(f);
+  f.execute.mockClear();
+  slider.vm.$emit("change", 10);
+  slider.vm.$emit("change", 20);
+  slider.vm.$emit("changeEnd", 20);
+  await flushPromises();
+  expect(f.execute).not.toHaveBeenCalled();
+  expect(field.get<HTMLInputElement>("input").element.value).toBe("0");
+  expectAppearanceUnchanged(f, before);
 });
 
 test("mixed member fill is an explicit non-applying placeholder, not the inherited setting", async () => {
