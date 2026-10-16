@@ -1137,12 +1137,13 @@ function nativeMask(
   outline?: ShapeLine,
   clip = true,
   runs: readonly Readonly<ShapeTextRun>[] = plan.runs,
+  fillColor = "#ffffff",
 ): void {
   context.save();
   try {
     context.globalAlpha = 1;
     context.globalCompositeOperation = "source-over";
-    context.fillStyle = "#ffffff";
+    context.fillStyle = fillColor;
     context.strokeStyle = "#ffffff";
     context.textAlign = "left";
     context.textBaseline = "alphabetic";
@@ -1343,6 +1344,17 @@ function masked(paint: PictureRgbaSurface, mask: PictureRgbaSurface): void {
     if (paint.data[index + 3] === 0) paint.data.fill(0, index, index + 3);
   }
 }
+/** Match solid paint's byte opacity, once over the native RGBA union. Native
+ * colored glyphs keep their RGB; ordinary glyphs already used the authored fill. */
+function applyNativeFillOpacity(surface: PictureRgbaSurface, opacity: number): void {
+  const alpha = Math.round(opacity * 255) / 255;
+  if (alpha === 1) return;
+  for (let index = 0; index < surface.data.length; index += 4) {
+    surface.data[index + 3] = surface.data[index + 3]! * alpha;
+    if (surface.data[index + 3] === 0) surface.data.fill(0, index, index + 3);
+  }
+}
+
 function clipMask(surface: PictureRgbaSurface, plan: ShapeTextPaintPlan): void {
   if (!plan.clipRect) return;
   const rect = plan.clipRect,
@@ -1806,22 +1818,40 @@ function prepareShapeTextPaintAtDensity(
       maskContext = context2d(maskCanvas);
     maskContext.translate(-plan.frontBoundsRaster.left, -plan.frontBoundsRaster.top);
     maskContext.scale(plan.actualDensity, plan.actualDensity);
-    const paintMask = (runs: readonly Readonly<ShapeTextRun>[] = plan.runs, clip = true) => {
+    // Only ordinary, unwarped solid text uses native RGBA. Detailed paints and
+    // WordArt still intentionally sample their appearance through native alpha.
+    const nativeFill = (fill: ShapePaint | undefined, color?: string) => {
+      if (plan.warpPlan || color === "transparent") return undefined;
+      if (color !== undefined) return { color, opacity: 1 };
+      if (fill?.kind !== "solid") return undefined;
+      const rgb = resolvePictureColor(fill.color, theme);
+      return {
+        color: `#${rgb.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`,
+        opacity: fill.opacity,
+      };
+    };
+    const fill =
+        plan.effectiveStyle.fill?.kind === "value" ? plan.effectiveStyle.fill.value : undefined,
+      uniformNativeFill = !plan.attributedFill ? nativeFill(fill) : undefined;
+    const paintMask = (
+      runs: readonly Readonly<ShapeTextRun>[] = plan.runs,
+      clip = true,
+      fillColor?: string,
+    ) => {
       if (plan.warpPlan) {
         const warped = warpedNativeMask(plan, runs, make);
         if (clip) clipMask(warped, plan);
         write(maskCanvas, warped);
-      } else nativeMask(maskContext, plan, undefined, clip, runs);
+      } else nativeMask(maskContext, plan, undefined, clip, runs, fillColor);
     };
     paintMask(
       plan.runs,
       !plan.contourRequired && (!options.captureSilhouette || plan.requiresGlyphProjection),
+      uniformNativeFill?.color,
     );
     const glyphMask = read(maskCanvas),
       silhouette =
-        plan.contourRequired && !plan.attributedLine ? traceGlyphSilhouette(glyphMask) : undefined,
-      fill =
-        plan.effectiveStyle.fill?.kind === "value" ? plan.effectiveStyle.fill.value : undefined;
+        plan.contourRequired && !plan.attributedLine ? traceGlyphSilhouette(glyphMask) : undefined;
     if (plan.contourRequired || (options.captureSilhouette && !plan.requiresGlyphProjection))
       clipMask(glyphMask, plan);
     const paintSurface = (paint: ShapePaint) =>
@@ -1839,26 +1869,31 @@ function prepareShapeTextPaintAtDensity(
       });
     let source: PictureRgbaSurface;
     const emptyMask = createPictureRgbaSurface(glyphMask.width, glyphMask.height);
+    const overFillSpan = (target: PictureRgbaSurface, span: ShapeTextFillSpan) => {
+      if (span.color === "transparent" || (span.color === undefined && !span.fill)) return;
+      const native = nativeFill(span.fill, span.color);
+      write(maskCanvas, emptyMask);
+      paintMask(plan.runs.slice(span.start, span.end), true, native?.color);
+      const pixels = read(maskCanvas);
+      if (native) {
+        applyNativeFillOpacity(pixels, native.opacity);
+        over(target, pixels);
+      } else {
+        overMaskedFill(target, pixels, span.fill ? paintSurface(span.fill) : undefined, span.color);
+      }
+    };
     if (!plan.attributedFill) {
-      if (fill) {
+      if (uniformNativeFill) {
+        source = glyphMask;
+        applyNativeFillOpacity(source, uniformNativeFill.opacity);
+      } else if (fill) {
         source = paintSurface(fill);
         masked(source, glyphMask);
       } else source = createPictureRgbaSurface(glyphMask.width, glyphMask.height);
     } else {
       source = createPictureRgbaSurface(glyphMask.width, glyphMask.height);
-      // Each authored whole run is drawn with native shaping intact. Only the
-      // mask changes; gradient/pattern/picture sampling shares the same frame.
-      for (const span of plan.fillSpans) {
-        if (span.color === "transparent" || (span.color === undefined && !span.fill)) continue;
-        write(maskCanvas, emptyMask);
-        paintMask(plan.runs.slice(span.start, span.end));
-        overMaskedFill(
-          source,
-          read(maskCanvas),
-          span.fill ? paintSurface(span.fill) : undefined,
-          span.color,
-        );
-      }
+      // Whole native runs keep shaping; detailed paint sampling stays frame-owned.
+      for (const span of plan.fillSpans) overFillSpan(source, span);
     }
     const outlineSpans = plan.lineSpans.filter((span) => visibleLine(span.line));
     if (outlineSpans.length) {
@@ -1903,17 +1938,7 @@ function prepareShapeTextPaintAtDensity(
     };
     const paintOwnedSubset = (start: number, end: number): OwnedCharacterFront => {
       const owned = createPictureRgbaSurface(plan.frontWidthRaster, plan.frontHeightRaster);
-      for (const span of intersectRunSpans(plan.fillSpans, start, end)) {
-        if (span.color === "transparent" || (span.color === undefined && !span.fill)) continue;
-        write(maskCanvas, emptyMask);
-        paintMask(plan.runs.slice(span.start, span.end));
-        overMaskedFill(
-          owned,
-          read(maskCanvas),
-          span.fill ? paintSurface(span.fill) : undefined,
-          span.color,
-        );
-      }
+      for (const span of intersectRunSpans(plan.fillSpans, start, end)) overFillSpan(owned, span);
       const ownFill = { ...owned, data: new Uint8ClampedArray(owned.data) };
       const lines = intersectRunSpans(plan.lineSpans, start, end).filter((span) =>
         visibleLine(span.line),

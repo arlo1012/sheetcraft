@@ -212,7 +212,12 @@ class MemoryContext {
             ly < y + half ||
             ly >= y + height - half)
         )
-          this.pixel(px, py, [255, 255, 255, 255]);
+          this.pixel(px, py, [
+            ...[1, 3, 5].map((start) =>
+              parseInt((outline ? this.strokeStyle : this.fillStyle).slice(start, start + 2), 16),
+            ),
+            255,
+          ]);
       }
   }
   fillRect(x: number, y: number, w: number, h: number) {
@@ -2020,5 +2025,138 @@ describe("run-local modern WordArt glyph appearance", () => {
     const proof = preflightShapeTextGlyphBudgets({ ...input, canvasFactory: native.make });
     expect(proof).toMatchObject({ kind: "ready", proof: "native-alpha-outline", contourCount: 1 });
     expect(native.calls().map((call) => call.text)).toEqual(["alpha"]);
+  });
+});
+
+describe("native colored glyph RGBA in ordinary solid text", () => {
+  const at = (result: ReturnType<typeof paint>, x: number, y: number) =>
+    pixel(
+      result.canvas,
+      Math.floor(x * result.actualDensity - result.outputBoundsRaster.left),
+      Math.floor(y * result.actualDensity - result.outputBoundsRaster.top),
+    );
+  function coloredInput() {
+    const original = MemoryContext.prototype.fillText;
+    vi.spyOn(MemoryContext.prototype, "fillText").mockImplementation(function (
+      this: MemoryContext,
+      text: string,
+      x: number,
+      y: number,
+    ) {
+      original.call(this, text, x, y);
+      if (text !== "a🙂") return;
+      const previous = this.fillStyle;
+      // A color-font face ignores ordinary fillStyle, including white mask paint.
+      this.fillStyle = "#ffcc00";
+      this.paintRect(x + 4, y - 4, 4, 4);
+      this.fillStyle = "#332211";
+      this.paintRect(x + 5, y - 3, 1, 1);
+      const edge = this.transformed(x + 7, y - 4);
+      this.pixel(Math.floor(edge.x), Math.floor(edge.y), [255, 204, 0, 128]);
+      this.fillStyle = previous;
+    });
+    const input = options();
+    input.layout = layout([run("a🙂")]);
+    return input;
+  }
+  test("uniform fill keeps native face details and authored ordinary text color", () => {
+    const input = coloredInput(),
+      before = JSON.stringify(input),
+      native = factory(),
+      result = paint(input, native.make);
+    expect(at(result, 3, 3)).toEqual([18, 52, 86, 255]);
+    expect(at(result, 6, 3)).toEqual([255, 204, 0, 255]);
+    expect(at(result, 7, 3)).toEqual([51, 34, 17, 255]);
+    expect(at(result, 9, 2)).toEqual([255, 204, 0, 128]);
+    expect(native.calls().map((call) => call.text)).toEqual(["a🙂"]);
+    expect(JSON.stringify(input)).toBe(before);
+  });
+  test.each([false, true])("solid opacity is applied once (attributed=%s)", (attributed) => {
+    const input = coloredInput();
+    const fill = { kind: "value", value: solid("#00ff00", 0.5) } as const;
+    if (attributed) input.layout.runs[0]!.fill = fill;
+    else input.drawing.shapeText!.style = { fill };
+    const result = paint(input, factory().make);
+    expect(at(result, 3, 3)).toEqual([0, 255, 0, 128]);
+    expect(at(result, 6, 3)).toEqual([255, 204, 0, 128]);
+    expect(at(result, 7, 3)).toEqual([51, 34, 17, 128]);
+    expect(at(result, 9, 2)).toEqual([255, 204, 0, 64]);
+  });
+  test("explicit RGB and owned character-effect fronts retain color", () => {
+    const input = coloredInput();
+    input.layout.runs[0]!.color = "#00ff00";
+    input.layout.runs[0]!.reflection = {
+      kind: "value",
+      value: { size: 1, opacity: 1, blurPt: 0, distancePt: 0 },
+    };
+    const result = paint(input, factory().make);
+    expect(result.attributedEffects).toBe(true);
+    expect(at(result, 3, 3)).toEqual([0, 255, 0, 255]);
+    expect(at(result, 6, 3)).toEqual([255, 204, 0, 255]);
+    // The reflected owner must also retain native yellow, not the run's green.
+    const data = (result.canvas as unknown as MemoryCanvas).data;
+    let reflectedYellow = false;
+    for (let y = 7; y < result.canvas.height; y++)
+      for (let x = 0; x < result.canvas.width; x++) {
+        const index = (y * result.canvas.width + x) * 4;
+        if (data[index] === 255 && data[index + 1] === 204 && data[index + 3]! > 0)
+          reflectedYellow = true;
+      }
+    expect(reflectedYellow).toBe(true);
+  });
+  test.each(["none", "transparent", "zero"] as const)("%s never leaks native color", (kind) => {
+    const input = coloredInput();
+    if (kind === "transparent") input.layout.runs[0]!.color = "transparent";
+    else
+      input.drawing.shapeText!.style = {
+        fill: kind === "none" ? { kind: "none" } : { kind: "value", value: solid("#00ff00", 0) },
+      };
+    const result = paint(input, factory().make);
+    expect(at(result, 3, 3)).toEqual([0, 0, 0, 0]);
+    expect(at(result, 6, 3)).toEqual([0, 0, 0, 0]);
+  });
+  test("clipping applies to native color and cached results remain independently owned", () => {
+    const input = coloredInput(),
+      native = factory();
+    input.layout = {
+      ...input.layout,
+      overflow: false,
+      clipRect: { x: 0, y: 0, width: 7, height: 8 },
+    };
+    vi.stubGlobal("document", { createElement: () => native.make() });
+    const first = ready(prepareShapeTextPaint({ ...input, key: "ready-font-1" }));
+    owned.push(first);
+    const calls = native.calls().length;
+    const second = ready(prepareShapeTextPaint({ ...input, key: "ready-font-1" }));
+    owned.push(second);
+    expect(native.calls()).toHaveLength(calls);
+    expect(at(second, 6, 3)).toEqual([255, 204, 0, 255]);
+    expect(at(second, 7, 3)[3]).toBe(0);
+    first.dispose();
+    expect(at(second, 6, 3)).toEqual([255, 204, 0, 255]);
+    second.dispose();
+    clearShapeTextPaintCache();
+    expect(getShapeTextPaintOwnedBytes()).toEqual({ cached: 0, liveCanvases: 0, liveResults: 0 });
+  });
+  test("gradient retains its explicit alpha-mask appearance policy", () => {
+    const input = coloredInput();
+    input.drawing.shapeText!.style = {
+      fill: {
+        kind: "value",
+        value: {
+          kind: "linear",
+          angleDeg: 0,
+          rotateWithShape: true,
+          opacity: 1,
+          stops: [
+            { offset: 0, color: { kind: "rgb", rgb: "#0000ff" }, opacity: 1, brightness: 0 },
+            { offset: 1, color: { kind: "rgb", rgb: "#0000ff" }, opacity: 1, brightness: 0 },
+          ],
+        },
+      },
+    };
+    const result = paint(input, factory().make);
+    expect(at(result, 6, 3)).toEqual([0, 0, 255, 255]);
+    expect(at(result, 7, 3)).toEqual([0, 0, 255, 255]);
   });
 });

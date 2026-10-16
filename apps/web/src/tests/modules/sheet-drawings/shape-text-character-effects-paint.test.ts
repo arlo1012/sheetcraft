@@ -212,7 +212,12 @@ class MemoryContext {
             ly < y + half ||
             ly >= y + height - half)
         )
-          this.pixel(px, py, [255, 255, 255, 255]);
+          this.pixel(px, py, [
+            ...[1, 3, 5].map((start) =>
+              parseInt((outline ? this.strokeStyle : this.fillStyle).slice(start, start + 2), 16),
+            ),
+            255,
+          ]);
       }
   }
   fillRect(x: number, y: number, w: number, h: number) {
