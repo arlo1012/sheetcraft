@@ -173,3 +173,58 @@ describe("standard TDesign InputNumber proof", () => {
     expect(replacement.mock.calls[1]?.[0]).toEqual({ kind: "value", value: 8.75 });
   });
 });
+
+test.each([true, false])(
+  "composition blur retains actual text and end outside commits once (accepted=%s)",
+  async (accepted) => {
+    const commit = vi.fn((..._args: unknown[]) =>
+      accepted ? { accepted: true as const } : { accepted: false as const, error: "Rejected" },
+    );
+    const f = fixture({
+      onCommit: commit,
+      value: { kind: "auto" },
+      spec: { displayStep: 1, allowAuto: true },
+    });
+    f.input.element.focus();
+    await f.input.trigger("compositionstart");
+    f.input.element.value = "3.75";
+    await f.input.trigger("input");
+    f.input.element.blur();
+    await nextTick();
+    expect(f.input.element.value).toBe("3.75");
+    expect(commit).not.toHaveBeenCalled();
+    expect(f.wrapper.vm.hasPending()).toBe(true);
+    await f.input.trigger("compositionend");
+    await nextTick();
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(commit.mock.calls[0]?.[0]).toEqual({ kind: "value", value: 3.75 });
+    expect(f.input.element.value).toBe("3.75");
+    expect(f.wrapper.vm.hasPending()).toBe(!accepted);
+    await f.input.trigger("blur");
+    expect(commit).toHaveBeenCalledTimes(1);
+  },
+);
+
+test("owner change during blurred composition retires the old text and cannot write the new owner", async () => {
+  const f = fixture();
+  f.input.element.focus();
+  await f.input.trigger("compositionstart");
+  f.input.element.value = "3.75";
+  await f.input.trigger("input");
+  f.input.element.blur();
+  await nextTick();
+  const replacement = vi.fn(() => ({ accepted: true }));
+  await f.wrapper.setProps({
+    ownerKey: "object-b",
+    value: { kind: "value", value: 6 },
+    onCommit: replacement,
+  });
+  const current = f.wrapper.get<HTMLInputElement>("input");
+  expect(current.element.value).toBe("6");
+  expect(current.element).not.toBe(f.input.element);
+  await f.input.trigger("compositionend");
+  await nextTick();
+  expect(f.commit).not.toHaveBeenCalled();
+  expect(replacement).not.toHaveBeenCalled();
+  expect(f.wrapper.vm.hasPending()).toBe(false);
+});

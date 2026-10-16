@@ -142,3 +142,28 @@ test.each([
   expect(f.dispatch().handled).toBe(false);
   expect(f.undo).not.toHaveBeenCalled();
 });
+
+test.each(["No fill", "No line"])("routes explicitly owned %s commands only", (label) => {
+  const f = fixture(
+    `<button data-target data-format-pane-history-control="command">${label}</button>`,
+  );
+  f.pane.removeAttribute("data-shape-format-pane");
+  f.pane.setAttribute("data-chart-format-pane", "");
+  expect(f.dispatch().handled).toBe(true);
+  expect(f.undo).toHaveBeenCalledTimes(1);
+  expect(f.dispatch({ shiftKey: true }).handled).toBe(true);
+  expect(f.redo).toHaveBeenCalledTimes(1);
+  f.current.mockReturnValue(false);
+  expect(f.dispatch().handled).toBe(false);
+});
+test.each([
+  '<input data-target data-format-pane-history-control="command">',
+  '<button disabled data-target data-format-pane-history-control="command">No fill</button>',
+  '<div role="dialog"><button data-target data-format-pane-history-control="command">No line</button></div>',
+])("explicit command marker cannot override native or popup isolation: %s", (markup) => {
+  const f = fixture(markup);
+  f.pane.removeAttribute("data-shape-format-pane");
+  f.pane.setAttribute("data-chart-format-pane", "");
+  expect(f.dispatch().handled).toBe(false);
+  expect(f.undo).not.toHaveBeenCalled();
+});

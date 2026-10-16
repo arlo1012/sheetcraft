@@ -43,7 +43,6 @@ import {
   chartFormatTargetKey,
   chartFormatTargetLabelKeys,
   compactChartAxis,
-  commitChartFormatNumberDraft,
   createChartFormatDraft,
   editChartFormatDraft,
   getChartFormatCapabilities,
@@ -111,11 +110,6 @@ function captureAction<Args extends unknown[], Result>(action: (...args: Args) =
       activeHandler = previous;
     }
   };
-}
-function numberAction(field: ChartFormatNumericField) {
-  return captureAction((value: string | number, context: { e: KeyboardEvent | FocusEvent }) =>
-    commitNumber(field, value, context),
-  );
 }
 function textAction(field: "title" | "axisTitle" | "formatCode") {
   return captureAction((value: string | number, context: { e: KeyboardEvent | FocusEvent }) =>
@@ -197,6 +191,10 @@ const numericFields: ChartFormatNumericField[] = [
   "overlap",
 ];
 type SharedNumericField =
+  | "min"
+  | "max"
+  | "majorUnit"
+  | "minorUnit"
   | "fontSize"
   | "strokeWidth"
   | "labelAngle"
@@ -204,6 +202,10 @@ type SharedNumericField =
   | "overlap"
   | "decimals";
 const sharedNumericFields: SharedNumericField[] = [
+  "min",
+  "max",
+  "majorUnit",
+  "minorUnit",
   "fontSize",
   "strokeWidth",
   "labelAngle",
@@ -214,6 +216,10 @@ const sharedNumericFields: SharedNumericField[] = [
 function isSharedNumericField(field: string): field is SharedNumericField {
   return sharedNumericFields.includes(field as SharedNumericField);
 }
+const minControl = ref<InstanceType<typeof NumericField>>();
+const maxControl = ref<InstanceType<typeof NumericField>>();
+const majorUnitControl = ref<InstanceType<typeof NumericField>>();
+const minorUnitControl = ref<InstanceType<typeof NumericField>>();
 const labelAngleControl = ref<InstanceType<typeof NumericField>>();
 const gapWidthControl = ref<InstanceType<typeof NumericField>>();
 const overlapControl = ref<InstanceType<typeof NumericField>>();
@@ -234,6 +240,15 @@ const draftFields = [
   "axisTitle",
   "formatCode",
 ];
+const axisBoundSpec: NumericFieldSpec = {
+  displayStep: 1,
+  allowAuto: true,
+  parsePolicy: { scientific: true },
+};
+const axisUnitSpec: NumericFieldSpec = {
+  ...axisBoundSpec,
+  canonicalBounds: { min: 0, minExclusive: true },
+};
 const fontSizeSpec: NumericFieldSpec = {
   displayUnit: "px",
   displayStep: 1,
@@ -281,6 +296,18 @@ function sharedNumericValue(field: SharedNumericField, previous?: NumericValue):
     ? previous
     : { kind: "value", value };
 }
+const minNumericValue = computed<NumericValue>((previous) => sharedNumericValue("min", previous));
+const minCommit = computed(() => sharedNumericCommit("min"));
+const maxNumericValue = computed<NumericValue>((previous) => sharedNumericValue("max", previous));
+const maxCommit = computed(() => sharedNumericCommit("max"));
+const majorUnitNumericValue = computed<NumericValue>((previous) =>
+  sharedNumericValue("majorUnit", previous),
+);
+const majorUnitCommit = computed(() => sharedNumericCommit("majorUnit"));
+const minorUnitNumericValue = computed<NumericValue>((previous) =>
+  sharedNumericValue("minorUnit", previous),
+);
+const minorUnitCommit = computed(() => sharedNumericCommit("minorUnit"));
 const fontSizeNumericValue = computed<NumericValue>((previous) =>
   sharedNumericValue("fontSize", previous),
 );
@@ -319,7 +346,13 @@ function sharedNumericCommit(field: SharedNumericField) {
       (field === "decimals" && candidate.kind !== "value")
     )
       return { accepted: false, error: t("chart.formatApplyFailed") };
-    const intent = numericIntent(field, candidate.kind === "auto" ? undefined : candidate.value);
+    const value = candidate.kind === "auto" ? undefined : candidate.value;
+    if (
+      (field === "min" || field === "max" || field === "majorUnit" || field === "minorUnit") &&
+      !isChartValueAxisDraftValid(setChartFormatField(valueAxis.value, field, value) ?? {})
+    )
+      return { accepted: false, error: t("chart.formatInvalidBounds") };
+    const intent = numericIntent(field, value);
     const accepted = !!intent && submit(intent, handler);
     if (accepted) delete sharedNumericResetErrors[field];
     return accepted ? { accepted: true } : { accepted: false, error: t("chart.formatApplyFailed") };
@@ -343,6 +376,14 @@ function sharedNumericFocusBoundary(field: SharedNumericField): Element[] {
 }
 function sharedNumericControl(field: SharedNumericField) {
   switch (field) {
+    case "min":
+      return minControl.value;
+    case "max":
+      return maxControl.value;
+    case "majorUnit":
+      return majorUnitControl.value;
+    case "minorUnit":
+      return minorUnitControl.value;
     case "fontSize":
       return fontSizeControl.value;
     case "strokeWidth":
@@ -617,77 +658,25 @@ function numericIntent(
       return undefined;
   }
 }
-function commitNumber(
-  field: ChartFormatNumericField,
-  _value?: unknown,
-  context?: { e: KeyboardEvent | FocusEvent },
-): boolean {
-  if (props.disabled) return false;
-  if (
-    context?.e instanceof FocusEvent &&
-    (pendingResetField === field || pendingResetField === "element")
-  )
-    return true;
-  if (context?.e instanceof KeyboardEvent && context.e.isComposing) {
-    drafts[field]!.error = "composition";
-    return false;
-  }
-  const handler = draftHandlers.get(field) ?? props.apply;
-  const accepted = commitChartFormatNumberDraft(
-    drafts[field]!,
-    field,
-    (value) => {
-      const intent = numericIntent(field, value);
-      return !!intent && submit(intent, handler);
-    },
-    (value) => {
-      if (!["min", "max", "majorUnit", "minorUnit"].includes(field)) return true;
-      return isChartValueAxisDraftValid(
-        setChartFormatField(
-          valueAxis.value,
-          field as "min" | "max" | "majorUnit" | "minorUnit",
-          value,
-        ) ?? {},
-      );
-    },
-  );
-  if (accepted) draftHandlers.delete(field);
-  return accepted;
-}
 function resetNumber(field: ChartFormatNumericField): void {
   if (props.disabled || composing()) return;
   pendingResetField = undefined;
-  if (isSharedNumericField(field)) {
-    const control = sharedNumericControl(field);
-    if (!control) return;
-    if (numericValue(field) === undefined) {
-      control.cancel();
-      delete sharedNumericResetErrors[field];
-      fieldError.value = undefined;
-      return;
-    }
-    const intent = numericIntent(field, undefined);
-    if (intent && submit(intent)) {
-      control.cancel();
-      sharedNumericResets[field] = ownerKey.value;
-    } else {
-      // Reset is a distinct action. A rejection must not edit, rebind, or lose
-      // the NumericField's existing draft (including a stale handler lease).
-      sharedNumericResetErrors[field] = t("chart.formatApplyFailed");
-    }
-    return;
-  }
-  // Discarding an invalid auto draft does not manufacture an unchanged workbook edit.
+  const control = sharedNumericControl(field);
+  if (!control) return;
   if (numericValue(field) === undefined) {
-    drafts[field] = createChartFormatDraft();
-    draftHandlers.delete(field);
+    control.cancel();
+    delete sharedNumericResetErrors[field];
     fieldError.value = undefined;
     return;
   }
   const intent = numericIntent(field, undefined);
   if (intent && submit(intent)) {
-    drafts[field] = createChartFormatDraft();
-    draftHandlers.delete(field);
+    control.cancel();
+    sharedNumericResets[field] = ownerKey.value;
+  } else {
+    // Reset is a distinct action. A rejection must not edit, rebind, or lose
+    // the NumericField's existing draft (including a stale handler lease).
+    sharedNumericResetErrors[field] = t("chart.formatApplyFailed");
   }
 }
 function setText<K extends keyof ChartTextFormat>(
@@ -1272,24 +1261,32 @@ function escapeDraft(event: KeyboardEvent): void {
         <div class="chart-format-pane__field" data-chart-format-field="min">
           <label :for="`${paneId}-min`">{{ t("chart.formatMinimum") }}</label>
           <div class="chart-format-pane__number">
-            <TInput
+            <NumericField
+              ref="minControl"
               :id="`${paneId}-min`"
-              :value="drafts.min!.text"
-              size="small"
-              :placeholder="t('chart.formatAuto')"
+              :owner-key="`${ownerKey}/min`"
+              :value="minNumericValue"
+              :spec="axisBoundSpec"
+              :label="t('chart.formatMinimum')"
+              :auto-text="t('chart.formatAuto')"
               :disabled="disabled"
-              :aria-label="t('chart.formatMinimum')"
-              :status="drafts.min!.error ? 'error' : undefined"
-              :onChange="editAction('min')"
-              :onCompositionstart="compositionStartAction('min')"
-              :onCompositionend="compositionEndAction('min')"
-              :onEnter="numberAction('min')"
-              :onBlur="numberAction('min')"
+              :invalid-message="t('chart.formatInvalidNumber')"
+              :rejected-message="t('chart.formatApplyFailed')"
+              :stale-message="t('chart.formatApplyFailed')"
+              :external-error="sharedNumericResetErrors.min"
+              :focus-boundary="() => sharedNumericFocusBoundary('min')"
+              :on-commit="minCommit"
+              presentation="inline-stepper"
+              :show-unit="false"
+              @draft-change="sharedNumericDraftChange('min', $event)"
+              @cancel="delete sharedNumericResetErrors.min"
             /><TButton
               variant="text"
               shape="square"
               size="small"
-              :disabled="disabled || (valueAxis.min === undefined && !drafts.min!.dirty)"
+              :disabled="
+                disabled || (minNumericValue.kind === 'auto' && !sharedNumericDrafts.min?.dirty)
+              "
               :aria-label="t('chart.formatReset')"
               data-chart-format-reset="min"
               :onClick="captureAction(() => resetNumber('min'))"
@@ -1300,24 +1297,32 @@ function escapeDraft(event: KeyboardEvent): void {
         <div class="chart-format-pane__field" data-chart-format-field="max">
           <label :for="`${paneId}-max`">{{ t("chart.formatMaximum") }}</label>
           <div class="chart-format-pane__number">
-            <TInput
+            <NumericField
+              ref="maxControl"
               :id="`${paneId}-max`"
-              :value="drafts.max!.text"
-              size="small"
-              :placeholder="t('chart.formatAuto')"
+              :owner-key="`${ownerKey}/max`"
+              :value="maxNumericValue"
+              :spec="axisBoundSpec"
+              :label="t('chart.formatMaximum')"
+              :auto-text="t('chart.formatAuto')"
               :disabled="disabled"
-              :aria-label="t('chart.formatMaximum')"
-              :status="drafts.max!.error ? 'error' : undefined"
-              :onChange="editAction('max')"
-              :onCompositionstart="compositionStartAction('max')"
-              :onCompositionend="compositionEndAction('max')"
-              :onEnter="numberAction('max')"
-              :onBlur="numberAction('max')"
+              :invalid-message="t('chart.formatInvalidNumber')"
+              :rejected-message="t('chart.formatApplyFailed')"
+              :stale-message="t('chart.formatApplyFailed')"
+              :external-error="sharedNumericResetErrors.max"
+              :focus-boundary="() => sharedNumericFocusBoundary('max')"
+              :on-commit="maxCommit"
+              presentation="inline-stepper"
+              :show-unit="false"
+              @draft-change="sharedNumericDraftChange('max', $event)"
+              @cancel="delete sharedNumericResetErrors.max"
             /><TButton
               variant="text"
               shape="square"
               size="small"
-              :disabled="disabled || (valueAxis.max === undefined && !drafts.max!.dirty)"
+              :disabled="
+                disabled || (maxNumericValue.kind === 'auto' && !sharedNumericDrafts.max?.dirty)
+              "
               :aria-label="t('chart.formatReset')"
               data-chart-format-reset="max"
               :onClick="captureAction(() => resetNumber('max'))"
@@ -1328,25 +1333,32 @@ function escapeDraft(event: KeyboardEvent): void {
         <div class="chart-format-pane__field" data-chart-format-field="majorUnit">
           <label :for="`${paneId}-major`">{{ t("chart.formatMajorUnit") }}</label>
           <div class="chart-format-pane__number">
-            <TInput
+            <NumericField
+              ref="majorUnitControl"
               :id="`${paneId}-major`"
-              :value="drafts.majorUnit!.text"
-              size="small"
-              :placeholder="t('chart.formatAuto')"
+              :owner-key="`${ownerKey}/majorUnit`"
+              :value="majorUnitNumericValue"
+              :spec="axisUnitSpec"
+              :label="t('chart.formatMajorUnit')"
+              :auto-text="t('chart.formatAuto')"
               :disabled="disabled"
-              :aria-label="t('chart.formatMajorUnit')"
-              :status="drafts.majorUnit!.error ? 'error' : undefined"
-              :onChange="editAction('majorUnit')"
-              :onCompositionstart="compositionStartAction('majorUnit')"
-              :onCompositionend="compositionEndAction('majorUnit')"
-              :onEnter="numberAction('majorUnit')"
-              :onBlur="numberAction('majorUnit')"
+              :invalid-message="t('chart.formatInvalidNumber')"
+              :rejected-message="t('chart.formatApplyFailed')"
+              :stale-message="t('chart.formatApplyFailed')"
+              :external-error="sharedNumericResetErrors.majorUnit"
+              :focus-boundary="() => sharedNumericFocusBoundary('majorUnit')"
+              :on-commit="majorUnitCommit"
+              presentation="inline-stepper"
+              :show-unit="false"
+              @draft-change="sharedNumericDraftChange('majorUnit', $event)"
+              @cancel="delete sharedNumericResetErrors.majorUnit"
             /><TButton
               variant="text"
               shape="square"
               size="small"
               :disabled="
-                disabled || (valueAxis.majorUnit === undefined && !drafts.majorUnit!.dirty)
+                disabled ||
+                (majorUnitNumericValue.kind === 'auto' && !sharedNumericDrafts.majorUnit?.dirty)
               "
               :aria-label="t('chart.formatReset')"
               data-chart-format-reset="majorUnit"
@@ -1358,25 +1370,32 @@ function escapeDraft(event: KeyboardEvent): void {
         <div class="chart-format-pane__field" data-chart-format-field="minorUnit">
           <label :for="`${paneId}-minor`">{{ t("chart.formatMinorUnit") }}</label>
           <div class="chart-format-pane__number">
-            <TInput
+            <NumericField
+              ref="minorUnitControl"
               :id="`${paneId}-minor`"
-              :value="drafts.minorUnit!.text"
-              size="small"
-              :placeholder="t('chart.formatAuto')"
+              :owner-key="`${ownerKey}/minorUnit`"
+              :value="minorUnitNumericValue"
+              :spec="axisUnitSpec"
+              :label="t('chart.formatMinorUnit')"
+              :auto-text="t('chart.formatAuto')"
               :disabled="disabled"
-              :aria-label="t('chart.formatMinorUnit')"
-              :status="drafts.minorUnit!.error ? 'error' : undefined"
-              :onChange="editAction('minorUnit')"
-              :onCompositionstart="compositionStartAction('minorUnit')"
-              :onCompositionend="compositionEndAction('minorUnit')"
-              :onEnter="numberAction('minorUnit')"
-              :onBlur="numberAction('minorUnit')"
+              :invalid-message="t('chart.formatInvalidNumber')"
+              :rejected-message="t('chart.formatApplyFailed')"
+              :stale-message="t('chart.formatApplyFailed')"
+              :external-error="sharedNumericResetErrors.minorUnit"
+              :focus-boundary="() => sharedNumericFocusBoundary('minorUnit')"
+              :on-commit="minorUnitCommit"
+              presentation="inline-stepper"
+              :show-unit="false"
+              @draft-change="sharedNumericDraftChange('minorUnit', $event)"
+              @cancel="delete sharedNumericResetErrors.minorUnit"
             /><TButton
               variant="text"
               shape="square"
               size="small"
               :disabled="
-                disabled || (valueAxis.minorUnit === undefined && !drafts.minorUnit!.dirty)
+                disabled ||
+                (minorUnitNumericValue.kind === 'auto' && !sharedNumericDrafts.minorUnit?.dirty)
               "
               :aria-label="t('chart.formatReset')"
               data-chart-format-reset="minorUnit"
@@ -1498,6 +1517,7 @@ function escapeDraft(event: KeyboardEvent): void {
               variant="text"
               size="small"
               :disabled="disabled"
+              data-format-pane-history-control="command"
               :onClick="captureAction(() => setFill('transparent'))"
               >{{ t("chart.formatNoFill") }}</TButton
             >
@@ -1518,6 +1538,7 @@ function escapeDraft(event: KeyboardEvent): void {
               variant="text"
               size="small"
               :disabled="disabled"
+              data-format-pane-history-control="command"
               :onClick="captureAction(() => setLineColor('transparent'))"
               >{{ t("chart.formatNoLine") }}</TButton
             >

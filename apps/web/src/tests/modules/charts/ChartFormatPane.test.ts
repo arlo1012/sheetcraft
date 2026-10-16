@@ -1,6 +1,5 @@
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { Input } from "tdesign-vue-next/es/input";
 import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
 import { Select } from "tdesign-vue-next/es/select";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
@@ -119,9 +118,6 @@ function fixture(
 function input(wrapper: VueWrapper, field: string) {
   return wrapper.get(`[data-chart-format-field="${field}"]`).get<HTMLInputElement>("input");
 }
-function inputControl(wrapper: VueWrapper, field: string) {
-  return wrapper.get(`[data-chart-format-field="${field}"]`).getComponent(Input);
-}
 function select(wrapper: VueWrapper, label: string) {
   return wrapper
     .findAllComponents(Select)
@@ -223,20 +219,35 @@ describe("chart format right pane", () => {
   test("previously rendered callbacks reject callback replacement and unmount before any external apply", async () => {
     const { wrapper, apply } = fixture();
     await input(wrapper, "min").setValue("20");
-    const oldEnter = inputControl(wrapper, "min").vm.$.vnode.props!.onEnter as () => void;
+    const oldEnter = wrapper
+      .get('[data-chart-format-field="min"]')
+      .getComponent(NumericField)
+      .props("onCommit");
     const replacement = vi.fn((_intent: ChartFormatIntent) => true);
     await wrapper.setProps({ apply: replacement });
-    oldEnter();
+    oldEnter(
+      { kind: "value", value: 20 },
+      { ownerKey: "chart-one/valueAxis/min", sessionId: "old", source: "enter" },
+    );
     expect(apply).not.toHaveBeenCalled();
     expect(replacement).not.toHaveBeenCalled();
     expect(input(wrapper, "min").element.value).toBe("20");
     await input(wrapper, "min").setValue("30");
-    oldEnter();
+    oldEnter(
+      { kind: "value", value: 20 },
+      { ownerKey: "chart-one/valueAxis/min", sessionId: "old", source: "enter" },
+    );
     expect(replacement).not.toHaveBeenCalled();
-    const currentEnter = inputControl(wrapper, "min").vm.$.vnode.props!.onEnter as () => void;
+    const currentEnter = wrapper
+      .get('[data-chart-format-field="min"]')
+      .getComponent(NumericField)
+      .props("onCommit");
     wrapper.unmount();
     wrappers.splice(wrappers.indexOf(wrapper), 1);
-    currentEnter();
+    currentEnter(
+      { kind: "value", value: 30 },
+      { ownerKey: "chart-one/valueAxis/min", sessionId: "closed", source: "enter" },
+    );
     expect(replacement).not.toHaveBeenCalled();
   });
   test("changing drawing or target clears uncommitted numeric drafts", async () => {
@@ -251,8 +262,8 @@ describe("chart format right pane", () => {
   });
   test("composition blocks Enter, blur, target changes and other format controls", async () => {
     const { wrapper, apply } = fixture();
-    const control = inputControl(wrapper, "min");
-    control.vm.$emit("compositionstart", "", { e: new CompositionEvent("compositionstart") });
+    input(wrapper, "min").element.focus();
+    await input(wrapper, "min").trigger("compositionstart");
     await input(wrapper, "min").setValue("20");
     await input(wrapper, "min").trigger("keydown", { key: "Enter", isComposing: true });
     await input(wrapper, "min").trigger("blur");
@@ -262,7 +273,8 @@ describe("chart format right pane", () => {
     expect(apply).not.toHaveBeenCalled();
     expect(wrapper.emitted("update:target")).toBeUndefined();
     expect(wrapper.get('[role="alert"]').text()).toContain("Finish composing");
-    control.vm.$emit("compositionend", "20", { e: { target: input(wrapper, "min").element } });
+    expect(input(wrapper, "min").element.value).toBe("20");
+    await input(wrapper, "min").trigger("compositionend");
     await input(wrapper, "min").trigger("keydown", { key: "Enter" });
     expect(apply).toHaveBeenCalledExactlyOnceWith({ kind: "valueAxis", format: { min: 20 } });
   });
@@ -272,7 +284,7 @@ describe("chart format right pane", () => {
       { drawing: drawing({ format: { valueAxis: { min: 20, max: 180, reverse: true } } }) },
     );
     await input(wrapper, "min").setValue("25");
-    const reset = wrapper.get('[data-chart-format-field="min"] button');
+    const reset = wrapper.get('[data-chart-format-reset="min"]');
     await reset.trigger("pointerdown");
     await input(wrapper, "min").trigger("blur", { relatedTarget: reset.element });
     expect(apply).not.toHaveBeenCalled();
@@ -610,7 +622,7 @@ describe("shared chart style numbers", () => {
       "aria-valuemax": "32",
       "aria-valuetext": "1.5 px",
     });
-    expect(wrapper.findAllComponents(NumericField)).toHaveLength(2);
+    expect(wrapper.findAllComponents(NumericField)).toHaveLength(6);
     await wrapper.get('button[aria-label="Font size (px) +"]').trigger("click");
     expect(apply).toHaveBeenLastCalledWith({
       kind: "valueAxis",
@@ -993,5 +1005,77 @@ describe("legend layout pane", () => {
     await wrapper.setProps({ disabled: false, target: { kind: "title" } });
     oldPosition("left");
     expect(apply).not.toHaveBeenCalled();
+  });
+});
+
+describe("shared value-axis numbers", () => {
+  test.each(["min", "max", "majorUnit", "minorUnit"] as const)(
+    "%s retains auto and rejects failed resets without losing drafts",
+    async (field) => {
+      const apply = vi.fn(() => false);
+      const { wrapper } = fixture(
+        { kind: "valueAxis" },
+        { apply, drawing: drawing({ format: { valueAxis: { [field]: 2.5 } } }) },
+      );
+      const control = input(wrapper, field);
+      expect(control.attributes("role")).toBe("spinbutton");
+      expect(control.element.value).toBe("2.5");
+      await control.setValue("3e1");
+      await wrapper.get(`[data-chart-format-reset="${field}"]`).trigger("click");
+      expect(control.element.value).toBe("3e1");
+      expect(apply).toHaveBeenCalledTimes(1);
+      apply.mockReturnValue(true);
+      await wrapper.get(`[data-chart-format-reset="${field}"]`).trigger("click");
+      expect(control.element.value).toBe("");
+      expect(control.attributes("placeholder")).toBe("Auto");
+      expect(apply).toHaveBeenLastCalledWith({ kind: "valueAxis", format: undefined });
+      expect(
+        wrapper.get(`[aria-label="${control.attributes("aria-label")} +"]`).attributes("disabled"),
+      ).toBeDefined();
+    },
+  );
+  test.each([0, -1, 3, 0.01])(
+    "minor unit %s must preserve positive, even, bounded divisions",
+    async (value) => {
+      const { wrapper, apply } = fixture(
+        { kind: "valueAxis" },
+        { drawing: drawing({ format: { valueAxis: { majorUnit: 10 } } }) },
+      );
+      const control = input(wrapper, "minorUnit");
+      await control.setValue(String(value));
+      await control.trigger("keydown", { key: "Enter" });
+      expect(apply).not.toHaveBeenCalled();
+      expect(control.element.value).toBe(String(value));
+      await control.setValue("2.5");
+      await control.trigger("keydown", { key: "Enter" });
+      expect(apply).toHaveBeenCalledExactlyOnceWith({
+        kind: "valueAxis",
+        format: { majorUnit: 10, minorUnit: 2.5 },
+      });
+    },
+  );
+  test("secondary axis shares the bounds contract and command buttons opt into history explicitly", async () => {
+    const { wrapper, apply } = fixture(
+      { kind: "secondaryValueAxis" },
+      {
+        drawing: drawing({
+          format: {
+            series: [{ id: "pears", axis: "secondary" }],
+            secondaryValueAxis: { min: -5, max: 5 },
+          },
+        }),
+      },
+    );
+    await input(wrapper, "max").setValue("-5");
+    await input(wrapper, "max").trigger("keydown", { key: "Enter" });
+    expect(apply).not.toHaveBeenCalled();
+    await wrapper.setProps({ target: { kind: "plot" } });
+    const commands = wrapper.findAll('button[data-format-pane-history-control="command"]');
+    expect(commands.map((button) => button.text())).toEqual(["No fill", "No line"]);
+    await commands[0]!.trigger("click");
+    expect(apply).toHaveBeenLastCalledWith({ kind: "plot", format: { fill: "transparent" } });
+    expect(
+      wrapper.get('button[aria-label="Close"]').attributes("data-format-pane-history-control"),
+    ).toBeUndefined();
   });
 });

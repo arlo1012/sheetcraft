@@ -55,11 +55,13 @@ export function routeFormatPaneHistoryShortcut(
     )
   )
     return false;
-  // Chart resets are explicit commands, shared by every element and numeric field.
+  // Chart resets and explicitly marked actions share the current pane owner.
   // Do not admit arbitrary chart buttons or native editors into workbook history.
   if (
     pane.hasAttribute("data-chart-format-pane") &&
-    !target.closest("button[data-chart-format-reset]")
+    !target.closest(
+      'button[data-chart-format-reset], button[data-format-pane-history-control="command"]',
+    )
   )
     return false;
   const readonlyMode = isFormatPaneReadonlyHistoryControl(target);

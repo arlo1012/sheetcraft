@@ -227,7 +227,22 @@ function documentFocusin(event: FocusEvent) {
   state.focused.value = false;
   emit("focusChange", false);
 }
+const editorEpoch = ref(0);
+let compositionOwner: string | undefined;
+function compositionStart() {
+  compositionOwner = props.ownerKey;
+  state.setComposing(true);
+}
+function composingBlur(event: FocusEvent) {
+  if (!composing.value || !(event.target instanceof HTMLInputElement)) return;
+  // InputNumber normalizes its own stale numeric value on blur, even during IME.
+  // Preserve the actual composition text; focusout still performs owner cleanup,
+  // and compositionEnd commits through the existing lease if focus has left.
+  state.edit(event.target.value);
+  event.stopPropagation();
+}
 function compositionEnd(event: CompositionEvent) {
+  compositionOwner = undefined;
   state.setComposing(
     false,
     event.target instanceof HTMLInputElement ? event.target.value : undefined,
@@ -239,7 +254,15 @@ function windowBlur() {
 }
 watch(
   () => props.ownerKey,
-  () => stopRepeating(false),
+  () => {
+    stopRepeating(false);
+    if (compositionOwner !== undefined && compositionOwner !== props.ownerKey) {
+      // Retire the library's internal IME session as well as the domain lease.
+      // Ordinary same-owner updates retain the native editor and selection.
+      compositionOwner = undefined;
+      editorEpoch.value++;
+    }
+  },
   { flush: "sync" },
 );
 watch(
@@ -282,13 +305,15 @@ defineExpose({
     :aria-label="label"
     @focusin="focusin"
     @focusout="focusout"
+    @blur.capture="composingBlur"
     @keydown.capture="keydown"
-    @compositionstart.capture="state.setComposing(true)"
+    @compositionstart.capture="compositionStart"
     @compositionend.capture="compositionEnd"
   >
     <span v-if="showLabel" class="numeric-field__label" :title="label">{{ label }}</span>
     <TInput
       v-if="!hasStepper"
+      :key="`plain-${editorEpoch}`"
       v-native-control="{ attributes: nativeAttributes }"
       :model-value="text"
       size="small"
@@ -310,6 +335,7 @@ defineExpose({
     </TInput>
     <TInputNumber
       v-else
+      :key="`stepper-${editorEpoch}`"
       v-native-control="{
         attributes: nativeAttributes,
         numberSteps: {
