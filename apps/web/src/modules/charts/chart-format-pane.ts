@@ -1,5 +1,6 @@
 import type {
   ChartAxisLineFormat,
+  ChartLegendFormat,
   ChartBarFormat,
   ChartCategoryAxisFormat,
   ChartFormatSettings,
@@ -48,7 +49,8 @@ export type ChartFormatIntent =
   | { kind: "valueAxis" | "secondaryValueAxis"; format: ChartValueAxisFormat | undefined }
   | { kind: "series"; seriesId: string; format: Omit<ChartSeriesFormat, "id"> | undefined }
   | { kind: "elements"; patch: ChartElementPatch }
-  | { kind: "legend"; reset: true };
+  | { kind: "legend"; reset: true }
+  | { kind: "legend"; format: ChartLegendFormat | undefined };
 export type ChartFormatIntentHandler = (intent: ChartFormatIntent) => boolean;
 export type ChartFormatNumericField =
   | "min"
@@ -219,7 +221,7 @@ export function getChartSeriesFormat(chart: SheetChart, id: string): Omit<ChartS
 /** Produces detached branch data. Host validates/normalizes and owns the workbook command. */
 export function getChartFormatIntentSettings(
   current: ChartFormatSettings | undefined,
-  intent: Exclude<ChartFormatIntent, { kind: "elements" | "legend" }>,
+  intent: Exclude<ChartFormatIntent, { kind: "elements" } | { kind: "legend"; reset: true }>,
 ): ChartFormatSettings | undefined {
   const result: ChartFormatSettings = { ...current };
   if (intent.kind === "series") {
@@ -243,6 +245,13 @@ export function getChartFormatIntentSettings(
       switch (intent.kind) {
         case "chart":
           result.bar = { ...intent.format };
+          break;
+        case "legend":
+          result.legend = {
+            ...intent.format,
+            ...(intent.format.text ? { text: { ...intent.format.text } } : {}),
+            ...(intent.format.surface ? { surface: { ...intent.format.surface } } : {}),
+          };
           break;
         case "title":
           result.title = { ...intent.format };

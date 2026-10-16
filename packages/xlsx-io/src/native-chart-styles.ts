@@ -1,4 +1,8 @@
-import type { ChartFormatSettings, ChartTextFormat } from "@sheetcraft/core/chart-format";
+import type {
+  ChartFormatSettings,
+  ChartTextFormat,
+  ChartSurfaceFormat,
+} from "@sheetcraft/core/chart-format";
 import {
   DEFAULT_CHART_PALETTE,
   resolveChartSeriesColors,
@@ -20,8 +24,8 @@ export function nativeChartSeriesColors(
   );
 }
 /** Web text is in CSS px; DrawingML sz is hundredths of a point (96px = 72pt). */
-export function nativeChartTextProperties(format: ChartTextFormat): string {
-  const attributes = `${format.fontSize === undefined ? "" : ` sz="${Math.round(format.fontSize * 75)}"`}${format.bold === undefined ? "" : ` b="${Number(format.bold)}"`}`;
+export function nativeChartTextProperties(format: ChartTextFormat, legend = false): string {
+  const attributes = `${format.fontSize === undefined ? "" : ` sz="${Math.round(format.fontSize * 75)}"`}${format.bold === undefined ? "" : ` b="${Number(format.bold)}"`}${!legend || format.italic === undefined ? "" : ` i="${Number(format.italic)}"`}`;
   const color =
     format.color === undefined
       ? ""
@@ -34,10 +38,30 @@ export function nativeChartTextProperties(format: ChartTextFormat): string {
           .join("");
   return `<a:defRPr${attributes}>${color}${font}</a:defRPr>`;
 }
-export function nativeChartTextBody(format?: ChartTextFormat): string {
+export function nativeChartTextBody(format?: ChartTextFormat, legend = false): string {
   return format && Object.keys(format).length
-    ? `<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr>${nativeChartTextProperties(format)}</a:pPr><a:endParaRPr/></a:p></c:txPr>`
+    ? `<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr>${nativeChartTextProperties(format, legend)}</a:pPr><a:endParaRPr/></a:p></c:txPr>`
     : "";
+}
+
+/** Only the legend's explicitly admitted solid paint; widths are CSS px to exact EMU. */
+export function nativeChartLegendSurface(surface?: ChartSurfaceFormat): string {
+  if (!surface || !Object.keys(surface).length) return "";
+  const paint = (value: string | undefined) =>
+    value === undefined
+      ? ""
+      : value === "transparent"
+        ? "<a:noFill/>"
+        : `<a:solidFill><a:srgbClr val="${nativeChartRgb(value)!}"/></a:solidFill>`;
+  // Same effective defaults as Web legend rendering. Materialize only a requested border;
+  // this does not mutate sparse Core settings or add a border for fill-only formatting.
+  const stroke = surface.stroke ?? (surface.strokeWidth ? "#d1d5db" : "transparent");
+  const width = surface.strokeWidth ?? (surface.stroke ? 1 : 0);
+  const line =
+    surface.stroke === undefined && surface.strokeWidth === undefined
+      ? ""
+      : `<a:ln w="${Math.round(width * 9525)}">${paint(stroke)}</a:ln>`;
+  return `<c:spPr>${paint(surface.fill)}${line}</c:spPr>`;
 }
 
 type TextLeaf = "fontFamily" | "fontSize" | "bold" | "color";
@@ -146,6 +170,139 @@ function uniformText(
   return Object.keys(out).length ? out : undefined;
 }
 
+/** Legend-only reader: unsupported paint/text never disappears without a location. */
+function readLegendStyle(
+  legend: XmlNode,
+  rootDefaults: TextChoices,
+  warn: (path: string) => void,
+): NonNullable<ChartFormatSettings["legend"]> | undefined {
+  const get = (node: XmlNode, key: string): XmlNode | undefined => {
+    if (node[key] === undefined) return;
+    if (typeof node[key] === "string" && !node[key].trim()) return {};
+    return single(node, key);
+  };
+  const result: NonNullable<ChartFormatSettings["legend"]> = {};
+  const check = (node: XmlNode, allowed: readonly string[], path: string): boolean => {
+    let valid = true;
+    for (const key of Object.keys(node)) {
+      if (key.startsWith("@_xmlns")) continue;
+      if (key === "#text" && !String(node[key]).trim()) continue;
+      if (!allowed.includes(key)) {
+        warn(`${path}.${key.replace(/^@_/, "")}`);
+        valid = false;
+      }
+    }
+    return valid;
+  };
+  const paint = (node: XmlNode, path: string): string | undefined => {
+    const keys = ["noFill", "solidFill", "gradFill", "pattFill", "grpFill"].filter(
+      (key) => node[key] !== undefined,
+    );
+    if (!keys.length) return;
+    if (keys.length !== 1) {
+      warn(path);
+      return;
+    }
+    if (keys[0] === "noFill") {
+      const empty = get(node, "noFill")!;
+      if (check(empty, [], path)) return "transparent";
+      return;
+    }
+    const value = rgbFill(node);
+    if (!value) {
+      warn(path);
+      return;
+    }
+    const fill = single(node, "solidFill"),
+      rgb = single(fill, "srgbClr");
+    if (check(fill, ["srgbClr"], path) && check(rgb, ["@_val"], path)) return value;
+  };
+  const shape = get(legend, "spPr");
+  if (shape) {
+    const surface: ChartSurfaceFormat = {};
+    check(shape, ["solidFill", "noFill", "ln"], "format.legend.surface");
+    const fill = paint(shape, "format.legend.surface.fill");
+    if (fill !== undefined) surface.fill = fill;
+    const line = get(shape, "ln");
+    if (line) {
+      check(line, ["@_w", "solidFill", "noFill"], "format.legend.surface.stroke");
+      const stroke = paint(line, "format.legend.surface.stroke");
+      if (stroke !== undefined) surface.stroke = stroke;
+      if (line["@_w"] !== undefined) {
+        const width = Number(attr(line, "w"));
+        if (
+          /^\d+$/.test(attr(line, "w")) &&
+          Number.isSafeInteger(width) &&
+          width > 0 &&
+          width <= 304800
+        )
+          surface.strokeWidth = width / 9525;
+        else warn("format.legend.surface.strokeWidth");
+      }
+    }
+    if (Object.keys(surface).length) result.surface = surface;
+  }
+  const body = get(legend, "txPr");
+  if (body) {
+    const path = "format.legend.text";
+    check(body, ["bodyPr", "lstStyle", "p"], path);
+    for (const key of ["bodyPr", "lstStyle"]) {
+      const node = get(body, key);
+      if (
+        node &&
+        Object.keys(node).some(
+          (key) => !key.startsWith("@_xmlns") && !(key === "#text" && !String(node[key]).trim()),
+        )
+      )
+        warn(`${path}.${key}`);
+    }
+    const paragraphs = nodes(body.p);
+    if (paragraphs.length !== 1) warn(path);
+    const paragraph = paragraphs.length === 1 ? paragraphs[0] : undefined;
+    if (paragraph) {
+      check(paragraph, ["pPr", "endParaRPr"], path);
+      const pPr = get(paragraph, "pPr");
+      if (pPr) check(pPr, ["defRPr"], path);
+      const end = get(paragraph, "endParaRPr");
+      if (end) check(end, ["@_lang"], path);
+      const props = pPr && get(pPr, "defRPr");
+      if (props) {
+        check(
+          props,
+          ["@_sz", "@_b", "@_i", "@_lang", "solidFill", "latin", "ea", "cs", "sym"],
+          path,
+        );
+        for (const script of ["latin", "ea", "cs", "sym"]) {
+          const font = get(props, script);
+          if (font) check(font, ["@_typeface"], `${path}.fontFamily`);
+        }
+      }
+      // Rich runs/fields are not a single legend-wide text format.
+      if (paragraph.r === undefined && paragraph.fld === undefined && paragraph.br === undefined) {
+        const text = uniformText(body, rootDefaults, path, warn) ?? {};
+        const symbol = props && get(props, "sym");
+        if (symbol && attr(symbol, "typeface") !== text.fontFamily) {
+          delete text.fontFamily;
+          warn(`${path}.fontFamily`);
+        }
+        if (props?.["@_i"] !== undefined) {
+          const italic = attr(props, "i");
+          if (["0", "1", "false", "true"].includes(italic))
+            text.italic = ["1", "true"].includes(italic);
+          else warn(`${path}.italic`);
+        }
+        if (props && props.solidFill !== undefined) {
+          const color = paint(props, `${path}.color`);
+          if (color !== undefined && color !== "transparent") text.color = color;
+          else delete text.color;
+        }
+        if (Object.keys(text).length) result.text = text;
+      }
+    }
+  }
+  return Object.keys(result).length ? result : undefined;
+}
+
 /** Restore only independently representable leaves; report unresolved fonts/colors precisely. */
 export function readNativeChartStyles(
   chartSpace: XmlNode,
@@ -189,6 +346,10 @@ export function readNativeChartStyles(
     const body = optional(axis, "txPr");
     const text = uniformText(body, rootDefaults, `format.${field}.text`, warn);
     if (text) format[field] = { text };
+  }
+  if (native.legend !== undefined) {
+    const legend = readLegendStyle(single(native, "legend"), rootDefaults, warn);
+    if (legend) format.legend = legend;
   }
   if (Object.keys(format).length) chart.format = format;
   const series = nodes(family.ser);

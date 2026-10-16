@@ -201,7 +201,42 @@ export function readNativeChartElements(
   }
   if (native.legend !== undefined) {
     const legend = single(native, "legend");
-    only(legend, ["legendPos", "layout", "overlay", "spPr", "txPr"]);
+    only(legend, ["legendPos", "legendEntry", "layout", "overlay", "spPr", "txPr"]);
+    // WPS repeats the whole legend typography per entry. This is not permission
+    // for per-entry overrides, deleted entries, invalid indices or local rich text.
+    const indices = new Set<number>();
+    const entries =
+      legend.legendEntry === undefined
+        ? []
+        : Array.isArray(legend.legendEntry)
+          ? legend.legendEntry
+          : [legend.legendEntry];
+    if (entries.length !== nodes(legend.legendEntry).length)
+      throw new Error("Malformed legend entry.");
+    for (const entry of nodes(legend.legendEntry)) {
+      only(entry, ["idx", "txPr"]);
+      if (
+        Object.keys(entry).some((key) => key.startsWith("@_") && !key.startsWith("@_xmlns")) ||
+        (entry["#text"] !== undefined && String(entry["#text"]).trim())
+      )
+        throw new Error("Unsupported legend-entry attributes.");
+      const idx = single(entry, "idx");
+      const value = attr(idx, "val"),
+        index = Number(value);
+      attributes(idx, { val: value });
+      if (
+        !/^\d+$/.test(value) ||
+        !Number.isSafeInteger(index) ||
+        index >= nodes(family.ser).length ||
+        indices.has(index)
+      )
+        throw new Error("Invalid or duplicate legend-entry index.");
+      indices.add(index);
+      if (JSON.stringify(single(entry, "txPr")) !== JSON.stringify(single(legend, "txPr")))
+        throw new Error("Per-entry legend text is outside the uniform-style slice.");
+    }
+    if (legend.legendEntry !== undefined && !nodes(legend.legendEntry).length)
+      throw new Error("Malformed legend entry.");
     emptyLayout(legend);
     const position = leaf(legend, "legendPos", Object.values(legendPositions));
     if (position !== "b")

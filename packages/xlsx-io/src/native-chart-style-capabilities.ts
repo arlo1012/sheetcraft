@@ -52,6 +52,7 @@ function record(value: unknown, known: readonly string[]): Record<string, unknow
 const textKeys = ["fontFamily", "fontSize", "bold", "color", "italic"];
 const formatKeys = [
   "title",
+  "legend",
   "plot",
   "categoryAxis",
   "valueAxis",
@@ -81,7 +82,7 @@ const presentationKeys = ["palette", "percentStacked", "lineMarkers", "backgroun
 /** Shared fail-closed leaf admission, safe before any resource access or caller getters. */
 export function unsupportedNativeChartStyles(chart: SheetChart): readonly string[] {
   const issues = new Set<string>();
-  const text = (value: unknown, path: string) => {
+  const text = (value: unknown, path: string, legend = false) => {
     let fields: Record<string, unknown>;
     try {
       fields = record(value, textKeys);
@@ -98,8 +99,10 @@ export function unsupportedNativeChartStyles(chart: SheetChart): readonly string
               Number.isFinite(choice) &&
               choice >= 4 / 3 &&
               choice <= 256 &&
-              Math.abs(choice * 75 - Math.round(choice * 75)) < 1e-8
-            : key === "bold"
+              (legend
+                ? Math.round(choice * 75) / 75 === choice
+                : Math.abs(choice * 75 - Math.round(choice * 75)) < 1e-8)
+            : key === "bold" || (legend && key === "italic")
               ? typeof choice === "boolean"
               : key === "color"
                 ? nativeChartRgb(choice) !== undefined
@@ -163,6 +166,38 @@ export function unsupportedNativeChartStyles(chart: SheetChart): readonly string
             continue;
           }
           text(value, path);
+        } else if (key === "legend") {
+          try {
+            if (own(chart, "legend") !== true) {
+              issues.add(path);
+              continue;
+            }
+            for (const [leaf, choice] of Object.entries(record(value, ["text", "surface"]))) {
+              if (leaf === "text") text(choice, `${path}.text`, true);
+              else if (leaf === "surface") {
+                try {
+                  for (const [paint, setting] of Object.entries(
+                    record(choice, ["fill", "stroke", "strokeWidth"]),
+                  )) {
+                    const valid =
+                      paint === "fill" || paint === "stroke"
+                        ? setting === "transparent" || nativeChartRgb(setting) !== undefined
+                        : paint === "strokeWidth" &&
+                          typeof setting === "number" &&
+                          Number.isFinite(setting) &&
+                          setting > 0 &&
+                          setting <= 32 &&
+                          Math.round(setting * 9525) / 9525 === setting;
+                    if (!valid) issues.add(`${path}.surface.${paint}`);
+                  }
+                } catch {
+                  issues.add(`${path}.surface`);
+                }
+              } else issues.add(`${path}.${leaf}`);
+            }
+          } catch {
+            issues.add(path);
+          }
         } else if (key === "categoryAxis" || key === "valueAxis") {
           try {
             for (const [leaf, choice] of Object.entries(record(value, axisKeys)))

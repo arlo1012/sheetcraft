@@ -495,3 +495,29 @@ test("legend layout is one undoable command and survives workbook save/reopen wi
   expect(f.controls.snapshot.value!.apply({ kind: "legend", reset: true })).toBe(true);
   expect(f.session.history.undoStack).toHaveLength(history);
 });
+
+test("legend text and surface are one owned undoable edit, survive snapshot and remain after layout reset", () => {
+  const f = fixture({ kind: "legend" });
+  const before = structuredClone(f.current());
+  const legend = {
+    text: { fontFamily: "Arial", fontSize: 18, bold: true, italic: true, color: "#123456" },
+    surface: { fill: "#abcdef", stroke: "transparent", strokeWidth: 2 },
+  };
+  const old = f.controls.snapshot.value!;
+  expect(old.apply({ kind: "legend", format: legend })).toBe(true);
+  expect(f.session.history.undoStack).toHaveLength(1);
+  expect(old.apply({ kind: "legend", format: undefined })).toBe(false);
+  const changed = structuredClone(f.current());
+  expect(
+    deserializeWorkbook(serializeWorkbook(f.workbook.value)).sheets.get(f.ownerSheet.id)
+      ?.drawings?.[0],
+  ).toEqual(changed);
+  expect(undoWorkbookCommand(f.session)).toBe(true);
+  f.revision.value++;
+  expect(f.current()).toEqual(before);
+  expect(redoWorkbookCommand(f.session)).toBe(true);
+  f.revision.value++;
+  expect(f.current()).toEqual(changed);
+  expect(f.controls.snapshot.value!.apply({ kind: "legend", reset: true })).toBe(true);
+  expect(f.current().chart.format?.legend).toEqual(legend);
+});

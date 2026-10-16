@@ -679,6 +679,17 @@ describe("Chart pixel paint and font invalidation", () => {
     expect(f.createFonts).toHaveBeenCalledOnce();
   });
 
+  test("legend-only escaped font stacks warm the decoded font before print preparation", async () => {
+    const f = fixture();
+    const source = f.sheet.drawings?.[0];
+    if (!source || source.kind !== "chart") throw new Error("Missing chart owner.");
+    source.chart.format = { legend: { text: { fontFamily: '"noto\\20 sans math", serif' } } };
+    await f.consumer.prepare(f.capture(), 1, current);
+    expect(ensureCellFontResource).toHaveBeenCalledWith("Noto Sans Math");
+    expect(ensureCellFontResource).not.toHaveBeenCalledWith("Noto20 Sans Math");
+    expect(f.createFonts).toHaveBeenCalledOnce();
+  });
+
   test("unrelated font events preserve a still-current font lease", async () => {
     const invalidated = vi.fn(),
       f = fixture(1, invalidated);

@@ -51,9 +51,11 @@ export type ChartSeriesFormat = {
   smooth?: boolean;
   markers?: boolean;
 };
+export type ChartLegendFormat = { text?: ChartTextFormat; surface?: ChartSurfaceFormat };
 export type ChartBarFormat = { gapWidth?: number; overlap?: number };
 export type ChartFormatSettings = {
   title?: ChartTextFormat;
+  legend?: ChartLegendFormat;
   plot?: ChartSurfaceFormat;
   categoryAxis?: ChartCategoryAxisFormat;
   valueAxis?: ChartValueAxisFormat;
@@ -323,6 +325,7 @@ function series(value: unknown): ChartSeriesFormat[] {
 export function normalizeChartFormat(value: unknown): ChartFormatSettings {
   const source = record(value, [
     "title",
+    "legend",
     "plot",
     "categoryAxis",
     "valueAxis",
@@ -332,6 +335,12 @@ export function normalizeChartFormat(value: unknown): ChartFormatSettings {
   ]);
   const result: ChartFormatSettings = {};
   if (Object.hasOwn(source, "title")) result.title = text(source.title);
+  if (Object.hasOwn(source, "legend")) {
+    const settings = record(source.legend, ["text", "surface"]);
+    result.legend = {};
+    if (Object.hasOwn(settings, "text")) result.legend.text = text(settings.text);
+    if (Object.hasOwn(settings, "surface")) result.legend.surface = surface(settings.surface);
+  }
   if (Object.hasOwn(source, "plot")) result.plot = surface(source.plot);
   if (Object.hasOwn(source, "categoryAxis"))
     result.categoryAxis = categoryAxis(source.categoryAxis);

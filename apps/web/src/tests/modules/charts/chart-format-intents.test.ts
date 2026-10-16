@@ -398,3 +398,59 @@ describe("legend layout intents", () => {
     ).toThrow();
   });
 });
+
+test("legend style replaces only its sparse branch and layout reset preserves styles", () => {
+  const original = {
+    ...chart(),
+    elements: { legendPosition: "left" as const },
+    format: {
+      title: { bold: true },
+      legend: {
+        text: { fontSize: 18, italic: true },
+        surface: { fill: "#abcdef", stroke: "transparent", strokeWidth: 2 },
+      },
+    },
+  };
+  const next = applyChartFormatIntent(
+    original,
+    { kind: "legend" },
+    { kind: "legend", format: { surface: original.format.legend.surface } },
+  );
+  expect(next.format).toEqual({
+    title: { bold: true },
+    legend: { surface: original.format.legend.surface },
+  });
+  expect(next.elements).toEqual(original.elements);
+  const reset = applyChartFormatIntent(
+    original,
+    { kind: "legend" },
+    { kind: "legend", reset: true },
+  );
+  expect(reset.format).toEqual(original.format);
+  expect(reset.elements).toBeUndefined();
+  const cleared = applyChartFormatIntent(
+    original,
+    { kind: "legend" },
+    { kind: "legend", format: undefined },
+  );
+  expect(cleared.format).toEqual({ title: { bold: true } });
+  expect(cleared.elements).toEqual(original.elements);
+  expect(original.format.legend.text.fontSize).toBe(18);
+});
+test("legend styles reject wrong targets, hidden/unsupported legends and mixed intents", () => {
+  const intent: ChartFormatIntent = { kind: "legend", format: { text: { bold: true } } };
+  expect(() => applyChartFormatIntent(chart(), { kind: "title" }, intent)).toThrow();
+  expect(() =>
+    applyChartFormatIntent({ ...chart(), legend: false }, { kind: "legend" }, intent),
+  ).toThrow();
+  expect(() =>
+    applyChartFormatIntent({ ...chart(), type: "wordCloud" }, { kind: "legend" }, intent),
+  ).toThrow();
+  expect(() =>
+    applyChartFormatIntent(chart(), { kind: "legend" }, {
+      kind: "legend",
+      reset: true,
+      format: {},
+    } as ChartFormatIntent),
+  ).toThrow();
+});

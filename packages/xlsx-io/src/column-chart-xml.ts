@@ -1,5 +1,6 @@
 import {
   nativeChartSeriesColors,
+  nativeChartLegendSurface,
   nativeChartTextBody,
   nativeChartTextProperties,
 } from "./native-chart-styles.js";
@@ -108,7 +109,7 @@ export function columnChartXml(
     : `<c:autoTitleDeleted val="1"/>`;
   const labels = `<c:dLbls>${elements?.labelPosition ? `<c:dLblPos val="${elements.labelPosition}"/>` : ""}<c:showLegendKey val="0"/><c:showVal val="${Number(drawing.chart.labels)}"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>`;
   const legend = drawing.chart.legend
-    ? `<c:legend><c:legendPos val="${elements?.legendPosition ?? "r"}"/><c:layout/><c:overlay val="${Number(elements?.legendOverlay ?? false)}"/></c:legend>`
+    ? `<c:legend><c:legendPos val="${elements?.legendPosition ?? "r"}"/><c:layout/><c:overlay val="${Number(elements?.legendOverlay ?? false)}"/>${pivotIdentity === undefined ? nativeChartLegendSurface(drawing.chart.format?.legend?.surface) + nativeChartTextBody(drawing.chart.format?.legend?.text, true) : ""}</c:legend>`
     : "";
   return strToU8(
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="${CHART_NS}" xmlns:a="${ART_NS}" xmlns:r="${REL_NS}"><c:date1904 val="${Number(workbook.dateSystem === "1904")}"/><c:style val="2"/>${pivotIdentity ? `<c:pivotSource><c:name>${xml(pivotIdentity)}</c:name><c:fmtId val="0"/></c:pivotSource>` : ""}<c:chart>${title}<c:plotArea><c:layout/><c:${family}>${familyStart}${series}${labels}${familyEnd}<c:axId val="1"/><c:axId val="2"/></c:${family}><c:catAx><c:axId val="1"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="${horizontal ? "l" : "b"}"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/>${pivotIdentity === undefined ? nativeChartTextBody(drawing.chart.format?.categoryAxis?.text) : ""}<c:crossAx val="2"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/></c:catAx><c:valAx><c:axId val="2"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="${horizontal ? "b" : "l"}"/><c:majorGridlines/><c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/>${pivotIdentity === undefined ? nativeChartTextBody(drawing.chart.format?.valueAxis?.text) : ""}<c:crossAx val="1"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx></c:plotArea>${legend}<c:plotVisOnly val="${Number(!drawing.chart.showHidden)}"/><c:dispBlanksAs val="gap"/><c:showDLblsOverMax val="0"/></c:chart>${pivotIdentity ? `<c:extLst><c:ext uri="{781A3756-C4B2-4CAC-9D66-4F8BD8637D16}" xmlns:c14="http://schemas.microsoft.com/office/drawing/2007/8/2/chart"><c14:pivotOptions><c14:dropZoneFilter val="1"/><c14:dropZoneCategories val="1"/><c14:dropZoneData val="1"/><c14:dropZoneSeries val="1"/><c14:dropZonesVisible val="1"/></c14:pivotOptions></c:ext></c:extLst>` : ""}</c:chartSpace>`,

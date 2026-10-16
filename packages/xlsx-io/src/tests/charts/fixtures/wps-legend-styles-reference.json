@@ -1,0 +1,8 @@
+{
+  "file": "wps-legend-styles-reference.xlsx",
+  "sha256": "440c88d4ba005ffce390bba62ae1cc24070dab913fc5e939b2b5e758918b4557",
+  "provenance": "Unmodified synthetic workbook saved through WPS GUI on 2026-10-16. Contains two ordinary clustered column charts plus unrelated synthetic picture/textbox objects.",
+  "chart1": "Legend Liberation Sans 12pt, bold and italic, RGB red text, yellow fill, RGB green 1.50pt solid border.",
+  "chart2": "Copied chart, bold and italic explicitly disabled, no fill and no line. WPS retains border width 19050 EMU under noFill.",
+  "scope": "Tests read original chart XML from the untouched package. This is source-producer evidence, not whole-workbook import acceptance or product-export GUI acceptance. Zero-width borders are not established."
+}

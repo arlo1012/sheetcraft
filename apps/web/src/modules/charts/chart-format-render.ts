@@ -287,6 +287,22 @@ export function applyChartCommonFormat(
       ...option.title,
       textStyle: { ...option.title.textStyle, ...textStyle(format.title) },
     };
+  if (format.legend && option.legend) {
+    const settings = format.legend;
+    const legend = (entry: ScrollableLegendComponentOption): ScrollableLegendComponentOption => ({
+      ...entry,
+      textStyle: { ...entry.textStyle, ...textStyle(settings.text) },
+      ...(settings.surface
+        ? {
+            backgroundColor: settings.surface.fill ?? "transparent",
+            borderColor:
+              settings.surface.stroke ?? (settings.surface.strokeWidth ? "#d1d5db" : "transparent"),
+            borderWidth: settings.surface.strokeWidth ?? (settings.surface.stroke ? 1 : 0),
+          }
+        : {}),
+    });
+    next.legend = Array.isArray(option.legend) ? option.legend.map(legend) : legend(option.legend);
+  }
   const bars = chart.type === "bar" || chart.type === "column";
   const lines = chart.type === "line" || chart.type === "area";
   const cartesian = bars || lines || combo || chart.type === "scatter";

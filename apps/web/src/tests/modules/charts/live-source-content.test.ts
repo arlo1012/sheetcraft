@@ -155,8 +155,8 @@ describe("live chart content lifecycle", () => {
     };
     expect(option.legend[0]?.selectedMode).toBe(false);
     expect(option.legend[0]?.formatter?.(option.series[0]!.name)).toBe("extra");
-    expect(option.legend[0]?.borderWidth).toBe(1);
-    expect(option.legend[0]?.borderColor).not.toBe("transparent");
+    expect(option.legend[0]?.borderWidth).toBe(0);
+    expect(f.wrapper.find(".chart-content__legend-selection").exists()).toBe(true);
     const repaint = vi.spyOn(instance, "setOption");
     await f.wrapper.setProps({ selectedElement: { kind: "legend" } });
     expect(repaint).not.toHaveBeenCalled();
@@ -205,9 +205,7 @@ describe("live chart content lifecycle", () => {
     const afterSelection = instance.getOption() as typeof beforeSelection;
     for (const key of ["left", "top", "width", "height", "scrollDataIndex"] as const)
       expect(afterSelection.legend[0]?.[key]).toEqual(beforeSelection.legend[0]?.[key]);
-    expect(
-      (instance.getOption() as { legend: { borderColor: string }[] }).legend[0]?.borderColor,
-    ).toBe("transparent");
+    expect(f.wrapper.find(".chart-content__legend-selection").exists()).toBe(false);
     await f.wrapper.setProps({
       drawing: { ...f.drawing, chart: { ...f.drawing.chart, legend: false } },
     });
@@ -333,6 +331,46 @@ describe("live chart content lifecycle", () => {
       .trigger("click", { offsetX: x, offsetY: y, event: new MouseEvent("click", { detail: 2 }) });
     expect(f.wrapper.emitted("selectElement")).toHaveLength(2);
   });
+  test("selection outline preserves real legend fill, border and native page state", async () => {
+    const f = fixture();
+    const drawing = {
+      ...f.drawing,
+      chart: {
+        ...f.drawing.chart,
+        format: {
+          legend: {
+            text: { fontSize: 20, bold: true, italic: true },
+            surface: { fill: "#fff4cc", stroke: "#b91c1c", strokeWidth: 5 },
+          },
+        },
+      },
+    };
+    await f.wrapper.setProps({
+      drawing,
+      editableLegend: true,
+      selectedElement: { kind: "legend" },
+    });
+    const instance = rendered.instances.at(-1)!;
+    const read = () => (instance.getOption() as { legend: Record<string, unknown>[] }).legend[0]!;
+    expect(read()).toMatchObject({
+      borderWidth: 5,
+      borderColor: "#b91c1c",
+      backgroundColor: "#fff4cc",
+    });
+    expect(f.wrapper.find(".chart-content__legend-selection").exists()).toBe(true);
+    const repaint = vi.spyOn(instance, "setOption");
+    await f.wrapper.setProps({ selectedElement: { kind: "chart" } });
+    expect(f.wrapper.find(".chart-content__legend-selection").exists()).toBe(false);
+    await f.wrapper.setProps({ selectedElement: { kind: "legend" } });
+    expect(repaint).not.toHaveBeenCalled();
+    expect(read()).toMatchObject({
+      borderWidth: 5,
+      borderColor: "#b91c1c",
+      backgroundColor: "#fff4cc",
+    });
+    expect(drawing.chart.format.legend.surface.stroke).toBe("#b91c1c");
+  });
+
   test("preview legend retains native selection behavior", () => {
     const f = fixture();
     const option = rendered.instances.at(-1)!.getOption() as {

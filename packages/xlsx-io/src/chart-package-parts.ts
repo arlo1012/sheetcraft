@@ -168,6 +168,7 @@ function inspectStrictRoot(
     "title",
     "rich",
     "legend",
+    "legendEntry",
     "legendPos",
     "overlay",
     "layout",
@@ -231,6 +232,7 @@ function inspectStrictRoot(
     "pPr",
     "defRPr",
     "latin",
+    "sym",
     "ea",
     "cs",
     "lumMod",
@@ -383,6 +385,21 @@ function inspectStrictRoot(
                 (key) => key.startsWith("@_") && !key.startsWith("@_xmlns") && key !== "@_uri",
               ) ||
               (node["#text"] !== undefined && String(node["#text"]).trim() !== ""))))
+      )
+        reject();
+      // Only observed uniform WPS legend typography may carry a symbol font or
+      // redundant entry text. Element validation checks entry identity/equivalence.
+      if (
+        namespace === CHART_NS &&
+        ((localName === "legendEntry" &&
+          (ns !== CHART_NS || !ordinary || path !== "chartSpace/chart/legend")) ||
+          (localName === "sym" &&
+            (ns !== ART_NS ||
+              !ordinary ||
+              ![
+                "chartSpace/chart/legend/txPr/p/pPr/defRPr",
+                "chartSpace/chart/legend/legendEntry/txPr/p/pPr/defRPr",
+              ].includes(path))))
       )
         reject();
       // Observed WPS post-save straight lines add this inert solid-dash leaf

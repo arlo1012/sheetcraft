@@ -37,6 +37,7 @@ export function getPrintChartFontStacks(pass: PrintChartPass, ownerDocument: Doc
     const format = entry.drawing.chart.format;
     for (const family of [
       format?.title?.fontFamily,
+      format?.legend?.text?.fontFamily,
       format?.categoryAxis?.text?.fontFamily,
       format?.valueAxis?.text?.fontFamily,
       format?.secondaryValueAxis?.text?.fontFamily,

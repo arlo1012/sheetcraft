@@ -36,7 +36,7 @@ export function applyChartFormatIntent(
   validateDataRecord(intent, ["kind", "format", "seriesId", "patch", "reset"]);
   const legendAvailable =
     target.kind === "legend" && chart.legend && getChartElementCapabilities(chart.type).legend;
-  if (intent.kind === "legend") {
+  if (intent.kind === "legend" && "reset" in intent) {
     validateDataRecord(intent, ["kind", "reset"]);
     if (!legendAvailable || intent.reset !== true)
       throw new TypeError("Legend reset belongs to an unavailable element.");
@@ -141,6 +141,10 @@ export function applyChartFormatIntent(
       throw new TypeError("Only bars have a chart-wide gap and overlap.");
     if (intent.format === undefined) delete format.bar;
     else format.bar = intent.format;
+  } else if (intent.kind === "legend") {
+    if (!legendAvailable) throw new TypeError("Legend style belongs to an unavailable element.");
+    if (intent.format === undefined) delete format.legend;
+    else format.legend = intent.format;
   } else if (intent.kind === "title") {
     if (intent.format === undefined) delete format.title;
     else format.title = intent.format;

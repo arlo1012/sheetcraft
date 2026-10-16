@@ -1,0 +1,9 @@
+{
+  "file": "wps-legend-product-roundtrip.xlsx",
+  "sha256": "488e11f79c0a4ee14112d5161b3e8b3fc19a516d728c9e9770382fa996928915",
+  "provenance": "Sheetcraft compiled XLSX runtime generated two synthetic clustered column charts, opened and visually checked in WPS GUI, then saved as a new XLSX on 2026-10-16. This file is the unmodified WPS-saved package.",
+  "sourceNames": ["Sales销售", "Cost成本"],
+  "chart1": "Liberation Sans 16px/12pt, red text, bold+italic on, yellow fill, green 2px/1.50pt border.",
+  "chart2": "Same font/size/red text, bold+italic off, transparent fill/stroke, stored strokeWidth 2px.",
+  "scope": "Whole-package import and snapshot/re-export preserve these legend fields. WPS default text layout, metadata, theme and drawing geometry still generate compatibility warnings. Zero-width borders and non-column GUI roundtrips are not established by this fixture."
+}

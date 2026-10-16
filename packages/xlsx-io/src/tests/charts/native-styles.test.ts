@@ -223,7 +223,16 @@ test("actual WPS RGB producer preserves three editable styles and B2=90", async 
   for (const drawing of charts) {
     if (drawing.kind !== "chart") throw new Error("Not a chart");
     expect(drawing.chart.presentation).toEqual({ palette: ["#2468ac", "#d15a28"] });
-    expect(drawing.chart.format).toEqual(explicit().drawing.chart.format);
+    expect(drawing.chart.format).toEqual({
+      ...explicit().drawing.chart.format,
+      legend: { text: { fontSize: 1000 / 75, bold: false, italic: false } },
+    });
+    expect(read.report.issues.flatMap((issue) => issue.locations)).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/format\.legend\.text\.fontFamily$/),
+        expect.stringMatching(/format\.legend\.text\.color$/),
+      ]),
+    );
     expect(drawing.chart.rectangleSeries).toBeUndefined();
     expect(drawing.chart.format?.series).toBeUndefined();
   }

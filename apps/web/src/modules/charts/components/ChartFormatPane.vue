@@ -3,13 +3,20 @@ import { computed, onBeforeUnmount, reactive, ref, useId, watch } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Input as TInput } from "tdesign-vue-next/es/input";
-import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
+import {
+  Radio as TRadio,
+  RadioGroup as TRadioGroup,
+  RadioButton as TRadioButton,
+} from "tdesign-vue-next/es/radio";
+import { Tabs as TTabs, TabPanel as TTabPanel } from "tdesign-vue-next/es/tabs";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { ChartNoAxesColumn, RotateCcw, X } from "lucide-vue-next";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { ChartData } from "@sheetcraft/core/sheet-charts";
 import type {
   ChartAxisLineFormat,
+  ChartLegendFormat,
+  ChartSurfaceFormat,
   ChartCategoryAxisFormat,
   ChartTextFormat,
   ChartSeriesFormat,
@@ -89,6 +96,39 @@ const targets = computed(() =>
 );
 const targetKey = computed(() => chartFormatTargetKey(props.target));
 const ownerKey = computed(() => `${props.drawing.id}/${targetKey.value}`);
+const legendMode = ref<"legend" | "text">("legend");
+const legendTab = ref<"surface" | "layout">("layout");
+const legendPage = computed(
+  () => `${legendMode.value}/${legendMode.value === "legend" ? legendTab.value : "text"}`,
+);
+const legendFeedbackPage = ref<string>();
+watch(ownerKey, () => {
+  legendMode.value = "legend";
+  legendTab.value = "layout";
+});
+function changeLegendMode(value: unknown): void {
+  if (!composing() && (value === "legend" || value === "text")) legendMode.value = value;
+}
+function changeLegendTab(value: unknown): void {
+  if (!composing() && (value === "surface" || value === "layout")) legendTab.value = value;
+}
+function legendTabKeydown(event: KeyboardEvent): void {
+  if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || composing()) return;
+  const next =
+    event.key === "Home"
+      ? "surface"
+      : event.key === "End"
+        ? "layout"
+        : ["ArrowLeft", "ArrowRight"].includes(event.key)
+          ? legendTab.value === "layout"
+            ? "surface"
+            : "layout"
+          : undefined;
+  if (!next) return;
+  event.preventDefault();
+  changeLegendTab(next);
+  root.value?.querySelector<HTMLButtonElement>(`#${paneId}-${next}-tab`)?.focus();
+}
 let live = true;
 let activeHandler: ChartFormatIntentHandler | undefined;
 onBeforeUnmount(() => {
@@ -167,10 +207,19 @@ const series = computed(() => {
   return id ? getChartSeriesFormat(chart.value, id) : {};
 });
 const textFormat = computed<ChartTextFormat>(() =>
-  kind.value === "title" ? (chart.value.format?.title ?? {}) : (axis.value.text ?? {}),
+  kind.value === "legend"
+    ? (chart.value.format?.legend?.text ?? {})
+    : kind.value === "title"
+      ? (chart.value.format?.title ?? {})
+      : (axis.value.text ?? {}),
+);
+const surfaceFormat = computed<ChartSurfaceFormat>(() =>
+  kind.value === "legend"
+    ? (chart.value.format?.legend?.surface ?? {})
+    : (chart.value.format?.plot ?? {}),
 );
 const lineFormat = computed<ChartAxisLineFormat>(() =>
-  kind.value === "plot" ? (chart.value.format?.plot ?? {}) : (axis.value.line ?? {}),
+  kind.value === "plot" || kind.value === "legend" ? surfaceFormat.value : (axis.value.line ?? {}),
 );
 const elementSettings = computed(() => getChartElementSettings(chart.value));
 const barFormat = computed(() => chart.value.format?.bar ?? {});
@@ -257,6 +306,19 @@ const fontSizeSpec: NumericFieldSpec = {
   allowAuto: true,
   parsePolicy: { scientific: true },
 };
+const legendFontSizeSpec: NumericFieldSpec = {
+  ...fontSizeSpec,
+  displayUnit: "pt",
+  toDisplay: (value) => value * 0.75,
+  fromDisplay: (value) => (value * 4) / 3,
+  displayStep: 1,
+};
+const fontSizeFieldSpec = computed(() =>
+  kind.value === "legend" ? legendFontSizeSpec : fontSizeSpec,
+);
+const fontSizeLabel = computed(() =>
+  t(kind.value === "legend" ? "chart.legendFontSize" : "chart.formatFontSize"),
+);
 const strokeWidthSpec: NumericFieldSpec = {
   displayUnit: "px",
   displayStep: 0.25,
@@ -264,6 +326,19 @@ const strokeWidthSpec: NumericFieldSpec = {
   allowAuto: true,
   parsePolicy: { scientific: true },
 };
+const legendStrokeWidthSpec: NumericFieldSpec = {
+  ...strokeWidthSpec,
+  displayUnit: "pt",
+  toDisplay: (value) => value * 0.75,
+  fromDisplay: (value) => (value * 4) / 3,
+  displayPrecision: 2,
+};
+const surfaceStrokeWidthSpec = computed(() =>
+  kind.value === "legend" ? legendStrokeWidthSpec : strokeWidthSpec,
+);
+const surfaceStrokeWidthLabel = computed(() =>
+  t(kind.value === "legend" ? "chart.legendLineWidth" : "chart.formatLineWidth"),
+);
 const labelAngleSpec: NumericFieldSpec = {
   displayUnit: "°",
   displayStep: 1,
@@ -380,7 +455,7 @@ function sharedNumericDraftChange(field: SharedNumericField, draft: NumericDraft
 function sharedNumericFocusBoundary(field: SharedNumericField): Element[] {
   return [
     ...(root.value?.querySelectorAll(
-      `[data-chart-format-reset="${field}"], [data-chart-format-reset="element"]`,
+      `[data-chart-format-reset="${field}"], [data-chart-format-reset="element"], [data-chart-format-reset="${field === "fontSize" ? "legendText" : "legendSurface"}"], [data-chart-format-navigation]`,
     ) ?? []),
   ];
 }
@@ -543,6 +618,7 @@ function composing(): boolean {
   const styledField = sharedNumericFields.find((field) => sharedNumericDrafts[field]?.composing);
   const field = styledField ?? Object.keys(drafts).find((key) => drafts[key]!.composing);
   if (!field) return false;
+  if (kind.value === "legend") legendFeedbackPage.value = legendPage.value;
   if (styledField) fieldError.value = "composition";
   else drafts[field]!.error = "composition";
   root.value
@@ -555,6 +631,7 @@ defineExpose({
   getHistoryElement: () => (live ? root.value : undefined),
 });
 function submit(intent: ChartFormatIntent, handler = activeHandler ?? props.apply): boolean {
+  if (kind.value === "legend") legendFeedbackPage.value = legendPage.value;
   if (!live || handler !== props.apply) {
     fieldError.value = "rejected";
     return false;
@@ -601,7 +678,25 @@ function axisIntent(
     return { kind: kind.value, format: compactChartAxis(next) };
   return undefined;
 }
+function legendBranchIntent<K extends keyof ChartLegendFormat>(
+  branch: K,
+  value: ChartLegendFormat[K] | undefined,
+): ChartFormatIntent {
+  return {
+    kind: "legend",
+    format: setChartFormatField(chart.value.format?.legend ?? {}, branch, value),
+  };
+}
+function resetLegendBranch(branch: "text" | "surface"): void {
+  if (kind.value !== "legend" || composing()) return;
+  if (!submit(legendBranchIntent(branch, undefined))) return;
+  const field = branch === "text" ? "fontSize" : "strokeWidth";
+  sharedNumericControl(field)?.cancel();
+  delete sharedNumericResetErrors[field];
+  sharedNumericResets[field] = ownerKey.value;
+}
 function textIntent(next: ChartTextFormat | undefined): ChartFormatIntent | undefined {
+  if (kind.value === "legend") return legendBranchIntent("text", next);
   if (kind.value === "title") return { kind: "title", format: next };
   if (isAxis.value) {
     const nextAxis = { ...axis.value };
@@ -647,6 +742,11 @@ function numericIntent(
         ? { kind: "chart", format: setChartFormatField(barFormat.value, field, value) }
         : undefined;
     case "strokeWidth":
+      if (kind.value === "legend")
+        return legendBranchIntent(
+          "surface",
+          setChartFormatField(surfaceFormat.value, "strokeWidth", value),
+        );
       if (props.target.kind === "series" && capabilities.value.seriesStroke)
         return {
           kind: "series",
@@ -697,7 +797,14 @@ function setText<K extends keyof ChartTextFormat>(
   if (intent) submit(intent);
 }
 function setLineColor(value: string | null): void {
-  if (kind.value === "plot") {
+  if (kind.value === "legend") {
+    submit(
+      legendBranchIntent(
+        "surface",
+        setChartFormatField(surfaceFormat.value, "stroke", value ?? undefined),
+      ),
+    );
+  } else if (kind.value === "plot") {
     submit({
       kind: "plot",
       format: setChartFormatField(chart.value.format?.plot ?? {}, "stroke", value ?? undefined),
@@ -712,7 +819,14 @@ function setLineColor(value: string | null): void {
   }
 }
 function setFill(value: string | null): void {
-  if (kind.value === "plot")
+  if (kind.value === "legend")
+    submit(
+      legendBranchIntent(
+        "surface",
+        setChartFormatField(surfaceFormat.value, "fill", value ?? undefined),
+      ),
+    );
+  else if (kind.value === "plot")
     submit({
       kind: "plot",
       format: setChartFormatField(chart.value.format?.plot ?? {}, "fill", value ?? undefined),
@@ -1019,18 +1133,21 @@ const errorKeys: Record<ChartFormatDraftError, MessageKey> = {
 const localError = computed(
   () => Object.values(drafts).find((draft) => draft.error)?.error ?? fieldError.value,
 );
-const errorMessage = computed(
-  () =>
-    props.error ||
-    (localError.value
-      ? t(errorKeys[localError.value])
-      : minorGridlinesState.value.invalid
-        ? t("chart.formatInvalidBounds")
-        : undefined),
+const errorMessage = computed(() =>
+  kind.value === "legend" &&
+  legendFeedbackPage.value &&
+  legendFeedbackPage.value !== legendPage.value
+    ? undefined
+    : props.error ||
+      (localError.value
+        ? t(errorKeys[localError.value])
+        : minorGridlinesState.value.invalid
+          ? t("chart.formatInvalidBounds")
+          : undefined),
 );
 function resetElement(): void {
   if (kind.value === "legend") {
-    if (submit({ kind: "legend", reset: true })) resetDrafts();
+    submit({ kind: "legend", reset: true });
   } else if (kind.value === "chart") {
     if (submit({ kind: "chart", format: undefined })) resetDrafts();
   } else if (props.target.kind === "series") {
@@ -1098,6 +1215,61 @@ function escapeDraft(event: KeyboardEvent): void {
       />
     </div>
     <p v-if="errorMessage" class="chart-format-pane__error" role="alert">{{ errorMessage }}</p>
+    <div
+      v-if="kind === 'legend'"
+      class="chart-format-pane__navigation"
+      data-chart-format-navigation
+    >
+      <TRadioGroup
+        :value="legendMode"
+        variant="default-filled"
+        :aria-label="t('chart.formatPane')"
+        :onChange="captureAction(changeLegendMode)"
+      >
+        <TRadioButton value="legend">{{ t("chart.legendOptions") }}</TRadioButton>
+        <TRadioButton value="text">{{ t("chart.legendTextOptions") }}</TRadioButton>
+      </TRadioGroup>
+      <TTabs
+        v-show="legendMode === 'legend'"
+        class="sheetcraft-tabs--compact"
+        :value="legendTab"
+        :onChange="captureAction(changeLegendTab)"
+        role="tablist"
+        :aria-label="t('chart.legendOptions')"
+        @keydown="legendTabKeydown"
+      >
+        <TTabPanel value="surface" :destroy-on-hide="false">
+          <template #label
+            ><button
+              type="button"
+              class="chart-format-pane__tab-label"
+              role="tab"
+              :id="`${paneId}-surface-tab`"
+              :aria-selected="legendTab === 'surface'"
+              :aria-controls="`${paneId}-surface-panel`"
+              :tabindex="legendTab === 'surface' ? 0 : -1"
+            >
+              {{ t("chart.legendFillLine") }}
+            </button></template
+          >
+        </TTabPanel>
+        <TTabPanel value="layout" :destroy-on-hide="false">
+          <template #label
+            ><button
+              type="button"
+              class="chart-format-pane__tab-label"
+              role="tab"
+              :id="`${paneId}-layout-tab`"
+              :aria-selected="legendTab === 'layout'"
+              :aria-controls="`${paneId}-layout-panel`"
+              :tabindex="legendTab === 'layout' ? 0 : -1"
+            >
+              {{ t("chart.legend") }}
+            </button></template
+          >
+        </TTabPanel>
+      </TTabs>
+    </div>
     <div class="chart-format-pane__body">
       <template v-if="kind === 'chart'">
         <p class="chart-format-pane__hint">{{ t("chart.formatSelectHint") }}</p>
@@ -1112,7 +1284,15 @@ function escapeDraft(event: KeyboardEvent): void {
         {{ t("chart.formatSeriesUnavailable") }}
       </p>
 
-      <FormatSection v-if="kind === 'legend'" :title="t('chart.legend')" initially-open>
+      <FormatSection
+        v-if="kind === 'legend'"
+        v-show="legendMode === 'legend' && legendTab === 'layout'"
+        role="tabpanel"
+        :id="`${paneId}-layout-panel`"
+        :aria-labelledby="`${paneId}-layout-tab`"
+        :title="t('chart.legend')"
+        initially-open
+      >
         <span>{{ t("chart.legendPosition") }}</span>
         <TRadioGroup
           :model-value="elementSettings.legendPosition"
@@ -1434,8 +1614,9 @@ function escapeDraft(event: KeyboardEvent): void {
       </FormatSection>
 
       <FormatSection
-        v-if="kind === 'title' || isAxis"
-        :title="t('chart.formatText')"
+        v-if="kind === 'title' || kind === 'legend' || isAxis"
+        v-show="kind !== 'legend' || legendMode === 'text'"
+        :title="t(kind === 'legend' ? 'chart.legendTextOptions' : 'chart.formatText')"
         initially-open
       >
         <div class="chart-format-pane__field">
@@ -1458,15 +1639,15 @@ function escapeDraft(event: KeyboardEvent): void {
           ></FontFormatField>
         </div>
         <div class="chart-format-pane__field" data-chart-format-field="fontSize">
-          <label :for="`${paneId}-font-size`">{{ t("chart.formatFontSize") }}</label>
+          <label :for="`${paneId}-font-size`">{{ fontSizeLabel }}</label>
           <div class="chart-format-pane__number">
             <NumericField
               ref="fontSizeControl"
               :id="`${paneId}-font-size`"
               :owner-key="`${ownerKey}/fontSize`"
               :value="fontSizeNumericValue"
-              :spec="fontSizeSpec"
-              :label="t('chart.formatFontSize')"
+              :spec="fontSizeFieldSpec"
+              :label="fontSizeLabel"
               :auto-text="t('chart.formatAuto')"
               :disabled="disabled"
               :invalid-message="t('chart.formatInvalidNumber')"
@@ -1524,19 +1705,32 @@ function escapeDraft(event: KeyboardEvent): void {
           >
         </div>
         <p class="chart-format-pane__hint">{{ t("chart.formatFontHint") }}</p>
+        <TButton
+          v-if="kind === 'legend'"
+          variant="text"
+          size="small"
+          :disabled="disabled"
+          data-chart-format-reset="legendText"
+          :onClick="captureAction(() => resetLegendBranch('text'))"
+          >{{ t("chart.legendResetText") }}</TButton
+        >
       </FormatSection>
 
       <FormatSection
-        v-if="kind === 'plot' || isAxis"
-        :title="t('chart.formatAppearance')"
+        v-if="kind === 'plot' || kind === 'legend' || isAxis"
+        v-show="kind !== 'legend' || (legendMode === 'legend' && legendTab === 'surface')"
+        :role="kind === 'legend' ? 'tabpanel' : undefined"
+        :id="kind === 'legend' ? `${paneId}-surface-panel` : undefined"
+        :aria-labelledby="kind === 'legend' ? `${paneId}-surface-tab` : undefined"
+        :title="t(kind === 'legend' ? 'chart.legendFillLine' : 'chart.formatAppearance')"
         initially-open
       >
-        <div v-if="kind === 'plot'" class="chart-format-pane__field">
+        <div v-if="kind === 'plot' || kind === 'legend'" class="chart-format-pane__field">
           <span>{{ t("chart.formatFill") }}</span>
           <div class="chart-format-pane__paint">
             <ColorPaletteSelect
               panel-class="chart-format-options-popup"
-              :model-value="chart.format?.plot?.fill"
+              :model-value="surfaceFormat.fill"
               :transparent-label="t('chart.formatNoFill')"
               :label="t('chart.formatFill')"
               :disabled="disabled"
@@ -1576,15 +1770,15 @@ function escapeDraft(event: KeyboardEvent): void {
           </div>
         </div>
         <div class="chart-format-pane__field" data-chart-format-field="strokeWidth">
-          <label :for="`${paneId}-line-width`">{{ t("chart.formatLineWidth") }}</label>
+          <label :for="`${paneId}-line-width`">{{ surfaceStrokeWidthLabel }}</label>
           <div class="chart-format-pane__number">
             <NumericField
               ref="strokeWidthControl"
               :id="`${paneId}-line-width`"
               :owner-key="`${ownerKey}/strokeWidth`"
               :value="strokeWidthNumericValue"
-              :spec="strokeWidthSpec"
-              :label="t('chart.formatLineWidth')"
+              :spec="surfaceStrokeWidthSpec"
+              :label="surfaceStrokeWidthLabel"
               :auto-text="t('chart.formatAuto')"
               :disabled="disabled"
               :invalid-message="t('chart.formatInvalidNumber')"
@@ -1612,6 +1806,15 @@ function escapeDraft(event: KeyboardEvent): void {
             /></TButton>
           </div>
         </div>
+        <TButton
+          v-if="kind === 'legend'"
+          variant="text"
+          size="small"
+          :disabled="disabled"
+          data-chart-format-reset="legendSurface"
+          :onClick="captureAction(() => resetLegendBranch('surface'))"
+          >{{ t("chart.legendResetSurface") }}</TButton
+        >
       </FormatSection>
 
       <FormatSection v-if="isValueAxis" :title="t('chart.formatNumber')" initially-open>
@@ -1915,6 +2118,7 @@ function escapeDraft(event: KeyboardEvent): void {
       <div
         v-if="available && (kind !== 'chart' || capabilities.bar)"
         class="chart-format-pane__reset"
+        v-show="kind !== 'legend' || (legendMode === 'legend' && legendTab === 'layout')"
       >
         <TButton
           variant="text"
@@ -1922,7 +2126,9 @@ function escapeDraft(event: KeyboardEvent): void {
           :disabled="disabled"
           data-chart-format-reset="element"
           :onClick="captureAction(resetElement)"
-          ><RotateCcw :size="14" aria-hidden="true" />{{ t("chart.formatResetAll") }}</TButton
+          ><RotateCcw :size="14" aria-hidden="true" />{{
+            t(kind === "legend" ? "chart.legendResetLayout" : "chart.formatResetAll")
+          }}</TButton
         >
       </div>
     </div>
@@ -1930,6 +2136,7 @@ function escapeDraft(event: KeyboardEvent): void {
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/tabs/tab-label";
 .chart-format-pane {
   box-sizing: border-box;
   display: flex;
@@ -2029,6 +2236,14 @@ function escapeDraft(event: KeyboardEvent): void {
     align-items: center;
     gap: 4px;
     min-width: 0;
+  }
+  &__tab-label {
+    @include tab-label.label;
+  }
+  &__navigation {
+    padding: 0 12px;
+    display: grid;
+    gap: 6px;
   }
   &__legend-positions {
     display: flex;

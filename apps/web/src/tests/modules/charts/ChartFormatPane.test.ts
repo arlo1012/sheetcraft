@@ -1,6 +1,7 @@
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
+import { Radio, RadioGroup, RadioButton } from "tdesign-vue-next/es/radio";
+import { Tabs } from "tdesign-vue-next/es/tabs";
 import { Select } from "tdesign-vue-next/es/select";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import ChartFormatPane from "../../../modules/charts/components/ChartFormatPane.vue";
@@ -946,14 +947,18 @@ describe("legend layout pane", () => {
       { drawing: drawing({ elements: { legendPosition: "right", legendOverlay: true } }) },
     );
     expect(select(wrapper, "Chart element").props("value")).toBe("legend");
-    expect(wrapper.getComponent(RadioGroup).props("modelValue")).toBe("right");
-    expect(wrapper.findAllComponents(Radio).map((control) => control.props("value"))).toEqual([
-      "top",
-      "bottom",
-      "left",
-      "right",
-      "topRight",
-    ]);
+    expect(
+      wrapper
+        .findAllComponents(RadioGroup)
+        .find((group) => group.attributes("aria-label") === "Legend position")!
+        .props("modelValue"),
+    ).toBe("right");
+    expect(
+      wrapper
+        .findAllComponents(Radio)
+        .filter((control) => !control.element.closest("[data-chart-format-navigation]"))
+        .map((control) => control.props("value")),
+    ).toEqual(["top", "bottom", "left", "right", "topRight"]);
     expect(checkbox(wrapper, "Show legend without overlapping the chart").props("checked")).toBe(
       false,
     );
@@ -975,12 +980,15 @@ describe("legend layout pane", () => {
     await wrapper.get('[data-chart-format-reset="element"]').trigger("click");
     expect(apply).toHaveBeenLastCalledWith({ kind: "legend", reset: true });
     expect(apply).toHaveBeenCalledTimes(3);
-    expect(wrapper.findAllComponents(NumericField)).toHaveLength(0);
+    expect(wrapper.findAllComponents(NumericField)).toHaveLength(2);
   });
   test("rejected position retains the target and an external hide returns to chart", async () => {
     const apply = vi.fn(() => false);
     const { wrapper } = fixture({ kind: "legend" }, { apply });
-    wrapper.getComponent(RadioGroup).vm.$emit("change", "left");
+    wrapper
+      .findAllComponents(RadioGroup)
+      .find((group) => group.attributes("aria-label") === "Legend position")!
+      .vm.$emit("change", "left");
     await flushPromises();
     expect(apply).toHaveBeenCalledExactlyOnceWith({
       kind: "elements",
@@ -994,11 +1002,15 @@ describe("legend layout pane", () => {
   });
   test("disabled and stale legend controls cannot send changes", async () => {
     const { wrapper, apply } = fixture({ kind: "legend" });
-    const oldPosition = wrapper.getComponent(RadioGroup).vm.$props.onChange as (
-      value: string,
-    ) => void;
+    const oldPosition = wrapper
+      .findAllComponents(RadioGroup)
+      .find((group) => group.attributes("aria-label") === "Legend position")!.vm.$props
+      .onChange as (value: string) => void;
     await wrapper.setProps({ disabled: true });
-    wrapper.getComponent(RadioGroup).vm.$emit("change", "left");
+    wrapper
+      .findAllComponents(RadioGroup)
+      .find((group) => group.attributes("aria-label") === "Legend position")!
+      .vm.$emit("change", "left");
     checkbox(wrapper, "Show legend without overlapping the chart").vm.$emit("change", false);
     await flushPromises();
     expect(apply).not.toHaveBeenCalled();
@@ -1086,7 +1098,9 @@ test.each(["legend", "categoryAxis", "valueAxis", "title", "series"] as const)(
     const { wrapper } = fixture(kind === "series" ? { kind, seriesId: "apples" } : { kind });
     for (const control of [
       ...wrapper.findAllComponents(Checkbox),
-      ...wrapper.findAllComponents(Radio),
+      ...wrapper
+        .findAllComponents(Radio)
+        .filter((control) => !control.element.closest("[data-chart-format-navigation]")),
     ]) {
       expect(control.element.tagName).toBe("LABEL");
       expect(control.attributes("data-format-pane-history-control")).toBe("discrete");
@@ -1099,4 +1113,135 @@ test("paint controls receive separate transparent labels", () => {
   const { wrapper } = fixture({ kind: "plot" });
   expect(wrapper.get('button[aria-label="Fill"]').attributes("transparent-label")).toBe("No fill");
   expect(wrapper.get('button[aria-label="Line"]').attributes("transparent-label")).toBe("No line");
+});
+
+describe("legend text and surface panes", () => {
+  function modes(wrapper: VueWrapper) {
+    return wrapper
+      .findAllComponents(RadioGroup)
+      .find((group) => group.attributes("aria-label") === "Format chart")!;
+  }
+  test("real modes default to layout and switching preserves an invalid numeric draft", async () => {
+    const { wrapper, apply } = fixture({ kind: "legend" });
+    expect(wrapper.getComponent(Tabs).props("value")).toBe("layout");
+    expect(input(wrapper, "fontSize").isVisible()).toBe(false);
+    modes(wrapper).vm.$emit("change", "text");
+    await flushPromises();
+    const field = input(wrapper, "fontSize");
+    await field.setValue("1e");
+    await field.trigger("keydown", { key: "Enter" });
+    modes(wrapper).vm.$emit("change", "legend");
+    await flushPromises();
+    expect(field.isVisible()).toBe(false);
+    expect(apply).not.toHaveBeenCalled();
+    await wrapper.get('[data-chart-format-reset="element"]').trigger("click");
+    expect(apply).toHaveBeenCalledExactlyOnceWith({ kind: "legend", reset: true });
+    modes(wrapper).vm.$emit("change", "text");
+    await flushPromises();
+    expect(field.element.value).toBe("1e");
+    expect(field.isVisible()).toBe(true);
+    await field.trigger("compositionstart");
+    modes(wrapper).vm.$emit("change", "legend");
+    await flushPromises();
+    expect(modes(wrapper).props("value")).toBe("text");
+    expect(
+      wrapper
+        .findAllComponents(RadioButton)
+        .every((button) => button.attributes("data-format-pane-history-control") === undefined),
+    ).toBe(true);
+  });
+  test("font, width and independent branch resets preserve layout and the other style", async () => {
+    const legend = {
+      text: { fontSize: 18, bold: true, italic: true, color: "#123456" },
+      surface: { fill: "#abcdef", stroke: "#102030", strokeWidth: 2 },
+    };
+    const { wrapper, apply } = fixture(
+      { kind: "legend" },
+      { drawing: drawing({ elements: { legendPosition: "left" }, format: { legend } }) },
+    );
+    modes(wrapper).vm.$emit("change", "text");
+    await flushPromises();
+    expect(input(wrapper, "fontSize").element.value).toBe("13.5");
+    expect(input(wrapper, "fontSize").attributes("aria-valuetext")).toBe("13.5 pt");
+    await input(wrapper, "fontSize").setValue("20");
+    await input(wrapper, "fontSize").trigger("keydown", { key: "Enter" });
+    expect(apply).toHaveBeenLastCalledWith({
+      kind: "legend",
+      format: { ...legend, text: { ...legend.text, fontSize: 80 / 3 } },
+    });
+    await wrapper.get('[data-chart-format-reset="legendText"]').trigger("click");
+    expect(apply).toHaveBeenLastCalledWith({ kind: "legend", format: { surface: legend.surface } });
+    modes(wrapper).vm.$emit("change", "legend");
+    wrapper.getComponent(Tabs).vm.$emit("change", "surface");
+    await flushPromises();
+    expect(input(wrapper, "strokeWidth").element.value).toBe("1.5");
+    expect(input(wrapper, "strokeWidth").attributes("aria-valuetext")).toBe("1.5 pt");
+    await input(wrapper, "strokeWidth").setValue("3");
+    await input(wrapper, "strokeWidth").trigger("keydown", { key: "Enter" });
+    expect(apply).toHaveBeenLastCalledWith({
+      kind: "legend",
+      format: { ...legend, surface: { ...legend.surface, strokeWidth: 4 } },
+    });
+    await wrapper.get('[data-chart-format-reset="legendSurface"]').trigger("click");
+    expect(apply).toHaveBeenLastCalledWith({ kind: "legend", format: { text: legend.text } });
+  });
+  test("same-owner committed snapshots and new strict callbacks retain the active legend page", async () => {
+    const { wrapper, apply } = fixture({ kind: "legend" });
+    modes(wrapper).vm.$emit("change", "text");
+    await flushPromises();
+    await input(wrapper, "fontSize").setValue("12");
+    await input(wrapper, "fontSize").trigger("keydown", { key: "Enter" });
+    expect(apply).toHaveBeenLastCalledWith({
+      kind: "legend",
+      format: { text: { fontSize: 16 } },
+    });
+    const nextApply = vi.fn(() => true);
+    await wrapper.setProps({
+      drawing: drawing({ format: { legend: { text: { fontSize: 16 } } } }),
+      apply: nextApply,
+    });
+    expect(modes(wrapper).props("value")).toBe("text");
+    expect(input(wrapper, "fontSize").isVisible()).toBe(true);
+    checkbox(wrapper, "Bold").vm.$emit("change", true);
+    await flushPromises();
+    expect(nextApply).toHaveBeenLastCalledWith({
+      kind: "legend",
+      format: { text: { fontSize: 16, bold: true } },
+    });
+    await wrapper.setProps({
+      drawing: drawing({ format: { legend: { text: { fontSize: 16, bold: true } } } }),
+      apply: vi.fn(() => true),
+    });
+    expect(modes(wrapper).props("value")).toBe("text");
+    modes(wrapper).vm.$emit("change", "legend");
+    wrapper.getComponent(Tabs).vm.$emit("change", "surface");
+    await flushPromises();
+    await input(wrapper, "strokeWidth").setValue("2");
+    await input(wrapper, "strokeWidth").trigger("keydown", { key: "Enter" });
+    await wrapper.setProps({
+      drawing: drawing({
+        format: { legend: { text: { fontSize: 16, bold: true }, surface: { strokeWidth: 2 } } },
+      }),
+      apply: vi.fn(() => true),
+    });
+    expect(modes(wrapper).props("value")).toBe("legend");
+    expect(wrapper.getComponent(Tabs).props("value")).toBe("surface");
+    expect(input(wrapper, "strokeWidth").isVisible()).toBe(true);
+  });
+  test("rejected branch reset retains exact draft and a hidden legend retains document styles", async () => {
+    const apply = vi.fn(() => false);
+    const legend = { text: { fontSize: 18 }, surface: { strokeWidth: 2 } };
+    const { wrapper } = fixture(
+      { kind: "legend" },
+      { apply, drawing: drawing({ format: { legend } }) },
+    );
+    modes(wrapper).vm.$emit("change", "text");
+    await flushPromises();
+    await input(wrapper, "fontSize").setValue("bad");
+    await wrapper.get('[data-chart-format-reset="legendText"]').trigger("click");
+    expect(input(wrapper, "fontSize").element.value).toBe("bad");
+    await wrapper.setProps({ drawing: drawing({ legend: false, format: { legend } }) });
+    expect(wrapper.emitted("update:target")?.at(-1)).toEqual([{ kind: "chart" }]);
+    expect(wrapper.props("drawing").chart.format?.legend).toEqual(legend);
+  });
 });

@@ -1,4 +1,4 @@
-import { createChartElementLayout } from "./chart-element-layout";
+import { createChartElementLayout, getChartLegendLayout } from "./chart-element-layout";
 import { applySeriesLegendIdentity } from "./chart-series-legend";
 import type { EChartsOption, SeriesOption } from "echarts";
 import { formatCellNumberValue } from "@sheetcraft/core/number-format";
@@ -481,9 +481,17 @@ export function createChartOption(
     option.yAxis = valueAxis(
       percent ? { kind: "percent", fractionDigits: 0 } : uniformFormat(plotted),
     );
-  return applySeriesLegendIdentity(
-    applyChartCommonFormat(option, chart, renderedData, comboSeriesChanges),
-    chart,
-    renderedData,
-  );
+  const formatted = applyChartCommonFormat(option, chart, renderedData, comboSeriesChanges);
+  // Styled legends share one measured viewport in editor, preview and print.
+  // Unstyled legacy export geometry remains unchanged.
+  const legendLayout = chart.format?.legend
+    ? getChartLegendLayout(chart, renderedData, dimensions ?? { width: 480, height: 300 })
+    : undefined;
+  if (legendLayout && formatted.legend && !Array.isArray(formatted.legend))
+    formatted.legend = {
+      ...formatted.legend,
+      ...legendLayout.option,
+      textStyle: { ...formatted.legend.textStyle, ...legendLayout.option.textStyle },
+    };
+  return applySeriesLegendIdentity(formatted, chart, renderedData);
 }

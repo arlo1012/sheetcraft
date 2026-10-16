@@ -80,11 +80,24 @@ const result = computed(() => {
   }
 });
 const data = computed(() => result.value.data);
-const legendLayout = computed(() =>
-  props.editableLegend && !result.value.invalid
+const fontRevision = ref(0);
+const legendLayout = computed(() => {
+  void fontRevision.value;
+  return props.editableLegend && !result.value.invalid
     ? getChartLegendLayout(paintChart.value, data.value, props.drawing)
-    : undefined,
-);
+    : undefined;
+});
+const legendSelectionStyle = computed(() => {
+  const bounds = legendLayout.value?.bounds;
+  return bounds
+    ? {
+        left: `${bounds.x}px`,
+        top: `${bounds.y}px`,
+        width: `${bounds.width}px`,
+        height: `${bounds.height}px`,
+      }
+    : undefined;
+});
 const error = ref(false);
 const tableError = ref(false);
 const fontError = ref(false);
@@ -98,6 +111,7 @@ const fontFamilies = computed(() => {
     ...new Set(
       [
         format?.title?.fontFamily,
+        format?.legend?.text?.fontFamily,
         format?.categoryAxis?.text?.fontFamily,
         format?.valueAxis?.text?.fontFamily,
         format?.secondaryValueAxis?.text?.fontFamily,
@@ -132,6 +146,7 @@ function loadFonts(retry = false) {
         paint === paintChart.value
       ) {
         fontError.value = false;
+        fontRevision.value++;
         render();
       }
     },
@@ -305,12 +320,6 @@ function legendDoubleClick(event: MouseEvent) {
   legendDoubleClickHandled = true;
   emit("selectElement", { kind: "legend" }, true);
 }
-function legendBorderColor() {
-  return props.selectedElement?.kind === "legend" && root.value
-    ? getComputedStyle(root.value).getPropertyValue("--sheetcraft-action-primary").trim() ||
-        "#2563eb"
-    : "transparent";
-}
 function render() {
   if (!root.value || paintChart.value.type === "wordCloud") {
     eventCleanup?.();
@@ -347,11 +356,10 @@ function render() {
       option.legend = {
         ...option.legend,
         ...legendLayout.value.option,
+        textStyle: { ...option.legend.textStyle, ...legendLayout.value.option.textStyle },
         formatter: option.legend.formatter,
         selectedMode: false,
-        // Keep layout stable while changing only the editor's transient paint.
-        borderWidth: 1,
-        borderColor: legendBorderColor(),
+        // Selection is a separate DOM outline; never replace the user's border.
       };
     // Enable native title/axis hit events without changing legacy serialized options.
     if (option.title && !Array.isArray(option.title))
@@ -406,15 +414,6 @@ watch(
     deep: true,
     flush: "post",
   },
-);
-// Paint-only target changes preserve native legend pagination and plot state.
-watch(
-  () => props.selectedElement?.kind === "legend",
-  () => {
-    if (chart && legendLayout.value && !error.value)
-      chart.setOption({ legend: { borderColor: legendBorderColor() } });
-  },
-  { flush: "post" },
 );
 watch([fontFamilies, () => props.drawing, () => props.revision, paintChart], () => loadFonts(), {
   immediate: true,
@@ -473,6 +472,12 @@ onBeforeUnmount(() => {
       </text>
     </svg>
     <div v-else ref="root" class="chart-content__canvas" />
+    <div
+      v-if="legendLayout && selectedElement?.kind === 'legend' && !error"
+      class="chart-content__legend-selection"
+      :style="legendSelectionStyle"
+      aria-hidden="true"
+    />
     <div v-if="fontError" class="chart-content__font-error" role="status">
       {{ t("chart.formatFontLoadFailed") }}
       <button type="button" @pointerdown.stop @click.stop="loadFonts(true)">
@@ -501,6 +506,13 @@ onBeforeUnmount(() => {
   &__canvas {
     width: 100%;
     height: 100%;
+  }
+  &__legend-selection {
+    position: absolute;
+    pointer-events: none;
+    box-sizing: border-box;
+    outline: 1px solid var(--sheetcraft-action-primary, #2563eb);
+    outline-offset: 2px;
   }
   &__error {
     position: absolute;
