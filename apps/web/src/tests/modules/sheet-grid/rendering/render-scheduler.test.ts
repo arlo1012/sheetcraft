@@ -45,3 +45,26 @@ describe("sheet render scheduler", () => {
     expect(paint).not.toHaveBeenCalled();
   });
 });
+
+test("an invalidation during paint schedules a following frame instead of being swallowed", () => {
+  const frames: FrameRequestCallback[] = [];
+  const paint = vi.fn(() => {
+    if (paint.mock.calls.length === 1) scheduler.invalidate();
+  });
+  const scheduler = createSheetRenderScheduler(
+    paint,
+    (callback) => {
+      frames.push(callback);
+      return frames.length;
+    },
+    vi.fn(),
+  );
+  scheduler.invalidate();
+  frames[0]!(0);
+  expect(paint).toHaveBeenCalledOnce();
+  expect(frames).toHaveLength(2);
+  frames[1]!(1);
+  expect(paint).toHaveBeenCalledTimes(2);
+  expect(frames).toHaveLength(2);
+  scheduler.dispose();
+});

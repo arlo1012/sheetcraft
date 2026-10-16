@@ -225,6 +225,15 @@ export function paintFloatingImages(
   )
     throw new TypeError("Framed picture viewport fragments require a frame context.");
   const resources = createPicturePaintResources(options.theme, options.assetUrls, options.cache);
+  // Asset reads and browser decoding are separate loading stages. A terminal
+  // decoder error must not be masked by another resource still being read.
+  const isAssetPending = (id: string): boolean => {
+    const url = options.assetUrls.get(id);
+    const state = url ? options.cache.state?.(url) : undefined;
+    if (state === "error" || state === "ready") return false;
+    if (state === "loading") return true;
+    return options.loadingAssetIds?.has(id) === true;
+  };
   const density = getPicturePaintDensity(context);
   const bounds = (
     picture:
@@ -331,7 +340,7 @@ export function paintFloatingImages(
             resources,
           );
         else {
-          const loading = Boolean(options.loadingAssetIds?.has(fragment.image.assetId));
+          const loading = isAssetPending(fragment.image.assetId);
           const label = loading ? options.loadingLabel : options.unavailableLabel;
           if (fragment.kind === "framed" || fragment.kind === "group-leaf")
             paintFramedPlaceholder(context, fragment.geometry, label, loading, options.palette);
@@ -339,7 +348,8 @@ export function paintFloatingImages(
         }
       } catch (error) {
         if (!(error instanceof PicturePaintUnavailableError)) throw error;
-        const loading = error.missingAssetIds.some((id) => options.loadingAssetIds?.has(id));
+        const loading =
+          error.missingAssetIds.length > 0 && error.missingAssetIds.every(isAssetPending);
         const label = loading ? options.loadingLabel : options.unavailableLabel;
         if (fragment.kind === "framed" || fragment.kind === "group-leaf")
           paintFramedPlaceholder(context, fragment.geometry, label, loading, options.palette);
