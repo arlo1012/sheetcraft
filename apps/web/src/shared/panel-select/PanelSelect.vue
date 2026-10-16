@@ -110,6 +110,36 @@ function close(): void {
   });
 }
 
+// The readonly input owns focus for the whole composite trigger. Browsers blur
+// an editor to body on mousedown on the decorative arrow/value, before click
+// can open this popup. Transfer focus synchronously, without changing click or
+// pointer ownership, so exact edit leases do not mistake that gap for outside.
+function focusCompositeTrigger(event: MouseEvent): void {
+  const input = control.value?.querySelector<HTMLInputElement>("input"),
+    target = event.target;
+  if (
+    props.disabled ||
+    composing.value ||
+    event.defaultPrevented ||
+    event.button !== 0 ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey ||
+    !input?.readOnly ||
+    input.disabled ||
+    !(target instanceof Element) ||
+    !control.value?.contains(target)
+  )
+    return;
+  const interactive = target.closest(
+    'input, textarea, select, button, a[href], [contenteditable="true"], [tabindex]',
+  );
+  if (interactive && control.value.contains(interactive)) return;
+  event.preventDefault();
+  input.focus({ preventScroll: true });
+}
+
 // The library also has a native ArrowDown listener. During IME, keep those
 // keys within the browser composition session without cancelling its default.
 function guardCompositionKeydown(event: KeyboardEvent): void {
@@ -176,6 +206,7 @@ watch(open, (visible) => {
   <div
     ref="control"
     class="panel-select sheetcraft-panel-select"
+    @mousedown="focusCompositeTrigger"
     @keydown.capture="guardCompositionKeydown"
     @compositionstart.capture="composing = true"
     @compositionend.capture="composing = false"

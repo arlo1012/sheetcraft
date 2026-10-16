@@ -358,3 +358,43 @@ test.each(["owner", "focus", "pointer", "reopen"])(
     expect(document.activeElement?.hasAttribute("data-red-choice")).not.toBe(true);
   },
 );
+
+test("composite trigger transfers only ordinary primary mouse focus and leaves editable, IME and disabled paths native", async () => {
+  const wrapper = fixture();
+  await settle();
+  const input = wrapper.get<HTMLInputElement>("input").element;
+  const arrow = wrapper.get(".t-fake-arrow path").element;
+  // A focusable floating parent is not an interactive child of this trigger.
+  wrapper.element.parentElement!.setAttribute("tabindex", "-1");
+  const outside = document.createElement("button");
+  document.body.append(outside);
+  function down(target: Element, options: MouseEventInit = {}) {
+    const event = new MouseEvent("mousedown", { bubbles: true, cancelable: true, ...options });
+    target.dispatchEvent(event);
+    return event;
+  }
+  outside.focus();
+  expect(down(arrow).defaultPrevented).toBe(true);
+  expect(document.activeElement).toBe(input);
+  expect(input.getAttribute("aria-expanded")).toBe("false");
+  expect(down(input).defaultPrevented).toBe(false);
+  for (const options of [
+    { button: 1 },
+    { button: 2 },
+    { ctrlKey: true },
+    { metaKey: true },
+    { altKey: true },
+    { shiftKey: true },
+  ]) {
+    outside.focus();
+    expect(down(arrow, options).defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(outside);
+  }
+  input.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+  expect(down(arrow).defaultPrevented).toBe(false);
+  input.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true }));
+  await wrapper.setProps({ disabled: true });
+  expect(down(arrow).defaultPrevented).toBe(false);
+  expect(document.activeElement).toBe(outside);
+  wrapper.element.parentElement!.removeAttribute("tabindex");
+});
