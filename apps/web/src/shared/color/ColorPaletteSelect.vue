@@ -11,6 +11,7 @@ const props = withDefaults(
     label: string;
     defaultColor?: string;
     defaultLabel?: string;
+    transparentLabel?: string;
     mixed?: boolean;
     disabled?: boolean;
     showValue?: boolean;
@@ -29,6 +30,8 @@ const resolvedDefaultLabel = computed(() => props.defaultLabel ?? t("cellFormat.
 const valueLabel = computed(() => {
   if (props.mixed) return t("format.mixed");
   if (props.disabled) return t("cellFormat.patternNone");
+  if (color.value.toLowerCase() === "transparent" && props.transparentLabel)
+    return props.transparentLabel;
   return automatic.value ? resolvedDefaultLabel.value : color.value.toUpperCase();
 });
 

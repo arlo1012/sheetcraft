@@ -1079,3 +1079,24 @@ describe("shared value-axis numbers", () => {
     ).toBeUndefined();
   });
 });
+
+test.each(["legend", "categoryAxis", "valueAxis", "title", "series"] as const)(
+  "%s document toggles carry explicit history ownership on the real focus node",
+  (kind) => {
+    const { wrapper } = fixture(kind === "series" ? { kind, seriesId: "apples" } : { kind });
+    for (const control of [
+      ...wrapper.findAllComponents(Checkbox),
+      ...wrapper.findAllComponents(Radio),
+    ]) {
+      expect(control.element.tagName).toBe("LABEL");
+      expect(control.attributes("data-format-pane-history-control")).toBe("discrete");
+      expect(["checkbox", "radio"]).toContain(control.get("input").attributes("type"));
+    }
+    expect(wrapper.get("aside").attributes("style")).toContain("--chart-format-label-width: 120px");
+  },
+);
+test("paint controls receive separate transparent labels", () => {
+  const { wrapper } = fixture({ kind: "plot" });
+  expect(wrapper.get('button[aria-label="Fill"]').attributes("transparent-label")).toBe("No fill");
+  expect(wrapper.get('button[aria-label="Line"]').attributes("transparent-label")).toBe("No line");
+});

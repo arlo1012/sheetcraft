@@ -206,6 +206,11 @@ export const chartsEnUS = {
   "chart.formatBarGlobalHint":
     "Gap width and overlap apply to all column or bar series in this chart, grouped by value axis.",
   "chart.formatInvalidNumber": "Enter a complete finite number within the allowed range.",
+  "chart.formatAxisBoundsOrder": "Minimum must be less than maximum.",
+  "chart.formatAxisPositiveUnit": "Enter a positive unit.",
+  "chart.formatAxisMinorTooLarge": "Minor unit must not exceed major unit.",
+  "chart.formatAxisDivisionLimit": "Use at most 100 minor divisions.",
+  "chart.formatAxisUnevenDivision": "Minor unit must evenly divide major unit.",
   "chart.formatInvalidBounds":
     "Minimum must be less than maximum. Units must be positive; an explicit minor unit must evenly divide the major unit, with at most 100 divisions.",
   "chart.formatInvalidFormat": "Check the format value. Your draft is retained.",

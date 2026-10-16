@@ -96,3 +96,21 @@ describe("ColorPaletteSelect", () => {
     expect(document.activeElement).toBe(trigger.element);
   });
 });
+
+test.each(["No fill", "No line"])(
+  "transparent colors expose the caller's semantic label: %s",
+  (transparentLabel) => {
+    const wrapper = mountControl({ modelValue: "transparent", showValue: true, transparentLabel });
+    expect(wrapper.text()).toContain(transparentLabel);
+    expect(wrapper.text()).not.toContain("TRANSPARENT");
+    expect(wrapper.get("input").attributes("aria-label")).toContain(transparentLabel);
+  },
+);
+test("transparent label is opt-in and does not alter ordinary colors or automatic labels", async () => {
+  const wrapper = mountControl({ modelValue: "transparent", showValue: true });
+  expect(wrapper.text()).toContain("TRANSPARENT");
+  await wrapper.setProps({ modelValue: "#abcdef", transparentLabel: "No fill" });
+  expect(wrapper.text()).toContain("#ABCDEF");
+  await wrapper.setProps({ modelValue: null, defaultLabel: "Default" });
+  expect(wrapper.text()).toContain("Default");
+});

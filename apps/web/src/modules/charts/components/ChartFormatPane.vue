@@ -50,7 +50,8 @@ import {
   getChartFormatTargets,
   getChartSeriesFormat,
   resolveChartFormatSeriesId,
-  isChartValueAxisDraftValid,
+  getChartValueAxisDraftError,
+  type ChartValueAxisDraftError,
   setChartFormatField,
   syncChartFormatDraft,
   type ChartFormatDraft,
@@ -332,6 +333,14 @@ const decimalsNumericValue = computed<NumericValue>((previous) =>
 const decimalsCommit = computed(() => sharedNumericCommit("decimals"));
 const fontSizeCommit = computed(() => sharedNumericCommit("fontSize"));
 const strokeWidthCommit = computed(() => sharedNumericCommit("strokeWidth"));
+const axisDraftErrorKeys: Record<ChartValueAxisDraftError, MessageKey> = {
+  number: "chart.formatInvalidNumber",
+  bounds: "chart.formatAxisBoundsOrder",
+  positiveUnit: "chart.formatAxisPositiveUnit",
+  minorTooLarge: "chart.formatAxisMinorTooLarge",
+  divisionLimit: "chart.formatAxisDivisionLimit",
+  unevenDivision: "chart.formatAxisUnevenDivision",
+};
 function sharedNumericCommit(field: SharedNumericField) {
   const owner = ownerKey.value,
     handler = props.apply,
@@ -347,11 +356,12 @@ function sharedNumericCommit(field: SharedNumericField) {
     )
       return { accepted: false, error: t("chart.formatApplyFailed") };
     const value = candidate.kind === "auto" ? undefined : candidate.value;
-    if (
-      (field === "min" || field === "max" || field === "majorUnit" || field === "minorUnit") &&
-      !isChartValueAxisDraftValid(setChartFormatField(valueAxis.value, field, value) ?? {})
-    )
-      return { accepted: false, error: t("chart.formatInvalidBounds") };
+    if (field === "min" || field === "max" || field === "majorUnit" || field === "minorUnit") {
+      const error = getChartValueAxisDraftError(
+        setChartFormatField(valueAxis.value, field, value) ?? {},
+      );
+      if (error) return { accepted: false, error: t(axisDraftErrorKeys[error]) };
+    }
     const intent = numericIntent(field, value);
     const accepted = !!intent && submit(intent, handler);
     if (accepted) delete sharedNumericResetErrors[field];
@@ -1055,6 +1065,7 @@ function escapeDraft(event: KeyboardEvent): void {
     ref="root"
     class="chart-format-pane"
     data-chart-format-pane
+    :style="{ '--chart-format-label-width': locale === 'zh-CN' ? '84px' : '120px' }"
     :aria-label="t('chart.formatPane')"
     @keydown.capture="escapeDraft"
     @pointerdown.capture="pointerDown"
@@ -1111,13 +1122,24 @@ function escapeDraft(event: KeyboardEvent): void {
           class="chart-format-pane__legend-positions"
           :onChange="captureAction(setLegendPosition)"
         >
-          <TRadio value="top">{{ t("chart.positionTop") }}</TRadio>
-          <TRadio value="bottom">{{ t("chart.positionBottom") }}</TRadio>
-          <TRadio value="left">{{ t("chart.positionLeft") }}</TRadio>
-          <TRadio value="right">{{ t("chart.positionRight") }}</TRadio>
-          <TRadio value="topRight">{{ t("chart.positionTopRight") }}</TRadio>
+          <TRadio data-format-pane-history-control="discrete" value="top">{{
+            t("chart.positionTop")
+          }}</TRadio>
+          <TRadio data-format-pane-history-control="discrete" value="bottom">{{
+            t("chart.positionBottom")
+          }}</TRadio>
+          <TRadio data-format-pane-history-control="discrete" value="left">{{
+            t("chart.positionLeft")
+          }}</TRadio>
+          <TRadio data-format-pane-history-control="discrete" value="right">{{
+            t("chart.positionRight")
+          }}</TRadio>
+          <TRadio data-format-pane-history-control="discrete" value="topRight">{{
+            t("chart.positionTopRight")
+          }}</TRadio>
         </TRadioGroup>
         <TCheckbox
+          data-format-pane-history-control="discrete"
           :checked="!elementSettings.legendOverlay"
           :disabled="disabled"
           :onChange="captureAction(setLegendNonOverlapping)"
@@ -1159,18 +1181,21 @@ function escapeDraft(event: KeyboardEvent): void {
 
       <FormatSection v-if="isAxis" :title="t('chart.formatAxisOptions')" initially-open>
         <TCheckbox
+          data-format-pane-history-control="discrete"
           :checked="axis.show ?? true"
           :disabled="disabled"
           :onChange="captureAction((value: unknown) => setAxisBoolean('show', value))"
           >{{ t("chart.formatShowAxis") }}</TCheckbox
         >
         <TCheckbox
+          data-format-pane-history-control="discrete"
           :checked="axis.reverse ?? false"
           :disabled="disabled"
           :onChange="captureAction((value: unknown) => setAxisBoolean('reverse', value))"
           >{{ t("chart.formatReverse") }}</TCheckbox
         >
         <TCheckbox
+          data-format-pane-history-control="discrete"
           :checked="axis.titleVisible ?? !!axis.title"
           :disabled="disabled"
           data-chart-format-field="titleVisible"
@@ -1179,6 +1204,7 @@ function escapeDraft(event: KeyboardEvent): void {
         >
         <template v-if="isValueAxis">
           <TCheckbox
+            data-format-pane-history-control="discrete"
             :checked="valueAxis.majorGridlines ?? true"
             :disabled="disabled"
             data-chart-format-field="majorGridlines"
@@ -1186,6 +1212,7 @@ function escapeDraft(event: KeyboardEvent): void {
             >{{ t("chart.formatMajorGridlines") }}</TCheckbox
           >
           <TCheckbox
+            data-format-pane-history-control="discrete"
             :checked="minorGridlinesState.checked"
             :indeterminate="minorGridlinesState.invalid"
             :disabled="disabled || minorGridlinesState.invalid"
@@ -1342,7 +1369,7 @@ function escapeDraft(event: KeyboardEvent): void {
               :label="t('chart.formatMajorUnit')"
               :auto-text="t('chart.formatAuto')"
               :disabled="disabled"
-              :invalid-message="t('chart.formatInvalidNumber')"
+              :invalid-message="t('chart.formatAxisPositiveUnit')"
               :rejected-message="t('chart.formatApplyFailed')"
               :stale-message="t('chart.formatApplyFailed')"
               :external-error="sharedNumericResetErrors.majorUnit"
@@ -1379,7 +1406,7 @@ function escapeDraft(event: KeyboardEvent): void {
               :label="t('chart.formatMinorUnit')"
               :auto-text="t('chart.formatAuto')"
               :disabled="disabled"
-              :invalid-message="t('chart.formatInvalidNumber')"
+              :invalid-message="t('chart.formatAxisPositiveUnit')"
               :rejected-message="t('chart.formatApplyFailed')"
               :stale-message="t('chart.formatApplyFailed')"
               :external-error="sharedNumericResetErrors.minorUnit"
@@ -1483,11 +1510,13 @@ function escapeDraft(event: KeyboardEvent): void {
         </div>
         <div class="chart-format-pane__checks">
           <TCheckbox
+            data-format-pane-history-control="discrete"
             :checked="textFormat.bold ?? (kind === 'title' && chart.type !== 'wordCloud')"
             :disabled="disabled"
             :onChange="captureAction((value: unknown) => setText('bold', !!value))"
             >{{ t("format.bold") }}</TCheckbox
           ><TCheckbox
+            data-format-pane-history-control="discrete"
             :checked="textFormat.italic ?? false"
             :disabled="disabled"
             :onChange="captureAction((value: unknown) => setText('italic', !!value))"
@@ -1508,6 +1537,7 @@ function escapeDraft(event: KeyboardEvent): void {
             <ColorPaletteSelect
               panel-class="chart-format-options-popup"
               :model-value="chart.format?.plot?.fill"
+              :transparent-label="t('chart.formatNoFill')"
               :label="t('chart.formatFill')"
               :disabled="disabled"
               :default-label="t('chart.formatDefault')"
@@ -1529,6 +1559,7 @@ function escapeDraft(event: KeyboardEvent): void {
             <ColorPaletteSelect
               panel-class="chart-format-options-popup"
               :model-value="lineFormat.stroke"
+              :transparent-label="t('chart.formatNoLine')"
               :label="t('chart.formatLine')"
               :disabled="disabled"
               :default-label="t('chart.formatDefault')"
@@ -1585,6 +1616,7 @@ function escapeDraft(event: KeyboardEvent): void {
 
       <FormatSection v-if="isValueAxis" :title="t('chart.formatNumber')" initially-open>
         <TCheckbox
+          data-format-pane-history-control="discrete"
           v-if="!percentageAxis"
           :checked="linkedToSource"
           :disabled="disabled"
@@ -1650,6 +1682,7 @@ function escapeDraft(event: KeyboardEvent): void {
           />
         </div>
         <TCheckbox
+          data-format-pane-history-control="discrete"
           v-if="numberCategory === 'number'"
           :checked="
             numberFormat && 'useGrouping' in numberFormat
@@ -1778,6 +1811,7 @@ function escapeDraft(event: KeyboardEvent): void {
           </div>
         </div>
         <TCheckbox
+          data-format-pane-history-control="discrete"
           v-if="capabilities.seriesSmooth"
           :checked="series.smooth ?? false"
           :disabled="disabled"
@@ -1785,6 +1819,7 @@ function escapeDraft(event: KeyboardEvent): void {
           >{{ t("chart.formatSmooth") }}</TCheckbox
         >
         <TCheckbox
+          data-format-pane-history-control="discrete"
           v-if="capabilities.seriesMarkers"
           :checked="
             series.markers ??
@@ -1959,13 +1994,16 @@ function escapeDraft(event: KeyboardEvent): void {
   }
   &__field {
     display: grid;
-    grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
-    align-items: center;
+    grid-template-columns: var(--chart-format-label-width) minmax(0, 1fr);
+    align-items: start;
     gap: 10px;
     min-width: 0;
     > label,
     > span {
-      white-space: nowrap;
+      min-height: 24px;
+      display: flex;
+      align-items: center;
+      overflow-wrap: anywhere;
     }
     &--stack {
       grid-template-columns: minmax(0, 1fr);
@@ -1975,11 +2013,14 @@ function escapeDraft(event: KeyboardEvent): void {
   &__number {
     display: flex;
     gap: 2px;
-    align-items: center;
+    align-items: flex-start;
     min-width: 0;
     > :first-child {
       min-width: 0;
       flex: 1;
+    }
+    > button {
+      flex-shrink: 0;
     }
   }
   &__paint {

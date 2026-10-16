@@ -310,27 +310,37 @@ export function parseChartFormatNumber(
     return { valid: false };
   return { valid: true, value: Object.is(value, -0) ? 0 : value };
 }
-export function isChartValueAxisDraftValid(axis: ChartValueAxisFormat): boolean {
+export type ChartValueAxisDraftError =
+  | "number"
+  | "bounds"
+  | "positiveUnit"
+  | "minorTooLarge"
+  | "divisionLimit"
+  | "unevenDivision";
+
+export function getChartValueAxisDraftError(
+  axis: ChartValueAxisFormat,
+): ChartValueAxisDraftError | undefined {
   if (
     [axis.min, axis.max, axis.majorUnit, axis.minorUnit].some(
       (value) => value !== undefined && !Number.isFinite(value),
     )
   )
-    return false;
-  if (axis.min !== undefined && axis.max !== undefined && axis.min >= axis.max) return false;
-  if (axis.majorUnit !== undefined && axis.majorUnit <= 0) return false;
-  if (axis.minorUnit !== undefined && axis.minorUnit <= 0) return false;
+    return "number";
+  if (axis.min !== undefined && axis.max !== undefined && axis.min >= axis.max) return "bounds";
+  if (axis.majorUnit !== undefined && axis.majorUnit <= 0) return "positiveUnit";
+  if (axis.minorUnit !== undefined && axis.minorUnit <= 0) return "positiveUnit";
   if (axis.majorUnit !== undefined && axis.minorUnit !== undefined) {
     const divisions = axis.majorUnit / axis.minorUnit;
-    if (
-      !Number.isFinite(divisions) ||
-      divisions < 1 ||
-      divisions > 100 ||
-      Math.abs(divisions - Math.round(divisions)) > 1e-9
-    )
-      return false;
+    if (!Number.isFinite(divisions)) return "divisionLimit";
+    if (divisions < 1) return "minorTooLarge";
+    if (divisions > 100) return "divisionLimit";
+    if (Math.abs(divisions - Math.round(divisions)) > 1e-9) return "unevenDivision";
   }
-  return true;
+  return undefined;
+}
+export function isChartValueAxisDraftValid(axis: ChartValueAxisFormat): boolean {
+  return getChartValueAxisDraftError(axis) === undefined;
 }
 
 export function commitChartFormatNumberDraft(

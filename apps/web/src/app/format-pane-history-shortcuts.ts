@@ -25,6 +25,23 @@ export function isFormatPaneReadonlyHistoryControl(
   );
 }
 
+/** Explicit document toggles only; TDesign focuses their label, not their input. */
+function isFormatPaneDiscreteHistoryControl(target: Element): boolean {
+  const label = target.closest('label[data-format-pane-history-control="discrete"]');
+  const input = label?.querySelector<HTMLInputElement>(
+    'input[type="checkbox"],input[type="radio"]',
+  );
+  return !!(
+    label &&
+    input &&
+    input.closest("label") === label &&
+    (target === label || target === input) &&
+    !input.disabled &&
+    !input.readOnly &&
+    !label.closest(':disabled,[aria-disabled="true"]')
+  );
+}
+
 /** Only the current owned pane's command controls participate in workbook history. */
 export function routeFormatPaneHistoryShortcut(
   event: KeyboardEvent,
@@ -55,10 +72,12 @@ export function routeFormatPaneHistoryShortcut(
     )
   )
     return false;
+  const discreteMode = isFormatPaneDiscreteHistoryControl(target);
   // Chart resets and explicitly marked actions share the current pane owner.
   // Do not admit arbitrary chart buttons or native editors into workbook history.
   if (
     pane.hasAttribute("data-chart-format-pane") &&
+    !discreteMode &&
     !target.closest(
       'button[data-chart-format-reset], button[data-format-pane-history-control="command"]',
     )
@@ -67,12 +86,15 @@ export function routeFormatPaneHistoryShortcut(
   const readonlyMode = isFormatPaneReadonlyHistoryControl(target);
   if (
     !readonlyMode &&
+    !discreteMode &&
     (target.closest("input,textarea,select") ||
       !target.closest('button,[role="button"],[role="tab"],[role="radio"],[role="checkbox"]'))
   )
     return false;
   if (target.closest(':disabled,[aria-disabled="true"]')) return false;
-  const action = getWorkbookHistoryShortcut(event, { allowEditableTarget: readonlyMode });
+  const action = getWorkbookHistoryShortcut(event, {
+    allowEditableTarget: readonlyMode || discreteMode,
+  });
   if (!action || !context.current()) return false;
   event.preventDefault();
   event.stopPropagation();

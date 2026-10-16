@@ -187,6 +187,11 @@ export const chartsZhCN = {
   "chart.formatOverlap": "系列重叠 (%)",
   "chart.formatBarGlobalHint": "间隙宽度与重叠应用于此图全部柱形或条形系列，并按数值轴分组。",
   "chart.formatInvalidNumber": "请输入范围内的完整有限数值。",
+  "chart.formatAxisBoundsOrder": "最小值须小于最大值。",
+  "chart.formatAxisPositiveUnit": "请输入大于零的单位。",
+  "chart.formatAxisMinorTooLarge": "次要单位不能大于主要单位。",
+  "chart.formatAxisDivisionLimit": "次要单位最多分为 100 份。",
+  "chart.formatAxisUnevenDivision": "次要单位须整除主要单位。",
   "chart.formatInvalidBounds":
     "最小值须小于最大值，单位须大于零。手动次要单位须整除主要单位，且最多分为 100 份。",
   "chart.formatInvalidFormat": "请检查格式值，输入内容已保留。",

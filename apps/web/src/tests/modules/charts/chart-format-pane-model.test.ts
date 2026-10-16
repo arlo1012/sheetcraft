@@ -11,6 +11,7 @@ import {
   getChartFormatSeries,
   getChartFormatTargets,
   isChartValueAxisDraftValid,
+  getChartValueAxisDraftError,
   parseChartFormatNumber,
   setChartFormatField,
   syncChartFormatDraft,
@@ -295,4 +296,23 @@ test("Ribbon and pane share exhaustive, distinct labels for every non-series tar
       .filter((target) => target.kind !== "series")
       .map((target) => chartFormatTargetLabelKeys[target.kind]),
   ).toContain("chart.legend");
+});
+
+test.each([
+  [{ min: NaN, max: -1, majorUnit: 0 }, "number"],
+  [{ min: 10, max: 10, majorUnit: 0 }, "bounds"],
+  [{ majorUnit: 0, minorUnit: -1 }, "positiveUnit"],
+  [{ minorUnit: -1 }, "positiveUnit"],
+  [{ majorUnit: 1, minorUnit: 2 }, "minorTooLarge"],
+  [{ majorUnit: 101, minorUnit: 1 }, "divisionLimit"],
+  [{ majorUnit: Number.MAX_VALUE, minorUnit: Number.MIN_VALUE }, "divisionLimit"],
+  [{ majorUnit: 10, minorUnit: 3 }, "unevenDivision"],
+  [{ majorUnit: 10 + 2e-9, minorUnit: 1 }, "unevenDivision"],
+  [{ majorUnit: 10 + 0.5e-9, minorUnit: 1 }, undefined],
+  [{ majorUnit: 100, minorUnit: 1 }, undefined],
+  [{ majorUnit: 1, minorUnit: 1 }, undefined],
+  [{}, undefined],
+] as const)("axis reason preserves validation precedence and tolerance for %j", (axis, reason) => {
+  expect(getChartValueAxisDraftError(axis)).toBe(reason);
+  expect(isChartValueAxisDraftValid(axis)).toBe(reason === undefined);
 });

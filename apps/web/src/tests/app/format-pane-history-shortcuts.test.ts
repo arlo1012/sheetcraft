@@ -167,3 +167,38 @@ test.each([
   expect(f.dispatch().handled).toBe(false);
   expect(f.undo).not.toHaveBeenCalled();
 });
+
+test.each(["checkbox", "radio"])(
+  "owned %s label and input route history without admitting other controls",
+  (type) => {
+    for (const target of ["label", "input"]) {
+      const f = fixture(
+        `<label ${target === "label" ? "data-target" : ""} data-format-pane-history-control="discrete"><input ${target === "input" ? "data-target" : ""} type="${type}"></label>`,
+      );
+      f.pane.removeAttribute("data-shape-format-pane");
+      f.pane.setAttribute("data-chart-format-pane", "");
+      expect(f.dispatch().handled).toBe(true);
+      expect(f.undo).toHaveBeenCalledTimes(1);
+      expect(f.dispatch({ shiftKey: true }).handled).toBe(true);
+      expect(f.redo).toHaveBeenCalledTimes(1);
+      expect(f.dispatch({ isComposing: true }).handled).toBe(false);
+      f.current.mockReturnValue(false);
+      expect(f.dispatch().handled).toBe(false);
+    }
+  },
+);
+test.each([
+  '<label data-target><input type="checkbox"></label>',
+  '<label data-target data-format-pane-history-control="discrete"><input type="text"></label>',
+  '<label data-target data-format-pane-history-control="discrete"><input type="checkbox" disabled></label>',
+  '<label data-target data-format-pane-history-control="discrete"><input type="radio" readonly></label>',
+  '<label data-format-pane-history-control="discrete"><span data-target>Text</span><input type="checkbox"></label>',
+  '<div role="dialog"><label data-target data-format-pane-history-control="discrete"><input type="radio"></label></div>',
+  '<div role="listbox"><label data-target data-format-pane-history-control="discrete"><input type="checkbox"></label></div>',
+])("discrete marker does not bypass edit, disabled or popup isolation: %s", (markup) => {
+  const f = fixture(markup);
+  f.pane.removeAttribute("data-shape-format-pane");
+  f.pane.setAttribute("data-chart-format-pane", "");
+  expect(f.dispatch().handled).toBe(false);
+  expect(f.undo).not.toHaveBeenCalled();
+});
