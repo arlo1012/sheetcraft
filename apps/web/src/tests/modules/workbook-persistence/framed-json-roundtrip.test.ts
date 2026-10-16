@@ -2,6 +2,7 @@ import { createHash, webcrypto } from "node:crypto";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createWorkbook, getActiveSheet, setCellContent } from "@sheetcraft/core/workbook";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
+import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import type { PictureFrameAnchor } from "@sheetcraft/core/picture-frame";
 import type { PictureDetailedStyle } from "@sheetcraft/core/picture-detailed-style";
 import { DEFAULT_SHEET_WATERMARK } from "@sheetcraft/core/page-decoration";
@@ -317,7 +318,8 @@ describe("standalone canonical picture portable JSON", () => {
     const getter = vi.fn(() => {
       throw Error("must not run");
     });
-    Object.defineProperty(image.transform!, "annotations", { get: getter, enumerable: true });
+    if (!isFramedPictureObject(image) || !image.transform) throw Error("Expected framed fixture");
+    Object.defineProperty(image.transform, "annotations", { get: getter, enumerable: true });
     expect(() => assertExternalPictureGroupSupport(workbook)).toThrow(/own data fields/);
     expect(getter).not.toHaveBeenCalled();
   });
@@ -325,7 +327,8 @@ describe("standalone canonical picture portable JSON", () => {
   test("cyclic canonical data rejects before normalization", () => {
     const workbook = fixture(),
       image = getActiveSheet(workbook).floatingImages[0]!;
-    Object.assign(image.transform!, { annotations: [image.transform] });
+    if (!isFramedPictureObject(image) || !image.transform) throw Error("Expected framed fixture");
+    Object.assign(image.transform, { annotations: [image.transform] });
     expect(() => assertExternalPictureGroupSupport(workbook)).toThrow(/cycle/);
   });
 
@@ -339,15 +342,13 @@ describe("standalone canonical picture portable JSON", () => {
     expect(getter).not.toHaveBeenCalled();
   });
 
-  test("cell frames still reject before writes", async () => {
+  test("malformed cell frames still reject before asset reads or writes", async () => {
     const workbook = fixture();
     const cell = getActiveSheet(workbook).cells.get("0:0")!;
     if (cell.content?.kind !== "image") throw Error("fixture");
     Object.assign(cell.content.image, { frame: {} });
     const store = { get: vi.fn(async () => undefined), put: vi.fn(async () => {}) };
-    await expect(downloadWorkbookBundle(workbook, store)).rejects.toMatchObject({
-      code: "unsupported-picture-frame",
-    });
+    await expect(downloadWorkbookBundle(workbook, store)).rejects.toThrow(/cell picture frame/);
     expect(store.get).not.toHaveBeenCalled();
     expect(store.put).not.toHaveBeenCalled();
   });

@@ -283,7 +283,43 @@ function assertPortableFramedPictureData(value: object, omitMembers = false): vo
   }
 }
 
-/** Portable JSON retains validated standalone frames and owned trees; cell frames remain gated. */
+/** Inspect the cell envelope before reading source-bearing data from a live workbook. */
+function assertPortableCellPictureSupport(cell: object, theme: WorkbookTheme): void {
+  const contentField = Object.getOwnPropertyDescriptor(cell, "content");
+  if (contentField && !("value" in contentField))
+    throw new TypeError("Portable cell content must be an own data field.");
+  if (!contentField) {
+    if ("content" in cell) throw new TypeError("Portable cell content must be an own data field.");
+    return;
+  }
+  const content: unknown = contentField.value;
+  if (!content || typeof content !== "object") return;
+  const kindField = Object.getOwnPropertyDescriptor(content, "kind");
+  if (kindField && !("value" in kindField))
+    throw new TypeError("Portable cell content kind must be an own data field.");
+  if (!kindField && "kind" in content)
+    throw new TypeError("Portable cell content kind must be an own data field.");
+  if (kindField?.value !== "image") return;
+  const imageField = Object.getOwnPropertyDescriptor(content, "image");
+  if (!imageField || !("value" in imageField))
+    throw new TypeError("Portable cell image must be an own data field.");
+  const image: unknown = imageField.value;
+  if (!image || typeof image !== "object" || Array.isArray(image))
+    throw new TypeError("Invalid portable cell image.");
+  // Inherited geometry must not escape into the legacy path. Core validates the
+  // actual own discriminant and rejects unknown/conflicting frame fields.
+  if (!("frame" in image) && !("lockAspectRatio" in image)) return;
+  for (const envelope of [cell, content]) {
+    const prototype: unknown = Object.getPrototypeOf(envelope);
+    if (prototype !== Object.prototype && prototype !== null)
+      throw new TypeError("Portable cell pictures require ordinary own data records.");
+  }
+  assertPortableFramedPictureData(image);
+  const normalized = normalizeCellImage(image as Parameters<typeof normalizeCellImage>[0]);
+  assertCellPictureSupport({ kind: "image", image: normalized }, theme);
+}
+
+/** Portable JSON retains validated frames and owned trees without weakening other consumers. */
 export function assertExternalPictureGroupSupport(workbook: Workbook): void {
   for (const sheet of workbook.sheets.values()) {
     const images = sheet.floatingImages;
@@ -309,7 +345,6 @@ export function assertExternalPictureGroupSupport(workbook: Workbook): void {
         if (!("value" in Object.getOwnPropertyDescriptor(image, field)!))
           throw new TypeError("Portable pictures must be own data fields.");
     }
-    const ids: string[] = [];
     const safeImages: FloatingImage[] = [];
     let nodeCount = 0;
     for (let index = 0; index < images.length; index++) {
@@ -326,10 +361,7 @@ export function assertExternalPictureGroupSupport(workbook: Workbook): void {
       } else if (isFramedPictureObject(image)) assertPortableFramedPictureData(image);
       safeImages.push(image);
     }
-    for (const [key, cell] of sheet.cells)
-      if (cell.content?.kind === "image" && Object.hasOwn(cell.content.image, "frame"))
-        ids.push(`cell:${key}`);
-    if (ids.length) throw new UnsupportedPictureDocumentError(sheet.id, ids);
+    for (const cell of sheet.cells.values()) assertPortableCellPictureSupport(cell, workbook.theme);
     const roots = normalizePictureObjectCollection(safeImages);
     assertPictureObjectsForSheet(roots, sheet);
   }

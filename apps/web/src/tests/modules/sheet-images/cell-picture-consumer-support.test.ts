@@ -16,12 +16,7 @@ import {
   assertWorkbookPictureSupport,
 } from "../../../modules/sheet-images/picture-document-support";
 import { UnsupportedPicturePaintError } from "../../../modules/sheet-images/picture-paint-effects";
-import {
-  downloadWorkbookBundle,
-  downloadWorkbookJson,
-  parseWorkbookJson,
-  readWorkbookBundleFile,
-} from "../../../modules/workbook-persistence/workbookJsonTransfer";
+import { parseWorkbookJson } from "../../../modules/workbook-persistence/workbookJsonTransfer";
 import {
   assertXlsxPictureGeometrySupport,
   prepareXlsxImages,
@@ -210,44 +205,28 @@ describe("source-bearing cell internal content admission", () => {
   });
 });
 
-describe("paused source-bearing cell external consumers", () => {
-  test("portable JSON and XLSX refuse before asset reads, writes, decoding or download targets", async () => {
+describe("independent source-bearing cell external consumers", () => {
+  test("XLSX still refuses supported cell frames before asset reads or writes", async () => {
     const { workbook, sheet } = fixture();
     setCellContent(sheet, { row: 3, column: 2 }, { kind: "image", image: framedCellPicture() });
     const before = serializeWorkbook(workbook);
-    const get = vi.fn(async () => undefined);
-    const put = vi.fn(async () => {});
-    const store = { get, put };
-    const createUrl = vi.spyOn(URL, "createObjectURL");
-    expect(() => downloadWorkbookJson(workbook)).toThrow(/does not support/);
-    expect(() => parseWorkbookJson(JSON.stringify(before))).toThrow(
-      expect.objectContaining({ code: "unsupported-picture-frame" }),
-    );
-    await expect(downloadWorkbookBundle(workbook, store)).rejects.toThrow(/does not support/);
-    await expect(
-      readWorkbookBundleFile(
-        {
-          text: async () =>
-            JSON.stringify({
-              format: "sheetcraft-workbook",
-              version: 1,
-              snapshot: before,
-              images: [{ id: "cell-source", data: "bad" }],
-            }),
-        },
-        store,
-      ),
-    ).rejects.toMatchObject({ code: "unsupported-picture-frame" });
+    const store = { get: vi.fn(), put: vi.fn() };
     await expect(prepareXlsxImages(before, store)).rejects.toMatchObject({
       report: {
         issues: [{ code: "feature-omitted", severity: "block", locations: ["Synthetic!C4.frame"] }],
       },
     });
-    expect(get).not.toHaveBeenCalled();
-    expect(put).not.toHaveBeenCalled();
-    expect(createUrl).not.toHaveBeenCalled();
-    createUrl.mockRestore();
+    expect(store.get).not.toHaveBeenCalled();
+    expect(store.put).not.toHaveBeenCalled();
     expect(serializeWorkbook(workbook)).toEqual(before);
+  });
+
+  test("JSON admits supported local geometry without changing its snapshot", () => {
+    const { workbook, sheet } = fixture();
+    setCellContent(sheet, { row: 3, column: 2 }, { kind: "image", image: framedCellPicture() });
+    const before = serializeWorkbook(workbook);
+    expect(() => assertExternalPictureGroupSupport(workbook)).not.toThrow();
+    expect(serializeWorkbook(parseWorkbookJson(JSON.stringify(before)))).toEqual(before);
   });
 
   test.each([undefined, null, {}, { kind: "future-cell-frame" }])(
@@ -260,9 +239,7 @@ describe("paused source-bearing cell external consumers", () => {
           image: { assetId: "source", altText: "Framed", frame } as CellImage,
         },
       });
-      expect(() => assertExternalPictureGroupSupport(workbook)).toThrow(
-        expect.objectContaining({ code: "unsupported-picture-frame", imageIds: ["cell:3:2"] }),
-      );
+      expect(() => assertExternalPictureGroupSupport(workbook)).toThrow();
       expect(() => assertXlsxPictureGeometrySupport(workbook)).toThrow(
         expect.objectContaining({
           report: {
@@ -289,7 +266,7 @@ describe("paused source-bearing cell external consumers", () => {
       get: getter,
     }) as CellImage;
     sheet.cells.set("3:2", { content: { kind: "image", image } });
-    expect(() => assertExternalPictureGroupSupport(workbook)).toThrow(/does not support/);
+    expect(() => assertExternalPictureGroupSupport(workbook)).toThrow(/own data fields/);
     expect(() => assertXlsxPictureGeometrySupport(workbook)).toThrow(/not yet supported/);
     expect(getter).not.toHaveBeenCalled();
   });
