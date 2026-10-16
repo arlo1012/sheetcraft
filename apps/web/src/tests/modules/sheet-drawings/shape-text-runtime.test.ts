@@ -123,6 +123,15 @@ describe("drawing shape-text resolution", () => {
       expect(() => getDrawingShapeTextNativeWarpSource(changed, layout)).toThrow(
         /prepare its layout/,
       );
+    const previousLanguage = document.documentElement.lang;
+    try {
+      document.documentElement.lang = previousLanguage === "zh-CN" ? "en-US" : "zh-CN";
+      expect(() => getDrawingShapeTextNativeWarpSource(source, layout)).toThrow(
+        /prepare its layout/,
+      );
+    } finally {
+      document.documentElement.lang = previousLanguage;
+    }
     resource.fontRevision.value++;
     expect(() => getDrawingShapeTextNativeWarpSource(source, layout)).toThrow(/ready font changed/);
   });

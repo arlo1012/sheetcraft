@@ -10,12 +10,14 @@ import ShapeFormatNumberField from "./ShapeFormatNumberField.vue";
 import ShapeFormatChoiceField from "./ShapeFormatChoiceField.vue";
 import ShapeFormatCheckbox from "./ShapeFormatCheckbox.vue";
 import ShapeFormatFontFields from "./ShapeFormatFontFields.vue";
+import type { ShapeFormatPresentation } from "../../useShapeFormatPresentation";
 import type { ShapeFormatController } from "./useShapeFormatPane";
 const props = withDefaults(
   defineProps<{
     controller: ShapeFormatController;
     unit: PictureFormatLengthUnit;
     includeFont?: boolean;
+    presentationState?: ShapeFormatPresentation;
   }>(),
   { includeFont: true },
 );
@@ -84,7 +86,16 @@ const action = computed(() => {
 <template>
   <div ref="root" class="shape-format-text-box">
     <Teleport to="body"><div ref="marginsPopupHost" data-shape-format-margins-popup /></Teleport>
-    <FormatSection :title="controller.s.value('textBox')" initially-open>
+    <FormatSection
+      :title="controller.s.value('textBox')"
+      initially-open
+      :open="presentationState?.textBoxOpen"
+      @update:open="
+        (value) => {
+          if (presentationState) presentationState.textBoxOpen = value;
+        }
+      "
+    >
       <ShapeFormatChoiceField :controller="controller" field="textVerticalAlignment" />
       <ShapeFormatChoiceField :controller="controller" field="textDirection" />
       <ShapeFormatChoiceField
@@ -124,6 +135,10 @@ const action = computed(() => {
       <ShapeFormatCheckbox :controller="controller" field="textOverflow" />
       <ShapeFormatCheckbox :controller="controller" field="textWrap" />
     </FormatSection>
-    <ShapeFormatFontFields v-if="includeFont" :controller="controller" />
+    <ShapeFormatFontFields
+      v-if="includeFont"
+      :controller="controller"
+      :presentation-state="presentationState"
+    />
   </div>
 </template>

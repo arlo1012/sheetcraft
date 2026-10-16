@@ -1,3 +1,4 @@
+import { syncShapeTextCanvasLanguage } from "./shape-text-language";
 import {
   getShapeTextNativeDirection,
   shapeTextCanvasFont,
@@ -11,7 +12,7 @@ import {
 export type ShapeTextCanvasContext = Pick<
   CanvasRenderingContext2D,
   "font" | "textAlign" | "textBaseline" | "direction" | "measureText"
->;
+> & { canvas?: HTMLCanvasElement };
 export type ShapeTextNormalMetricPolicy =
   | "font-bounding-box-sum"
   | "measured-hg-ink-box-sum"
@@ -32,6 +33,7 @@ export class ShapeTextMeasureError extends Error {
 }
 
 function prepare(context: ShapeTextCanvasContext, font: ShapeTextFont, text: string): void {
+  if (context.canvas) syncShapeTextCanvasLanguage(context.canvas);
   if (
     !font.family ||
     !Number.isFinite(font.size) ||

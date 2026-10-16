@@ -42,6 +42,7 @@ type NativeCall = {
 /** A deterministic native-Canvas boundary double, not browser glyph fidelity.
  * Real shared paint sampling/effects operate on its detached numeric pixels. */
 class MemoryCanvas {
+  lang = "";
   private w = 0;
   private h = 0;
   data = new Uint8ClampedArray();
@@ -847,6 +848,21 @@ describe("real native run source and shared glyph paints", () => {
     expect(native.calls()[1]!.matrix[1]).toBeCloseTo(1);
     expect(native.calls()[2]!.matrix[1]).toBeCloseTo(-1);
   });
+  test("all detached glyph canvases inherit the current document language", () => {
+    const documentElement = { lang: "zh-CN" };
+    vi.stubGlobal("document", { documentElement });
+    for (const language of ["zh-CN", "en-US"]) {
+      documentElement.lang = language;
+      const native = factory();
+      paint(options(), native.make);
+      expect(native.canvases.length).toBeGreaterThan(0);
+      expect(native.canvases.every((canvas) => canvas.lang === language)).toBe(true);
+      const proof = factory();
+      preflightShapeTextGlyphBudgets({ ...warpOptions("textWave1"), canvasFactory: proof.make });
+      expect(proof.canvases.length).toBeGreaterThan(0);
+      expect(proof.canvases.every((canvas) => canvas.lang === language)).toBe(true);
+    }
+  });
   test("ordinary fill is actual glyph alpha with independent RGBA and no backplate", () => {
     const native = factory(),
       result = paint(options(), native.make);
@@ -1538,6 +1554,22 @@ describe("true painted glyph text-own3D", () => {
   });
 });
 describe("detached cache and returned Canvas ownership", () => {
+  test("document language changes invalidate an otherwise identical paint cache key", () => {
+    const native = factory();
+    const documentElement = { lang: "zh-CN" };
+    vi.stubGlobal("document", { documentElement, createElement: () => native.make() });
+    const input = { ...options(), key: "same-font-revision" };
+    owned.push(ready(prepareShapeTextPaint(input)));
+    const calls = native.calls().length;
+    owned.push(ready(prepareShapeTextPaint(input)));
+    expect(native.calls()).toHaveLength(calls);
+    documentElement.lang = "en-US";
+    const next = ready(prepareShapeTextPaint(input));
+    owned.push(next);
+    expect(native.calls().length).toBeGreaterThan(calls);
+    expect(next.canvas.lang).toBe("en-US");
+  });
+
   test("cache borrows no returned Canvas; dispose is independent and idempotent", () => {
     const native = factory();
     vi.stubGlobal("document", { createElement: () => native.make() });

@@ -4,10 +4,22 @@ import {
   Collapse as TCollapse,
   CollapsePanel as TCollapsePanel,
 } from "tdesign-vue-next/es/collapse";
-const props = withDefaults(defineProps<{ title: string; initiallyOpen?: boolean }>(), {
-  initiallyOpen: false,
+const props = withDefaults(
+  defineProps<{ title: string; initiallyOpen?: boolean; open?: boolean }>(),
+  {
+    initiallyOpen: false,
+    open: undefined,
+  },
+);
+const emit = defineEmits<{ "update:open": [value: boolean] }>();
+const localOpen = ref(props.initiallyOpen);
+const open = computed({
+  get: () => props.open ?? localOpen.value,
+  set: (value: boolean) => {
+    localOpen.value = value;
+    emit("update:open", value);
+  },
 });
-const open = ref(props.initiallyOpen);
 const contentId = `format-section-${useId()}`;
 const expanded = computed({
   get: () => (open.value ? [contentId] : []),

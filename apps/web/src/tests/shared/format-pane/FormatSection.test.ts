@@ -44,3 +44,16 @@ test("shared FormatSection respects initiallyOpen without an extra domain state 
   wrappers.push(wrapper);
   expect(wrapper.get("button[aria-expanded]").attributes("aria-expanded")).toBe("true");
 });
+
+test("controlled open state changes only after its presentation owner accepts the update", async () => {
+  const wrapper = mount(FormatSection, { props: { title: "Paragraph", open: false } });
+  wrappers.push(wrapper);
+  const heading = wrapper.get("button[aria-expanded]");
+  await heading.trigger("click");
+  expect(wrapper.emitted("update:open")).toEqual([[true]]);
+  expect(heading.attributes("aria-expanded")).toBe("false");
+  await wrapper.setProps({ open: true });
+  expect(heading.attributes("aria-expanded")).toBe("true");
+  await heading.trigger("click");
+  expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
+});

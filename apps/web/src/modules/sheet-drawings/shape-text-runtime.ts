@@ -1,3 +1,4 @@
+import { getShapeTextLanguage } from "./shape-text-language";
 import { normalizeSheetDrawing, type SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import { getShapeTextCharacterSegments } from "@sheetcraft/core/shape-text-character-runs";
 import {
@@ -300,6 +301,7 @@ const nativeWarpSources = new WeakMap<
 function nativeSourceSignature(drawing: SheetGraphicDrawing): string {
   return JSON.stringify(
     [
+      getShapeTextLanguage(),
       drawing.text,
       drawing.width,
       drawing.height,

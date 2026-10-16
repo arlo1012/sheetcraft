@@ -16,10 +16,12 @@ import { useShapeTextFieldDraft } from "../../shape-text-field-drafts";
 import ShapeFormatFillLine from "./ShapeFormatFillLine.vue";
 import ShapeFormatEffects from "./ShapeFormatEffects.vue";
 import ShapeFormatSizeProperties from "./ShapeFormatSizeProperties.vue";
+import type { ShapeFormatPresentation } from "../../useShapeFormatPresentation";
 import ShapeFormatTextBox from "./ShapeFormatTextBox.vue";
 const props = withDefaults(
   defineProps<
     ShapeFormatPaneInput & {
+      presentationState?: ShapeFormatPresentation;
       initialMode?: ShapeFormatMode;
       initialTab?: ShapeFormatTab;
       initialUnit?: PictureFormatLengthUnit;
@@ -69,6 +71,25 @@ useShapeTextFieldDraft({
 });
 const unit = ref<PictureFormatLengthUnit>(props.initialUnit);
 const paneRoot = ref<HTMLElement>();
+const paneBody = ref<HTMLElement>();
+let restoredPresentation: ShapeFormatPresentation | undefined;
+watch(
+  () => [props.presentationState, paneBody.value] as const,
+  async ([state, body]) => {
+    restoredPresentation = undefined;
+    await nextTick();
+    if (!body || body !== paneBody.value || state !== props.presentationState) return;
+    body.scrollTop = state?.scrollTop ?? 0;
+    restoredPresentation = state;
+  },
+  { immediate: true, flush: "post" },
+);
+function rememberScroll() {
+  const state = props.presentationState;
+  if (state && state === restoredPresentation && paneBody.value)
+    state.scrollTop = paneBody.value.scrollTop;
+}
+
 const unitsPopup = useNativePopupOwnership({
   owner: () => (props.snapshot ? `${controller.ownerKey.value}:units` : undefined),
   disabled: () => !props.snapshot || controller.hasActiveNumericDraft.value,
@@ -310,7 +331,7 @@ defineExpose({
         @change="changeUnitAction"
       />
     </div>
-    <div class="shape-format-pane__body">
+    <div ref="paneBody" class="shape-format-pane__body" @scroll="rememberScroll">
       <p v-if="!snapshot" class="shape-format-pane__hint">
         {{ controller.s.value("missingSelection") }}
       </p>
@@ -392,7 +413,11 @@ defineExpose({
           role="tabpanel"
           :aria-labelledby="`${paneId}-text-box-tab`"
         >
-          <ShapeFormatTextBox :controller="controller" :unit="unit" />
+          <ShapeFormatTextBox
+            :controller="controller"
+            :unit="unit"
+            :presentation-state="presentationState"
+          />
         </div>
       </template>
     </div>

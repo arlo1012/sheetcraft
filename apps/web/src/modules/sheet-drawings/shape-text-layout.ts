@@ -250,9 +250,27 @@ export function getShapeTextNativeDirection(text: string): "ltr" | "rtl" {
   }
   return "ltr";
 }
-/** Same resolved CSS family stack for measurement and painting. */
+const CSS_GENERIC_FONT_FAMILIES = new Set([
+  "serif",
+  "sans-serif",
+  "monospace",
+  "cursive",
+  "fantasy",
+  "system-ui",
+  "ui-serif",
+  "ui-sans-serif",
+  "ui-monospace",
+  "ui-rounded",
+  "math",
+  "fangsong",
+]);
+/** Same resolved CSS family stack for measurement and painting. Quoting a generic
+ * family would instead request a named face and change native fallback. */
 export function shapeTextCanvasFont(font: ShapeTextFont): string {
-  const family = font.family.includes(",") ? font.family : JSON.stringify(font.family);
+  const family =
+    font.family.includes(",") || CSS_GENERIC_FONT_FAMILIES.has(font.family.toLowerCase())
+      ? font.family
+      : JSON.stringify(font.family);
   return `${font.italic ? "italic " : ""}${font.weight} ${font.size}px ${family}`;
 }
 function union(left: ShapeTextRect | null, right: ShapeTextRect): ShapeTextRect {

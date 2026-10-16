@@ -196,6 +196,7 @@ import {
   shapeFormatOwnerKey,
   type ShapeFormatTab,
 } from "../modules/sheet-drawings/shape-format-pane-model";
+import { useShapeFormatPresentation } from "../modules/sheet-drawings/useShapeFormatPresentation";
 import ShapeFormatPane from "../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
 import ShapeTextRibbonTools from "../modules/sheet-drawings/components/ShapeTextRibbonTools.vue";
 import { useShapeRibbonFormat } from "../modules/sheet-drawings/useShapeRibbonFormat";
@@ -2268,6 +2269,36 @@ const shapeTextCharacterPane = useShapeTextCharacterFormatPane({
   getWorkbookId: () => session.workbook.id,
   getSheetId: () => activeSheet.value.id,
   getLocale: () => (locale.value === "zh-CN" ? "zh-CN" : "en-US"),
+});
+const shapeFormatPresentation = useShapeFormatPresentation(() => {
+  const edit = shapeTextCharacterPane.snapshot.value ? shapeTextEdit.snapshot.value : undefined;
+  const connector = shapeConnectorFormatPane.snapshot.value;
+  const group = shapeGroupFormatPane.snapshot.value;
+  const object = shapeFormatPane.snapshot.value;
+  const rootId =
+    edit?.sourceRootId ??
+    (connector
+      ? shapeConnectorFormatPane.root.value?.id
+      : group
+        ? shapeGroupFormatPane.root.value?.id
+        : object?.drawing.id);
+  const path =
+    edit?.path ??
+    (connector
+      ? shapeConnectorFormatPane.path.value
+      : group
+        ? shapeGroupFormatPane.path.value
+        : object
+          ? [object.drawing.id]
+          : undefined);
+  if (!rootId || !path) return undefined;
+  return {
+    workbook: session.workbook,
+    generation: workbookGeneration.value,
+    sheet: activeSheet.value,
+    rootId,
+    path,
+  };
 });
 function startShapeTextEdit(request: ShapeCanvasTextEditRequest): boolean {
   const keepPropertiesOpen = !!(
@@ -6691,6 +6722,7 @@ watch(
               : 'text-box'
             : shapePaneRequestedTab
         "
+        :presentation-state="shapeFormatPresentation"
         :before-tab-change="beforeShapeFormatTabChange"
         :data-shape-text-edit-session="shapeTextEdit.snapshot.value?.sessionId"
         @close="

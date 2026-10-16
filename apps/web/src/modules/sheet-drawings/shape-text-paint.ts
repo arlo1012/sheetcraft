@@ -1,3 +1,4 @@
+import { getShapeTextLanguage, syncShapeTextCanvasLanguage } from "./shape-text-language";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
   FREE_SHAPE_PATH_WORK_BUDGET,
@@ -1743,6 +1744,7 @@ function prepareShapeTextPaintAtDensity(
   const theme = options.resources?.theme ?? DEFAULT_WORKBOOK_THEME,
     cacheable = options.key !== undefined && !options.canvasFactory && !options.captureSilhouette,
     key = JSON.stringify([
+      getShapeTextLanguage(),
       identity(options.sourceIdentity ?? options.drawing),
       identity(options.layout),
       options.key,
@@ -1779,6 +1781,7 @@ function prepareShapeTextPaintAtDensity(
     if (canvases.has(canvas) || [...images.values()].includes(canvas))
       throw new TypeError("Glyph canvas factory must return a fresh unowned Canvas.");
     canvases.add(canvas);
+    syncShapeTextCanvasLanguage(canvas);
     canvas.width = width;
     canvas.height = height;
     return canvas;
@@ -2168,6 +2171,7 @@ export function preflightShapeTextGlyphBudgets(
     if (canvases.has(canvas))
       throw new TypeError("Glyph preflight factory must return a fresh unowned Canvas.");
     canvases.add(canvas);
+    syncShapeTextCanvasLanguage(canvas);
     canvas.width = plan.frontWidthRaster;
     canvas.height = plan.frontHeightRaster;
     return canvas;

@@ -1,4 +1,5 @@
 import { createI18n, useI18n } from "vue-i18n";
+import { invalidateCellTextFontMetrics } from "../cell-text/text-metrics";
 import { enUS } from "./messages/en-US";
 import { zhCN } from "./messages/zh-CN";
 import type { AppLocale, MessageKey, MessageParams, MessageSchema } from "./schema";
@@ -56,8 +57,10 @@ export function resolveInitialLocale(options?: {
 }
 
 function syncDocumentLocale(locale: AppLocale): void {
-  if (typeof document !== "undefined") {
+  if (typeof document !== "undefined" && document.documentElement.lang !== locale) {
     document.documentElement.lang = locale;
+    // Native font fallback depends on language, including detached shape canvases.
+    invalidateCellTextFontMetrics();
   }
 }
 

@@ -30,6 +30,23 @@ function context(value = metrics()): ShapeTextCanvasContext {
 }
 
 describe("native shape-text measurement", () => {
+  test("detached measurement canvas follows the document language on reuse", () => {
+    const previous = document.documentElement.lang;
+    const canvas = document.createElement("canvas");
+    const native = { ...context(), canvas };
+    const adapter = createCanvasShapeTextMeasurement(native);
+    try {
+      for (const language of ["zh-CN", "en-US", "zh-CN"]) {
+        document.documentElement.lang = language;
+        adapter.measurer.measure("First paragraph", font);
+        expect(canvas.lang).toBe(language);
+        expect(native.font).toBe('italic 700 20px "Exact face"');
+      }
+    } finally {
+      document.documentElement.lang = previous;
+    }
+  });
+
   test("preserves signed actual ink overhang instead of using advance-box bounds", () => {
     const canvas = context();
     const adapter = createCanvasShapeTextMeasurement(canvas);

@@ -14,6 +14,9 @@ import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import SheetDrawingLayer from "../../../modules/sheet-drawings/components/SheetDrawingLayer.vue";
 import ShapeCanvasTextEditor from "../../../modules/sheet-drawings/components/ShapeCanvasTextEditor.vue";
+import FormatSection from "../../../shared/format-pane/FormatSection.vue";
+import NumericField from "../../../shared/numeric-field/NumericField.vue";
+import ShapeFormatTextBox from "../../../modules/sheet-drawings/components/shape-format/ShapeFormatTextBox.vue";
 import ShapeFormatPane from "../../../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
 import ShapeFormatFillLine from "../../../modules/sheet-drawings/components/shape-format/ShapeFormatFillLine.vue";
 import ShapeFormatEffects from "../../../modules/sheet-drawings/components/shape-format/ShapeFormatEffects.vue";
@@ -704,6 +707,8 @@ test.each([false, true])(
   15_000,
 );
 
+// The full Workspace/native-control fixture can exceed 15 seconds on the cloud
+// runner. Keep this local timeout; the owner and focus assertions stay unchanged.
 test("retired native fill popup and callback cannot edit a replacement shape or worksheet owner", async () => {
   const { wrapper, current } = await fixture(workbook(false, true));
   const pane = await openFormat(wrapper, current);
@@ -730,7 +735,7 @@ test("retired native fill popup and callback cannot edit a replacement shape or 
   await flushPromises();
   expect(serializeWorkbook(current.session.workbook)).toEqual(switched);
   expect(current.session.history.undoStack).toHaveLength(0);
-}, 15_000);
+}, 60_000);
 
 test("pending native fill choice focus cannot follow a replacement owner or override new user focus", async () => {
   const { wrapper, current } = await fixture(workbook(false, true));
@@ -758,4 +763,73 @@ test("pending native fill choice focus cannot follow a replacement owner or over
   elsewhere.focus();
   await flushPromises();
   expect(document.activeElement).toBe(elsewhere);
-}, 15_000);
+}, 60_000);
+
+test.each([false, true])(
+  "TextBox presentation survives object/character remount without sharing transaction leases (owned=%s)",
+  async (owned) => {
+    const { wrapper, current, before } = await fixture(workbook(owned));
+    let pane = await openFormat(wrapper, current, owned);
+    await pane.get(".shape-format-pane__modes label:nth-of-type(2)").trigger("click");
+    await pane.get('[role="tab"][id$="text-box-tab"]').trigger("click");
+    const textbox = () => pane.get('[id$="text-box-panel"]').getComponent(ShapeFormatTextBox);
+    const sections = () => textbox().findAllComponents(FormatSection);
+    const originalPane = pane.vm;
+    const numeric = textbox().getComponent(NumericField);
+    const retiredCommit = numeric.props("onCommit");
+    const retiredContext = {
+      ownerKey: numeric.props("ownerKey"),
+      sessionId: "retired-test",
+      source: "enter" as const,
+    };
+    sections()[0]!.vm.$emit("update:open", false);
+    sections()[1]!.vm.$emit("update:open", false);
+    sections()[2]!.vm.$emit("update:open", true);
+    const body = pane.get<HTMLElement>(".shape-format-pane__body");
+    body.element.scrollTop = 73;
+    await body.trigger("scroll");
+    await flushPromises();
+    const presentation = pane.props("presentationState");
+    expect(presentation).toEqual({
+      textBoxOpen: false,
+      fontOpen: false,
+      paragraphOpen: true,
+      scrollTop: 73,
+    });
+    const layer = wrapper.getComponent(SheetDrawingLayer);
+    layer.props("startTextEdit")!({
+      root: getActiveSheet(current.session.workbook).drawings![0],
+      path: owned ? ["group", "box"] : ["box"],
+      selection: "all",
+    });
+    await flushPromises();
+    pane = wrapper.getComponent(ShapeFormatPane);
+    expect(pane.vm).not.toBe(originalPane);
+    expect(pane.props("presentationState")).toBe(presentation);
+    expect(sections().map((section) => section.props("open"))).toEqual([false, false, true]);
+    expect(pane.get<HTMLElement>(".shape-format-pane__body").element.scrollTop).toBe(73);
+    const editor = wrapper
+      .getComponent(ShapeCanvasTextEditor)
+      .get<HTMLElement>("[data-shape-rich-text-input]");
+    expect(document.activeElement).toBe(editor.element);
+    expect(retiredCommit({ kind: "value", value: 12 }, retiredContext).accepted).toBe(false);
+    expect(serializeWorkbook(current.session.workbook)).toEqual(before);
+    expect(current.session.history.undoStack).toHaveLength(0);
+    // The existing shape-tab transition commits the private session and opens the
+    // same exact source owner; presentation must survive this reverse handoff too.
+    await pane.get(".shape-format-pane__modes label:nth-of-type(1)").trigger("click");
+    await flushPromises();
+    expect(current.shapeTextEdit.snapshot.value).toBeUndefined();
+    pane = wrapper.getComponent(ShapeFormatPane);
+    expect(pane.props("presentationState")).toBe(presentation);
+    await pane.get(".shape-format-pane__modes label:nth-of-type(2)").trigger("click");
+    await pane.get('[role="tab"][id$="text-box-tab"]').trigger("click");
+    expect(sections().map((section) => section.props("open"))).toEqual([false, false, true]);
+    pane.vm.$emit("close");
+    await flushPromises();
+    pane = await openFormat(wrapper, current, owned);
+    expect(pane.props("presentationState")).not.toBe(presentation);
+    expect(pane.props("presentationState")?.scrollTop).toBe(0);
+  },
+  60_000,
+);

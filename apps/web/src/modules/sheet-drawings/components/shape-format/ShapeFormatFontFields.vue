@@ -7,13 +7,26 @@ import PictureFormatField from "../../../sheet-images/components/format-pane/Pic
 import ShapeFormatNumberField from "./ShapeFormatNumberField.vue";
 import ShapeFormatCheckbox from "./ShapeFormatCheckbox.vue";
 import ShapeFormatChoiceField from "./ShapeFormatChoiceField.vue";
+import type { ShapeFormatPresentation } from "../../useShapeFormatPresentation";
 import type { ShapeFormatController } from "./useShapeFormatPane";
-const props = defineProps<{ controller: ShapeFormatController }>();
+const props = defineProps<{
+  controller: ShapeFormatController;
+  presentationState?: ShapeFormatPresentation;
+}>();
 const colorAction = computed(() => props.controller.session.fieldAction("textColor"));
 </script>
 <template>
   <div class="shape-format-font-fields">
-    <FormatSection :title="controller.s.value('font')" initially-open>
+    <FormatSection
+      :title="controller.s.value('font')"
+      initially-open
+      :open="presentationState?.fontOpen"
+      @update:open="
+        (value) => {
+          if (presentationState) presentationState.fontOpen = value;
+        }
+      "
+    >
       <PictureFormatField
         :label="controller.s.value('fontFamily')"
         :reason="controller.fieldCapability('fontFamily').reason"
@@ -42,7 +55,15 @@ const colorAction = computed(() => props.controller.session.fieldAction("textCol
         <ShapeFormatCheckbox :controller="controller" field="textStrike" />
       </div>
     </FormatSection>
-    <FormatSection :title="controller.s.value('paragraph')">
+    <FormatSection
+      :title="controller.s.value('paragraph')"
+      :open="presentationState?.paragraphOpen"
+      @update:open="
+        (value) => {
+          if (presentationState) presentationState.paragraphOpen = value;
+        }
+      "
+    >
       <ShapeFormatChoiceField :controller="controller" field="paragraphAlignment" />
       <ShapeFormatNumberField :controller="controller" field="paragraphBeforePt" />
       <ShapeFormatNumberField :controller="controller" field="paragraphAfterPt" />

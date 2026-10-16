@@ -610,6 +610,25 @@ describe("bounded numeric shape text layout", () => {
     expect(measure.mock.calls.reduce((sum, call) => sum + call[0].length, 0)).toBeLessThan(2000000);
     expect(result.measurementCount).toBe(measure.mock.calls.length);
   });
+  test("Canvas preserves generic family keywords rather than requesting quoted names", () => {
+    for (const family of [
+      "serif",
+      "sans-serif",
+      "monospace",
+      "system-ui",
+      "ui-sans-serif",
+      "math",
+      "fangsong",
+      "SANS-SERIF",
+    ]) {
+      expect(shapeTextCanvasFont({ family, size: 20, weight: 400, italic: false })).toBe(
+        `400 20px ${family}`,
+      );
+    }
+    expect(shapeTextCanvasFont({ family: "Inter", size: 20, weight: 400, italic: false })).toBe(
+      '400 20px "Inter"',
+    );
+  });
   test("Canvas font and native base direction are shared public shaping inputs", () => {
     expect(shapeTextCanvasFont({ family: "A face", size: 20, weight: 700, italic: true })).toBe(
       'italic 700 20px "A face"',
