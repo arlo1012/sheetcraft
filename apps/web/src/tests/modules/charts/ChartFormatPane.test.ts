@@ -5,6 +5,8 @@ import { Select } from "tdesign-vue-next/es/select";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import ChartFormatPane from "../../../modules/charts/components/ChartFormatPane.vue";
 import NumericField from "../../../shared/numeric-field/NumericField.vue";
+import FormatSection from "../../../shared/format-pane/FormatSection.vue";
+import type { CellNumberFormat } from "@sheetcraft/core/style";
 import type {
   ChartFormatIntent,
   ChartFormatTarget,
@@ -386,6 +388,92 @@ describe("chart format right pane", () => {
     expect(apply).toHaveBeenCalledTimes(1);
     expect(input(wrapper, "formatCode").element.value).toBe('"unterminated');
   });
+  test.each([
+    {
+      field: "decimals",
+      format: { kind: "number", fractionDigits: 2 },
+      invalid: "21",
+      expected: "2",
+    },
+    {
+      field: "formatCode",
+      format: { kind: "custom", code: "0.00" },
+      invalid: '"unterminated',
+      expected: "0.00",
+    },
+  ] as { field: string; format: CellNumberFormat; invalid: string; expected: string }[])(
+    "accepted number category clears only replaced $field drafts and errors",
+    async ({ field, format, invalid, expected }) => {
+      const snapshot = (numberFormat: CellNumberFormat) =>
+        drawing({
+          format: { valueAxis: { linkedToSource: false, numberFormat } },
+        });
+      const { wrapper, apply } = fixture({ kind: "valueAxis" }, { drawing: snapshot(format) });
+      await input(wrapper, "min").setValue("-");
+      await input(wrapper, field).setValue(invalid);
+      await input(wrapper, field).trigger("blur");
+      expect(wrapper.find('[role="alert"]').exists()).toBe(true);
+      select(wrapper, "Category").vm.$emit("change", "date");
+      await flushPromises();
+      expect(apply).toHaveBeenCalledTimes(1);
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+      await wrapper.setProps({ drawing: snapshot({ kind: "date", code: "yyyy-mm-dd" }) });
+      expect(input(wrapper, "formatCode").element.value).toBe("yyyy-mm-dd");
+      expect(input(wrapper, "min").element.value).toBe("-");
+      select(wrapper, "Category").vm.$emit("change", format.kind);
+      await flushPromises();
+      await wrapper.setProps({ drawing: snapshot(format) });
+      expect(input(wrapper, field).element.value).toBe(expected);
+      await input(wrapper, field).trigger("blur");
+      expect(apply).toHaveBeenCalledTimes(2);
+    },
+  );
+  test("rejected number category retains the current editor draft for retry", async () => {
+    const apply = vi.fn((_intent: ChartFormatIntent) => false);
+    const { wrapper } = fixture(
+      { kind: "valueAxis" },
+      {
+        apply,
+        drawing: drawing({
+          format: {
+            valueAxis: {
+              linkedToSource: false,
+              numberFormat: { kind: "number", fractionDigits: 2 },
+            },
+          },
+        }),
+      },
+    );
+    await input(wrapper, "decimals").setValue("3");
+    select(wrapper, "Category").vm.$emit("change", "date");
+    await flushPromises();
+    expect(input(wrapper, "decimals").element.value).toBe("3");
+    expect(select(wrapper, "Category").props("value")).toBe("number");
+    apply.mockReturnValue(true);
+    await input(wrapper, "decimals").trigger("keydown", { key: "Enter" });
+    expect(apply).toHaveBeenLastCalledWith({
+      kind: "valueAxis",
+      format: {
+        linkedToSource: false,
+        numberFormat: { kind: "number", fractionDigits: 3 },
+      },
+    });
+  });
+  test("shared sections start open and retain mounted drafts while collapsed", async () => {
+    const { wrapper } = fixture();
+    const sections = wrapper.findAllComponents(FormatSection);
+    expect(sections).toHaveLength(5);
+    expect(sections.every((section) => section.props("initiallyOpen"))).toBe(true);
+    const field = input(wrapper, "min");
+    await field.setValue("-");
+    const section = sections[1]!;
+    await section.get("button").trigger("click");
+    expect(section.get("button").attributes("aria-expanded")).toBe("false");
+    expect(input(wrapper, "min").element).toBe(field.element);
+    await wrapper.setProps({ drawing: drawing({}, "chart-two") });
+    expect(section.get("button").attributes("aria-expanded")).toBe("false");
+    expect(input(wrapper, "min").element.value).toBe("");
+  });
   test("series editing addresses a stable ID and global gap never becomes a series field", async () => {
     const { wrapper, apply } = fixture({ kind: "series", seriesId: "pears" });
     select(wrapper, "Plot series on").vm.$emit("change", "secondary");
@@ -719,5 +807,120 @@ describe("shared chart style numbers", () => {
     await wrapper.getComponent(NumericField).vm.edit("2");
     wrapper.getComponent(NumericField).vm.commit("external");
     expect(apply).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("shared chart layout numbers", () => {
+  test.each([
+    {
+      field: "labelAngle",
+      target: { kind: "categoryAxis" },
+      format: { categoryAxis: { labelAngle: 12.5 } },
+      min: "-90",
+      max: "90",
+      value: "12.5 °",
+      invalid: "91",
+    },
+    {
+      field: "gapWidth",
+      target: { kind: "chart" },
+      format: { bar: { gapWidth: 25.5 } },
+      min: "0",
+      max: "500",
+      value: "25.5 %",
+      invalid: "501",
+    },
+    {
+      field: "overlap",
+      target: { kind: "chart" },
+      format: { bar: { overlap: -12.5 } },
+      min: "-100",
+      max: "100",
+      value: "-12.5 %",
+      invalid: "-101",
+    },
+  ] as const)(
+    "$field preserves units, fractional values, bounds and automatic reset",
+    async (row) => {
+      const { wrapper, apply } = fixture(row.target, { drawing: drawing({ format: row.format }) });
+      const field = input(wrapper, row.field);
+      expect(field.attributes()).toMatchObject({
+        role: "spinbutton",
+        "aria-valuemin": row.min,
+        "aria-valuemax": row.max,
+        "aria-valuetext": row.value,
+      });
+      await field.setValue(row.invalid);
+      await field.trigger("keydown", { key: "Enter" });
+      expect(apply).not.toHaveBeenCalled();
+      await field.trigger("keydown", { key: "Escape" });
+      expect(field.attributes("aria-valuetext")).toBe(row.value);
+      await field.setValue("");
+      await field.trigger("keydown", { key: "Enter" });
+      expect(apply).toHaveBeenCalledExactlyOnceWith({ kind: row.target.kind, format: undefined });
+      expect(field.element.value).toBe("");
+    },
+  );
+  test("layout auto never steps from a made-up zero, and resets preserve rejected drafts", async () => {
+    const { wrapper, apply } = fixture({ kind: "chart" });
+    const field = input(wrapper, "gapWidth");
+    expect(
+      wrapper.get('button[aria-label="Gap width (%) +"]').attributes("disabled"),
+    ).toBeDefined();
+    await field.setValue("1e");
+    await wrapper.get('[data-chart-format-reset="gapWidth"]').trigger("click");
+    expect(field.element.value).toBe("");
+    expect(apply).not.toHaveBeenCalled();
+    await wrapper.setProps({ drawing: drawing({ format: { bar: { gapWidth: 100 } } }) });
+    await field.setValue("200.");
+    apply.mockReturnValue(false);
+    await wrapper.get('[data-chart-format-reset="gapWidth"]').trigger("click");
+    expect(field.element.value).toBe("200.");
+    expect(wrapper.text()).toContain("draft is retained");
+    const replacement = vi.fn(() => true);
+    await wrapper.setProps({ apply: replacement });
+    await field.trigger("keydown", { key: "Enter" });
+    expect(replacement).not.toHaveBeenCalled();
+    await field.trigger("keydown", { key: "Escape" });
+    await field.setValue("250");
+    await field.trigger("keydown", { key: "Enter" });
+    expect(replacement).toHaveBeenCalledExactlyOnceWith({
+      kind: "chart",
+      format: { gapWidth: 250 },
+    });
+  });
+  test("decimal places uses integer bounds, disallows auto, and composition guards other actions", async () => {
+    const { wrapper, apply } = fixture(
+      { kind: "valueAxis" },
+      {
+        drawing: drawing({
+          format: { valueAxis: { linkedToSource: false, numberFormat: { kind: "number" } } },
+        }),
+      },
+    );
+    const field = input(wrapper, "decimals");
+    expect(field.attributes()).toMatchObject({
+      role: "spinbutton",
+      "aria-valuemin": "0",
+      "aria-valuemax": "20",
+      inputmode: "numeric",
+    });
+    for (const invalid of ["", "1.5", "21", "-1"]) {
+      await field.setValue(invalid);
+      await field.trigger("keydown", { key: "Enter" });
+    }
+    expect(apply).not.toHaveBeenCalled();
+    field.element.focus();
+    await field.trigger("compositionstart");
+    await field.setValue("3");
+    select(wrapper, "Category").vm.$emit("change", "date");
+    await flushPromises();
+    expect(apply).not.toHaveBeenCalled();
+    await field.trigger("compositionend");
+    await field.trigger("keydown", { key: "Enter" });
+    expect(apply).toHaveBeenCalledExactlyOnceWith({
+      kind: "valueAxis",
+      format: { linkedToSource: false, numberFormat: { kind: "number", fractionDigits: 3 } },
+    });
   });
 });

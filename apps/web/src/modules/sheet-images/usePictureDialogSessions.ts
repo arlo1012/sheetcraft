@@ -34,6 +34,7 @@ import {
 import type { MessageKey } from "../../shared/i18n";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import type { PictureCompression } from "./picture-asset-conversion";
+import type { PictureBatchSizeScopes } from "./picture-batch-size-preview";
 
 type ResizeSettings = { width: number; height: number; locked: boolean; all: boolean };
 type Dialog = { dialogId: string; error: Ref<MessageKey | undefined>; close: () => void };
@@ -46,6 +47,7 @@ type AnnotationDialog = Dialog & {
 };
 type CompressionDialog = Dialog & { confirm: (settings: PictureCompression) => Promise<boolean> };
 type BatchDialog = Dialog & {
+  sizeScopes: PictureBatchSizeScopes;
   image: { width: number; height: number };
   confirm: (settings: ResizeSettings) => boolean;
 };
@@ -148,6 +150,26 @@ export function usePictureDialogSessions(options: {
     }
     const root = owner.selected.roots.find((root) => root.id === owner.primaryId);
     return root ? getPictureToolGeometry(root, owner.context) : undefined;
+  }
+  function batchSizeScope(
+    owner: SourceOwner,
+    all: boolean,
+    scope = all ? owner.all : owner.selected,
+  ) {
+    if (!all && scope.path && scope.path.length > 1) {
+      if (!owner.context) return [undefined];
+      const node = resolveOwnedPictureNode(scope.roots, scope.path, owner.context);
+      return [
+        node?.visible && node.layout && !node.layout.collapsed
+          ? { width: node.layout.rect.width, height: node.layout.rect.height }
+          : undefined,
+      ];
+    }
+    return scope.rootIds.map((id) => {
+      const root = scope.roots.find((entry) => entry.id === id);
+      const size = root ? getPictureToolGeometry(root, owner.context) : undefined;
+      return size ? { width: size.width, height: size.height } : undefined;
+    });
   }
   function annotationSource(owner: SourceOwner): PictureAssetSource | undefined {
     if (owner.selectedIds.length !== 1 || owner.selected.sources.length !== 1) return;
@@ -358,6 +380,7 @@ export function usePictureDialogSessions(options: {
     const dialog: BatchDialog = {
       dialogId: idFactory("picture-batch-size"),
       image: { width: geometry.width, height: geometry.height },
+      sizeScopes: { selected: batchSizeScope(owner, false), all: batchSizeScope(owner, true) },
       error: ref(),
       close: () => {
         if (batch.value === dialog) batch.value = undefined;
@@ -370,6 +393,21 @@ export function usePictureDialogSessions(options: {
           return false;
         }
         try {
+          // A ratio preview describes the captured target geometry. Never silently
+          // submit against a changed ratio while the dialog still displays that preview.
+          const latestScope = capturePictureSourceSelection(
+            owner.sheet.floatingImages,
+            owner.selectedIds,
+            owner.selected.path,
+            settings.all,
+          );
+          if (
+            JSON.stringify(batchSizeScope(owner, settings.all, latestScope)) !==
+            JSON.stringify(dialog.sizeScopes[settings.all ? "all" : "selected"])
+          ) {
+            dialog.error.value = "picture.operationFailed";
+            return false;
+          }
           if (!options.resize(settings)) {
             dialog.error.value = options.resizeFeedback() ?? "picture.operationFailed";
             return false;

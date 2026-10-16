@@ -102,6 +102,50 @@ function fixture() {
   };
 }
 describe("picture dialog owner sessions", () => {
+  test("batch captures selected and all target dimensions without live geometry references", () => {
+    const f = fixture();
+    f.sheet.floatingImages.push({
+      ...cloneFloatingImage(f.image),
+      id: "second",
+      width: 100,
+      height: 100,
+    });
+    f.dialogs.openBatchSize();
+    const draft = f.dialogs.batch.value!;
+    expect(draft.sizeScopes.selected).toEqual([{ width: 200, height: 100 }]);
+    expect(draft.sizeScopes.all).toEqual([
+      { width: 200, height: 100 },
+      { width: 100, height: 100 },
+    ]);
+    f.sheet.floatingImages[0] = { ...cloneFloatingImage(f.image), width: 400 };
+    expect(draft.sizeScopes.selected).toEqual([{ width: 200, height: 100 }]);
+    expect(draft.confirm(resize)).toBe(false);
+    expect(f.resizeMany).not.toHaveBeenCalled();
+  });
+
+  test.each([false, true])(
+    "batch size guard checks only the submitted target scope (all=%s)",
+    (all) => {
+      const f = fixture();
+      f.sheet.floatingImages.push({ ...cloneFloatingImage(f.image), id: "second" });
+      f.dialogs.openBatchSize();
+      f.sheet.floatingImages[1] = { ...cloneFloatingImage(f.image), id: "second", height: 200 };
+      expect(f.dialogs.batch.value!.confirm({ ...resize, all })).toBe(!all);
+      expect(f.resizeMany).toHaveBeenCalledTimes(all ? 0 : 1);
+    },
+  );
+  test("batch size guard permits unrelated position and metadata edits", () => {
+    const f = fixture();
+    f.dialogs.openBatchSize();
+    f.sheet.floatingImages[0] = {
+      ...cloneFloatingImage(f.image),
+      offsetX: 10,
+      altText: "New description",
+    };
+    expect(f.dialogs.batch.value!.confirm(resize)).toBe(true);
+    expect(f.resizeMany).toHaveBeenCalledTimes(1);
+  });
+
   test("rejected annotation retains its draft and can retry as one undoable command", () => {
     const f = fixture();
     f.dialogs.openAnnotation();

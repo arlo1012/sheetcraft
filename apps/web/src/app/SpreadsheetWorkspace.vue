@@ -6773,6 +6773,8 @@ watch(
     <PictureBatchSizeDialog
       v-if="pictureBatchSize"
       :key="pictureBatchSize.dialogId"
+      :owner-key="pictureBatchSize.dialogId"
+      :size-scopes="pictureBatchSize.sizeScopes"
       :width="pictureBatchSize.image.width"
       :height="pictureBatchSize.image.height"
       :error="pictureBatchSize.error.value ? t(pictureBatchSize.error.value) : ''"

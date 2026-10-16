@@ -22,6 +22,7 @@ import type { CellNumberFormat, CellNumberFormatNegativeStyle } from "@sheetcraf
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import OptionList from "../../../shared/option-list/OptionList.vue";
 import NumericField from "../../../shared/numeric-field/NumericField.vue";
+import FormatSection from "../../../shared/format-pane/FormatSection.vue";
 import type {
   NumericCandidate,
   NumericCommitResult,
@@ -191,22 +192,43 @@ const numericFields: ChartFormatNumericField[] = [
   "gapWidth",
   "overlap",
 ];
-type StyledNumericField = "fontSize" | "strokeWidth";
+type SharedNumericField =
+  | "fontSize"
+  | "strokeWidth"
+  | "labelAngle"
+  | "gapWidth"
+  | "overlap"
+  | "decimals";
+const sharedNumericFields: SharedNumericField[] = [
+  "fontSize",
+  "strokeWidth",
+  "labelAngle",
+  "gapWidth",
+  "overlap",
+  "decimals",
+];
+function isSharedNumericField(field: string): field is SharedNumericField {
+  return sharedNumericFields.includes(field as SharedNumericField);
+}
+const labelAngleControl = ref<InstanceType<typeof NumericField>>();
+const gapWidthControl = ref<InstanceType<typeof NumericField>>();
+const overlapControl = ref<InstanceType<typeof NumericField>>();
+const decimalsControl = ref<InstanceType<typeof NumericField>>();
+const acceptedCategoryDecimals = ref<{ owner: string; value: number }>();
 const fontSizeControl = ref<InstanceType<typeof NumericField>>();
 const strokeWidthControl = ref<InstanceType<typeof NumericField>>();
 // NumericField owns these drafts. The pane only mirrors their interaction state
 // for its existing composition guard and reset action availability.
-const styledNumericDrafts = reactive<Partial<Record<StyledNumericField, NumericDraftChange>>>({});
-const styledNumericResetErrors = reactive<Partial<Record<StyledNumericField, string>>>({});
+const sharedNumericDrafts = reactive<Partial<Record<SharedNumericField, NumericDraftChange>>>({});
+const sharedNumericResetErrors = reactive<Partial<Record<SharedNumericField, string>>>({});
 // Echo an acknowledged Reset until the next source snapshot arrives. This is
 // committed presentation state, never a second editable draft or document writer.
-const styledNumericResets = reactive<Partial<Record<StyledNumericField, string>>>({});
+const sharedNumericResets = reactive<Partial<Record<SharedNumericField, string>>>({});
 const draftFields = [
-  ...numericFields.filter((field) => field !== "fontSize" && field !== "strokeWidth"),
+  ...numericFields.filter((field) => !isSharedNumericField(field)),
   "title",
   "axisTitle",
   "formatCode",
-  "decimals",
 ];
 const fontSizeSpec: NumericFieldSpec = {
   displayUnit: "px",
@@ -222,54 +244,121 @@ const strokeWidthSpec: NumericFieldSpec = {
   allowAuto: true,
   parsePolicy: { scientific: true },
 };
-function styledNumericValue(field: StyledNumericField, previous?: NumericValue): NumericValue {
-  const value = styledNumericResets[field] === ownerKey.value ? undefined : numericValue(field);
+const labelAngleSpec: NumericFieldSpec = {
+  displayUnit: "°",
+  displayStep: 1,
+  canonicalBounds: { min: -90, max: 90 },
+  allowAuto: true,
+  parsePolicy: { scientific: true },
+};
+const gapWidthSpec: NumericFieldSpec = {
+  displayUnit: "%",
+  displayStep: 1,
+  canonicalBounds: { min: 0, max: 500 },
+  allowAuto: true,
+  parsePolicy: { scientific: true },
+};
+const overlapSpec: NumericFieldSpec = {
+  displayUnit: "%",
+  displayStep: 1,
+  canonicalBounds: { min: -100, max: 100 },
+  allowAuto: true,
+  parsePolicy: { scientific: true },
+};
+const decimalsSpec: NumericFieldSpec = {
+  displayStep: 1,
+  canonicalBounds: { min: 0, max: 20 },
+  integer: true,
+};
+function sharedNumericValue(field: SharedNumericField, previous?: NumericValue): NumericValue {
+  const value = sharedNumericResets[field] === ownerKey.value ? undefined : numericValue(field);
   if (value === undefined) return previous?.kind === "auto" ? previous : { kind: "auto" };
   return previous?.kind === "value" && previous.value === value
     ? previous
     : { kind: "value", value };
 }
 const fontSizeNumericValue = computed<NumericValue>((previous) =>
-  styledNumericValue("fontSize", previous),
+  sharedNumericValue("fontSize", previous),
 );
 const strokeWidthNumericValue = computed<NumericValue>((previous) =>
-  styledNumericValue("strokeWidth", previous),
+  sharedNumericValue("strokeWidth", previous),
 );
-const fontSizeCommit = computed(() => styledNumericCommit("fontSize"));
-const strokeWidthCommit = computed(() => styledNumericCommit("strokeWidth"));
-function styledNumericCommit(field: StyledNumericField) {
+const labelAngleNumericValue = computed<NumericValue>((previous) =>
+  sharedNumericValue("labelAngle", previous),
+);
+const labelAngleCommit = computed(() => sharedNumericCommit("labelAngle"));
+const gapWidthNumericValue = computed<NumericValue>((previous) =>
+  sharedNumericValue("gapWidth", previous),
+);
+const gapWidthCommit = computed(() => sharedNumericCommit("gapWidth"));
+const overlapNumericValue = computed<NumericValue>((previous) =>
+  sharedNumericValue("overlap", previous),
+);
+const overlapCommit = computed(() => sharedNumericCommit("overlap"));
+const decimalsNumericValue = computed<NumericValue>((previous) =>
+  sharedNumericValue("decimals", previous),
+);
+const decimalsCommit = computed(() => sharedNumericCommit("decimals"));
+const fontSizeCommit = computed(() => sharedNumericCommit("fontSize"));
+const strokeWidthCommit = computed(() => sharedNumericCommit("strokeWidth"));
+function sharedNumericCommit(field: SharedNumericField) {
   const owner = ownerKey.value,
-    handler = props.apply;
+    handler = props.apply,
+    category = field === "decimals" ? numberCategory.value : undefined;
   return (candidate: NumericCandidate): NumericCommitResult => {
-    if (!live || owner !== ownerKey.value || handler !== props.apply || candidate.kind === "empty")
+    if (
+      !live ||
+      owner !== ownerKey.value ||
+      handler !== props.apply ||
+      (field === "decimals" && category !== numberCategory.value) ||
+      candidate.kind === "empty" ||
+      (field === "decimals" && candidate.kind !== "value")
+    )
       return { accepted: false, error: t("chart.formatApplyFailed") };
     const intent = numericIntent(field, candidate.kind === "auto" ? undefined : candidate.value);
     const accepted = !!intent && submit(intent, handler);
-    if (accepted) delete styledNumericResetErrors[field];
+    if (accepted) delete sharedNumericResetErrors[field];
     return accepted ? { accepted: true } : { accepted: false, error: t("chart.formatApplyFailed") };
   };
 }
-function styledNumericDraftChange(field: StyledNumericField, draft: NumericDraftChange): void {
+function sharedNumericDraftChange(field: SharedNumericField, draft: NumericDraftChange): void {
   if (draft.ownerKey !== `${ownerKey.value}/${field}`) return;
-  const previous = styledNumericDrafts[field];
-  styledNumericDrafts[field] = draft;
+  const previous = sharedNumericDrafts[field];
+  sharedNumericDrafts[field] = draft;
   if (draft.text !== previous?.text || !draft.dirty || (previous?.composing && !draft.composing)) {
-    delete styledNumericResetErrors[field];
+    delete sharedNumericResetErrors[field];
     fieldError.value = undefined;
   }
 }
-function styledNumericFocusBoundary(field: StyledNumericField): Element[] {
+function sharedNumericFocusBoundary(field: SharedNumericField): Element[] {
   return [
     ...(root.value?.querySelectorAll(
       `[data-chart-format-reset="${field}"], [data-chart-format-reset="element"]`,
     ) ?? []),
   ];
 }
-function styledNumericControl(field: StyledNumericField) {
-  return field === "fontSize" ? fontSizeControl.value : strokeWidthControl.value;
-}
-function numericValue(field: ChartFormatNumericField): number | undefined {
+function sharedNumericControl(field: SharedNumericField) {
   switch (field) {
+    case "fontSize":
+      return fontSizeControl.value;
+    case "strokeWidth":
+      return strokeWidthControl.value;
+    case "labelAngle":
+      return labelAngleControl.value;
+    case "gapWidth":
+      return gapWidthControl.value;
+    case "overlap":
+      return overlapControl.value;
+    case "decimals":
+      return decimalsControl.value;
+  }
+}
+function numericValue(field: ChartFormatNumericField | "decimals"): number | undefined {
+  switch (field) {
+    case "decimals":
+      return acceptedCategoryDecimals.value?.owner === ownerKey.value
+        ? acceptedCategoryDecimals.value.value
+        : decimals.value;
     case "min":
     case "max":
     case "majorUnit":
@@ -350,14 +439,13 @@ function committedValue(field: string): string | number | undefined {
 function resetDrafts(): void {
   for (const field of draftFields) drafts[field] = createChartFormatDraft(committedValue(field));
   draftHandlers.clear();
-  fontSizeControl.value?.cancel();
-  strokeWidthControl.value?.cancel();
-  delete styledNumericDrafts.fontSize;
-  delete styledNumericDrafts.strokeWidth;
-  delete styledNumericResetErrors.fontSize;
-  delete styledNumericResetErrors.strokeWidth;
-  delete styledNumericResets.fontSize;
-  delete styledNumericResets.strokeWidth;
+  for (const field of sharedNumericFields) {
+    sharedNumericControl(field)?.cancel();
+    delete sharedNumericDrafts[field];
+    delete sharedNumericResetErrors[field];
+    delete sharedNumericResets[field];
+  }
+  acceptedCategoryDecimals.value = undefined;
   pendingResetField = undefined;
   fieldError.value = undefined;
 }
@@ -365,8 +453,8 @@ watch(() => `${props.drawing.id}/${targetKey.value}`, resetDrafts, { immediate: 
 watch(
   () => [chart.value, props.data] as const,
   () => {
-    delete styledNumericResets.fontSize;
-    delete styledNumericResets.strokeWidth;
+    for (const field of sharedNumericFields) delete sharedNumericResets[field];
+    acceptedCategoryDecimals.value = undefined;
     for (const field of draftFields) syncChartFormatDraft(drafts[field]!, committedValue(field));
   },
   { deep: true },
@@ -397,9 +485,7 @@ function endComposition(field: string, _value: string, context: { e: Composition
   delete drafts[field]!.error;
 }
 function composing(): boolean {
-  const styledField = (["fontSize", "strokeWidth"] as const).find(
-    (field) => styledNumericDrafts[field]?.composing,
-  );
+  const styledField = sharedNumericFields.find((field) => sharedNumericDrafts[field]?.composing);
   const field = styledField ?? Object.keys(drafts).find((key) => drafts[key]!.composing);
   if (!field) return false;
   if (styledField) fieldError.value = "composition";
@@ -482,10 +568,22 @@ function textIntent(next: ChartTextFormat | undefined): ChartFormatIntent | unde
   return undefined;
 }
 function numericIntent(
-  field: ChartFormatNumericField,
+  field: ChartFormatNumericField | "decimals",
   value: number | undefined,
 ): ChartFormatIntent | undefined {
   switch (field) {
+    case "decimals": {
+      const format = numberFormat.value;
+      return value !== undefined &&
+        format &&
+        (format.kind === "number" ||
+          format.kind === "percent" ||
+          format.kind === "currency" ||
+          format.kind === "accounting" ||
+          format.kind === "scientific")
+        ? numberIntent({ ...format, fractionDigits: value })
+        : undefined;
+    }
     case "fontSize":
       return textIntent(setChartFormatField(textFormat.value, "fontSize", value));
     case "min":
@@ -566,23 +664,23 @@ function commitNumber(
 function resetNumber(field: ChartFormatNumericField): void {
   if (props.disabled || composing()) return;
   pendingResetField = undefined;
-  if (field === "fontSize" || field === "strokeWidth") {
-    const control = styledNumericControl(field);
+  if (isSharedNumericField(field)) {
+    const control = sharedNumericControl(field);
     if (!control) return;
     if (numericValue(field) === undefined) {
       control.cancel();
-      delete styledNumericResetErrors[field];
+      delete sharedNumericResetErrors[field];
       fieldError.value = undefined;
       return;
     }
     const intent = numericIntent(field, undefined);
     if (intent && submit(intent)) {
       control.cancel();
-      styledNumericResets[field] = ownerKey.value;
+      sharedNumericResets[field] = ownerKey.value;
     } else {
       // Reset is a distinct action. A rejection must not edit, rebind, or lose
       // the NumericField's existing draft (including a stale handler lease).
-      styledNumericResetErrors[field] = t("chart.formatApplyFailed");
+      sharedNumericResetErrors[field] = t("chart.formatApplyFailed");
     }
     return;
   }
@@ -804,7 +902,19 @@ function selectNumberCategory(value: unknown): void {
     special: { kind: "special", code: "00000" },
     custom: { kind: "custom", code: "0.00" },
   };
-  applyNumberFormat(defaults[category]);
+  const next = defaults[category];
+  if (!applyNumberFormat(next)) return;
+  // An accepted category replaces both number-format editors, even before the
+  // next owner snapshot arrives. Unrelated axis drafts remain untouched.
+  acceptedCategoryDecimals.value = {
+    owner: ownerKey.value,
+    value: next && "fractionDigits" in next ? (next.fractionDigits ?? 2) : 2,
+  };
+  decimalsControl.value?.cancel();
+  delete sharedNumericDrafts.decimals;
+  delete sharedNumericResetErrors.decimals;
+  drafts.formatCode = createChartFormatDraft(next && "code" in next ? next.code : "");
+  draftHandlers.delete("formatCode");
 }
 const showDecimals = computed(() =>
   ["number", "percent", "currency", "accounting", "scientific"].includes(numberCategory.value),
@@ -818,42 +928,6 @@ const showCode = computed(() =>
 const showNegative = computed(
   () => numberCategory.value === "number" || numberCategory.value === "currency",
 );
-function commitDecimals(_value?: unknown, context?: { e: KeyboardEvent | FocusEvent }): void {
-  if (context?.e instanceof FocusEvent && pendingResetField === "element") return;
-  const draft = drafts.decimals!;
-  if (draft.composing || (context?.e instanceof KeyboardEvent && context.e.isComposing)) {
-    draft.error = "composition";
-    return;
-  }
-  if (!draft.dirty) return;
-  const digits = Number(draft.text.trim()),
-    format = numberFormat.value;
-  if (
-    !/^\d+$/.test(draft.text.trim()) ||
-    !Number.isInteger(digits) ||
-    digits < 0 ||
-    digits > 20 ||
-    !format ||
-    !(
-      format.kind === "number" ||
-      format.kind === "percent" ||
-      format.kind === "currency" ||
-      format.kind === "accounting" ||
-      format.kind === "scientific"
-    )
-  ) {
-    draft.error = "number";
-    return;
-  }
-  const intent = numberIntent({ ...format, fractionDigits: digits });
-  if (!intent || !submit(intent, draftHandlers.get("decimals") ?? props.apply)) {
-    draft.error = "rejected";
-    return;
-  }
-  draft.dirty = false;
-  delete draft.error;
-  draftHandlers.delete("decimals");
-}
 function setGrouping(value: unknown): void {
   const format = numberFormat.value;
   if (format?.kind === "number") applyNumberFormat({ ...format, useGrouping: !!value });
@@ -1027,710 +1101,726 @@ function escapeDraft(event: KeyboardEvent): void {
         {{ t("chart.formatSeriesUnavailable") }}
       </p>
 
-      <details v-if="kind === 'title'" class="chart-format-pane__section" open>
-        <summary>{{ t("chart.title") }}</summary>
-        <div class="chart-format-pane__section-body">
-          <div class="chart-format-pane__field" data-chart-format-field="title">
-            <label :for="`${paneId}-title`">{{ t("chart.titleText") }}</label>
+      <FormatSection v-if="kind === 'title'" :title="t('chart.title')" initially-open>
+        <div class="chart-format-pane__field" data-chart-format-field="title">
+          <label :for="`${paneId}-title`">{{ t("chart.titleText") }}</label>
+          <TInput
+            :id="`${paneId}-title`"
+            :value="drafts.title!.text"
+            size="small"
+            :maxlength="1000"
+            :disabled="disabled"
+            :aria-label="t('chart.titleText')"
+            :status="drafts.title!.error ? 'error' : undefined"
+            :onChange="editAction('title')"
+            :onCompositionstart="compositionStartAction('title')"
+            :onCompositionend="compositionEndAction('title')"
+            :onEnter="textAction('title')"
+            :onBlur="captureAction(blurTitle)"
+          />
+        </div>
+        <div class="chart-format-pane__field" data-chart-format-title-position>
+          <span>{{ t("chart.titlePosition") }}</span
+          ><TSelect
+            :popup-props="popupProps"
+            :value="chart.elements?.titlePosition ?? 'above'"
+            :options="titlePositionOptions"
+            size="small"
+            :disabled="disabled"
+            :aria-label="t('chart.titlePosition')"
+            :onChange="captureAction(setTitlePosition)"
+          />
+        </div>
+      </FormatSection>
+
+      <FormatSection v-if="isAxis" :title="t('chart.formatAxisOptions')" initially-open>
+        <TCheckbox
+          :checked="axis.show ?? true"
+          :disabled="disabled"
+          :onChange="captureAction((value: unknown) => setAxisBoolean('show', value))"
+          >{{ t("chart.formatShowAxis") }}</TCheckbox
+        >
+        <TCheckbox
+          :checked="axis.reverse ?? false"
+          :disabled="disabled"
+          :onChange="captureAction((value: unknown) => setAxisBoolean('reverse', value))"
+          >{{ t("chart.formatReverse") }}</TCheckbox
+        >
+        <TCheckbox
+          :checked="axis.titleVisible ?? !!axis.title"
+          :disabled="disabled"
+          data-chart-format-field="titleVisible"
+          :onChange="captureAction((value: unknown) => setAxisBoolean('titleVisible', value))"
+          >{{ t("chart.formatShowAxisTitle") }}</TCheckbox
+        >
+        <template v-if="isValueAxis">
+          <TCheckbox
+            :checked="valueAxis.majorGridlines ?? true"
+            :disabled="disabled"
+            data-chart-format-field="majorGridlines"
+            :onChange="captureAction((value: unknown) => setAxisBoolean('majorGridlines', value))"
+            >{{ t("chart.formatMajorGridlines") }}</TCheckbox
+          >
+          <TCheckbox
+            :checked="minorGridlinesState.checked"
+            :indeterminate="minorGridlinesState.invalid"
+            :disabled="disabled || minorGridlinesState.invalid"
+            data-chart-format-field="minorGridlines"
+            :onChange="captureAction((value: unknown) => setAxisBoolean('minorGridlines', value))"
+            >{{ t("chart.formatMinorGridlines") }}</TCheckbox
+          >
+        </template>
+        <div class="chart-format-pane__field" data-chart-format-field="axisTitle">
+          <label :for="`${paneId}-axis-title`">{{ t("chart.formatAxisTitle") }}</label
+          ><TInput
+            :id="`${paneId}-axis-title`"
+            :value="drafts.axisTitle!.text"
+            size="small"
+            :maxlength="1000"
+            :disabled="disabled"
+            :aria-label="t('chart.formatAxisTitle')"
+            :status="drafts.axisTitle!.error ? 'error' : undefined"
+            :onChange="editAction('axisTitle')"
+            :onCompositionstart="compositionStartAction('axisTitle')"
+            :onCompositionend="compositionEndAction('axisTitle')"
+            :onEnter="textAction('axisTitle')"
+            :onBlur="textAction('axisTitle')"
+          />
+        </div>
+        <div
+          v-if="kind === 'categoryAxis'"
+          class="chart-format-pane__field"
+          data-chart-format-field="labelAngle"
+        >
+          <label :for="`${paneId}-angle`">{{ t("chart.formatLabelAngle") }}</label>
+          <div class="chart-format-pane__number">
+            <NumericField
+              ref="labelAngleControl"
+              :id="`${paneId}-angle`"
+              :owner-key="`${ownerKey}/labelAngle`"
+              :value="labelAngleNumericValue"
+              :spec="labelAngleSpec"
+              :label="t('chart.formatLabelAngle')"
+              :auto-text="t('chart.formatAuto')"
+              :disabled="disabled"
+              :invalid-message="t('chart.formatInvalidNumber')"
+              :rejected-message="t('chart.formatApplyFailed')"
+              :stale-message="t('chart.formatApplyFailed')"
+              :external-error="sharedNumericResetErrors.labelAngle"
+              :focus-boundary="() => sharedNumericFocusBoundary('labelAngle')"
+              :on-commit="labelAngleCommit"
+              presentation="inline-stepper"
+              :show-unit="false"
+              @draft-change="sharedNumericDraftChange('labelAngle', $event)"
+              @cancel="delete sharedNumericResetErrors.labelAngle"
+            /><TButton
+              variant="text"
+              shape="square"
+              size="small"
+              :disabled="
+                disabled ||
+                (labelAngleNumericValue.kind === 'auto' && !sharedNumericDrafts.labelAngle?.dirty)
+              "
+              :aria-label="t('chart.formatReset')"
+              data-chart-format-reset="labelAngle"
+              :onClick="captureAction(() => resetNumber('labelAngle'))"
+              ><RotateCcw :size="14" aria-hidden="true"
+            /></TButton>
+          </div>
+        </div>
+      </FormatSection>
+
+      <FormatSection v-if="isValueAxis" :title="t('chart.formatBounds')" initially-open>
+        <p v-if="percentageAxis" class="chart-format-pane__hint">
+          {{ t("chart.formatPercentAxisHint") }}
+        </p>
+        <div class="chart-format-pane__field" data-chart-format-field="min">
+          <label :for="`${paneId}-min`">{{ t("chart.formatMinimum") }}</label>
+          <div class="chart-format-pane__number">
             <TInput
-              :id="`${paneId}-title`"
-              :value="drafts.title!.text"
+              :id="`${paneId}-min`"
+              :value="drafts.min!.text"
               size="small"
-              :maxlength="1000"
+              :placeholder="t('chart.formatAuto')"
               :disabled="disabled"
-              :aria-label="t('chart.titleText')"
-              :status="drafts.title!.error ? 'error' : undefined"
-              :onChange="editAction('title')"
-              :onCompositionstart="compositionStartAction('title')"
-              :onCompositionend="compositionEndAction('title')"
-              :onEnter="textAction('title')"
-              :onBlur="captureAction(blurTitle)"
-            />
-          </div>
-          <div class="chart-format-pane__field" data-chart-format-title-position>
-            <span>{{ t("chart.titlePosition") }}</span
-            ><TSelect
-              :popup-props="popupProps"
-              :value="chart.elements?.titlePosition ?? 'above'"
-              :options="titlePositionOptions"
+              :aria-label="t('chart.formatMinimum')"
+              :status="drafts.min!.error ? 'error' : undefined"
+              :onChange="editAction('min')"
+              :onCompositionstart="compositionStartAction('min')"
+              :onCompositionend="compositionEndAction('min')"
+              :onEnter="numberAction('min')"
+              :onBlur="numberAction('min')"
+            /><TButton
+              variant="text"
+              shape="square"
               size="small"
-              :disabled="disabled"
-              :aria-label="t('chart.titlePosition')"
-              :onChange="captureAction(setTitlePosition)"
-            />
+              :disabled="disabled || (valueAxis.min === undefined && !drafts.min!.dirty)"
+              :aria-label="t('chart.formatReset')"
+              data-chart-format-reset="min"
+              :onClick="captureAction(() => resetNumber('min'))"
+              ><RotateCcw :size="14" aria-hidden="true"
+            /></TButton>
           </div>
         </div>
-      </details>
-
-      <details v-if="isAxis" class="chart-format-pane__section" open>
-        <summary>{{ t("chart.formatAxisOptions") }}</summary>
-        <div class="chart-format-pane__section-body">
-          <TCheckbox
-            :checked="axis.show ?? true"
-            :disabled="disabled"
-            :onChange="captureAction((value: unknown) => setAxisBoolean('show', value))"
-            >{{ t("chart.formatShowAxis") }}</TCheckbox
-          >
-          <TCheckbox
-            :checked="axis.reverse ?? false"
-            :disabled="disabled"
-            :onChange="captureAction((value: unknown) => setAxisBoolean('reverse', value))"
-            >{{ t("chart.formatReverse") }}</TCheckbox
-          >
-          <TCheckbox
-            :checked="axis.titleVisible ?? !!axis.title"
-            :disabled="disabled"
-            data-chart-format-field="titleVisible"
-            :onChange="captureAction((value: unknown) => setAxisBoolean('titleVisible', value))"
-            >{{ t("chart.formatShowAxisTitle") }}</TCheckbox
-          >
-          <template v-if="isValueAxis">
-            <TCheckbox
-              :checked="valueAxis.majorGridlines ?? true"
-              :disabled="disabled"
-              data-chart-format-field="majorGridlines"
-              :onChange="captureAction((value: unknown) => setAxisBoolean('majorGridlines', value))"
-              >{{ t("chart.formatMajorGridlines") }}</TCheckbox
-            >
-            <TCheckbox
-              :checked="minorGridlinesState.checked"
-              :indeterminate="minorGridlinesState.invalid"
-              :disabled="disabled || minorGridlinesState.invalid"
-              data-chart-format-field="minorGridlines"
-              :onChange="captureAction((value: unknown) => setAxisBoolean('minorGridlines', value))"
-              >{{ t("chart.formatMinorGridlines") }}</TCheckbox
-            >
-          </template>
-          <div class="chart-format-pane__field" data-chart-format-field="axisTitle">
-            <label :for="`${paneId}-axis-title`">{{ t("chart.formatAxisTitle") }}</label
-            ><TInput
-              :id="`${paneId}-axis-title`"
-              :value="drafts.axisTitle!.text"
+        <div class="chart-format-pane__field" data-chart-format-field="max">
+          <label :for="`${paneId}-max`">{{ t("chart.formatMaximum") }}</label>
+          <div class="chart-format-pane__number">
+            <TInput
+              :id="`${paneId}-max`"
+              :value="drafts.max!.text"
               size="small"
-              :maxlength="1000"
+              :placeholder="t('chart.formatAuto')"
               :disabled="disabled"
-              :aria-label="t('chart.formatAxisTitle')"
-              :status="drafts.axisTitle!.error ? 'error' : undefined"
-              :onChange="editAction('axisTitle')"
-              :onCompositionstart="compositionStartAction('axisTitle')"
-              :onCompositionend="compositionEndAction('axisTitle')"
-              :onEnter="textAction('axisTitle')"
-              :onBlur="textAction('axisTitle')"
-            />
-          </div>
-          <div
-            v-if="kind === 'categoryAxis'"
-            class="chart-format-pane__field"
-            data-chart-format-field="labelAngle"
-          >
-            <label :for="`${paneId}-angle`">{{ t("chart.formatLabelAngle") }}</label>
-            <div class="chart-format-pane__number">
-              <TInput
-                :id="`${paneId}-angle`"
-                :value="drafts.labelAngle!.text"
-                size="small"
-                :placeholder="t('chart.formatAuto')"
-                :disabled="disabled"
-                :aria-label="t('chart.formatLabelAngle')"
-                :status="drafts.labelAngle!.error ? 'error' : undefined"
-                :onChange="editAction('labelAngle')"
-                :onCompositionstart="compositionStartAction('labelAngle')"
-                :onCompositionend="compositionEndAction('labelAngle')"
-                :onEnter="numberAction('labelAngle')"
-                :onBlur="numberAction('labelAngle')"
-              /><TButton
-                variant="text"
-                shape="square"
-                size="small"
-                :disabled="
-                  disabled || (categoryAxis.labelAngle === undefined && !drafts.labelAngle!.dirty)
-                "
-                :aria-label="t('chart.formatReset')"
-                data-chart-format-reset="labelAngle"
-                :onClick="captureAction(() => resetNumber('labelAngle'))"
-                ><RotateCcw :size="14" aria-hidden="true"
-              /></TButton>
-            </div>
+              :aria-label="t('chart.formatMaximum')"
+              :status="drafts.max!.error ? 'error' : undefined"
+              :onChange="editAction('max')"
+              :onCompositionstart="compositionStartAction('max')"
+              :onCompositionend="compositionEndAction('max')"
+              :onEnter="numberAction('max')"
+              :onBlur="numberAction('max')"
+            /><TButton
+              variant="text"
+              shape="square"
+              size="small"
+              :disabled="disabled || (valueAxis.max === undefined && !drafts.max!.dirty)"
+              :aria-label="t('chart.formatReset')"
+              data-chart-format-reset="max"
+              :onClick="captureAction(() => resetNumber('max'))"
+              ><RotateCcw :size="14" aria-hidden="true"
+            /></TButton>
           </div>
         </div>
-      </details>
-
-      <details v-if="isValueAxis" class="chart-format-pane__section" open>
-        <summary>{{ t("chart.formatBounds") }}</summary>
-        <div class="chart-format-pane__section-body">
-          <p v-if="percentageAxis" class="chart-format-pane__hint">
-            {{ t("chart.formatPercentAxisHint") }}
-          </p>
-          <div class="chart-format-pane__field" data-chart-format-field="min">
-            <label :for="`${paneId}-min`">{{ t("chart.formatMinimum") }}</label>
-            <div class="chart-format-pane__number">
-              <TInput
-                :id="`${paneId}-min`"
-                :value="drafts.min!.text"
-                size="small"
-                :placeholder="t('chart.formatAuto')"
-                :disabled="disabled"
-                :aria-label="t('chart.formatMinimum')"
-                :status="drafts.min!.error ? 'error' : undefined"
-                :onChange="editAction('min')"
-                :onCompositionstart="compositionStartAction('min')"
-                :onCompositionend="compositionEndAction('min')"
-                :onEnter="numberAction('min')"
-                :onBlur="numberAction('min')"
-              /><TButton
-                variant="text"
-                shape="square"
-                size="small"
-                :disabled="disabled || (valueAxis.min === undefined && !drafts.min!.dirty)"
-                :aria-label="t('chart.formatReset')"
-                data-chart-format-reset="min"
-                :onClick="captureAction(() => resetNumber('min'))"
-                ><RotateCcw :size="14" aria-hidden="true"
-              /></TButton>
-            </div>
-          </div>
-          <div class="chart-format-pane__field" data-chart-format-field="max">
-            <label :for="`${paneId}-max`">{{ t("chart.formatMaximum") }}</label>
-            <div class="chart-format-pane__number">
-              <TInput
-                :id="`${paneId}-max`"
-                :value="drafts.max!.text"
-                size="small"
-                :placeholder="t('chart.formatAuto')"
-                :disabled="disabled"
-                :aria-label="t('chart.formatMaximum')"
-                :status="drafts.max!.error ? 'error' : undefined"
-                :onChange="editAction('max')"
-                :onCompositionstart="compositionStartAction('max')"
-                :onCompositionend="compositionEndAction('max')"
-                :onEnter="numberAction('max')"
-                :onBlur="numberAction('max')"
-              /><TButton
-                variant="text"
-                shape="square"
-                size="small"
-                :disabled="disabled || (valueAxis.max === undefined && !drafts.max!.dirty)"
-                :aria-label="t('chart.formatReset')"
-                data-chart-format-reset="max"
-                :onClick="captureAction(() => resetNumber('max'))"
-                ><RotateCcw :size="14" aria-hidden="true"
-              /></TButton>
-            </div>
-          </div>
-          <div class="chart-format-pane__field" data-chart-format-field="majorUnit">
-            <label :for="`${paneId}-major`">{{ t("chart.formatMajorUnit") }}</label>
-            <div class="chart-format-pane__number">
-              <TInput
-                :id="`${paneId}-major`"
-                :value="drafts.majorUnit!.text"
-                size="small"
-                :placeholder="t('chart.formatAuto')"
-                :disabled="disabled"
-                :aria-label="t('chart.formatMajorUnit')"
-                :status="drafts.majorUnit!.error ? 'error' : undefined"
-                :onChange="editAction('majorUnit')"
-                :onCompositionstart="compositionStartAction('majorUnit')"
-                :onCompositionend="compositionEndAction('majorUnit')"
-                :onEnter="numberAction('majorUnit')"
-                :onBlur="numberAction('majorUnit')"
-              /><TButton
-                variant="text"
-                shape="square"
-                size="small"
-                :disabled="
-                  disabled || (valueAxis.majorUnit === undefined && !drafts.majorUnit!.dirty)
-                "
-                :aria-label="t('chart.formatReset')"
-                data-chart-format-reset="majorUnit"
-                :onClick="captureAction(() => resetNumber('majorUnit'))"
-                ><RotateCcw :size="14" aria-hidden="true"
-              /></TButton>
-            </div>
-          </div>
-          <div class="chart-format-pane__field" data-chart-format-field="minorUnit">
-            <label :for="`${paneId}-minor`">{{ t("chart.formatMinorUnit") }}</label>
-            <div class="chart-format-pane__number">
-              <TInput
-                :id="`${paneId}-minor`"
-                :value="drafts.minorUnit!.text"
-                size="small"
-                :placeholder="t('chart.formatAuto')"
-                :disabled="disabled"
-                :aria-label="t('chart.formatMinorUnit')"
-                :status="drafts.minorUnit!.error ? 'error' : undefined"
-                :onChange="editAction('minorUnit')"
-                :onCompositionstart="compositionStartAction('minorUnit')"
-                :onCompositionend="compositionEndAction('minorUnit')"
-                :onEnter="numberAction('minorUnit')"
-                :onBlur="numberAction('minorUnit')"
-              /><TButton
-                variant="text"
-                shape="square"
-                size="small"
-                :disabled="
-                  disabled || (valueAxis.minorUnit === undefined && !drafts.minorUnit!.dirty)
-                "
-                :aria-label="t('chart.formatReset')"
-                data-chart-format-reset="minorUnit"
-                :onClick="captureAction(() => resetNumber('minorUnit'))"
-                ><RotateCcw :size="14" aria-hidden="true"
-              /></TButton>
-            </div>
-          </div>
-        </div>
-      </details>
-
-      <details v-if="kind === 'title' || isAxis" class="chart-format-pane__section" open>
-        <summary>{{ t("chart.formatText") }}</summary>
-        <div class="chart-format-pane__section-body">
-          <div class="chart-format-pane__field">
-            <span>{{ t("format.fontFamily") }}</span
-            ><FontFormatField
-              :model-value="textFormat.fontFamily ?? ''"
-              :options="fontFamilyOptions"
-              :label="t('format.fontFamily')"
-              :search-label="t('format.searchFonts')"
-              :empty-label="t('format.noMatchingFonts')"
+        <div class="chart-format-pane__field" data-chart-format-field="majorUnit">
+          <label :for="`${paneId}-major`">{{ t("chart.formatMajorUnit") }}</label>
+          <div class="chart-format-pane__number">
+            <TInput
+              :id="`${paneId}-major`"
+              :value="drafts.majorUnit!.text"
+              size="small"
+              :placeholder="t('chart.formatAuto')"
               :disabled="disabled"
-              :popup-attach="() => root!"
-              :onChange="
-                captureAction(
-                  (value: unknown) =>
-                    typeof value === 'string' && setText('fontFamily', value || undefined),
-                )
+              :aria-label="t('chart.formatMajorUnit')"
+              :status="drafts.majorUnit!.error ? 'error' : undefined"
+              :onChange="editAction('majorUnit')"
+              :onCompositionstart="compositionStartAction('majorUnit')"
+              :onCompositionend="compositionEndAction('majorUnit')"
+              :onEnter="numberAction('majorUnit')"
+              :onBlur="numberAction('majorUnit')"
+            /><TButton
+              variant="text"
+              shape="square"
+              size="small"
+              :disabled="
+                disabled || (valueAxis.majorUnit === undefined && !drafts.majorUnit!.dirty)
               "
-              ><template #searchAction="{ close }"><FontSettingsAction @open="close" /></template
-            ></FontFormatField>
-          </div>
-          <div class="chart-format-pane__field" data-chart-format-field="fontSize">
-            <label :for="`${paneId}-font-size`">{{ t("chart.formatFontSize") }}</label>
-            <div class="chart-format-pane__number">
-              <NumericField
-                ref="fontSizeControl"
-                :id="`${paneId}-font-size`"
-                :owner-key="`${ownerKey}/fontSize`"
-                :value="fontSizeNumericValue"
-                :spec="fontSizeSpec"
-                :label="t('chart.formatFontSize')"
-                :auto-text="t('chart.formatAuto')"
-                :disabled="disabled"
-                :invalid-message="t('chart.formatInvalidNumber')"
-                :rejected-message="t('chart.formatApplyFailed')"
-                :stale-message="t('chart.formatApplyFailed')"
-                :external-error="styledNumericResetErrors.fontSize"
-                :focus-boundary="() => styledNumericFocusBoundary('fontSize')"
-                :on-commit="fontSizeCommit"
-                presentation="inline-stepper"
-                :show-unit="false"
-                @draft-change="styledNumericDraftChange('fontSize', $event)"
-                @cancel="delete styledNumericResetErrors.fontSize"
-              /><TButton
-                variant="text"
-                shape="square"
-                size="small"
-                :disabled="
-                  disabled ||
-                  (fontSizeNumericValue.kind === 'auto' && !styledNumericDrafts.fontSize?.dirty)
-                "
-                :aria-label="t('chart.formatReset')"
-                data-chart-format-reset="fontSize"
-                :onClick="captureAction(() => resetNumber('fontSize'))"
-                ><RotateCcw :size="14" aria-hidden="true"
-              /></TButton>
-            </div>
-          </div>
-          <div class="chart-format-pane__field">
-            <span>{{ t("format.textColor") }}</span
-            ><ColorPaletteSelect
-              panel-class="chart-format-options-popup"
-              :model-value="textFormat.color"
-              :label="t('format.textColor')"
-              :default-label="t('chart.formatDefault')"
-              :disabled="disabled"
-              show-value
-              :onSelect="
-                captureAction((value: string | null) => setText('color', value ?? undefined))
-              "
-            />
-          </div>
-          <div class="chart-format-pane__checks">
-            <TCheckbox
-              :checked="textFormat.bold ?? (kind === 'title' && chart.type !== 'wordCloud')"
-              :disabled="disabled"
-              :onChange="captureAction((value: unknown) => setText('bold', !!value))"
-              >{{ t("format.bold") }}</TCheckbox
-            ><TCheckbox
-              :checked="textFormat.italic ?? false"
-              :disabled="disabled"
-              :onChange="captureAction((value: unknown) => setText('italic', !!value))"
-              >{{ t("format.italic") }}</TCheckbox
-            >
-          </div>
-          <p class="chart-format-pane__hint">{{ t("chart.formatFontHint") }}</p>
-        </div>
-      </details>
-
-      <details v-if="kind === 'plot' || isAxis" class="chart-format-pane__section" open>
-        <summary>{{ t("chart.formatAppearance") }}</summary>
-        <div class="chart-format-pane__section-body">
-          <div v-if="kind === 'plot'" class="chart-format-pane__field">
-            <span>{{ t("chart.formatFill") }}</span>
-            <div class="chart-format-pane__paint">
-              <ColorPaletteSelect
-                panel-class="chart-format-options-popup"
-                :model-value="chart.format?.plot?.fill"
-                :label="t('chart.formatFill')"
-                :disabled="disabled"
-                :default-label="t('chart.formatDefault')"
-                show-value
-                :onSelect="captureAction(setFill)"
-              /><TButton
-                variant="text"
-                size="small"
-                :disabled="disabled"
-                :onClick="captureAction(() => setFill('transparent'))"
-                >{{ t("chart.formatNoFill") }}</TButton
-              >
-            </div>
-          </div>
-          <div class="chart-format-pane__field">
-            <span>{{ t("chart.formatLine") }}</span>
-            <div class="chart-format-pane__paint">
-              <ColorPaletteSelect
-                panel-class="chart-format-options-popup"
-                :model-value="lineFormat.stroke"
-                :label="t('chart.formatLine')"
-                :disabled="disabled"
-                :default-label="t('chart.formatDefault')"
-                show-value
-                :onSelect="captureAction(setLineColor)"
-              /><TButton
-                variant="text"
-                size="small"
-                :disabled="disabled"
-                :onClick="captureAction(() => setLineColor('transparent'))"
-                >{{ t("chart.formatNoLine") }}</TButton
-              >
-            </div>
-          </div>
-          <div class="chart-format-pane__field" data-chart-format-field="strokeWidth">
-            <label :for="`${paneId}-line-width`">{{ t("chart.formatLineWidth") }}</label>
-            <div class="chart-format-pane__number">
-              <NumericField
-                ref="strokeWidthControl"
-                :id="`${paneId}-line-width`"
-                :owner-key="`${ownerKey}/strokeWidth`"
-                :value="strokeWidthNumericValue"
-                :spec="strokeWidthSpec"
-                :label="t('chart.formatLineWidth')"
-                :auto-text="t('chart.formatAuto')"
-                :disabled="disabled"
-                :invalid-message="t('chart.formatInvalidNumber')"
-                :rejected-message="t('chart.formatApplyFailed')"
-                :stale-message="t('chart.formatApplyFailed')"
-                :external-error="styledNumericResetErrors.strokeWidth"
-                :focus-boundary="() => styledNumericFocusBoundary('strokeWidth')"
-                :on-commit="strokeWidthCommit"
-                presentation="inline-stepper"
-                :show-unit="false"
-                @draft-change="styledNumericDraftChange('strokeWidth', $event)"
-                @cancel="delete styledNumericResetErrors.strokeWidth"
-              /><TButton
-                variant="text"
-                shape="square"
-                size="small"
-                :disabled="
-                  disabled ||
-                  (strokeWidthNumericValue.kind === 'auto' &&
-                    !styledNumericDrafts.strokeWidth?.dirty)
-                "
-                :aria-label="t('chart.formatReset')"
-                data-chart-format-reset="strokeWidth"
-                :onClick="captureAction(() => resetNumber('strokeWidth'))"
-                ><RotateCcw :size="14" aria-hidden="true"
-              /></TButton>
-            </div>
+              :aria-label="t('chart.formatReset')"
+              data-chart-format-reset="majorUnit"
+              :onClick="captureAction(() => resetNumber('majorUnit'))"
+              ><RotateCcw :size="14" aria-hidden="true"
+            /></TButton>
           </div>
         </div>
-      </details>
-
-      <details v-if="isValueAxis" class="chart-format-pane__section" open>
-        <summary>{{ t("chart.formatNumber") }}</summary>
-        <div class="chart-format-pane__section-body">
-          <TCheckbox
-            v-if="!percentageAxis"
-            :checked="linkedToSource"
-            :disabled="disabled"
-            :onChange="captureAction(toggleSourceLink)"
-            >{{ t("chart.formatLinkedToSource") }}</TCheckbox
-          >
-          <p class="chart-format-pane__hint">
-            {{ t(percentageAxis ? "chart.formatPercentAxisHint" : "chart.formatNumberSourceHint") }}
-          </p>
-          <div class="chart-format-pane__preview">
-            <span>{{ t("cellFormat.preview") }}</span
-            ><output :style="{ color: numberPreview.color }">{{ numberPreview.text }}</output>
-          </div>
-          <div class="chart-format-pane__field">
-            <span>{{ t("cellFormat.category") }}</span
-            ><TSelect
-              :popup-props="popupProps"
-              :value="numberCategory"
-              :options="numberCategoryOptions"
+        <div class="chart-format-pane__field" data-chart-format-field="minorUnit">
+          <label :for="`${paneId}-minor`">{{ t("chart.formatMinorUnit") }}</label>
+          <div class="chart-format-pane__number">
+            <TInput
+              :id="`${paneId}-minor`"
+              :value="drafts.minorUnit!.text"
               size="small"
+              :placeholder="t('chart.formatAuto')"
               :disabled="disabled"
-              :aria-label="t('cellFormat.category')"
-              :onChange="captureAction(selectNumberCategory)"
-            />
-          </div>
-          <div
-            v-if="showDecimals"
-            class="chart-format-pane__field"
-            data-chart-format-field="decimals"
-          >
-            <label :for="`${paneId}-decimals`">{{ t("cellFormat.decimalPlaces") }}</label
-            ><TInput
-              :id="`${paneId}-decimals`"
-              :value="drafts.decimals!.text"
+              :aria-label="t('chart.formatMinorUnit')"
+              :status="drafts.minorUnit!.error ? 'error' : undefined"
+              :onChange="editAction('minorUnit')"
+              :onCompositionstart="compositionStartAction('minorUnit')"
+              :onCompositionend="compositionEndAction('minorUnit')"
+              :onEnter="numberAction('minorUnit')"
+              :onBlur="numberAction('minorUnit')"
+            /><TButton
+              variant="text"
+              shape="square"
               size="small"
-              :disabled="disabled"
-              :aria-label="t('cellFormat.decimalPlaces')"
-              :status="drafts.decimals!.error ? 'error' : undefined"
-              :onChange="editAction('decimals')"
-              :onCompositionstart="compositionStartAction('decimals')"
-              :onCompositionend="compositionEndAction('decimals')"
-              :onEnter="captureAction(commitDecimals)"
-              :onBlur="captureAction(commitDecimals)"
-            />
-          </div>
-          <div v-if="showCurrency" class="chart-format-pane__field">
-            <span>{{ t("cellFormat.currencyCode") }}</span
-            ><TSelect
-              :popup-props="popupProps"
-              :value="numberFormat && 'currency' in numberFormat ? numberFormat.currency : ''"
-              :options="currencyOptions"
-              size="small"
-              :disabled="disabled"
-              :aria-label="t('cellFormat.currencyCode')"
-              :onChange="captureAction(setCurrency)"
-            />
-          </div>
-          <TCheckbox
-            v-if="numberCategory === 'number'"
-            :checked="
-              numberFormat && 'useGrouping' in numberFormat
-                ? (numberFormat.useGrouping ?? true)
-                : true
-            "
-            :disabled="disabled"
-            :onChange="captureAction(setGrouping)"
-            >{{ t("cellFormat.grouping") }}</TCheckbox
-          >
-          <fieldset
-            v-if="showNegative"
-            class="chart-format-pane__stack chart-format-pane__negative"
-            :disabled="disabled"
-          >
-            <legend>{{ t("cellFormat.negativeNumbers") }}</legend>
-            <OptionList
-              :model-value="
-                numberFormat && 'negativeStyle' in numberFormat
-                  ? (numberFormat.negativeStyle ?? 'minus')
-                  : 'minus'
+              :disabled="
+                disabled || (valueAxis.minorUnit === undefined && !drafts.minorUnit!.dirty)
               "
-              :options="negativeOptions"
-              :label="t('cellFormat.negativeNumbers')"
-              :onSelect="captureAction(setNegative)"
-            />
-          </fieldset>
-          <div
-            v-if="showCode"
-            class="chart-format-pane__field chart-format-pane__field--stack"
-            data-chart-format-field="formatCode"
-          >
-            <label :for="`${paneId}-format-code`">{{ t("cellFormat.customCode") }}</label
-            ><TInput
-              :id="`${paneId}-format-code`"
-              :value="drafts.formatCode!.text"
-              size="small"
-              :maxlength="255"
-              :disabled="disabled"
-              :aria-label="t('cellFormat.customCode')"
-              :status="drafts.formatCode!.error ? 'error' : undefined"
-              :onChange="editAction('formatCode')"
-              :onCompositionstart="compositionStartAction('formatCode')"
-              :onCompositionend="compositionEndAction('formatCode')"
-              :onEnter="textAction('formatCode')"
-              :onBlur="textAction('formatCode')"
-            />
+              :aria-label="t('chart.formatReset')"
+              data-chart-format-reset="minorUnit"
+              :onClick="captureAction(() => resetNumber('minorUnit'))"
+              ><RotateCcw :size="14" aria-hidden="true"
+            /></TButton>
           </div>
         </div>
-      </details>
+      </FormatSection>
 
-      <details v-if="kind === 'series'" class="chart-format-pane__section" open>
-        <summary>{{ t("chart.formatSeriesOptions") }}</summary>
-        <div class="chart-format-pane__section-body">
-          <div v-if="capabilities.seriesAxis" class="chart-format-pane__field">
-            <span>{{ t("chart.formatSeriesAxis") }}</span
-            ><TSelect
-              :popup-props="popupProps"
-              :value="series.axis ?? 'primary'"
-              :options="seriesAxisOptions"
-              size="small"
-              :disabled="disabled"
-              :aria-label="t('chart.formatSeriesAxis')"
-              :onChange="
-                captureAction(
-                  (value: unknown) =>
-                    (value === 'primary' || value === 'secondary') && setSeries('axis', value),
-                )
-              "
-            />
-          </div>
-          <div class="chart-format-pane__field">
-            <span>{{ t("chart.formatSeriesColor") }}</span
-            ><ColorPaletteSelect
-              panel-class="chart-format-options-popup"
-              :model-value="series.color"
-              :label="t('chart.formatSeriesColor')"
-              :disabled="disabled"
-              :default-label="t('chart.formatDefault')"
-              show-value
-              :onSelect="
-                captureAction((value: string | null) => setSeries('color', value ?? undefined))
-              "
-            />
-          </div>
-          <div
-            v-if="capabilities.seriesStroke"
-            class="chart-format-pane__field"
-            data-chart-format-field="strokeWidth"
-          >
-            <label :for="`${paneId}-series-width`">{{ t("chart.formatLineWidth") }}</label>
-            <div class="chart-format-pane__number">
-              <NumericField
-                ref="strokeWidthControl"
-                :id="`${paneId}-series-width`"
-                :owner-key="`${ownerKey}/strokeWidth`"
-                :value="strokeWidthNumericValue"
-                :spec="strokeWidthSpec"
-                :label="t('chart.formatLineWidth')"
-                :auto-text="t('chart.formatAuto')"
-                :disabled="disabled"
-                :invalid-message="t('chart.formatInvalidNumber')"
-                :rejected-message="t('chart.formatApplyFailed')"
-                :stale-message="t('chart.formatApplyFailed')"
-                :external-error="styledNumericResetErrors.strokeWidth"
-                :focus-boundary="() => styledNumericFocusBoundary('strokeWidth')"
-                :on-commit="strokeWidthCommit"
-                presentation="inline-stepper"
-                :show-unit="false"
-                @draft-change="styledNumericDraftChange('strokeWidth', $event)"
-                @cancel="delete styledNumericResetErrors.strokeWidth"
-              /><TButton
-                variant="text"
-                shape="square"
-                size="small"
-                :disabled="
-                  disabled ||
-                  (strokeWidthNumericValue.kind === 'auto' &&
-                    !styledNumericDrafts.strokeWidth?.dirty)
-                "
-                :aria-label="t('chart.formatReset')"
-                data-chart-format-reset="strokeWidth"
-                :onClick="captureAction(() => resetNumber('strokeWidth'))"
-                ><RotateCcw :size="14" aria-hidden="true"
-              /></TButton>
-            </div>
-          </div>
-          <TCheckbox
-            v-if="capabilities.seriesSmooth"
-            :checked="series.smooth ?? false"
-            :disabled="disabled"
-            :onChange="captureAction((value: unknown) => setSeries('smooth', !!value))"
-            >{{ t("chart.formatSmooth") }}</TCheckbox
-          >
-          <TCheckbox
-            v-if="capabilities.seriesMarkers"
-            :checked="
-              series.markers ??
-              (chart.type === 'combo' ? false : (chart.presentation?.lineMarkers ?? true))
-            "
-            :disabled="disabled"
-            :onChange="captureAction((value: unknown) => setSeries('markers', !!value))"
-            >{{ t("chart.formatMarkers") }}</TCheckbox
-          >
-        </div>
-      </details>
-
-      <details
-        v-if="capabilities.bar && (kind === 'chart' || kind === 'series')"
-        class="chart-format-pane__section"
-        open
+      <FormatSection
+        v-if="kind === 'title' || isAxis"
+        :title="t('chart.formatText')"
+        initially-open
       >
-        <summary>{{ t("chart.formatBarLayout") }}</summary>
-        <div class="chart-format-pane__section-body">
-          <p class="chart-format-pane__hint">{{ t("chart.formatBarGlobalHint") }}</p>
-          <div class="chart-format-pane__field" data-chart-format-field="gapWidth">
-            <label :for="`${paneId}-gap`">{{ t("chart.formatGapWidth") }}</label>
-            <div class="chart-format-pane__number">
-              <TInput
-                :id="`${paneId}-gap`"
-                :value="drafts.gapWidth!.text"
-                size="small"
-                :placeholder="t('chart.formatAuto')"
-                :disabled="disabled"
-                :aria-label="t('chart.formatGapWidth')"
-                :status="drafts.gapWidth!.error ? 'error' : undefined"
-                :onChange="editAction('gapWidth')"
-                :onCompositionstart="compositionStartAction('gapWidth')"
-                :onCompositionend="compositionEndAction('gapWidth')"
-                :onEnter="numberAction('gapWidth')"
-                :onBlur="numberAction('gapWidth')"
-              /><TButton
-                variant="text"
-                shape="square"
-                size="small"
-                :disabled="
-                  disabled || (barFormat.gapWidth === undefined && !drafts.gapWidth!.dirty)
-                "
-                :aria-label="t('chart.formatReset')"
-                data-chart-format-reset="gapWidth"
-                :onClick="captureAction(() => resetNumber('gapWidth'))"
-                ><RotateCcw :size="14" aria-hidden="true"
-              /></TButton>
-            </div>
-          </div>
-          <div class="chart-format-pane__field" data-chart-format-field="overlap">
-            <label :for="`${paneId}-overlap`">{{ t("chart.formatOverlap") }}</label>
-            <div class="chart-format-pane__number">
-              <TInput
-                :id="`${paneId}-overlap`"
-                :value="drafts.overlap!.text"
-                size="small"
-                :placeholder="t('chart.formatAuto')"
-                :disabled="disabled"
-                :aria-label="t('chart.formatOverlap')"
-                :status="drafts.overlap!.error ? 'error' : undefined"
-                :onChange="editAction('overlap')"
-                :onCompositionstart="compositionStartAction('overlap')"
-                :onCompositionend="compositionEndAction('overlap')"
-                :onEnter="numberAction('overlap')"
-                :onBlur="numberAction('overlap')"
-              /><TButton
-                variant="text"
-                shape="square"
-                size="small"
-                :disabled="disabled || (barFormat.overlap === undefined && !drafts.overlap!.dirty)"
-                :aria-label="t('chart.formatReset')"
-                data-chart-format-reset="overlap"
-                :onClick="captureAction(() => resetNumber('overlap'))"
-                ><RotateCcw :size="14" aria-hidden="true"
-              /></TButton>
-            </div>
+        <div class="chart-format-pane__field">
+          <span>{{ t("format.fontFamily") }}</span
+          ><FontFormatField
+            :model-value="textFormat.fontFamily ?? ''"
+            :options="fontFamilyOptions"
+            :label="t('format.fontFamily')"
+            :search-label="t('format.searchFonts')"
+            :empty-label="t('format.noMatchingFonts')"
+            :disabled="disabled"
+            :popup-attach="() => root!"
+            :onChange="
+              captureAction(
+                (value: unknown) =>
+                  typeof value === 'string' && setText('fontFamily', value || undefined),
+              )
+            "
+            ><template #searchAction="{ close }"><FontSettingsAction @open="close" /></template
+          ></FontFormatField>
+        </div>
+        <div class="chart-format-pane__field" data-chart-format-field="fontSize">
+          <label :for="`${paneId}-font-size`">{{ t("chart.formatFontSize") }}</label>
+          <div class="chart-format-pane__number">
+            <NumericField
+              ref="fontSizeControl"
+              :id="`${paneId}-font-size`"
+              :owner-key="`${ownerKey}/fontSize`"
+              :value="fontSizeNumericValue"
+              :spec="fontSizeSpec"
+              :label="t('chart.formatFontSize')"
+              :auto-text="t('chart.formatAuto')"
+              :disabled="disabled"
+              :invalid-message="t('chart.formatInvalidNumber')"
+              :rejected-message="t('chart.formatApplyFailed')"
+              :stale-message="t('chart.formatApplyFailed')"
+              :external-error="sharedNumericResetErrors.fontSize"
+              :focus-boundary="() => sharedNumericFocusBoundary('fontSize')"
+              :on-commit="fontSizeCommit"
+              presentation="inline-stepper"
+              :show-unit="false"
+              @draft-change="sharedNumericDraftChange('fontSize', $event)"
+              @cancel="delete sharedNumericResetErrors.fontSize"
+            /><TButton
+              variant="text"
+              shape="square"
+              size="small"
+              :disabled="
+                disabled ||
+                (fontSizeNumericValue.kind === 'auto' && !sharedNumericDrafts.fontSize?.dirty)
+              "
+              :aria-label="t('chart.formatReset')"
+              data-chart-format-reset="fontSize"
+              :onClick="captureAction(() => resetNumber('fontSize'))"
+              ><RotateCcw :size="14" aria-hidden="true"
+            /></TButton>
           </div>
         </div>
-      </details>
+        <div class="chart-format-pane__field">
+          <span>{{ t("format.textColor") }}</span
+          ><ColorPaletteSelect
+            panel-class="chart-format-options-popup"
+            :model-value="textFormat.color"
+            :label="t('format.textColor')"
+            :default-label="t('chart.formatDefault')"
+            :disabled="disabled"
+            show-value
+            :onSelect="
+              captureAction((value: string | null) => setText('color', value ?? undefined))
+            "
+          />
+        </div>
+        <div class="chart-format-pane__checks">
+          <TCheckbox
+            :checked="textFormat.bold ?? (kind === 'title' && chart.type !== 'wordCloud')"
+            :disabled="disabled"
+            :onChange="captureAction((value: unknown) => setText('bold', !!value))"
+            >{{ t("format.bold") }}</TCheckbox
+          ><TCheckbox
+            :checked="textFormat.italic ?? false"
+            :disabled="disabled"
+            :onChange="captureAction((value: unknown) => setText('italic', !!value))"
+            >{{ t("format.italic") }}</TCheckbox
+          >
+        </div>
+        <p class="chart-format-pane__hint">{{ t("chart.formatFontHint") }}</p>
+      </FormatSection>
+
+      <FormatSection
+        v-if="kind === 'plot' || isAxis"
+        :title="t('chart.formatAppearance')"
+        initially-open
+      >
+        <div v-if="kind === 'plot'" class="chart-format-pane__field">
+          <span>{{ t("chart.formatFill") }}</span>
+          <div class="chart-format-pane__paint">
+            <ColorPaletteSelect
+              panel-class="chart-format-options-popup"
+              :model-value="chart.format?.plot?.fill"
+              :label="t('chart.formatFill')"
+              :disabled="disabled"
+              :default-label="t('chart.formatDefault')"
+              show-value
+              :onSelect="captureAction(setFill)"
+            /><TButton
+              variant="text"
+              size="small"
+              :disabled="disabled"
+              :onClick="captureAction(() => setFill('transparent'))"
+              >{{ t("chart.formatNoFill") }}</TButton
+            >
+          </div>
+        </div>
+        <div class="chart-format-pane__field">
+          <span>{{ t("chart.formatLine") }}</span>
+          <div class="chart-format-pane__paint">
+            <ColorPaletteSelect
+              panel-class="chart-format-options-popup"
+              :model-value="lineFormat.stroke"
+              :label="t('chart.formatLine')"
+              :disabled="disabled"
+              :default-label="t('chart.formatDefault')"
+              show-value
+              :onSelect="captureAction(setLineColor)"
+            /><TButton
+              variant="text"
+              size="small"
+              :disabled="disabled"
+              :onClick="captureAction(() => setLineColor('transparent'))"
+              >{{ t("chart.formatNoLine") }}</TButton
+            >
+          </div>
+        </div>
+        <div class="chart-format-pane__field" data-chart-format-field="strokeWidth">
+          <label :for="`${paneId}-line-width`">{{ t("chart.formatLineWidth") }}</label>
+          <div class="chart-format-pane__number">
+            <NumericField
+              ref="strokeWidthControl"
+              :id="`${paneId}-line-width`"
+              :owner-key="`${ownerKey}/strokeWidth`"
+              :value="strokeWidthNumericValue"
+              :spec="strokeWidthSpec"
+              :label="t('chart.formatLineWidth')"
+              :auto-text="t('chart.formatAuto')"
+              :disabled="disabled"
+              :invalid-message="t('chart.formatInvalidNumber')"
+              :rejected-message="t('chart.formatApplyFailed')"
+              :stale-message="t('chart.formatApplyFailed')"
+              :external-error="sharedNumericResetErrors.strokeWidth"
+              :focus-boundary="() => sharedNumericFocusBoundary('strokeWidth')"
+              :on-commit="strokeWidthCommit"
+              presentation="inline-stepper"
+              :show-unit="false"
+              @draft-change="sharedNumericDraftChange('strokeWidth', $event)"
+              @cancel="delete sharedNumericResetErrors.strokeWidth"
+            /><TButton
+              variant="text"
+              shape="square"
+              size="small"
+              :disabled="
+                disabled ||
+                (strokeWidthNumericValue.kind === 'auto' && !sharedNumericDrafts.strokeWidth?.dirty)
+              "
+              :aria-label="t('chart.formatReset')"
+              data-chart-format-reset="strokeWidth"
+              :onClick="captureAction(() => resetNumber('strokeWidth'))"
+              ><RotateCcw :size="14" aria-hidden="true"
+            /></TButton>
+          </div>
+        </div>
+      </FormatSection>
+
+      <FormatSection v-if="isValueAxis" :title="t('chart.formatNumber')" initially-open>
+        <TCheckbox
+          v-if="!percentageAxis"
+          :checked="linkedToSource"
+          :disabled="disabled"
+          :onChange="captureAction(toggleSourceLink)"
+          >{{ t("chart.formatLinkedToSource") }}</TCheckbox
+        >
+        <p class="chart-format-pane__hint">
+          {{ t(percentageAxis ? "chart.formatPercentAxisHint" : "chart.formatNumberSourceHint") }}
+        </p>
+        <div class="chart-format-pane__preview">
+          <span>{{ t("cellFormat.preview") }}</span
+          ><output :style="{ color: numberPreview.color }">{{ numberPreview.text }}</output>
+        </div>
+        <div class="chart-format-pane__field">
+          <span>{{ t("cellFormat.category") }}</span
+          ><TSelect
+            :popup-props="popupProps"
+            :value="numberCategory"
+            :options="numberCategoryOptions"
+            size="small"
+            :disabled="disabled"
+            :aria-label="t('cellFormat.category')"
+            :onChange="captureAction(selectNumberCategory)"
+          />
+        </div>
+        <div
+          v-if="showDecimals"
+          class="chart-format-pane__field"
+          data-chart-format-field="decimals"
+        >
+          <label :for="`${paneId}-decimals`">{{ t("cellFormat.decimalPlaces") }}</label
+          ><NumericField
+            ref="decimalsControl"
+            :id="`${paneId}-decimals`"
+            :owner-key="`${ownerKey}/decimals`"
+            :value="decimalsNumericValue"
+            :spec="decimalsSpec"
+            :label="t('cellFormat.decimalPlaces')"
+            :auto-text="t('chart.formatAuto')"
+            :disabled="disabled"
+            :invalid-message="t('chart.formatInvalidNumber')"
+            :rejected-message="t('chart.formatApplyFailed')"
+            :stale-message="t('chart.formatApplyFailed')"
+            :external-error="sharedNumericResetErrors.decimals"
+            :focus-boundary="() => sharedNumericFocusBoundary('decimals')"
+            :on-commit="decimalsCommit"
+            presentation="inline-stepper"
+            :show-unit="false"
+            @draft-change="sharedNumericDraftChange('decimals', $event)"
+            @cancel="delete sharedNumericResetErrors.decimals"
+          />
+        </div>
+        <div v-if="showCurrency" class="chart-format-pane__field">
+          <span>{{ t("cellFormat.currencyCode") }}</span
+          ><TSelect
+            :popup-props="popupProps"
+            :value="numberFormat && 'currency' in numberFormat ? numberFormat.currency : ''"
+            :options="currencyOptions"
+            size="small"
+            :disabled="disabled"
+            :aria-label="t('cellFormat.currencyCode')"
+            :onChange="captureAction(setCurrency)"
+          />
+        </div>
+        <TCheckbox
+          v-if="numberCategory === 'number'"
+          :checked="
+            numberFormat && 'useGrouping' in numberFormat
+              ? (numberFormat.useGrouping ?? true)
+              : true
+          "
+          :disabled="disabled"
+          :onChange="captureAction(setGrouping)"
+          >{{ t("cellFormat.grouping") }}</TCheckbox
+        >
+        <fieldset
+          v-if="showNegative"
+          class="chart-format-pane__stack chart-format-pane__negative"
+          :disabled="disabled"
+        >
+          <legend>{{ t("cellFormat.negativeNumbers") }}</legend>
+          <OptionList
+            :model-value="
+              numberFormat && 'negativeStyle' in numberFormat
+                ? (numberFormat.negativeStyle ?? 'minus')
+                : 'minus'
+            "
+            :options="negativeOptions"
+            :label="t('cellFormat.negativeNumbers')"
+            :onSelect="captureAction(setNegative)"
+          />
+        </fieldset>
+        <div
+          v-if="showCode"
+          class="chart-format-pane__field chart-format-pane__field--stack"
+          data-chart-format-field="formatCode"
+        >
+          <label :for="`${paneId}-format-code`">{{ t("cellFormat.customCode") }}</label
+          ><TInput
+            :id="`${paneId}-format-code`"
+            :value="drafts.formatCode!.text"
+            size="small"
+            :maxlength="255"
+            :disabled="disabled"
+            :aria-label="t('cellFormat.customCode')"
+            :status="drafts.formatCode!.error ? 'error' : undefined"
+            :onChange="editAction('formatCode')"
+            :onCompositionstart="compositionStartAction('formatCode')"
+            :onCompositionend="compositionEndAction('formatCode')"
+            :onEnter="textAction('formatCode')"
+            :onBlur="textAction('formatCode')"
+          />
+        </div>
+      </FormatSection>
+
+      <FormatSection
+        v-if="kind === 'series'"
+        :title="t('chart.formatSeriesOptions')"
+        initially-open
+      >
+        <div v-if="capabilities.seriesAxis" class="chart-format-pane__field">
+          <span>{{ t("chart.formatSeriesAxis") }}</span
+          ><TSelect
+            :popup-props="popupProps"
+            :value="series.axis ?? 'primary'"
+            :options="seriesAxisOptions"
+            size="small"
+            :disabled="disabled"
+            :aria-label="t('chart.formatSeriesAxis')"
+            :onChange="
+              captureAction(
+                (value: unknown) =>
+                  (value === 'primary' || value === 'secondary') && setSeries('axis', value),
+              )
+            "
+          />
+        </div>
+        <div class="chart-format-pane__field">
+          <span>{{ t("chart.formatSeriesColor") }}</span
+          ><ColorPaletteSelect
+            panel-class="chart-format-options-popup"
+            :model-value="series.color"
+            :label="t('chart.formatSeriesColor')"
+            :disabled="disabled"
+            :default-label="t('chart.formatDefault')"
+            show-value
+            :onSelect="
+              captureAction((value: string | null) => setSeries('color', value ?? undefined))
+            "
+          />
+        </div>
+        <div
+          v-if="capabilities.seriesStroke"
+          class="chart-format-pane__field"
+          data-chart-format-field="strokeWidth"
+        >
+          <label :for="`${paneId}-series-width`">{{ t("chart.formatLineWidth") }}</label>
+          <div class="chart-format-pane__number">
+            <NumericField
+              ref="strokeWidthControl"
+              :id="`${paneId}-series-width`"
+              :owner-key="`${ownerKey}/strokeWidth`"
+              :value="strokeWidthNumericValue"
+              :spec="strokeWidthSpec"
+              :label="t('chart.formatLineWidth')"
+              :auto-text="t('chart.formatAuto')"
+              :disabled="disabled"
+              :invalid-message="t('chart.formatInvalidNumber')"
+              :rejected-message="t('chart.formatApplyFailed')"
+              :stale-message="t('chart.formatApplyFailed')"
+              :external-error="sharedNumericResetErrors.strokeWidth"
+              :focus-boundary="() => sharedNumericFocusBoundary('strokeWidth')"
+              :on-commit="strokeWidthCommit"
+              presentation="inline-stepper"
+              :show-unit="false"
+              @draft-change="sharedNumericDraftChange('strokeWidth', $event)"
+              @cancel="delete sharedNumericResetErrors.strokeWidth"
+            /><TButton
+              variant="text"
+              shape="square"
+              size="small"
+              :disabled="
+                disabled ||
+                (strokeWidthNumericValue.kind === 'auto' && !sharedNumericDrafts.strokeWidth?.dirty)
+              "
+              :aria-label="t('chart.formatReset')"
+              data-chart-format-reset="strokeWidth"
+              :onClick="captureAction(() => resetNumber('strokeWidth'))"
+              ><RotateCcw :size="14" aria-hidden="true"
+            /></TButton>
+          </div>
+        </div>
+        <TCheckbox
+          v-if="capabilities.seriesSmooth"
+          :checked="series.smooth ?? false"
+          :disabled="disabled"
+          :onChange="captureAction((value: unknown) => setSeries('smooth', !!value))"
+          >{{ t("chart.formatSmooth") }}</TCheckbox
+        >
+        <TCheckbox
+          v-if="capabilities.seriesMarkers"
+          :checked="
+            series.markers ??
+            (chart.type === 'combo' ? false : (chart.presentation?.lineMarkers ?? true))
+          "
+          :disabled="disabled"
+          :onChange="captureAction((value: unknown) => setSeries('markers', !!value))"
+          >{{ t("chart.formatMarkers") }}</TCheckbox
+        >
+      </FormatSection>
+
+      <FormatSection
+        v-if="capabilities.bar && (kind === 'chart' || kind === 'series')"
+        :title="t('chart.formatBarLayout')"
+        initially-open
+      >
+        <p class="chart-format-pane__hint">{{ t("chart.formatBarGlobalHint") }}</p>
+        <div class="chart-format-pane__field" data-chart-format-field="gapWidth">
+          <label :for="`${paneId}-gap`">{{ t("chart.formatGapWidth") }}</label>
+          <div class="chart-format-pane__number">
+            <NumericField
+              ref="gapWidthControl"
+              :id="`${paneId}-gap`"
+              :owner-key="`${ownerKey}/gapWidth`"
+              :value="gapWidthNumericValue"
+              :spec="gapWidthSpec"
+              :label="t('chart.formatGapWidth')"
+              :auto-text="t('chart.formatAuto')"
+              :disabled="disabled"
+              :invalid-message="t('chart.formatInvalidNumber')"
+              :rejected-message="t('chart.formatApplyFailed')"
+              :stale-message="t('chart.formatApplyFailed')"
+              :external-error="sharedNumericResetErrors.gapWidth"
+              :focus-boundary="() => sharedNumericFocusBoundary('gapWidth')"
+              :on-commit="gapWidthCommit"
+              presentation="inline-stepper"
+              :show-unit="false"
+              @draft-change="sharedNumericDraftChange('gapWidth', $event)"
+              @cancel="delete sharedNumericResetErrors.gapWidth"
+            /><TButton
+              variant="text"
+              shape="square"
+              size="small"
+              :disabled="
+                disabled ||
+                (gapWidthNumericValue.kind === 'auto' && !sharedNumericDrafts.gapWidth?.dirty)
+              "
+              :aria-label="t('chart.formatReset')"
+              data-chart-format-reset="gapWidth"
+              :onClick="captureAction(() => resetNumber('gapWidth'))"
+              ><RotateCcw :size="14" aria-hidden="true"
+            /></TButton>
+          </div>
+        </div>
+        <div class="chart-format-pane__field" data-chart-format-field="overlap">
+          <label :for="`${paneId}-overlap`">{{ t("chart.formatOverlap") }}</label>
+          <div class="chart-format-pane__number">
+            <NumericField
+              ref="overlapControl"
+              :id="`${paneId}-overlap`"
+              :owner-key="`${ownerKey}/overlap`"
+              :value="overlapNumericValue"
+              :spec="overlapSpec"
+              :label="t('chart.formatOverlap')"
+              :auto-text="t('chart.formatAuto')"
+              :disabled="disabled"
+              :invalid-message="t('chart.formatInvalidNumber')"
+              :rejected-message="t('chart.formatApplyFailed')"
+              :stale-message="t('chart.formatApplyFailed')"
+              :external-error="sharedNumericResetErrors.overlap"
+              :focus-boundary="() => sharedNumericFocusBoundary('overlap')"
+              :on-commit="overlapCommit"
+              presentation="inline-stepper"
+              :show-unit="false"
+              @draft-change="sharedNumericDraftChange('overlap', $event)"
+              @cancel="delete sharedNumericResetErrors.overlap"
+            /><TButton
+              variant="text"
+              shape="square"
+              size="small"
+              :disabled="
+                disabled ||
+                (overlapNumericValue.kind === 'auto' && !sharedNumericDrafts.overlap?.dirty)
+              "
+              :aria-label="t('chart.formatReset')"
+              data-chart-format-reset="overlap"
+              :onClick="captureAction(() => resetNumber('overlap'))"
+              ><RotateCcw :size="14" aria-hidden="true"
+            /></TButton>
+          </div>
+        </div>
+      </FormatSection>
       <div
         v-if="available && (kind !== 'chart' || capabilities.bar)"
         class="chart-format-pane__reset"
@@ -1810,20 +1900,6 @@ function escapeDraft(event: KeyboardEvent): void {
     overflow: auto;
     padding: 8px 12px 12px;
     overscroll-behavior: contain;
-  }
-  &__section {
-    border-bottom: 1px solid var(--sheetcraft-border-subtle);
-    summary {
-      cursor: pointer;
-      font-weight: 600;
-      padding: 10px 0;
-      white-space: nowrap;
-    }
-  }
-  &__section-body {
-    display: grid;
-    gap: 10px;
-    padding: 0 0 12px;
   }
   &__field {
     display: grid;
