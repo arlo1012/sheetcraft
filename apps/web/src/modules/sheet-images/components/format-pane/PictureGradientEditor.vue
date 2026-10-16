@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, useId, watch } from "vue";
+import { computed, onBeforeUnmount, ref, useId, watch, type ComponentPublicInstance } from "vue";
 import { useNativePopupOwnership } from "../../../../shared/floating/useNativePopupOwnership";
 import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -38,7 +38,9 @@ const kindPopup = useNativePopupOwnership({
   disabled: () => !!props.disabled,
   root: () => root.value,
 });
-const kindPopupHost = kindPopup.host;
+function setKindPopupHost(element: Element | ComponentPublicInstance | null): void {
+  kindPopup.host.value = element instanceof HTMLElement ? element : undefined;
+}
 const kindInputId = `picture-gradient-kind-${useId()}`;
 const kindNativeControl = computed(() => ({
   attributes: {
@@ -144,7 +146,7 @@ function numberProps(
 </script>
 <template>
   <div ref="root" class="picture-gradient-editor">
-    <Teleport to="body"><div ref="kindPopupHost" data-picture-gradient-kind-popup /></Teleport>
+    <Teleport to="body"><div :ref="setKindPopupHost" data-picture-gradient-kind-popup /></Teleport>
     <PictureFormatField :label="t('gradientKind')"
       ><TSelect
         v-native-control="kindNativeControl"

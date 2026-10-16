@@ -11,7 +11,15 @@ import {
 import { imageAssetFeedback } from "../../../image-assets/imageAssetFeedback";
 import { useAppI18n } from "../../../../shared/i18n";
 import PictureTextureGallery from "./PictureTextureGallery.vue";
-import { computed, nextTick, onUnmounted, ref, useId, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onUnmounted,
+  ref,
+  useId,
+  watch,
+  type ComponentPublicInstance,
+} from "vue";
 import type { PopupVisibleChangeContext } from "tdesign-vue-next/es/popup";
 import { useNativePopupOwnership } from "../../../../shared/floating/useNativePopupOwnership";
 import { vNativeControl } from "../../../../shared/tdesign/native-control";
@@ -153,9 +161,15 @@ const mirrorPopup = useNativePopupOwnership({
     !!disabled.value || paint.value?.kind !== "picture" || paint.value.layout.kind !== "tile",
   root: () => editorRoot.value,
 });
-const imageLayoutHost = imageLayoutPopup.host,
-  tileAlignHost = tileAlignPopup.host,
-  mirrorHost = mirrorPopup.host;
+function setImageLayoutHost(element: Element | ComponentPublicInstance | null): void {
+  imageLayoutPopup.host.value = element instanceof HTMLElement ? element : undefined;
+}
+function setTileAlignHost(element: Element | ComponentPublicInstance | null): void {
+  tileAlignPopup.host.value = element instanceof HTMLElement ? element : undefined;
+}
+function setMirrorHost(element: Element | ComponentPublicInstance | null): void {
+  mirrorPopup.host.value = element instanceof HTMLElement ? element : undefined;
+}
 const imageNative = computed(() => ({
   layout: {
     attributes: {
@@ -581,9 +595,9 @@ function patternPreview(preset: PicturePatternPreset) {
   <div ref="editorRoot" class="picture-paint-editor">
     <Teleport to="body">
       <div ref="modePopupHost" data-picture-paint-mode-popup />
-      <div ref="imageLayoutHost" data-picture-paint-image-popup="layout" />
-      <div ref="tileAlignHost" data-picture-paint-image-popup="alignment" />
-      <div ref="mirrorHost" data-picture-paint-image-popup="mirror" />
+      <div :ref="setImageLayoutHost" data-picture-paint-image-popup="layout" />
+      <div :ref="setTileAlignHost" data-picture-paint-image-popup="alignment" />
+      <div :ref="setMirrorHost" data-picture-paint-image-popup="mirror" />
     </Teleport>
     <PictureFormatField :label="t(paintRole === 'line' ? 'lineMode' : 'paintMode')"
       ><TSelect
