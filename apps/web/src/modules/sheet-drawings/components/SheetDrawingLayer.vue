@@ -3523,7 +3523,8 @@ watch(
             :drawing="equationPaintView(fragment.drawing)"
             :chart-editing="!readOnly"
             :chart-selected-element="
-              chartElementSelection?.owner === sourceOwner(fragment.drawing) &&
+              chartElementSelection &&
+              chartElementSelection.owner === sourceOwner(fragment.drawing) &&
               selectedDrawingId === fragment.drawing.id
                 ? chartElementSelection.target
                 : undefined

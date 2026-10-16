@@ -3,11 +3,12 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input } from "tdesign-vue-next/es/input";
 import { Select } from "tdesign-vue-next/es/select";
-import { shallowRef } from "vue";
+import { shallowRef, type ComponentPublicInstance } from "vue";
 import { Tabs } from "tdesign-vue-next/es/tabs";
 import SymbolDialog from "../../../modules/insert-tools/components/SymbolDialog.vue";
 import SymbolCharacterGrid from "../../../modules/insert-tools/components/SymbolCharacterGrid.vue";
 import OptionList from "../../../shared/option-list/OptionList.vue";
+import type { OptionListOption } from "../../../shared/option-list/option-list";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import FontSettingsAction from "../../../shared/cell-text/FontSettingsAction.vue";
 import { fontSettingsVisible } from "../../../shared/cell-text/font-settings";
@@ -791,7 +792,11 @@ describe("complete Symbol dialog", () => {
     ).not.toBeNull();
     wrapper.getComponent(Tabs).vm.$emit("update:modelValue", "special");
     await wrapper.vm.$nextTick();
-    const list = wrapper.getComponent(OptionList);
+    const list =
+      wrapper.findComponent<ComponentPublicInstance<{ options: readonly OptionListOption[] }>>(
+        OptionList,
+      );
+    expect(list.exists()).toBe(true);
     expect(list.props("options")).toHaveLength(17);
     const option = list.get('[data-symbol-special="0"]');
     expect(option.get(".option-list__icon .symbol-dialog__list-glyph").text()).toBe("—");
@@ -807,6 +812,33 @@ describe("complete Symbol dialog", () => {
     await flushPromises();
     expect(wrapper.emitted("insert")?.[0]?.[0]).toMatchObject({ text: "—" });
     expect(wrapper.emitted("close")).toBeUndefined();
+  });
+  test("custom row string attributes preserve keyboard focus, selection and insertion", async () => {
+    const wrapper = await fixture();
+    wrapper.getComponent(Tabs).vm.$emit("update:modelValue", "custom");
+    await wrapper.vm.$nextTick();
+    const list = wrapper.get(".symbol-dialog__custom-list");
+    const table = wrapper.getComponent(PrimaryTable);
+    const rows = list.findAll("[data-row-index]");
+    expect(rows.length).toBeGreaterThan(1);
+    expect(rows[0]!.attributes("data-row-index")).toBe("0");
+    expect(rows[1]!.attributes("data-row-index")).toBe("1");
+    for (const [key, index] of [
+      ["ArrowDown", 1],
+      ["ArrowUp", 0],
+      ["End", rows.length - 1],
+      ["Home", 0],
+    ] as const) {
+      await list.trigger("keydown", { key });
+      expect(table.props("activeRowKeys")).toEqual([index]);
+      expect(document.activeElement).toBe(rows[index]!.element);
+      expect(rows[index]!.attributes("aria-selected")).toBe("true");
+      expect(rows[index]!.attributes("tabindex")).toBe("0");
+    }
+    await list.trigger("keydown", { key: "ArrowDown" });
+    await list.trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(wrapper.emitted("insert")?.[0]).toEqual([{ text: "－" }]);
   });
   test("table row selection works while checkbox clicks do not change the active row or insert", async () => {
     const wrapper = await fixture();

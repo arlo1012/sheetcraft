@@ -597,8 +597,8 @@ const customColumns = computed<PrimaryTableCol[]>(() => [
 const customRowAttributes: TableRowAttributes<TableRowData> = ({ rowIndex }) => ({
   role: "option",
   "aria-selected": String(customIndex.value === rowIndex),
-  "data-row-index": rowIndex,
-  tabindex: customIndex.value === rowIndex ? 0 : -1,
+  "data-row-index": String(rowIndex),
+  tabindex: customIndex.value === rowIndex ? "0" : "-1",
 });
 function selectCustomRows(keys: Array<string | number>): void {
   if (typeof keys[0] === "number") customIndex.value = keys[0];

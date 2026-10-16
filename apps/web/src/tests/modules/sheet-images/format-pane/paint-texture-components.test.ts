@@ -201,3 +201,64 @@ test("late source validation errors do not replace a new paint selection's feedb
   expect(f.wrapper.text()).not.toContain("This BMP encoding");
   expect(f.onCommit).not.toHaveBeenCalled();
 });
+
+function tileSelect(wrapper: VueWrapper, label: "paintAlignment" | "paintMirror") {
+  const select = wrapper
+    .findAllComponents(Select)
+    .find((item) => item.attributes("aria-label") === label);
+  if (!select) throw new Error(`Missing ${label} select.`);
+  return select;
+}
+
+test.each([
+  ["paintAlignment", "bottom-left", "anchor"],
+  ["paintMirror", "x", "flip"],
+] as const)("%s changes only its tile field and rejects invalid input", (label, choice, field) => {
+  const f = create();
+  const select = tileSelect(f.wrapper, label);
+  select.vm.$emit("change", choice);
+  const original = value();
+  if (original.kind !== "value" || original.value.kind !== "picture")
+    throw new Error("Bad fixture.");
+  expect(f.onCommit).toHaveBeenCalledExactlyOnceWith({
+    kind: "value",
+    value: { ...original.value, layout: { ...original.value.layout, [field]: choice } },
+  });
+  f.onCommit.mockClear();
+  select.vm.$emit("change", "invalid");
+  expect(f.onCommit).not.toHaveBeenCalled();
+});
+
+test.each(["owner", "callback", "paint", "stretch", "disabled", "unmount"] as const)(
+  "old tile choice callbacks cannot commit after %s",
+  async (boundary) => {
+    const f = create();
+    const callbacks = (["paintAlignment", "paintMirror"] as const).map((label) => {
+      const handler = tileSelect(f.wrapper, label).vm.$.vnode.props?.onChange;
+      if (typeof handler !== "function") throw new Error(`Missing ${label} callback.`);
+      return handler;
+    });
+    const replacement = vi.fn(() => true);
+    if (boundary === "owner") await f.wrapper.setProps({ ownerKey: "next" });
+    if (boundary === "callback") await f.wrapper.setProps({ onCommit: replacement });
+    if (boundary === "paint") await f.wrapper.setProps({ value: value() });
+    if (boundary === "stretch") {
+      const next = value();
+      if (next.kind !== "value" || next.value.kind !== "picture") throw new Error("Bad fixture.");
+      next.value.layout = {
+        kind: "stretch",
+        offsetXRatio: 0,
+        offsetYRatio: 0,
+        widthRatio: 1,
+        heightRatio: 1,
+      };
+      await f.wrapper.setProps({ value: next });
+    }
+    if (boundary === "disabled") await f.wrapper.setProps({ disabled: true });
+    if (boundary === "unmount") f.wrapper.unmount();
+    callbacks[0]!("bottom-left");
+    callbacks[1]!("x");
+    expect(f.onCommit).not.toHaveBeenCalled();
+    expect(replacement).not.toHaveBeenCalled();
+  },
+);

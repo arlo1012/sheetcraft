@@ -443,8 +443,10 @@ const imageActions = computed(() => {
         current?.kind === "picture" &&
         current.layout.kind === "tile" &&
         anchors.some((item) => item.value === value) &&
-        tileAlignPopup.acceptChoice(() =>
-          apply({ ...current, layout: { ...current.layout, anchor: value as PictureAnchor } }),
+        tileAlignPopup.acceptChoice(
+          () =>
+            current.layout.kind === "tile" &&
+            apply({ ...current, layout: { ...current.layout, anchor: value as PictureAnchor } }),
         )
       );
     },
@@ -453,8 +455,10 @@ const imageActions = computed(() => {
         current?.kind === "picture" &&
         current.layout.kind === "tile" &&
         (value === "none" || value === "x" || value === "y" || value === "xy") &&
-        mirrorPopup.acceptChoice(() =>
-          apply({ ...current, layout: { ...current.layout, flip: value } }),
+        mirrorPopup.acceptChoice(
+          () =>
+            current.layout.kind === "tile" &&
+            apply({ ...current, layout: { ...current.layout, flip: value } }),
         )
       );
     },
