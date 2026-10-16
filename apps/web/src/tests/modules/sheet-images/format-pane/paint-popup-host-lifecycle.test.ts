@@ -7,13 +7,37 @@ import PicturePaintEditor from "../../../../modules/sheet-images/components/form
 import { createPictureGradientPaint } from "../../../../modules/sheet-images/picture-paint-edit";
 import { createAppI18n } from "../../../../shared/i18n";
 
+import PictureFormat3dEditor from "../../../../modules/sheet-images/components/format-pane/PictureFormat3dEditor.vue";
+import PictureLineEditor from "../../../../modules/sheet-images/components/format-pane/PictureLineEditor.vue";
+import PictureReflectionEditor from "../../../../modules/sheet-images/components/format-pane/PictureReflectionEditor.vue";
+import PictureShadowEditor from "../../../../modules/sheet-images/components/format-pane/PictureShadowEditor.vue";
+import {
+  createPictureLine,
+  createPictureShadow,
+  createPictureReflection,
+  createPictureFormat3d,
+} from "../../../../modules/sheet-images/picture-effect-edit";
+
 const mounted: VueWrapper[] = [];
 afterEach(() => {
   mounted.splice(0).forEach((wrapper) => wrapper.unmount());
   document.body.replaceChildren();
   vi.restoreAllMocks();
 });
-const fields = ["gradientKind", "paintLayout", "paintAlignment", "paintMirror"] as const;
+const fields = [
+  "gradientKind",
+  "paintLayout",
+  "paintAlignment",
+  "paintMirror",
+  "format3dSection",
+  "lineCompound",
+  "lineDash",
+  "lineCap",
+  "lineJoin",
+  "reflectionSection",
+  "shadowSection",
+  "shadowAnchor",
+] as const;
 type Field = (typeof fields)[number];
 function fixture(field: Field) {
   const onCommit = vi.fn(() => true);
@@ -21,7 +45,12 @@ function fixture(field: Field) {
     attachTo: document.body,
     global: {
       plugins: [createAppI18n("en-US")],
-      stubs: { PicturePaintNumber: true, PicturePaintColor: true, PictureTextureGallery: true },
+      stubs: {
+        PicturePaintNumber: true,
+        PicturePaintColor: true,
+        PictureTextureGallery: true,
+        PicturePresetGallery: true,
+      },
     },
   };
   const picture: Choice<PicturePaint> = {
@@ -44,12 +73,32 @@ function fixture(field: Field) {
   };
   const props = { ownerKey: "picture-a", t: (key: string) => key, onCommit };
   const wrapper =
-    field === "gradientKind"
-      ? mount(PictureGradientEditor, {
+    field === "format3dSection"
+      ? mount(PictureFormat3dEditor, {
           ...common,
-          props: { ...props, value: createPictureGradientPaint() },
+          props: { ...props, value: { kind: "value", value: createPictureFormat3d() } },
         })
-      : mount(PicturePaintEditor, { ...common, props: { ...props, value: picture } });
+      : field.startsWith("line")
+        ? mount(PictureLineEditor, {
+            ...common,
+            props: { ...props, value: { kind: "value", value: createPictureLine() } },
+          })
+        : field === "reflectionSection"
+          ? mount(PictureReflectionEditor, {
+              ...common,
+              props: { ...props, value: { kind: "value", value: createPictureReflection() } },
+            })
+          : field === "shadowSection" || field === "shadowAnchor"
+            ? mount(PictureShadowEditor, {
+                ...common,
+                props: { ...props, value: { kind: "value", value: createPictureShadow() } },
+              })
+            : field === "gradientKind"
+              ? mount(PictureGradientEditor, {
+                  ...common,
+                  props: { ...props, value: createPictureGradientPaint() },
+                })
+              : mount(PicturePaintEditor, { ...common, props: { ...props, value: picture } });
   mounted.push(wrapper);
   const select = wrapper
     .findAllComponents(Select)
@@ -119,19 +168,29 @@ test.each(fields)(
     expect(f.select.props("popupVisible")).toBe(false);
     expect(f.attach()).toBe(host);
     visible(true);
-    change(
-      field === "paintMirror"
-        ? "x"
-        : field === "paintAlignment"
-          ? "bottom-left"
-          : field === "paintLayout"
-            ? "stretch"
-            : "radial",
-    );
+    const validChoices: Record<Field, string> = {
+      gradientKind: "radial",
+      paintMirror: "x",
+      paintAlignment: "bottom-left",
+      paintLayout: "stretch",
+      format3dSection: "none",
+      lineCompound: "double",
+      lineDash: "dash",
+      lineCap: "round",
+      lineJoin: "bevel",
+      reflectionSection: "none",
+      shadowSection: "inner",
+      shadowAnchor: "bottom-left",
+    };
+    change(validChoices[field]);
     await flushPromises();
     expect(f.select.props("popupVisible")).toBe(false);
     expect(f.onCommit).not.toHaveBeenCalled();
     await open(f);
+    const currentChange = f.select.vm.$.vnode.props?.onChange;
+    if (typeof currentChange !== "function") throw new Error("Missing current callback.");
+    currentChange(validChoices[field]);
+    expect(f.onCommit).toHaveBeenCalledTimes(1);
     await f.wrapper.setProps({ disabled: true });
     expect(f.select.props("popupVisible")).toBe(false);
   },

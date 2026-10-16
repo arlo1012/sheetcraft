@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, useId } from "vue";
+import { computed, onBeforeUnmount, ref, useId, type ComponentPublicInstance } from "vue";
 import { useNativePopupOwnership } from "../../../../shared/floating/useNativePopupOwnership";
 import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -46,8 +46,12 @@ const anchorPopup = useNativePopupOwnership({
   disabled: () => !!props.disabled || !shadow.value,
   root: () => root.value,
 });
-const modeHost = modePopup.host,
-  anchorHost = anchorPopup.host;
+function setModeHost(element: Element | ComponentPublicInstance | null): void {
+  modePopup.host.value = element instanceof HTMLElement ? element : undefined;
+}
+function setAnchorHost(element: Element | ComponentPublicInstance | null): void {
+  anchorPopup.host.value = element instanceof HTMLElement ? element : undefined;
+}
 const fieldId = `picture-shadow-${useId()}`;
 function nativeControl(field: "mode" | "anchor", popup: typeof modePopup) {
   return computed(() => ({
@@ -158,8 +162,8 @@ function selectPreset(id: string) {
 <template>
   <div ref="root" class="picture-shadow-editor">
     <Teleport to="body">
-      <div ref="modeHost" data-picture-shadow-popup="mode" />
-      <div ref="anchorHost" data-picture-shadow-popup="anchor" />
+      <div :ref="setModeHost" data-picture-shadow-popup="mode" />
+      <div :ref="setAnchorHost" data-picture-shadow-popup="anchor" />
     </Teleport>
     <PicturePresetGallery
       v-if="!hidePreset"

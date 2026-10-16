@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PictureTextureId } from "../../picture-texture";
-import { computed, onBeforeUnmount, ref, useId } from "vue";
+import { computed, onBeforeUnmount, ref, useId, type ComponentPublicInstance } from "vue";
 import { useNativePopupOwnership } from "../../../../shared/floating/useNativePopupOwnership";
 import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -46,10 +46,18 @@ const compoundPopup = linePopup();
 const dashPopup = linePopup();
 const capPopup = linePopup();
 const joinPopup = linePopup();
-const compoundHost = compoundPopup.host;
-const dashHost = dashPopup.host;
-const capHost = capPopup.host;
-const joinHost = joinPopup.host;
+function setCompoundHost(element: Element | ComponentPublicInstance | null): void {
+  compoundPopup.host.value = element instanceof HTMLElement ? element : undefined;
+}
+function setDashHost(element: Element | ComponentPublicInstance | null): void {
+  dashPopup.host.value = element instanceof HTMLElement ? element : undefined;
+}
+function setCapHost(element: Element | ComponentPublicInstance | null): void {
+  capPopup.host.value = element instanceof HTMLElement ? element : undefined;
+}
+function setJoinHost(element: Element | ComponentPublicInstance | null): void {
+  joinPopup.host.value = element instanceof HTMLElement ? element : undefined;
+}
 const fieldId = `picture-line-${useId()}`;
 function nativeControl(field: string, popup: ReturnType<typeof linePopup>) {
   return computed(() => ({
@@ -169,10 +177,10 @@ const changeJoin = selectAction("join", () => joins.value);
 <template>
   <div ref="root" class="picture-line-editor">
     <Teleport to="body">
-      <div ref="compoundHost" data-picture-line-popup="compound" />
-      <div ref="dashHost" data-picture-line-popup="dash" />
-      <div ref="capHost" data-picture-line-popup="cap" />
-      <div ref="joinHost" data-picture-line-popup="join" />
+      <div :ref="setCompoundHost" data-picture-line-popup="compound" />
+      <div :ref="setDashHost" data-picture-line-popup="dash" />
+      <div :ref="setCapHost" data-picture-line-popup="cap" />
+      <div :ref="setJoinHost" data-picture-line-popup="join" />
     </Teleport>
     <PicturePaintEditor
       paint-role="line"
