@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { Slider as TSlider } from "tdesign-vue-next/es/slider";
+import { vSliderSemantics } from "../../../../shared/tdesign/slider-semantics";
 import NumericField from "../../../../shared/numeric-field/NumericField.vue";
 import type {
   NumericCandidate,
@@ -206,6 +207,7 @@ onBeforeUnmount(cancelSlide);
     />
     <div v-if="slider" class="picture-paint-number__slider">
       <TSlider
+        v-slider-semantics="{ label, value: sliderValue, min, max, unit }"
         :model-value="sliderValue"
         :min="min"
         :max="max"

@@ -220,6 +220,7 @@ function selectPreset(id: string) {
       />
       <PicturePaintNumber
         v-bind="numberProps('shadowBlurPt', shadow.blurPt, (blurPt) => update({ blurPt }), 0, 4096)"
+        :display-precision="2"
         unit="pt"
       />
       <PicturePaintNumber
@@ -232,6 +233,7 @@ function selectPreset(id: string) {
             4096,
           )
         "
+        :display-precision="2"
         unit="pt"
       />
       <PicturePaintNumber
@@ -244,6 +246,7 @@ function selectPreset(id: string) {
             3600,
           )
         "
+        :display-precision="2"
         unit="°"
       />
       <PictureFormatField :label="t('shadowAnchor')"
@@ -288,6 +291,7 @@ function selectPreset(id: string) {
           v-bind="
             numberProps('shadowSkew', shadow.skewXDeg, (skewXDeg) => update({ skewXDeg }), -80, 80)
           "
+          :display-precision="2"
           unit="°"
         />
         <PicturePaintNumber
