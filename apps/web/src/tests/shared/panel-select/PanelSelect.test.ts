@@ -1,5 +1,8 @@
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { defineComponent, h, nextTick, reactive, ref } from "vue";
+import { provideNativePopupScope } from "../../../shared/floating/useNativePopupOwnership";
+import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import PanelSelect from "../../../shared/panel-select/PanelSelect.vue";
 // happy-dom has no layout. TDesign deliberately closes a popup whose trigger
 // rectangle is 0x0; supply visible trigger geometry for these interaction tests.
@@ -151,5 +154,207 @@ test.each(["trigger", "content"] as const)(
     vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue(new DOMRect(1038, 700, 132, 28));
     expect(popup.overlayStyle(trigger).maxHeight).toBe("684px");
     expect(popup.overlayInnerStyle).toEqual({ padding: "0" });
+  },
+);
+
+// Use the real native SelectInput teleport and the same parent dismissal contract
+// as Ribbon menus. Await between pointerdown and click to expose premature unmount.
+function nestedFixture() {
+  const state = reactive({ owner: "shape-a", active: true, disabled: false, child: true });
+  const applied = vi.fn();
+  const dismissed = vi.fn();
+  let scope!: ReturnType<typeof provideNativePopupScope>;
+  let close!: () => void;
+  const wrapper = mount(
+    defineComponent({
+      setup() {
+        const trigger = ref<HTMLElement | null>(null);
+        const surface = ref<HTMLElement | null>(null);
+        const active = ref(true);
+        scope = provideNativePopupScope({ owner: () => state.owner, active: () => state.active });
+        useDismissibleFloatingPanel(trigger, surface, active, {
+          additionalInside: scope.popupElements,
+          onDismiss(payload) {
+            dismissed(payload.reason);
+            active.value = false;
+            state.active = false;
+          },
+        });
+        return () =>
+          h("div", [
+            h("button", { ref: trigger }, "Ribbon"),
+            state.active
+              ? h(
+                  "div",
+                  { ref: surface },
+                  state.child
+                    ? [
+                        h(
+                          PanelSelect,
+                          {
+                            label: "Text fill",
+                            valueLabel: "Automatic",
+                            disabled: state.disabled,
+                          },
+                          {
+                            panel: (slot: { close: () => void }) => {
+                              close = slot.close;
+                              return h(
+                                "button",
+                                {
+                                  "data-red-choice": "",
+                                  onClick: () => {
+                                    applied("#FF0000");
+                                    slot.close();
+                                  },
+                                },
+                                "Red",
+                              );
+                            },
+                          },
+                        ),
+                      ]
+                    : [],
+                )
+              : null,
+          ]);
+      },
+    }),
+    { attachTo: document.body },
+  );
+  wrappers.push(wrapper);
+  const outside = document.createElement("input");
+  // Even an unrelated native-library popup is outside this owner.
+  outside.className = "t-popup";
+  document.body.append(outside);
+  return { wrapper, state, scope, applied, dismissed, outside, close: () => close() };
+}
+async function openNested(f: ReturnType<typeof nestedFixture>) {
+  const input = f.wrapper.get<HTMLInputElement>('input[role="combobox"]');
+  input.element.focus();
+  await settle();
+  await input.trigger("mousedown");
+  await input.trigger("mouseup");
+  await input.trigger("click");
+  await settle();
+  const choice = document.querySelector<HTMLButtonElement>("[data-red-choice]")!;
+  expect(
+    choice,
+    JSON.stringify({ dismissed: f.dismissed.mock.calls, html: f.wrapper.html() }),
+  ).not.toBeNull();
+  expect(f.scope.containsTarget(choice)).toBe(true);
+  expect(f.dismissed).not.toHaveBeenCalled();
+  return choice;
+}
+test("owned nested popup survives pointerdown and focus until click commits its choice", async () => {
+  const f = nestedFixture();
+  const choice = await openNested(f);
+  choice.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+  choice.focus();
+  await settle();
+  expect(choice.isConnected).toBe(true);
+  expect(f.dismissed).not.toHaveBeenCalled();
+  choice.click();
+  await settle();
+  expect(f.applied).toHaveBeenCalledExactlyOnceWith("#FF0000");
+  expect(f.state.active).toBe(true);
+  expect(f.scope.popupElements()).toEqual([]);
+  expect(document.activeElement).toBe(f.wrapper.get("input").element);
+});
+test.each(["pointer", "focus"])("real outside %s still dismisses the parent", async (kind) => {
+  const f = nestedFixture();
+  await openNested(f);
+  expect(f.scope.containsTarget(f.outside)).toBe(false);
+  if (kind === "pointer")
+    f.outside.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+  else f.outside.focus();
+  await settle();
+  expect(f.dismissed).toHaveBeenCalledWith(
+    kind === "pointer" ? "outside-pointer" : "outside-focus",
+  );
+  expect(f.scope.popupElements()).toEqual([]);
+  expect(f.applied).not.toHaveBeenCalled();
+});
+test("Escape closes only nested popup and returns focus before a second Escape dismisses parent", async () => {
+  const f = nestedFixture();
+  const choice = await openNested(f);
+  choice.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+  );
+  await settle();
+  expect(f.scope.popupElements()).toEqual([]);
+  expect(f.dismissed).not.toHaveBeenCalled();
+  const input = f.wrapper.get("input");
+  expect(document.activeElement).toBe(input.element);
+  await input.trigger("keydown", { key: "Escape" });
+  await settle();
+  expect(f.dismissed).toHaveBeenCalledWith("escape");
+});
+test.each(["owner", "disabled", "inactive", "child unmount"])(
+  "%s retires the nested host and rejects old visibility callbacks",
+  async (boundary) => {
+    const f = nestedFixture();
+    const choice = await openNested(f);
+    const native = f.wrapper.findComponent({ name: "TSelectInput" });
+    const oldVisibleChange = native.vm.$.vnode.props!.onPopupVisibleChange as (
+      value: boolean,
+    ) => boolean;
+    if (boundary === "owner") f.state.owner = "shape-b";
+    else if (boundary === "disabled") f.state.disabled = true;
+    else if (boundary === "inactive") f.state.active = false;
+    else f.state.child = false;
+    await settle();
+    expect(f.scope.containsTarget(choice)).toBe(false);
+    expect(oldVisibleChange(true)).toBe(false);
+    await settle();
+    expect(document.querySelector("[data-red-choice]")).toBeNull();
+    expect(f.applied).not.toHaveBeenCalled();
+  },
+);
+test.each(["owner", "focus", "pointer", "unmount"])(
+  "%s cancels queued nested close focus restoration",
+  async (boundary) => {
+    const f = nestedFixture();
+    await openNested(f);
+    const input = f.wrapper.get("input").element;
+    f.close();
+    if (boundary === "owner") f.state.owner = "shape-b";
+    else if (boundary === "focus") f.outside.focus();
+    else if (boundary === "pointer")
+      f.outside.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    else f.state.child = false;
+    await nextTick();
+    await settle();
+    expect(document.activeElement).not.toBe(input);
+  },
+);
+
+test.each(["owner", "focus", "pointer", "reopen"])(
+  "%s cancels an old queued nested opening focus handoff",
+  async (boundary) => {
+    const f = nestedFixture();
+    const input = f.wrapper.get<HTMLInputElement>("input").element;
+    input.focus();
+    const native = f.wrapper.findComponent({ name: "TSelectInput" });
+    const visibleChange = () =>
+      native.vm.$.vnode.props!.onPopupVisibleChange as (value: boolean) => boolean;
+    visibleChange()(true);
+    // The render flush schedules PanelSelect's own nextTick focus callback.
+    // Resume before that callback to simulate a newer user/owner boundary.
+    await nextTick();
+    if (boundary === "owner") f.state.owner = "shape-b";
+    else if (boundary === "focus") f.outside.focus();
+    else if (boundary === "pointer")
+      input.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    else {
+      visibleChange()(false);
+      // The current render callback is retired by close and cannot reopen.
+      expect(visibleChange()(true)).toBe(false);
+      await nextTick();
+      f.outside.focus();
+      visibleChange()(true);
+    }
+    await settle();
+    expect(document.activeElement?.hasAttribute("data-red-choice")).not.toBe(true);
   },
 );
