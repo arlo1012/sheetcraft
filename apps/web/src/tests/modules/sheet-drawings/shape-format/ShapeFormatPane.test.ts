@@ -722,9 +722,9 @@ describe("actual shape group aggregate controls", () => {
         owner: groupSnapshot().owner,
       }),
     );
-    const unsupported = number(wrapper, "paragraphBeforePt").getComponent(Input);
-    expect(unsupported.props("modelValue")).toBe("");
-    expect(unsupported.props("disabled")).toBe(true);
+    const unsupported = number(wrapper, "paragraphBeforePt").get<HTMLInputElement>("input");
+    expect(unsupported.element.value).toBe("");
+    expect(unsupported.element.disabled).toBe(true);
   });
   test("mixed effect reset is explicit and capability gated instead of displaying invented inheritance", async () => {
     const { wrapper, onIntent } = fixture({

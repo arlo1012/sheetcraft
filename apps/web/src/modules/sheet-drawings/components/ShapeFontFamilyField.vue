@@ -162,7 +162,9 @@ function flush(): boolean {
   return true;
 }
 function escape(event: KeyboardEvent) {
-  if (!field.value?.ownsDraftTarget(event.target)) return;
+  const ownInput = field.value?.ownsDraftTarget(event.target);
+  const ownEscapeTrigger = event.key === "Escape" && field.value?.ownsTriggerTarget(event.target);
+  if (!ownInput && !ownEscapeTrigger) return;
   if (event.isComposing || event.keyCode === 229) return;
   if (event.key === "Enter" && (dirty.value || pending.value || error.value)) {
     event.preventDefault();

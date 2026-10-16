@@ -236,6 +236,13 @@ describe("existing font combo optional controlled draft", () => {
     const field = f.wrapper.getComponent(FontFormatField);
     expect(field.vm.containsTarget(row("14"))).toBe(true);
     expect(field.vm.ownsDraftTarget(row("14"))).toBe(false);
+    const arrow = f.wrapper.get(".font-format-field__arrow").element;
+    expect(field.vm.ownsTriggerTarget(arrow)).toBe(true);
+    expect(field.vm.ownsDraftTarget(arrow)).toBe(false);
+    expect(field.vm.ownsTriggerTarget(f.input.element)).toBe(false);
+    expect(field.vm.ownsTriggerTarget(row("14"))).toBe(false);
+    expect(field.vm.ownsTriggerTarget(field.element)).toBe(false);
+    expect(field.vm.ownsTriggerTarget(null)).toBe(false);
     const other = document.createElement("button");
     document.body.append(other);
     expect(field.vm.containsTarget(other)).toBe(false);
@@ -281,6 +288,7 @@ describe("existing font combo optional controlled draft", () => {
     const search = document.body.querySelector<HTMLInputElement>('input[type="search"]')!;
     expect(search).not.toBeNull();
     expect(w.vm.ownsDraftTarget(search)).toBe(false);
+    expect(w.vm.ownsTriggerTarget(search)).toBe(false);
     expect(w.vm.containsTarget(search)).toBe(true);
     search.value = "Arial";
     search.dispatchEvent(new Event("input", { bubbles: true }));

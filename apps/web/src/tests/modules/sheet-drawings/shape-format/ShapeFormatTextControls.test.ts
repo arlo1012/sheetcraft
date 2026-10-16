@@ -368,7 +368,8 @@ describe("shape font exact-resource preparation", () => {
       if (boundary === "handler") f.input.onIntent = vi.fn(() => true);
       if (boundary === "cancel") f.controller.cancel();
       if (boundary === "newer-font") font(f.wrapper).vm.$emit("change", "Arial");
-      if (boundary === "escape") await font(f.wrapper).trigger("keydown", { key: "Escape" });
+      if (boundary === "escape")
+        await font(f.wrapper).get("input").trigger("keydown", { key: "Escape", code: "Escape" });
       await nextTick();
       complete();
       await flushPromises();
@@ -383,7 +384,7 @@ describe("shape font exact-resource preparation", () => {
       if (boundary === "revision") {
         expect(font(f.wrapper).props("modelValue")).toBe("Noto Sans");
         expect(f.wrapper.text()).toContain("The selection or drawing changed.");
-        await font(f.wrapper).trigger("keydown", { key: "Escape" });
+        await font(f.wrapper).get("input").trigger("keydown", { key: "Escape", code: "Escape" });
         expect(font(f.wrapper).props("modelValue")).toBe("Arial");
       }
       if (boundary === "escape") expect(font(f.wrapper).props("modelValue")).toBe("");

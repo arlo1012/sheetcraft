@@ -265,6 +265,8 @@ const inputProps = reactive({
 defineExpose({
   // Exact native main-input identity. Popup search/menu descendants are separate controls.
   ownsDraftTarget,
+  // Exact focus-return trigger; consumers may own Escape without widening text input ownership.
+  ownsTriggerTarget: (target: EventTarget | null) => target !== null && target === triggerRef.value,
   containsTarget,
   readDraft: () => inputText.value,
   hasDraft: () => inputText.value !== displayValue.value || !!props.draft?.composing,
