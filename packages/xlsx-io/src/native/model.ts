@@ -1,3 +1,4 @@
+import type { NativePictureStyle } from "../picture-native-style.js";
 import type { NativePictureGeometry } from "../picture-frame-geometry.js";
 /** Product-owned, sparse OOXML exchange model. No third-party workbook engine. */
 export type NativeStyle = Record<string, unknown>;
@@ -25,6 +26,7 @@ export type NativeImageAnchor = {
     | { kind: "twoCell"; end: NativeImageAnchor["tl"] }
     | { kind: "absolute"; x: number; y: number };
   geometry?: NativePictureGeometry;
+  style?: NativePictureStyle;
   transformOrigin?: { x: number; y: number };
   lockAspectRatio?: boolean;
   altText?: string;

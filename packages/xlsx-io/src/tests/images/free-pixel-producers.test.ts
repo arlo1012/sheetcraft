@@ -302,10 +302,7 @@ const point = ([column, columnOffset, row, rowOffset]: Marker) => ({
   column: { index: column, offset: columnOffset / EMU },
   row: { index: row, offset: rowOffset / EMU },
 });
-function expectedAnchor(
-  record: ProducerRecord,
-  sheet: Parameters<typeof createPictureSheetMetrics>[0],
-): PictureFrameAnchor {
+function expectedAnchor(record: ProducerRecord): PictureFrameAnchor {
   if (record.mode === "fixed") {
     const [x, y, width, height] = record.physical;
     return {
@@ -321,23 +318,11 @@ function expectedAnchor(
     if (!record.end) throw Error("Missing producer to marker.");
     return { mode: "move-and-size", offsetMode: "free-pixels", start, end: point(record.end) };
   }
-  const metrics = createPictureSheetMetrics(sheet);
-  let size;
-  if (record.size) size = { width: record.size[0] / EMU, height: record.size[1] / EMU };
-  else {
-    if (!record.end) throw Error("Missing producer selected size.");
-    const end = point(record.end);
-    size = {
-      width:
-        metrics.columns.visiblePrefix(end.column.index) +
-        end.column.offset -
-        (metrics.columns.visiblePrefix(start.column.index) + start.column.offset),
-      height:
-        metrics.rows.visiblePrefix(end.row.index) +
-        end.row.offset -
-        (metrics.rows.visiblePrefix(start.row.index) + start.row.offset),
-    };
-  }
+  // Actual oneCellAnchor retains its anchor extent. The audited WPS twoCell /
+  // editAs=oneCell producers use the physical xfrm extent under our move-only
+  // compatibility policy; marker projection was 134px / 108px on Core's grid.
+  const extent = record.size ?? [record.physical[2], record.physical[3]];
+  const size = { width: extent[0] / EMU, height: extent[1] / EMU };
   return { mode: "move-only", offsetMode: "free-pixels", origin: start, size };
 }
 function expectSource(frame: PictureFrame, record: ProducerRecord) {
@@ -382,6 +367,10 @@ describe("byte-pinned actual WPS free-pixel producers", () => {
       expect(source.kind).toBe(record.kind);
       if (record.start) expect(rawMarker(source.anchor, "from")).toEqual(record.start);
       if (record.end) expect(rawMarker(source.anchor, "to")).toEqual(record.end);
+      const extent = child(child(child(source.pic, "spPr"), "xfrm"), "ext");
+      expect([Number(attr(extent, "cx")), Number(attr(extent, "cy"))]).toEqual(
+        record.physical.slice(2),
+      );
     }
     const decoded = await decodeXlsx(bytes);
     const sheet = getActiveSheet(decoded.workbook);
@@ -408,7 +397,7 @@ describe("byte-pinned actual WPS free-pixel producers", () => {
     for (const [index, record] of producer.records.entries()) {
       const image = sheet.floatingImages[index]!;
       if (!isFramedPictureObject(image)) throw Error("Expected editable native picture.");
-      expect(image.frame.anchor).toEqual(expectedAnchor(record, sheet));
+      expect(image.frame.anchor).toEqual(expectedAnchor(record));
       expectSource(image.frame, record);
       if (sparse20) {
         const rect = resolvePictureAnchorRect(image.frame.anchor, createPictureSheetMetrics(sheet));

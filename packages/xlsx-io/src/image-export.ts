@@ -310,6 +310,9 @@ export function createXlsxImageExporter(
         ...anchor,
         ...(transformed ? { geometry } : {}),
         transformOrigin,
+        ...(isFramedPictureObject(image) && image.transform?.appearance?.detailedStyle
+          ? { style: image.transform.appearance.detailedStyle }
+          : {}),
         altText: image.altText,
         ...(image.lockAspectRatio === undefined ? {} : { lockAspectRatio: image.lockAspectRatio }),
         issueLocation: `${issueLocation}.floatingImages[${JSON.stringify(image.id)}].altText`,

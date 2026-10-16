@@ -1,3 +1,5 @@
+import { readNativePictureStyle, type NativePictureStyle } from "./picture-native-style.js";
+import type { NativeTextBoxTheme } from "./textbox-theme.js";
 import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import { normalizePictureObject, type FramedFloatingImage } from "@sheetcraft/core/picture-object";
 import { resolvePictureAnchorRect, type PictureFrameAnchor } from "@sheetcraft/core/picture-frame";
@@ -5,6 +7,7 @@ import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type Workbook } from "@sheetcraft/co
 import { EMU_PER_PIXEL } from "./drawing-geometry.js";
 import {
   decodeNativePictureGeometry,
+  isIdentityNativePictureGeometry,
   parseNativeCropPercentage,
   parseNativeRotation,
   type NativePictureGeometry,
@@ -30,6 +33,8 @@ export type NativePicture = {
   editAs?: "oneCell" | "absolute";
   transform?: { x: number; y: number; width: number; height: number };
   location: string;
+  style?: NativePictureStyle;
+  styleWarnings?: string[];
 };
 export type NativePictureBackground = { sheetIndex: number; assetId: string };
 
@@ -66,7 +71,7 @@ function only(
   location: string,
 ): void {
   for (const [key, value] of Object.entries(node)) {
-    if (key.startsWith("@_xmlns")) continue;
+    if (key === "@_xmlns" || key.startsWith("@_xmlns:")) continue;
     if (key === "#text") {
       if (String(value).trim()) rejectNativePicture(location);
     } else if (key.startsWith("@_")) {
@@ -133,6 +138,7 @@ export function inspectNativePicture(
   kind: PictureAnchorKind,
   node: XmlNode,
   location: string,
+  theme?: NativeTextBoxTheme,
 ): Omit<NativePicture, "assetId" | "sheetIndex"> & { relationshipId: string } {
   only(
     node,
@@ -200,7 +206,8 @@ export function inspectNativePicture(
     flipVertical: false,
   };
   const shape = element(pic, "spPr", location)!;
-  only(shape, ["xfrm", "prstGeom"], [], location);
+  only(shape, ["xfrm", "prstGeom", "ln", "effectLst"], [], location);
+  const styling = readNativePictureStyle(shape, `${location}.spPr`, theme);
   const geometry = element(shape, "prstGeom", location)!;
   only(geometry, ["avLst"], ["prst"], location);
   if (attr(geometry, "prst") !== "rect") rejectNativePicture(`${location}.geometry`);
@@ -219,6 +226,8 @@ export function inspectNativePicture(
   }
   try {
     decodeNativePictureGeometry(nativeGeometry);
+    if (styling.style && !isIdentityNativePictureGeometry(nativeGeometry))
+      rejectNativePicture(`${location}.styledGeometry`);
   } catch {
     rejectNativePicture(`${location}.srcRect`);
   }
@@ -241,6 +250,8 @@ export function inspectNativePicture(
             end: marker(element(node, "to", location)!, location),
           };
   return {
+    ...(styling.style ? { style: styling.style } : {}),
+    ...(styling.warnings.length ? { styleWarnings: styling.warnings } : {}),
     objectId,
     name: attr(properties, "name"),
     altText: attr(properties, "descr"),
@@ -299,9 +310,12 @@ export function readXlsxPictures(
       const markerRect = resolvePictureAnchorRect(anchor, metrics);
       const transform = source.transform;
       // Product import policy, not a universal OOXML precedence claim:
-      // relative anchors use the parsed worksheet grid, whereas WPS's fixed
-      // twoCell/editAs=absolute representation retains its complete physical
-      // xfrm. A genuine absoluteAnchor already provides physical pos/ext.
+      // ordinary relative anchors use the parsed worksheet grid. For WPS's
+      // twoCell/editAs=oneCell, preserve from binding but use a complete xfrm's
+      // physical extent: changing column widths must not resize this object.
+      // editAs=absolute retains the complete physical xfrm; a genuine
+      // absoluteAnchor already provides physical pos/ext. Redundant conflicts
+      // remain diagnosed below, not represented as lossless grid conversion.
       if (source.editAs && anchor.mode === "move-and-size")
         anchor =
           source.editAs === "absolute"
@@ -318,7 +332,10 @@ export function readXlsxPictures(
                 mode: "move-only",
                 offsetMode: "free-pixels",
                 origin: anchor.start,
-                size: { width: markerRect.width, height: markerRect.height },
+                size: {
+                  width: transform ? transform.width : markerRect.width,
+                  height: transform ? transform.height : markerRect.height,
+                },
               };
       const rect = resolvePictureAnchorRect(anchor, metrics);
       // Initial native geometry must be positive. Persisted V86 frames may
@@ -328,11 +345,11 @@ export function readXlsxPictures(
         id: `xlsx-picture-${source.sheetIndex + 1}-${source.objectId}`,
         assetId: source.assetId,
         altText: source.altText,
-        // Native pictures admitted here have no style references or effects.
-        // Preserve that explicit absence instead of inheriting Core's theme.
+        // Native local styles replace inherited Core theme effects.
         transform: {
           appearance: {
             suppressThemeEffects: { shadow: true, outline: true, reflection: true, bevel: true },
+            ...(source.style ? { detailedStyle: source.style } : {}),
           },
         },
         ...(!source.lockAspectRatio ? { lockAspectRatio: false } : {}),
@@ -343,6 +360,8 @@ export function readXlsxPictures(
         },
       };
       sheet.floatingImages.push(normalizePictureObject(picture));
+      for (const location of source.styleWarnings ?? [])
+        report.add("style-omitted", "warning", location);
       const differs = (other: typeof rect) =>
         (["x", "y", "width", "height"] as const).some((key) => {
           const roundoff = Number.EPSILON * Math.max(1, Math.abs(other[key]), Math.abs(rect[key]));

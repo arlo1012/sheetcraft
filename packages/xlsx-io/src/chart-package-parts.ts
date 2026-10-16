@@ -4,6 +4,8 @@ import {
   MAX_XLSX_TEXT_BOXES,
   type NativeTextBox,
 } from "./textbox-reader.js";
+import { pictureUsesTheme } from "./picture-native-style.js";
+import { nativePictureElementNamespace } from "./picture-namespaces.js";
 import { nativeTextBoxElementNamespace } from "./textbox-namespaces.js";
 import { isIdentityNativePictureGeometry } from "./picture-frame-geometry.js";
 import { assertNativePictureSourceOrientation } from "./picture-source-orientation.js";
@@ -372,6 +374,18 @@ function inspectStrictRoot(
         if (localName !== "t" && text !== undefined && String(text).trim()) reject();
       }
 
+      const pictureNode =
+        namespace === DRAWING_NS &&
+        ancestors[0] === "wsDr" &&
+        ["oneCellAnchor", "twoCellAnchor", "absoluteAnchor"].includes(ancestors[1] ?? "") &&
+        (ancestors[2] === "pic" || (ancestors.length === 2 && localName === "pic"));
+      if (pictureNode) {
+        if (nativePictureElementNamespace([...ancestors.slice(2), localName!].join("/")) !== ns)
+          reject();
+        const text = typeof entry === "string" ? entry : node["#text"];
+        if (text !== undefined && String(text).trim()) reject();
+      }
+
       const ordinary =
         namespace === CHART_NS && child(local, "chartSpace").pivotSource === undefined;
       const empty =
@@ -450,20 +464,24 @@ function inspectStrictRoot(
           !inertLabelLeaf) ||
         (namespace === DRAWING_NS &&
           !textBoxNode &&
+          !pictureNode &&
           drawingElements.has(localName!) &&
           ns !== DRAWING_NS &&
           !(localName === "xfrm" && parent === "spPr" && ns === ART_NS)) ||
         (namespace === DRAWING_NS &&
           !textBoxNode &&
+          !pictureNode &&
           ns === DRAWING_NS &&
           !drawingElements.has(localName!) &&
           localName !== "ext") ||
         (namespace === DRAWING_NS &&
           !textBoxNode &&
+          !pictureNode &&
           ["graphic", "graphicData", "off"].includes(localName!) &&
           ns !== ART_NS) ||
         (namespace === DRAWING_NS &&
           !textBoxNode &&
+          !pictureNode &&
           localName === "ext" &&
           ns !==
             (["oneCellAnchor", "absoluteAnchor"].includes(parent)
@@ -473,10 +491,12 @@ function inspectStrictRoot(
                 : "")) ||
         (namespace === DRAWING_NS &&
           !textBoxNode &&
+          !pictureNode &&
           ns === ART_NS &&
           !["graphic", "graphicData", ...pictureArtElements].includes(localName!)) ||
         (namespace === DRAWING_NS &&
           !textBoxNode &&
+          !pictureNode &&
           pictureArtElements.has(localName!) &&
           !["xfrm", "off", "ext"].includes(localName!) &&
           ns !== ART_NS) ||
@@ -520,6 +540,11 @@ function inspectStrictRoot(
         if (textBoxNode && localName === "t" && !rawName.includes(":")) reject();
         if (!rawName.includes(":")) continue;
         const attributeNs = bindings.get(rawName.split(":")[0]!);
+        if (
+          pictureNode &&
+          !(localName === "blip" && rawName.split(":")[1] === "embed" && attributeNs === REL_NS)
+        )
+          reject();
         if (
           textBoxNode &&
           !(
@@ -832,6 +857,7 @@ export async function collectNativeChartParts(
           anchorKind,
           anchor,
           `${drawingPart}.pictures[${pictures.length + 1}]`,
+          pictureUsesTheme(anchor) ? await getTextBoxTheme() : undefined,
         );
         if (objectIds.has(String(picture.objectId))) rejectNativePicture(drawingPart);
         objectIds.add(String(picture.objectId));

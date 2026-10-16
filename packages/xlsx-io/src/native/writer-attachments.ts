@@ -1,3 +1,4 @@
+import { writeNativePictureStyle } from "../picture-native-style.js";
 import { strToU8 } from "fflate/browser";
 import { MAIN_NS, REL_NS, addRelationship, xml } from "../pivot-xml.js";
 import type { NativeCell, NativeImage, NativeImageAnchor, NativeSheetData } from "./model.js";
@@ -66,7 +67,7 @@ function drawingXml(sheet: NativeSheetData, relationshipIds: string[]): string {
                 ? marker("to", placement.end)
                 : `<xdr:ext cx="${width}" cy="${height}"/>`
             }`;
-      return `<xdr:${tag}>${position}<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${index + 1}" name="Picture ${index + 1}" descr="${description}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="${range.lockAspectRatio === false ? 0 : 1}"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="${relationshipIds[index]}"/>${crop}<a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm${transform}><a:off x="${origin.x}" y="${origin.y}"/><a:ext cx="${width}" cy="${height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:${tag}>`;
+      return `<xdr:${tag}>${position}<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${index + 1}" name="Picture ${index + 1}" descr="${description}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="${range.lockAspectRatio === false ? 0 : 1}"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="${relationshipIds[index]}"/>${crop}<a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm${transform}><a:off x="${origin.x}" y="${origin.y}"/><a:ext cx="${width}" cy="${height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${writeNativePictureStyle(range.style)}</xdr:spPr></xdr:pic><xdr:clientData/></xdr:${tag}>`;
     })
     .join("");
   return `${HEADER}<xdr:wsDr xmlns:xdr="${DRAWING_NS}" xmlns:a="${ART_NS}" xmlns:r="${REL_NS}">${anchors}</xdr:wsDr>`;

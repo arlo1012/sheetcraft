@@ -315,12 +315,12 @@ describe("transformed native picture reader", () => {
               mode: "move-only",
               offsetMode: "free-pixels",
               origin: { column: { index: 1, offset: 10 }, row: { index: 3, offset: 6 } },
-              size: { width: 120, height: 80 },
+              size: { width: 121, height: 80 },
             },
       );
       expect(
         resolvePictureAnchorRect(picture.frame.anchor, createPictureSheetMetrics(sheet)),
-      ).toEqual({ ...rect, width: editAs === "absolute" ? 121 : 120 });
+      ).toEqual({ ...rect, width: 121 });
       expect(picture.frame.source.widthRatio).toBeCloseTo(10 / 9, 12);
       expect(report.issues).toContainEqual(
         expect.objectContaining({
@@ -380,9 +380,61 @@ describe("transformed native picture reader", () => {
       }),
     );
     expectBlock(() => read("twoCellAnchor", source.replace(' editAs="absolute"', "")));
-    expectBlock(() =>
-      read("twoCellAnchor", source.replace('editAs="absolute"', 'editAs="oneCell"')),
+    const moving = read("twoCellAnchor", source.replace('editAs="absolute"', 'editAs="oneCell"'));
+    expect(moving.picture.frame.anchor).toEqual({
+      mode: "move-only",
+      offsetMode: "free-pixels",
+      origin: { column: { index: 1, offset: 200 }, row: { index: 3, offset: 6 } },
+      size: { width: 120, height: 80 },
+    });
+    expect(moving.report.issues).toContainEqual(
+      expect.objectContaining({ code: "picture-geometry-approximated" }),
     );
+    expectBlock(() =>
+      read(
+        "twoCellAnchor",
+        source
+          .replace('editAs="absolute"', 'editAs="oneCell"')
+          .replace(/<a:xfrm[^>]*>.*?<\/a:xfrm>/, ""),
+      ),
+    );
+  });
+
+  test("oneCell editAs keeps from binding, ignores redundant off, and falls back only when xfrm is absent", () => {
+    const chosen = read(
+      "twoCellAnchor",
+      xml("twoCellAnchor", {
+        editAs: "oneCell",
+        transform: { x: 999, y: 999, width: 121, height: 81 },
+      }),
+    );
+    expect(chosen.picture.frame.anchor).toEqual({
+      mode: "move-only",
+      offsetMode: "free-pixels",
+      origin: { column: { index: 1, offset: 10 }, row: { index: 3, offset: 6 } },
+      size: { width: 121, height: 81 },
+    });
+    const fallback = read(
+      "twoCellAnchor",
+      xml("twoCellAnchor", { editAs: "oneCell", transform: false }),
+    );
+    expect(fallback.picture.frame.anchor).toMatchObject({
+      mode: "move-only",
+      size: { width: 120, height: 80 },
+    });
+    for (const invalid of [
+      xml("twoCellAnchor", { editAs: "oneCell" }).replace('<a:ext cx="1143000"', '<a:ext cx="0"'),
+      xml("twoCellAnchor", { editAs: "oneCell" }).replace('<a:ext cx="1143000"', '<a:ext cx="-1"'),
+      xml("twoCellAnchor", { editAs: "oneCell" }).replace(
+        "<xdr:col>1</xdr:col>",
+        "<xdr:col>-1</xdr:col>",
+      ),
+      xml("twoCellAnchor", { editAs: "oneCell" }).replace(
+        marker("to", 2, 30, 6, 14),
+        marker("to", 0, 0, 0, 0),
+      ),
+    ])
+      expectBlock(() => read("twoCellAnchor", invalid));
   });
 
   test("absolute editAs without xfrm freezes parsed markers with a warning", () => {

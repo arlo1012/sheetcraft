@@ -1,7 +1,6 @@
 import { readXlsxTextBoxes } from "./textbox-reader.js";
 import { assertSupportedNativeTextBox } from "./textbox-capabilities.js";
 import { unsupportedNativeChartStyles } from "./native-chart-style-capabilities.js";
-import { isNativePictureThemeSuppression } from "./picture-capabilities.js";
 import { reportUnsupportedNativeChartElements } from "./native-chart-elements.js";
 import { hasShapeObjectFrame, type SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
@@ -1534,11 +1533,15 @@ export async function encodeWithNativeXlsx(
       // an explicit own shadow replaces the inherited shadow on legacy images.
       if (
         effects &&
-        !isNativePictureThemeSuppression(image.transform) &&
-        ((effects.shadow !== "none" && !appearance?.shadow && (appearance?.opacity ?? 1) > 0) ||
-          (effects.reflection && (appearance?.opacity ?? 1) > 0) ||
-          effects.bevel ||
-          effects.outlineWidth > 0)
+        ((effects.shadow !== "none" &&
+          !appearance?.suppressThemeEffects?.shadow &&
+          !appearance?.shadow &&
+          (appearance?.opacity ?? 1) > 0) ||
+          (effects.reflection &&
+            !appearance?.suppressThemeEffects?.reflection &&
+            (appearance?.opacity ?? 1) > 0) ||
+          (effects.bevel && !appearance?.suppressThemeEffects?.bevel) ||
+          (effects.outlineWidth > 0 && !appearance?.suppressThemeEffects?.outline))
       )
         add(
           report,

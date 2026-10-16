@@ -1,0 +1,112 @@
+{
+  "producer": "WPS Sheets 12.1.2.29182",
+  "capturedOn": "2026-10-16",
+  "scope": "Fresh synthetic transparent PNG picture. No user workbook content.",
+  "fixtures": [
+    {
+      "file": "wps-picture-solid-border.xml",
+      "kind": "drawing XML extracted without edits from a real WPS XLSX; not a complete original package",
+      "sha256": "176fd12a55b26dfb46ad9a6883f113551bdb08be97bb47a1fd48ca093443b786",
+      "originalFilename": "border.xlsx",
+      "originalXlsxSha256": "df7517b5238bf987f11142c844eabda5dca488b329df923f87688bb8f55d09d9",
+      "observedControls": {
+        "line": "solid",
+        "color": "red",
+        "widthPt": 1.5,
+        "transparencyPercent": 25
+      },
+      "regressionUsage": "Inserted into a controlled synthetic package with a synthetic raster asset. Full original WPS package is separately tested locally through decode, Core snapshot, native encode, and decode; it is not bundled here because its producer-private metadata is unrelated to drawing compatibility."
+    },
+    {
+      "file": "wps-picture-outer-shadow.xml",
+      "kind": "drawing XML extracted without edits from a real WPS XLSX; not a complete original package",
+      "sha256": "831d89e3246022f914e11e77152e2ebf244786f1c82c5c857e976ce057c3dc86",
+      "originalFilename": "shadow.xlsx",
+      "originalXlsxSha256": "2f6f4f881e0c3f5672d9cbff091e23a197096fef217db4e2f62375a208de0937",
+      "observedControls": {
+        "line": "none (dormant 1.5pt XML width)",
+        "shadow": "outer bottom-right",
+        "color": "black",
+        "transparencyPercent": 60,
+        "sizePercent": 100,
+        "blurPt": 4,
+        "distancePt": 3,
+        "angleDeg": 45
+      },
+      "regressionUsage": "Inserted into a controlled synthetic package with a synthetic raster asset. Full original WPS package is separately tested locally through decode, Core snapshot, native encode, and decode; it is not bundled here because its producer-private metadata is unrelated to drawing compatibility."
+    },
+    {
+      "file": "wps-picture-line-shadow.xml",
+      "kind": "drawing XML extracted without edits from a real WPS XLSX; not a complete original package",
+      "sha256": "3a08012643daeedc84636ec629aa8c7e00e82a88513942b6866de64d8d4e186c",
+      "originalFilename": "combined.xlsx",
+      "originalXlsxSha256": "668d2bb135d6189214f66ddad24ea115d53938bcb4d1d30794cec9969a122dbc",
+      "observedControls": {
+        "line": "solid",
+        "lineColor": "red",
+        "lineWidthPt": 1.5,
+        "lineTransparencyPercent": 25,
+        "shadow": "outer bottom-right",
+        "shadowColor": "black",
+        "shadowTransparencyPercent": 60,
+        "sizePercent": 100,
+        "blurPt": 4,
+        "distancePt": 3,
+        "angleDeg": 45
+      },
+      "regressionUsage": "Inserted into a controlled synthetic package with a synthetic raster asset. Full original WPS package is separately tested locally through decode, Core snapshot, native encode, and decode; it is not bundled here because its producer-private metadata is unrelated to drawing compatibility."
+    },
+    {
+      "file": "wps-picture-column-resize.xml",
+      "kind": "drawing XML extracted without edits from real WPS column-resize XLSX; worksheet width fields recorded separately below",
+      "sha256": "3b2df3d1c5d0be23e922cf11087efe87e83beb6ba6850ba84844892e8f10ee46",
+      "originalFilename": "border-column-resize.xlsx",
+      "originalXlsxSha256": "e698845b52c3c76a9a5a17b0eb8e722e95be165a54f2a5a799dd075d390b5e1c",
+      "sheetFormatPr": {
+        "defaultColWidth": "8.8",
+        "defaultRowHeight": "15"
+      },
+      "cols": [
+        {
+          "min": "1",
+          "max": "1",
+          "width": "12.7",
+          "customWidth": "1"
+        }
+      ],
+      "observedControls": {
+        "columnAPixelsBefore": 88,
+        "columnAPixelsAfter": 127,
+        "pictureWidthPixelsBefore": 200,
+        "pictureWidthPixelsAfter": 200,
+        "pictureHeightPixels": 160
+      },
+      "regressionUsage": "Read the captured drawing against Core worksheet metrics derived from the captured width fields. WPS changed markers but preserved xfrm.ext physical size. Original full workbook separately tested locally through decode/snapshot/encode/decode."
+    },
+    {
+      "file": "wps-picture-physical-resize.xml",
+      "kind": "drawing XML extracted without edits from real WPS picture-resize XLSX; worksheet width fields recorded separately below",
+      "sha256": "07df298ee64a23b0d6cc8918558e4e5662b1b8ea312d23b6d2ba33fb1c967e27",
+      "originalFilename": "border-picture-resize.xlsx",
+      "originalXlsxSha256": "74fa1e0099a978c8d0686604fdd8e58f71dd8c71174261c24ad9f488628fdc33",
+      "sheetFormatPr": {
+        "defaultColWidth": "8.8",
+        "defaultRowHeight": "15"
+      },
+      "cols": [
+        {
+          "min": "1",
+          "max": "1",
+          "width": "12.7",
+          "customWidth": "1"
+        }
+      ],
+      "observedControls": {
+        "columnAPixels": 127,
+        "pictureWidthPixels": 240,
+        "pictureHeightPixels": 192
+      },
+      "regressionUsage": "Read the captured drawing against Core worksheet metrics derived from the captured width fields. Explicit WPS picture resizing produced a 240x192 xfrm.ext while the Core marker projection is 176x192; this proves the policy follows physical extent rather than a fixed size or source-pixel dimensions. Original full workbook separately tested locally through decode/snapshot/encode/decode."
+    }
+  ]
+}

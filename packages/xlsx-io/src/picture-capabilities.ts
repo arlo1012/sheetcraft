@@ -1,3 +1,4 @@
+import { writeNativePictureStyle } from "./picture-native-style.js";
 import { resolvePictureFrame } from "@sheetcraft/core/picture-frame";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import {
@@ -7,10 +8,11 @@ import {
 } from "@sheetcraft/core/picture-object";
 import {
   encodeNativePictureGeometry,
+  isIdentityNativePictureGeometry,
   assertNativePictureGeometryPrecision,
 } from "./picture-frame-geometry.js";
 
-/** The sole appearance transform supported by the basic native-picture slice. */
+/** Exact no-local-style suppression used by the basic native-picture slice. */
 export function isNativePictureThemeSuppression(value: unknown): boolean {
   const record = (input: unknown, keys: readonly string[]): input is Record<string, unknown> => {
     if (!input || typeof input !== "object" || Array.isArray(input)) return false;
@@ -50,12 +52,7 @@ export function isSupportedNativePictureFrame(
     });
   };
   try {
-    if (
-      !data(image) ||
-      !isFramedPictureObject(image) ||
-      (image.transform !== undefined && !isNativePictureThemeSuppression(image.transform))
-    )
-      return false;
+    if (!data(image) || !isFramedPictureObject(image)) return false;
     const normalized = normalizePictureObject(image);
     if (
       !isFramedPictureObject(normalized) ||
@@ -64,7 +61,33 @@ export function isSupportedNativePictureFrame(
       normalized.frame.cropShape !== undefined
     )
       return false;
-    encodeNativePictureGeometry(normalized.frame);
+    const geometry = encodeNativePictureGeometry(normalized.frame);
+    if (image.transform !== undefined && !isNativePictureThemeSuppression(image.transform)) {
+      const transform = image.transform;
+      if (Object.keys(transform).some((key) => key !== "appearance") || !transform.appearance)
+        return false;
+      const appearance = transform.appearance;
+      if (
+        Object.keys(appearance).some(
+          (key) => !["suppressThemeEffects", "detailedStyle"].includes(key),
+        ) ||
+        !isNativePictureThemeSuppression({
+          appearance: { suppressThemeEffects: appearance.suppressThemeEffects },
+        }) ||
+        !appearance.detailedStyle ||
+        !Object.keys(appearance.detailedStyle).length ||
+        !isIdentityNativePictureGeometry(geometry) ||
+        normalized.frame.angleDeg !== 0 ||
+        normalized.frame.flipHorizontal === true ||
+        normalized.frame.flipVertical === true ||
+        normalized.frame.source.widthRatio !== 1 ||
+        normalized.frame.source.heightRatio !== 1 ||
+        normalized.frame.source.offsetXRatio !== 0 ||
+        normalized.frame.source.offsetYRatio !== 0
+      )
+        return false;
+      writeNativePictureStyle(appearance.detailedStyle);
+    }
     if (metrics) {
       const resolved = resolvePictureFrame(normalized.frame, metrics);
       if (resolved.collapsed) return false;
