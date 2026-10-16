@@ -82,6 +82,7 @@ export const PICTURE_PAINT_LABEL_KEYS = [
   "lineMiterLimit",
   "effectMode",
   "effectInherit",
+  "effectDefaultNone",
   "effectNone",
   "effectCustom",
   "shadowOuter",

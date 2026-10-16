@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, useId } from "vue";
+import { computed, onBeforeUnmount, ref, useId, type ComponentPublicInstance } from "vue";
 import { useNativePopupOwnership } from "../../../../shared/floating/useNativePopupOwnership";
 import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -42,7 +42,9 @@ const modePopup = useNativePopupOwnership({
   disabled: () => !!props.disabled,
   root: () => root.value,
 });
-const modeHost = modePopup.host;
+function setModeHost(element: Element | ComponentPublicInstance | null): void {
+  modePopup.host.value = element instanceof HTMLElement ? element : undefined;
+}
 const modeInputId = `picture-rotation3d-mode-${useId()}`;
 const modeNative = computed(() => ({
   attributes: {
@@ -58,7 +60,7 @@ onBeforeUnmount(() => {
   active = false;
 });
 const modes = computed(() => [
-  { value: "inherit", label: props.t("effectInherit") },
+  { value: "inherit", label: props.t("effectDefaultNone") },
   { value: "none", label: props.t("effectNone") },
   { value: "parallel", label: props.t("projectionParallel"), disabled: props.valueDisabled },
   { value: "perspective", label: props.t("projectionPerspective"), disabled: props.valueDisabled },
@@ -125,7 +127,7 @@ function selectPreset(id: string) {
 <template>
   <div ref="root" class="picture-rotation3d-editor">
     <Teleport to="body"
-      ><div ref="modeHost" data-picture-effect-mode-popup="rotation3d"
+      ><div :ref="setModeHost" data-picture-effect-mode-popup="rotation3d"
     /></Teleport>
     <PicturePresetGallery
       v-if="!hidePreset"
@@ -136,7 +138,7 @@ function selectPreset(id: string) {
       :t="t"
       :on-select="selectPreset"
       :columns="4"
-      :empty-label="mode === 'inherit' ? t('effectInherit') : t('effectCustom')"
+      :empty-label="mode === 'inherit' ? t('effectDefaultNone') : t('effectCustom')"
     />
     <PictureFormatField :label="t('projectionMode')"
       ><TSelect

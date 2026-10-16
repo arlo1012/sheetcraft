@@ -85,6 +85,7 @@ export const picturePaintZhCN = {
   lineMiterLimit: "尖角限制",
   effectMode: "效果",
   effectInherit: "使用主题",
+  effectDefaultNone: "默认（无效果）",
   effectNone: "无",
   effectCustom: "自定义",
   shadowOuter: "外部",

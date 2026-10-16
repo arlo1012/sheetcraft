@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, useId } from "vue";
+import { computed, onBeforeUnmount, ref, useId, type ComponentPublicInstance } from "vue";
 import { useNativePopupOwnership } from "../../../../shared/floating/useNativePopupOwnership";
 import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -31,7 +31,9 @@ const modePopup = useNativePopupOwnership({
   disabled: () => !!props.disabled,
   root: () => root.value,
 });
-const modeHost = modePopup.host;
+function setModeHost(element: Element | ComponentPublicInstance | null): void {
+  modePopup.host.value = element instanceof HTMLElement ? element : undefined;
+}
 const modeInputId = `picture-softEdges-mode-${useId()}`;
 const modeNative = computed(() => ({
   attributes: {
@@ -47,7 +49,7 @@ onBeforeUnmount(() => {
   active = false;
 });
 const modes = computed(() => [
-  { value: "inherit", label: props.t("effectInherit") },
+  { value: "inherit", label: props.t("effectDefaultNone") },
   { value: "none", label: props.t("effectNone") },
   { value: "value", label: props.t("effectCustom") },
 ]);
@@ -80,7 +82,9 @@ function selectPreset(id: string) {
 </script>
 <template>
   <div ref="root" class="picture-soft-edges-editor">
-    <Teleport to="body"><div ref="modeHost" data-picture-effect-mode-popup="softEdges" /></Teleport>
+    <Teleport to="body"
+      ><div :ref="setModeHost" data-picture-effect-mode-popup="softEdges"
+    /></Teleport>
     <PicturePresetGallery
       v-if="!hidePreset"
       :owner-key="ownerKey"
@@ -90,7 +94,7 @@ function selectPreset(id: string) {
       :t="t"
       :on-select="selectPreset"
       :columns="3"
-      :empty-label="mode === 'inherit' ? t('effectInherit') : t('effectCustom')"
+      :empty-label="mode === 'inherit' ? t('effectDefaultNone') : t('effectCustom')"
     />
     <PictureFormatField :label="t('effectMode')"
       ><TSelect

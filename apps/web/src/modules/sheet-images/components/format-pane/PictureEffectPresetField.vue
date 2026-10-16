@@ -48,6 +48,13 @@ const inheritBinding = computed(
   },
 );
 const inheritAction = computed(() => inheritBinding.value.apply);
+// These categories currently have no theme effect to inherit. Keep undefined as
+// the stored default; only its display label differs from inheritable effects.
+const defaultLabel = computed(() =>
+  props.category === "glow" || props.category === "softEdges" || props.category === "rotation3d"
+    ? "effectDefaultNone"
+    : "effectInherit",
+);
 const groups = computed(() => getPictureEffectPresetGroups(props.category));
 const selected = computed(() => findPictureEffectPresetId(props.category, binding.value.value));
 function select(id: string): boolean {
@@ -92,7 +99,7 @@ function select(id: string): boolean {
     :on-inherit="category === 'shadow' ? inheritAction : undefined"
     :columns="category === 'glow' ? 6 : category === 'rotation3d' ? 4 : 3"
     :empty-label="
-      binding.value === undefined ? controller.t('effectInherit') : controller.t('effectCustom')
+      binding.value === undefined ? controller.t(defaultLabel) : controller.t('effectCustom')
     "
   />
 </template>

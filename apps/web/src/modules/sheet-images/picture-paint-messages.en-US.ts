@@ -85,6 +85,7 @@ export const picturePaintEnUS = {
   lineMiterLimit: "Miter limit",
   effectMode: "Effect",
   effectInherit: "Use theme",
+  effectDefaultNone: "Default (no effect)",
   effectNone: "None",
   effectCustom: "Custom",
   shadowOuter: "Outer",
