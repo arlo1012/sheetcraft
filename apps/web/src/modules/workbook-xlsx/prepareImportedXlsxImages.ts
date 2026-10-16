@@ -1,3 +1,4 @@
+import { ImageAssetBatchError, storeImageAssetBatch } from "../image-assets/storeImageAssetBatch";
 import type { Workbook } from "@sheetcraft/core/workbook";
 import type { ImageAsset, ImageAssetStore } from "../image-assets/imageAssetStore";
 import { inspectEncodedImageHeader } from "../image-assets/inspectEncodedImageHeader";
@@ -82,13 +83,6 @@ export async function prepareImportedXlsxImages(
   }
 }
 
-async function sameBytes(left: Blob, right: Blob): Promise<boolean> {
-  if (left.size !== right.size) return false;
-  const first = new Uint8Array(await left.arrayBuffer());
-  const second = new Uint8Array(await right.arrayBuffer());
-  return first.every((byte, index) => byte === second[index]);
-}
-
 /** Existing content-addressed assets are never overwritten; new assets commit as one batch. */
 export async function storeImportedXlsxImages(
   assets: readonly ImageAsset[],
@@ -97,27 +91,13 @@ export async function storeImportedXlsxImages(
 ): Promise<void> {
   try {
     assertActive(signal);
-    if (!assets.length) return;
-    if (!store) throw new XlsxImportImageError("storage");
-    const unique = new Map<string, ImageAsset>();
-    for (const asset of assets) {
-      const existing = unique.get(asset.id) ?? (await store.get(asset.id));
-      assertActive(signal);
-      if (existing) {
-        if (!(await sameBytes(existing.blob, asset.blob)))
-          throw new XlsxImportImageError("invalid");
-      } else unique.set(asset.id, asset);
-    }
-    assertActive(signal);
-    const pending = [...unique.values()];
-    if (!pending.length) return;
-    if (store.putAll) await store.putAll(pending);
-    else if (pending.length === 1) await store.put(pending[0]!);
-    else throw new XlsxImportImageError("storage");
+    await storeImageAssetBatch(assets, store, signal);
     assertActive(signal);
   } catch (cause) {
     assertActive(signal);
     if (cause instanceof XlsxImportImageError) throw cause;
-    throw new XlsxImportImageError("storage", { cause });
+    throw new XlsxImportImageError(cause instanceof ImageAssetBatchError ? cause.code : "storage", {
+      cause,
+    });
   }
 }

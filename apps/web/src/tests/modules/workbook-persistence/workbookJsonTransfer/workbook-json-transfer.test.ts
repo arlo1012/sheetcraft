@@ -33,41 +33,32 @@ afterEach(() => {
 });
 
 describe("workbook JSON transfer", () => {
-  test.each([pictureGroup()])(
-    "external owned-picture documents reject before portable resource validation or storage writes: $id",
-    async (image) => {
-      const workbook = createTestWorkbook();
-      image.hidden = true;
-      getActiveSheet(workbook).floatingImages = [image];
-      const snapshot = serializeWorkbook(workbook),
-        text = JSON.stringify(snapshot);
-      expect(() => parseWorkbookJson(text)).toThrow(
-        expect.objectContaining({ code: "unsupported-picture-frame" }),
-      );
-      const assetStore = { get: vi.fn(async () => undefined), put: vi.fn(async () => {}) };
-      await expect(
-        readWorkbookBundleFile(
-          {
-            text: async () =>
-              JSON.stringify({ format: "sheetcraft-workbook", version: 1, snapshot, images: [] }),
-          },
-          assetStore,
-        ),
-      ).rejects.toMatchObject({ code: "unsupported-picture-frame" });
-      const createObjectURL = vi.fn(),
-        click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
-      vi.stubGlobal("URL", { createObjectURL });
-      expect(() => downloadWorkbookJson(workbook)).toThrow(/does not support/);
-      await expect(downloadWorkbookBundle(workbook, assetStore)).rejects.toThrow(
-        /does not support/,
-      );
-      expect(createObjectURL).not.toHaveBeenCalled();
-      expect(click).not.toHaveBeenCalled();
-      expect(assetStore.get).not.toHaveBeenCalled();
-      expect(assetStore.put).not.toHaveBeenCalled();
-      expect(serializeWorkbook(workbook)).toEqual(snapshot);
-    },
-  );
+  test("owned trees parse intact but a portable import requires all resources", async () => {
+    const workbook = createTestWorkbook();
+    const image = pictureGroup();
+    image.hidden = true;
+    getActiveSheet(workbook).floatingImages = [image];
+    const snapshot = serializeWorkbook(workbook);
+    expect(serializeWorkbook(parseWorkbookJson(JSON.stringify(snapshot)))).toEqual(snapshot);
+    const assetStore = { get: vi.fn(async () => undefined), put: vi.fn(async () => {}) };
+    await expect(
+      readWorkbookBundleFile(
+        {
+          text: async () =>
+            JSON.stringify({
+              format: "sheetcraft-workbook",
+              version: 1,
+              snapshot,
+              images: [],
+            }),
+        },
+        assetStore,
+      ),
+    ).rejects.toMatchObject({ code: "missing-image" });
+    expect(assetStore.get).not.toHaveBeenCalled();
+    expect(assetStore.put).not.toHaveBeenCalled();
+    expect(serializeWorkbook(workbook)).toEqual(snapshot);
+  });
   test("parses a current workbook snapshot through Core", () => {
     const workbook = createTestWorkbook();
 

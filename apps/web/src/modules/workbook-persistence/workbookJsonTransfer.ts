@@ -1,3 +1,5 @@
+import { isPictureGroup, traversePictureGroup } from "@sheetcraft/core/picture-group";
+import { ImageAssetBatchError, storeImageAssetBatch } from "../image-assets/storeImageAssetBatch";
 import type { PictureDetailedStyle } from "@sheetcraft/core/picture-detailed-style";
 import {
   assertWorkbookShapeSupport,
@@ -5,7 +7,6 @@ import {
 } from "../sheet-drawings/shape-document-support";
 import {
   assertExternalPictureGroupSupport,
-  requireStandalonePicture,
   UnsupportedPictureDocumentError,
 } from "../sheet-images/picture-document-support";
 import { deserializeWorkbook, serializeWorkbook } from "@sheetcraft/core/serialization";
@@ -153,19 +154,17 @@ function rewriteImageReferences(workbook: Workbook, ids: ReadonlyMap<string, str
       }
     }
     for (const root of sheet.floatingImages) {
-      const image = requireStandalonePicture(root);
-      image.assetId = ids.get(image.assetId) ?? image.assetId;
-      rewriteStyle(image.transform?.appearance?.detailedStyle);
+      const leaves = isPictureGroup(root)
+        ? traversePictureGroup(root).flatMap(({ node }) =>
+            node.kind === "grouped-picture-v1" ? [node] : [],
+          )
+        : [root];
+      for (const image of leaves) {
+        image.assetId = ids.get(image.assetId) ?? image.assetId;
+        rewriteStyle(image.transform?.appearance?.detailedStyle);
+      }
     }
   }
-}
-
-async function sameBytes(left: Blob, right: Blob): Promise<boolean> {
-  if (left.size !== right.size) return false;
-  const [a, b] = await Promise.all([left.arrayBuffer(), right.arrayBuffer()]);
-  const first = new Uint8Array(a);
-  const second = new Uint8Array(b);
-  return first.every((byte, index) => byte === second[index]);
 }
 
 export async function readWorkbookBundleFile(
@@ -232,31 +231,39 @@ export async function readWorkbookBundleFile(
     throw new WorkbookFileError("missing-image");
   let assets: Array<{ sourceId: string; asset: ImageAsset }>;
   try {
-    assets = await Promise.all(
-      [...provided.values()].map(async (image) => ({
+    assets = [];
+    // Bound peak decoder memory while retaining the original encoded bytes.
+    for (const image of provided.values()) {
+      assets.push({
         sourceId: image.id,
         // Envelope MIME and dimensions are descriptive only. The bytes determine the asset.
         asset: await prepareImageAsset(new Blob([fromBase64(image.data).buffer as ArrayBuffer])),
-      })),
-    );
+      });
+    }
   } catch (error) {
     if (error instanceof WorkbookFileError) throw error;
     throw new WorkbookFileError("invalid-images", { cause: error });
   }
   const replacements = new Map(assets.map(({ sourceId, asset }) => [sourceId, asset.id]));
-  // Verify all bytes before storage writes; content-derived IDs cannot overwrite a different asset.
-  for (const { asset } of assets) {
-    const existing = await assetStore.get(asset.id);
-    if (existing && !(await sameBytes(existing.blob, asset.blob)))
-      throw new WorkbookFileError("invalid-images");
-  }
   rewriteImageReferences(workbook, replacements);
   assertWorkbookShapeSupport(workbook);
   assertExternalPictureGroupSupport(workbook);
   const importedIds = new Set(assets.map(({ asset }) => asset.id));
   if ([...collectWorkbookImageAssetIds(workbook)].some((id) => !importedIds.has(id)))
     throw new WorkbookFileError("missing-image");
-  await Promise.all(assets.map(({ asset }) => assetStore.put(asset)));
+  try {
+    await storeImageAssetBatch(
+      assets.map(({ asset }) => asset),
+      assetStore,
+    );
+  } catch (error) {
+    throw new WorkbookFileError(
+      error instanceof ImageAssetBatchError && error.code === "invalid"
+        ? "invalid-images"
+        : "image-storage-unavailable",
+      { cause: error },
+    );
+  }
   return workbook;
 }
 

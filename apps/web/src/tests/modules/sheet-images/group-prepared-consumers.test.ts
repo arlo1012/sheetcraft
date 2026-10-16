@@ -19,11 +19,6 @@ import {
   assertExternalPictureGroupSupport,
 } from "../../../modules/sheet-images/picture-document-support";
 import { createPrintPreviewDocument } from "../../../modules/page-layout/page-print-renderer";
-import {
-  downloadWorkbookJson,
-  downloadWorkbookBundle,
-  readWorkbookBundleFile,
-} from "../../../modules/workbook-persistence/workbookJsonTransfer";
 import { prepareXlsxImages } from "../../../modules/workbook-xlsx/prepareXlsxImages";
 
 function fixture() {
@@ -39,14 +34,14 @@ function fixture() {
 }
 
 describe("owned group prepared-consumer safety", () => {
-  test("internal recovery accepts a hidden owned container while standalone and external consumers reject it", () => {
+  test("internal recovery and JSON accept a hidden owned container while standalone consumers reject it", () => {
     const { workbook, sheet } = fixture();
     sheet.floatingImages[0]!.hidden = true;
     const before = serializeWorkbook(workbook);
     expect(before.version).toBe(48);
     expect(() => assertWorkbookPictureSupport(workbook)).not.toThrow();
     expect(() => requireStandalonePictures(sheet.floatingImages)).toThrow(/does not support/);
-    expect(() => assertExternalPictureGroupSupport(workbook)).toThrow(/does not support/);
+    expect(() => assertExternalPictureGroupSupport(workbook)).not.toThrow();
     expect(serializeWorkbook(workbook)).toEqual(before);
   });
   test("prepared projection and root operations require actual worksheet frame context", () => {
@@ -64,28 +59,12 @@ describe("owned group prepared-consumer safety", () => {
     ])
       expect(operation).toThrow(/current worksheet frame geometry/);
   });
-  test("paused external packaging and print refuse before fetching or opening a download target", async () => {
+  test("paused XLSX packaging and print refuse before fetching or opening a download target", async () => {
     const { workbook, sheet } = fixture();
     const get = vi.fn(async () => undefined),
       put = vi.fn(async () => {}),
       store = { get, put };
     const before = serializeWorkbook(workbook);
-    expect(() => downloadWorkbookJson(workbook)).toThrow(/does not support/);
-    await expect(downloadWorkbookBundle(workbook, store)).rejects.toThrow(/does not support/);
-    await expect(
-      readWorkbookBundleFile(
-        {
-          text: async () =>
-            JSON.stringify({
-              format: "sheetcraft-workbook",
-              version: 1,
-              snapshot: before,
-              images: [],
-            }),
-        },
-        store,
-      ),
-    ).rejects.toMatchObject({ code: "unsupported-picture-frame" });
     await expect(prepareXlsxImages(before, store)).rejects.toMatchObject({
       report: {
         issues: [

@@ -15,7 +15,6 @@ import {
   readWorkbookBundleFile,
 } from "../../../modules/workbook-persistence/workbookJsonTransfer";
 import { framedPicture } from "../sheet-images/framed-picture-fixture";
-import { pictureGroup } from "../sheet-images/picture-group-fixture";
 import { actualPng, pngChunk } from "../image-assets/image-header-fixtures";
 
 const secondPng = new Uint8Array([
@@ -340,22 +339,17 @@ describe("standalone canonical picture portable JSON", () => {
     expect(getter).not.toHaveBeenCalled();
   });
 
-  test("owned groups and cell frames still reject before writes", async () => {
-    for (const kind of ["group", "cell"]) {
-      const workbook = fixture();
-      if (kind === "group") getActiveSheet(workbook).floatingImages.push(pictureGroup());
-      else {
-        const cell = getActiveSheet(workbook).cells.get("0:0")!;
-        if (cell.content?.kind !== "image") throw Error("fixture");
-        Object.assign(cell.content.image, { frame: {} });
-      }
-      const store = { get: vi.fn(async () => undefined), put: vi.fn(async () => {}) };
-      await expect(downloadWorkbookBundle(workbook, store)).rejects.toMatchObject({
-        code: "unsupported-picture-frame",
-      });
-      expect(store.get).not.toHaveBeenCalled();
-      expect(store.put).not.toHaveBeenCalled();
-    }
+  test("cell frames still reject before writes", async () => {
+    const workbook = fixture();
+    const cell = getActiveSheet(workbook).cells.get("0:0")!;
+    if (cell.content?.kind !== "image") throw Error("fixture");
+    Object.assign(cell.content.image, { frame: {} });
+    const store = { get: vi.fn(async () => undefined), put: vi.fn(async () => {}) };
+    await expect(downloadWorkbookBundle(workbook, store)).rejects.toMatchObject({
+      code: "unsupported-picture-frame",
+    });
+    expect(store.get).not.toHaveBeenCalled();
+    expect(store.put).not.toHaveBeenCalled();
   });
 
   test("invalid incoming frame rejects without writes", async () => {

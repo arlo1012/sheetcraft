@@ -1,4 +1,8 @@
-import { isPictureGroup } from "@sheetcraft/core";
+import {
+  isPictureGroup,
+  MAX_PICTURE_GROUP_NODES,
+  traversePictureGroup,
+} from "@sheetcraft/core/picture-group";
 import { isFramedCellImage, normalizeCellImage } from "@sheetcraft/core/cell-picture-frame";
 import type { CellContent } from "@sheetcraft/core/formula";
 import { applyWorkbookCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
@@ -224,7 +228,7 @@ export function assertPictureCommandSupport(command: WorkbookCommand, workbook: 
 }
 
 /** Canonical portable pictures are bounded plain data, never executable object graphs. */
-function assertPortableFramedPictureData(value: object): void {
+function assertPortableFramedPictureData(value: object, omitMembers = false): void {
   const active = new WeakSet<object>();
   const pending: { value: unknown; depth: number; leave?: boolean }[] = [{ value, depth: 0 }];
   let fields = 0;
@@ -262,6 +266,8 @@ function assertPortableFramedPictureData(value: object): void {
     let indexed = 0;
     for (const key of keys) {
       if (array && key === "length") continue;
+      // Core separately validates ownership and its 32-owner depth/10,000-node budget.
+      if (omitMembers && entry.depth === 0 && key === "members") continue;
       if (
         typeof key !== "string" ||
         (array && (!/^(0|[1-9]\d*)$/.test(key) || Number(key) >= node.length))
@@ -277,12 +283,14 @@ function assertPortableFramedPictureData(value: object): void {
   }
 }
 
-/** Portable JSON supports validated standalone frames, but not owned groups or cell frames. */
+/** Portable JSON retains validated standalone frames and owned trees; cell frames remain gated. */
 export function assertExternalPictureGroupSupport(workbook: Workbook): void {
   for (const sheet of workbook.sheets.values()) {
     const images = sheet.floatingImages;
     if (!Array.isArray(images) || Object.getPrototypeOf(images) !== Array.prototype)
       throw new TypeError("Portable pictures require an ordinary data array.");
+    if (images.length > MAX_PICTURE_GROUP_NODES)
+      throw new RangeError("Portable picture node budget exceeded.");
     // Inspect descriptors before using any caller-owned array methods or object fields.
     for (const key of Reflect.ownKeys(images)) {
       if (key === "length") continue;
@@ -303,13 +311,20 @@ export function assertExternalPictureGroupSupport(workbook: Workbook): void {
     }
     const ids: string[] = [];
     const safeImages: FloatingImage[] = [];
+    let nodeCount = 0;
     for (let index = 0; index < images.length; index++) {
       const entry = Object.getOwnPropertyDescriptor(images, String(index));
       if (!entry) throw new TypeError("Portable pictures require dense own data entries.");
       const image = entry.value as FloatingImage;
-      if (isFramedPictureObject(image)) assertPortableFramedPictureData(image);
+      // Ownership traversal is already descriptor-safe and bounded by Core per tree.
+      const visits = isPictureGroup(image) ? traversePictureGroup(image) : undefined;
+      nodeCount += visits?.length ?? 1;
+      if (nodeCount > MAX_PICTURE_GROUP_NODES)
+        throw new RangeError("Portable picture node budget exceeded.");
+      if (visits) {
+        for (const { node } of visits) assertPortableFramedPictureData(node, true);
+      } else if (isFramedPictureObject(image)) assertPortableFramedPictureData(image);
       safeImages.push(image);
-      if (isPictureGroup(image)) ids.push(image.id);
     }
     for (const [key, cell] of sheet.cells)
       if (cell.content?.kind === "image" && Object.hasOwn(cell.content.image, "frame"))
