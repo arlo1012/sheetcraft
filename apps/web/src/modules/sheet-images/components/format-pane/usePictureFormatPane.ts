@@ -23,6 +23,7 @@ import {
   reconcilePictureFormatDraftState,
   type PictureFormatBooleanField,
   type PictureFormatCapabilities,
+  type PictureFormatCapability,
   type PictureFormatChoiceField,
   type PictureFormatDraftField,
   type PictureFormatField,
@@ -48,6 +49,8 @@ export interface PictureFormatPaneInputs {
 }
 export interface PictureFormatDraftBinding {
   text: string;
+  /** Typed completion for shared numeric editors; false retains the exact draft. */
+  commit: () => boolean;
   disabled: boolean;
   reason?: string;
   error?: string;
@@ -56,6 +59,13 @@ export interface PictureFormatDraftBinding {
   blur: () => void;
   enter: () => void;
   keydown: (value: unknown, context: { e: KeyboardEvent }) => void;
+}
+export interface PictureFormatNumericEditor {
+  capability: () => PictureFormatCapability | undefined;
+  preview: (text: string) => void;
+  focus: (focused: boolean) => void;
+  cancel: () => void;
+  commit: () => boolean;
 }
 export interface PictureFormatChoiceBinding {
   value?: string;
@@ -87,6 +97,17 @@ export interface PictureFormatDetailedBinding<K extends PictureDetailedCategory>
 }
 export interface PictureFormatPaneController {
   snapshot: ComputedRef<PictureFormatSnapshot | null>;
+  /** Stable across digits/revisions; changes only when the edit lease changes. */
+  numericLease: ComputedRef<{
+    ownerKey: string | null;
+    handler: PictureFormatIntentHandler;
+    generation: number;
+    revisionEpoch: number;
+  }>;
+  numericEditor: (
+    field: PictureFormatNumberField,
+    unit: PictureFormatLengthUnit,
+  ) => PictureFormatNumericEditor;
   t: PictureFormatTranslate;
   number: (
     field: PictureFormatNumberField,
@@ -121,6 +142,8 @@ export function usePictureFormatPane(props: PictureFormatPaneInputs): PictureFor
   const prefix = `picture-format-${useId()}`;
   const state = ref(createPictureFormatDraftState(props.snapshot));
   const bindingGeneration = ref(0);
+  const numericRevisionEpoch = ref(0);
+  const numericIntents = new Set<string>();
   const shapeError = ref<string>();
   let shapeBindingKey: string | undefined;
   let shapeApply: (value: PictureCropShape | undefined) => boolean = () => false;
@@ -134,6 +157,7 @@ export function usePictureFormatPane(props: PictureFormatPaneInputs): PictureFor
   );
   function cancel() {
     bindingGeneration.value += 1;
+    numericIntents.clear();
     state.value = cancelPictureFormatDraft(state.value);
     detailedErrors.value = {};
     shapeError.value = undefined;
@@ -143,13 +167,23 @@ export function usePictureFormatPane(props: PictureFormatPaneInputs): PictureFor
   const t: PictureFormatTranslate = (key) => props.t(key);
   watch(
     () => props.snapshot,
-    (next) => {
+    (next, previous) => {
+      if (
+        next &&
+        previous &&
+        pictureFormatOwnerKey(next.owner) === pictureFormatOwnerKey(previous.owner) &&
+        next.revision !== previous.revision
+      ) {
+        const ownAck = !!next.acceptedIntentId && numericIntents.delete(next.acceptedIntentId);
+        if (!ownAck) numericRevisionEpoch.value++;
+      }
       if (
         !next ||
         !state.value.owner ||
         pictureFormatOwnerKey(next.owner) !== pictureFormatOwnerKey(state.value.owner)
       ) {
         bindingGeneration.value += 1;
+        numericIntents.clear();
         detailedErrors.value = {};
         shapeError.value = undefined;
       }
@@ -218,10 +252,10 @@ export function usePictureFormatPane(props: PictureFormatPaneInputs): PictureFor
       draft && (draft.dirty || draft.focused || draft.submitted) ? draft.text : formatted;
     const owned = identity();
     const enabled = () => owned() && props.capabilities.fields[field]?.enabled === true;
-    function commit() {
-      if (!enabled() || !props.snapshot) return;
+    function commit(): boolean {
+      if (!enabled() || !props.snapshot) return false;
       const editing = state.value.drafts[field];
-      if (!editing?.dirty) return;
+      if (!editing?.dirty) return true;
       const result = unit
         ? pictureFormatNumericValue(
             field as PictureFormatNumberField,
@@ -232,7 +266,7 @@ export function usePictureFormatPane(props: PictureFormatPaneInputs): PictureFor
         : { value: editing.text };
       if ("error" in result) {
         setError(field, result.error);
-        return;
+        return false;
       }
       const intentId = nextId();
       const intent = unit
@@ -267,15 +301,21 @@ export function usePictureFormatPane(props: PictureFormatPaneInputs): PictureFor
           },
         },
       };
+      // Register before dispatch: a host may synchronously acknowledge this ID.
+      if (unit) {
+        numericIntents.add(intentId);
+        if (numericIntents.size > 32) numericIntents.delete(numericIntents.values().next().value!);
+      }
       const accepted = dispatch(intent);
+      if (!accepted) numericIntents.delete(intentId);
       if (
         !props.snapshot ||
         pictureFormatOwnerKey(props.snapshot.owner) !== pictureFormatOwnerKey(intent.owner) ||
         bindingGeneration.value !== actionGeneration
       )
-        return;
+        return false;
       const latest = state.value.drafts[field];
-      if (!latest || latest.submitted?.intentId !== intentId) return;
+      if (!latest || latest.submitted?.intentId !== intentId) return accepted;
       if (accepted) {
         clearError(field);
         state.value = {
@@ -297,9 +337,11 @@ export function usePictureFormatPane(props: PictureFormatPaneInputs): PictureFor
         };
         state.value = reconcilePictureFormatDraftState(state.value, props.snapshot);
       } else setError(field, "applyRejected");
+      return accepted;
     }
     return {
       text: String(text),
+      commit,
       disabled: !current || capability?.enabled !== true,
       reason: capability?.reason,
       error: feedback(field),
@@ -341,6 +383,51 @@ export function usePictureFormatPane(props: PictureFormatPaneInputs): PictureFor
   }
   return {
     snapshot,
+    numericLease: computed(
+      (
+        previous:
+          | {
+              ownerKey: string | null;
+              handler: PictureFormatIntentHandler;
+              generation: number;
+              revisionEpoch: number;
+            }
+          | undefined,
+      ) => {
+        const ownerKey = props.snapshot ? pictureFormatOwnerKey(props.snapshot.owner) : null;
+        const handler = props.onIntent,
+          generation = bindingGeneration.value,
+          revisionEpoch = numericRevisionEpoch.value;
+        // Our registered intent acknowledgements preserve a continuous edit lease.
+        return previous?.ownerKey === ownerKey &&
+          previous.handler === handler &&
+          previous.generation === generation &&
+          previous.revisionEpoch === revisionEpoch
+          ? previous
+          : { ownerKey, handler, generation, revisionEpoch };
+      },
+    ),
+    numericEditor: (field, unit) => {
+      const binding = draftBinding(field, unit);
+      const identityOwned = identity();
+      const revisionEpoch = numericRevisionEpoch.value;
+      const owned = () => identityOwned() && revisionEpoch === numericRevisionEpoch.value;
+      return {
+        capability: () => props.capabilities.fields[field],
+        preview: (text) => {
+          if (owned()) binding.edit(text);
+        },
+        focus: (focused) => {
+          if (!owned()) return;
+          const text = state.value.drafts[field]?.text ?? binding.text;
+          state.value = focusPictureFormatDraft(state.value, field, text, focused);
+        },
+        cancel: () => {
+          if (owned()) state.value = cancelPictureFormatDraft(state.value, field);
+        },
+        commit: () => owned() && binding.commit(),
+      };
+    },
     t,
     loadPaintAsset: props.loadPaintAsset,
     cropShape: () => {

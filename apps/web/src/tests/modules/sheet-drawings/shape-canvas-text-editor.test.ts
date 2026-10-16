@@ -99,6 +99,194 @@ function listen(type: string) {
 }
 
 describe("owner-scoped plain-text shape canvas editor", () => {
+  test("normal editing has no floating actions; a failed save shows explicit recovery actions", async () => {
+    const commit = vi.fn(() => false);
+    const f = await fixture({ commit });
+    expect(document.querySelector("[data-shape-canvas-text-toolbar]")).toBeNull();
+    expect(document.querySelector("[data-shape-text-action]")).toBeNull();
+    await write(f.input, "Draft with\nnew line");
+    const enter = await key(f.input, "Enter");
+    expect(enter.defaultPrevented).toBe(false);
+    expect(commit).not.toHaveBeenCalled();
+    await key(f.input, "Enter", { ctrlKey: true });
+    expect(commit).toHaveBeenCalledOnce();
+    expect(button("apply").textContent).toContain("Retry Save");
+    expect(button("cancel").textContent).toContain("Discard Changes");
+    expect(f.input.value).toBe("Draft with\nnew line");
+    expect(f.cancel).not.toHaveBeenCalled();
+  });
+
+  test("rich input receives the leased history callback while Escape uses the owner commit intent", async () => {
+    const historyStep = vi.fn(() => true),
+      updateRich = vi.fn(() => true),
+      commit = vi.fn(() => true);
+    const escape = vi.fn(() => commit());
+    const wrapper = mount(ShapeCanvasTextEditor, {
+      attachTo: document.body,
+      props: {
+        drawing: drawing(),
+        sessionId: 12,
+        draft: "initial text",
+        rich: true,
+        update: () => true,
+        updateRich,
+        composition: () => true,
+        historyStep,
+        commit,
+        escape,
+        cancel: vi.fn(),
+      },
+    });
+    mounted.push(wrapper);
+    await nextTick();
+    await nextTick();
+    const rich = wrapper.getComponent(ShapeRichTextInput);
+    expect(rich.props("historyStep")).toBe(historyStep);
+    const element = rich.get<HTMLElement>("[data-shape-rich-text-input]").element;
+    await key(element, "z", { ctrlKey: true });
+    await key(element, "y", { ctrlKey: true });
+    expect(historyStep.mock.calls).toEqual([["undo"], ["redo"]]);
+    expect(updateRich).not.toHaveBeenCalled();
+    await key(element, "Escape");
+    expect(escape).toHaveBeenCalledOnce();
+    expect(commit).toHaveBeenCalledOnce();
+  });
+
+  test("document-captured shortcuts from the leased Ribbon and its unmarked controlled teleport share one history callback", async () => {
+    const historyStep = vi.fn((_direction: "undo" | "redo") => true);
+    const f = await fixture({ historyStep });
+    const workbook = listen("keydown");
+    const ribbon = document.createElement("div"),
+      control = document.createElement("button");
+    ribbon.dataset.shapeTextEditSession = "1";
+    control.setAttribute("aria-controls", "leased-history-popup");
+    ribbon.appendChild(control);
+    document.body.appendChild(ribbon);
+    const popup = document.createElement("div"),
+      choice = document.createElement("button");
+    popup.id = "leased-history-popup";
+    popup.appendChild(choice);
+    document.body.appendChild(popup);
+    // Dispatch from real connected controls so the document capture listener sees
+    // the actual target, including a popup outside the editor/Ribbon DOM trees.
+    for (const [target, value, options] of [
+      [control, "z", { ctrlKey: true }],
+      [choice, "y", { ctrlKey: true }],
+      [choice, "z", { metaKey: true, shiftKey: true }],
+    ] as const)
+      expect((await key(target, value, options)).defaultPrevented).toBe(true);
+    expect(historyStep.mock.calls).toEqual([["undo"], ["redo"], ["redo"]]);
+    expect(workbook).not.toHaveBeenCalled();
+    expect(f.commit).not.toHaveBeenCalled();
+    expect(f.cancel).not.toHaveBeenCalled();
+    expect(f.wrapper.emitted("requestCommit")).toBeUndefined();
+  });
+
+  test("document history boundary ignores foreign sessions and unrelated controls", async () => {
+    const historyStep = vi.fn((_direction: "undo" | "redo") => true);
+    const f = await fixture({ historyStep });
+    const workbook = listen("keydown");
+    const foreign = document.createElement("button");
+    foreign.dataset.shapeTextEditSession = "2";
+    document.body.appendChild(foreign);
+    const unrelated = externalButton();
+    expect((await key(foreign, "z", { ctrlKey: true })).defaultPrevented).toBe(false);
+    expect((await key(unrelated, "y", { ctrlKey: true })).defaultPrevented).toBe(false);
+    expect(historyStep).not.toHaveBeenCalled();
+    expect(workbook).toHaveBeenCalledTimes(2);
+    expect(f.commit).not.toHaveBeenCalled();
+  });
+
+  test.each(["input", "textarea", "select", "contenteditable"] as const)(
+    "owned %s keeps its native/local editing history instead of document-captured draft history",
+    async (kind) => {
+      const historyStep = vi.fn((_direction: "undo" | "redo") => true);
+      const f = await fixture({ historyStep });
+      const ribbon = document.createElement("div");
+      ribbon.dataset.shapeTextEditSession = "1";
+      const editable = document.createElement(kind === "contenteditable" ? "div" : kind);
+      if (kind === "contenteditable") editable.setAttribute("contenteditable", "true");
+      ribbon.appendChild(editable);
+      document.body.appendChild(ribbon);
+      const ownHistory = vi.fn();
+      editable.addEventListener("keydown", ownHistory);
+      expect((await key(editable, "z", { ctrlKey: true })).defaultPrevented).toBe(false);
+      expect(ownHistory).toHaveBeenCalledOnce();
+      expect(historyStep).not.toHaveBeenCalled();
+      expect(f.commit).not.toHaveBeenCalled();
+      expect((await key(f.input, "z", { ctrlKey: true })).defaultPrevented).toBe(false);
+      expect(historyStep).not.toHaveBeenCalled();
+    },
+  );
+
+  test("IME state and composing keyboard events block the owned Ribbon history route", async () => {
+    const historyStep = vi.fn((_direction: "undo" | "redo") => true);
+    const f = await fixture({ historyStep });
+    const control = document.createElement("button");
+    control.dataset.shapeTextEditSession = "1";
+    document.body.appendChild(control);
+    expect((await key(control, "z", { ctrlKey: true, isComposing: true })).defaultPrevented).toBe(
+      false,
+    );
+    expect((await key(control, "z", { ctrlKey: true, keyCode: 229 })).defaultPrevented).toBe(false);
+    await f.wrapper.setProps({ composing: true });
+    expect((await key(control, "y", { ctrlKey: true })).defaultPrevented).toBe(false);
+    expect(historyStep).not.toHaveBeenCalled();
+    await f.wrapper.setProps({ composing: false });
+    expect((await key(control, "z", { ctrlKey: true })).defaultPrevented).toBe(true);
+    expect(historyStep.mock.calls).toEqual([["undo"]]);
+    expect(f.commit).not.toHaveBeenCalled();
+  });
+
+  test("owned external Ribbon and directly controlled popup preserve draft until focus leaves their lease", async () => {
+    const f = await fixture();
+    await write(f.input, "Ribbon-owned draft");
+    f.input.setSelectionRange(1, 7, "backward");
+    const ribbon = document.createElement("div"),
+      control = document.createElement("button");
+    ribbon.dataset.shapeTextEditSession = "1";
+    control.setAttribute("aria-controls", "shape-text-owned-popup");
+    ribbon.appendChild(control);
+    document.body.appendChild(ribbon);
+    const popup = document.createElement("div"),
+      choice = document.createElement("button");
+    popup.id = "shape-text-owned-popup";
+    popup.appendChild(choice);
+    document.body.appendChild(popup);
+    control.focus();
+    await nextTick();
+    choice.focus();
+    await nextTick();
+    expect(f.wrapper.emitted("requestCommit")).toBeUndefined();
+    expect(f.commit).not.toHaveBeenCalled();
+    expect(f.input.value).toBe("Ribbon-owned draft");
+    expect([f.input.selectionStart, f.input.selectionEnd, f.input.selectionDirection]).toEqual([
+      1,
+      7,
+      "backward",
+    ]);
+    externalButton().focus();
+    await nextTick();
+    expect(f.wrapper.emitted("requestCommit")).toEqual([["blur"]]);
+  });
+
+  test("a popup controlled by another session is an outside blur", async () => {
+    const f = await fixture();
+    const other = document.createElement("div"),
+      button = document.createElement("button");
+    other.dataset.shapeTextEditSession = "2";
+    other.setAttribute("aria-controls", "other-session-popup");
+    document.body.appendChild(other);
+    const popup = document.createElement("div");
+    popup.id = "other-session-popup";
+    popup.appendChild(button);
+    document.body.appendChild(popup);
+    button.focus();
+    await nextTick();
+    expect(f.wrapper.emitted("requestCommit")).toEqual([["blur"]]);
+    expect(f.commit).not.toHaveBeenCalled();
+  });
+
   test("rich source preview discloses advanced appearance and receives theme and scale", async () => {
     const target = drawing();
     target.shapeText = {
@@ -124,6 +312,7 @@ describe("owner-scoped plain-text shape canvas editor", () => {
         sessionId: 42,
         draft: target.text,
         rich: true,
+        error: "Preview recovery",
         theme: DEFAULT_WORKBOOK_THEME,
         scale: 2,
         update: () => true,
@@ -141,12 +330,12 @@ describe("owner-scoped plain-text shape canvas editor", () => {
     );
     expect(wrapper.findComponent(ShapeRichTextInput).props("scale")).toBe(2);
     expect(document.querySelector("[data-shape-text-source-preview-note]")?.textContent).toContain(
-      "Applied text keeps its full appearance",
+      "Completed text keeps its full appearance",
     );
     expect(wrapper.get("[data-shape-rich-text-input]").element.textContent).toBe(target.text);
     await wrapper.setProps({ locale: "zh-CN" });
     expect(document.querySelector("[data-shape-text-source-preview-note]")?.textContent).toContain(
-      "应用后保留完整外观",
+      "结束编辑后保留完整外观",
     );
   });
   test("keeps one native textarea through continuous draft echoes and failure props", async () => {
@@ -314,8 +503,8 @@ describe("owner-scoped plain-text shape canvas editor", () => {
     expect(f.commit).not.toHaveBeenCalled();
   });
 
-  test("blur into either editor button is internal, including keyboard focus", async () => {
-    const f = await fixture();
+  test("blur into either recovery button is internal, including keyboard focus", async () => {
+    const f = await fixture({ error: "Retry is available" });
     button("apply").focus();
     await nextTick();
     button("cancel").focus();
@@ -328,8 +517,8 @@ describe("owner-scoped plain-text shape canvas editor", () => {
     expect(f.wrapper.emitted("requestCommit")).toEqual([["blur"]]);
   });
 
-  test("button pointerdown preserves native selection and avoids foreign blur", async () => {
-    const f = await fixture();
+  test("recovery button pointerdown preserves native selection and avoids foreign blur", async () => {
+    const f = await fixture({ error: "Retry is available" });
     f.input.setSelectionRange(2, 7, "backward");
     const pointer = new PointerEvent("pointerdown", { bubbles: true, cancelable: true });
     button("apply").dispatchEvent(pointer);
@@ -352,7 +541,7 @@ describe("owner-scoped plain-text shape canvas editor", () => {
     const f = await fixture({ commit });
     await write(f.input, "recoverable draft");
     f.input.setSelectionRange(2, 5, "backward");
-    button("apply").click();
+    await key(f.input, "Enter", { ctrlKey: true });
     await f.wrapper.setProps({ error: "Native font metrics unavailable" });
     await nextTick();
     expect(commit).toHaveBeenCalledTimes(1);
@@ -378,7 +567,7 @@ describe("owner-scoped plain-text shape canvas editor", () => {
       },
     });
     await write(f.input, "kept on exception");
-    button("apply").click();
+    await key(f.input, "Enter", { ctrlKey: true });
     await nextTick();
     expect(document.querySelector("[role=alert]")?.textContent).toContain(
       "Owner changed during apply",
@@ -408,7 +597,7 @@ describe("owner-scoped plain-text shape canvas editor", () => {
     async (flag) => {
       const f = await fixture();
       await write(f.input, "retain and copy");
-      await f.wrapper.setProps({ [flag]: true });
+      await f.wrapper.setProps({ [flag]: true, error: "Cannot save this draft yet" });
       expect(f.input.readOnly).toBe(true);
       expect(f.input.disabled).toBe(false);
       expect(button("apply").disabled).toBe(true);
@@ -487,6 +676,7 @@ describe("owner-scoped plain-text shape canvas editor", () => {
         height: "80px",
       },
       locale: "zh-CN",
+      error: "保留的草稿",
     });
     expect(f.wrapper.get("[data-shape-canvas-text-editor]").attributes("style")).toContain(
       "rotate(30deg)",
@@ -498,7 +688,7 @@ describe("owner-scoped plain-text shape canvas editor", () => {
     expect(document.querySelector("[data-shape-canvas-text-toolbar]")?.parentElement).toBe(
       document.body,
     );
-    expect(button("apply").textContent).toContain("应用");
+    expect(button("apply").textContent).toContain("重试保存");
     expect(source).toEqual(saved);
   });
 });

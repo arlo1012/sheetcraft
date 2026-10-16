@@ -50,6 +50,21 @@ afterEach(() => {
 });
 
 describe("RowColumnOperationsMenu", () => {
+  test.each([
+    { baseline: undefined, expected: 24 },
+    { baseline: 20, expected: 20 },
+    { baseline: 24, expected: 24 },
+  ])("opens unspecified row height with baseline $baseline", async ({ baseline, expected }) => {
+    const sheet = createSheet("Sheet1", "sheet-1");
+    sheet.defaultRowHeight = baseline;
+    const wrapper = mountMenu({ sheet });
+    await wrapper.get('[data-ribbon-action="row-column-operations"]').trigger("click");
+    await nextTick();
+    await rootMenu().get('[data-row-column-action="row-height"]').trigger("click");
+    expect(wrapper.getComponent(SheetDimensionInput).props("modelValue")).toBe(expected);
+    expect(sheet.rowHeights.size).toBe(0);
+  });
+
   test("groups structural operations into screenshot-matching cascading menus", async () => {
     const wrapper = mountMenu();
     await wrapper.get('[data-ribbon-action="row-column-operations"]').trigger("click");

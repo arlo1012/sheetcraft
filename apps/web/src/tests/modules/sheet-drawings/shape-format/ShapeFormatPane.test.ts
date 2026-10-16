@@ -4,15 +4,16 @@ import { Input } from "tdesign-vue-next/es/input";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { Select } from "tdesign-vue-next/es/select";
 import { Button } from "tdesign-vue-next/es/button";
+import { RadioGroup, RadioButton } from "tdesign-vue-next/es/radio";
+import { Tabs } from "tdesign-vue-next/es/tabs";
 import { createAppI18n } from "../../../../shared/i18n";
 import ShapeFormatPane from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
 import ShapeFormatNumberField from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatNumberField.vue";
 import ShapeFormatCheckbox from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatCheckbox.vue";
 import ShapeFormatChoiceField from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatChoiceField.vue";
-import ShapeFormatMixedNumber from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatMixedNumber.vue";
 import ShapeFormatMixedEffect from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatMixedEffect.vue";
 import ShapeLineEndsControls from "../../../../modules/sheet-drawings/components/ShapeLineEndsControls.vue";
-import PicturePaintNumber from "../../../../modules/sheet-images/components/format-pane/PicturePaintNumber.vue";
+import NumericField from "../../../../shared/numeric-field/NumericField.vue";
 import PicturePaintEditor from "../../../../modules/sheet-images/components/format-pane/PicturePaintEditor.vue";
 import PictureLineEditor from "../../../../modules/sheet-images/components/format-pane/PictureLineEditor.vue";
 import PictureFormat3dEditor from "../../../../modules/sheet-images/components/format-pane/PictureFormat3dEditor.vue";
@@ -186,8 +187,23 @@ function number(wrapper: VueWrapper, field: NumberField) {
 function input(wrapper: VueWrapper, field: NumberField) {
   return number(wrapper, field).getComponent(Input).get<HTMLInputElement>("input");
 }
+function retainedNumericAction(wrapper: VueWrapper, field: NumberField) {
+  const numeric = number(wrapper, field).getComponent(NumericField);
+  const callback = numeric.props("onCommit");
+  const context = {
+    ownerKey: numeric.props("ownerKey"),
+    sessionId: "retained-test",
+    source: "external" as const,
+  };
+  return (value: number) => callback({ kind: "value", value }, context).accepted;
+}
 async function textMode(wrapper: VueWrapper) {
-  await wrapper.get(".shape-format-pane__modes button:nth-child(2)").trigger("click");
+  wrapper
+    .findAllComponents(RadioButton)
+    .find((radio) => radio.props("value") === "text")!
+    .get<HTMLLabelElement>("label")
+    .element.click();
+  await flushPromises();
 }
 describe("shape format pane desktop reference surface", () => {
   test("Text Rotation clearly shares the body camera, retains saved-glyph warning and edits the same Keep Flat field", async () => {
@@ -245,13 +261,11 @@ describe("shape format pane desktop reference surface", () => {
       initialMode: "text",
       initialTab: "text-box",
     });
-    expect(wrapper.findAll(".shape-format-pane__modes button")).toHaveLength(1);
+    expect(wrapper.findAllComponents(RadioButton)).toHaveLength(1);
     expect(wrapper.findAll('[role="tabpanel"]')).toHaveLength(3);
     expect(wrapper.find("[data-shape-format-units]").exists()).toBe(true);
     expect(wrapper.findAllComponents(ShapeFormatNumberField)).toHaveLength(5);
-    expect(number(wrapper, "rotationDeg").getComponent(PicturePaintNumber).props("disabled")).toBe(
-      true,
-    );
+    expect(input(wrapper, "rotationDeg").element.disabled).toBe(true);
     expect(wrapper.findAllComponents(ShapeFormatChoiceField)).toHaveLength(0);
     expect(wrapper.findAllComponents(PictureFormat3dEditor)).toHaveLength(0);
     expect(wrapper.findAllComponents(PictureRotation3dEditor)).toHaveLength(0);
@@ -269,7 +283,7 @@ describe("shape format pane desktop reference surface", () => {
       }),
     );
     await wrapper.setProps({ snapshot: snapshot(), initialMode: "shape" });
-    expect(wrapper.findAll(".shape-format-pane__modes button")).toHaveLength(2);
+    expect(wrapper.findAllComponents(RadioButton)).toHaveLength(2);
     expect(wrapper.findAll('[role="tabpanel"]')).toHaveLength(6);
   });
   test("bound connector lists exact associations and requires its explicit leased disconnect action", async () => {
@@ -303,9 +317,7 @@ describe("shape format pane desktop reference surface", () => {
     );
     expect(wrapper.get("[data-shape-connector-bindings]").text()).toContain("终点: Ellipse two");
     expect(wrapper.get("[data-shape-connector-bindings]").find("one").exists()).toBe(false);
-    expect(number(wrapper, "sizeWidthPt").getComponent(PicturePaintNumber).props("disabled")).toBe(
-      true,
-    );
+    expect(input(wrapper, "sizeWidthPt").element.disabled).toBe(true);
     expect(onIntent).not.toHaveBeenCalled();
     await wrapper.get("[data-shape-connector-disconnect]").trigger("click");
     expect(onIntent).toHaveBeenCalledExactlyOnceWith(
@@ -405,18 +417,22 @@ describe("shape format pane desktop reference surface", () => {
       expect(onIntent).toHaveBeenCalledTimes(1);
     }
   });
-  test("an unrelated external revision clears drafts and retained numeric callbacks reject stale targets", async () => {
+  test("an unrelated external revision retains a stale draft until Escape; old callbacks reject stale targets", async () => {
     const { wrapper, onIntent } = fixture();
-    const oldAction = number(wrapper, "sizeWidthPt")
-      .getComponent(PicturePaintNumber)
-      .props("onCommit");
+    const oldAction = retainedNumericAction(wrapper, "sizeWidthPt");
     await input(wrapper, "sizeWidthPt").setValue("240.");
     await wrapper.setProps({
       snapshot: { ...snapshot(), revision: 3, values: { ...snapshot().values, sizeWidthPt: 200 } },
     });
-    expect(input(wrapper, "sizeWidthPt").element.value).toBe("200");
+    const width = input(wrapper, "sizeWidthPt");
+    expect(width.element.value).toBe("240.");
     expect(oldAction(300)).toBe(false);
+    await width.trigger("keydown", { key: "Enter" });
+    expect(width.attributes("aria-invalid")).toBe("true");
     expect(onIntent).not.toHaveBeenCalled();
+    await width.trigger("keydown", { key: "Escape" });
+    expect(width.element.value).toBe("200");
+    expect(wrapper.emitted("close")).toBeUndefined();
     await wrapper.setProps({
       snapshot: {
         ...snapshot(),
@@ -432,10 +448,9 @@ describe("shape format pane desktop reference surface", () => {
     const height = input(wrapper, "sizeHeightPt"),
       element = height.element;
     await height.setValue("155.");
-    const accepted = number(wrapper, "sizeWidthPt")
-      .getComponent(PicturePaintNumber)
-      .props("onCommit")(230);
-    expect(accepted).toBe(true);
+    await input(wrapper, "sizeWidthPt").setValue("230");
+    await input(wrapper, "sizeWidthPt").trigger("keydown", { key: "Enter" });
+    expect(onIntent).toHaveBeenCalledTimes(1);
     const intent = onIntent.mock.calls.at(-1)![0];
     await wrapper.setProps({
       snapshot: {
@@ -596,7 +611,7 @@ describe("actual shape group aggregate controls", () => {
     await field.trigger("blur");
     expect(onIntent).toHaveBeenCalledTimes(1);
   });
-  test("mixed numeric invalid and rejected drafts remain intact; external changes reset and stale actions reject", async () => {
+  test("mixed invalid/rejected drafts remain intact; external revisions retain stale drafts until Escape", async () => {
     const onIntent = vi.fn(() => false);
     const { wrapper } = fixture({
       snapshot: groupSnapshot(),
@@ -607,9 +622,7 @@ describe("actual shape group aggregate controls", () => {
       },
     });
     const field = input(wrapper, "fontSizePt");
-    const action = number(wrapper, "fontSizePt")
-      .getComponent(ShapeFormatMixedNumber)
-      .props("onCommit");
+    const action = retainedNumericAction(wrapper, "fontSizePt");
     await field.setValue("12e");
     await field.trigger("blur");
     expect(field.element.value).toBe("12e");
@@ -624,9 +637,14 @@ describe("actual shape group aggregate controls", () => {
     expect(wrapper.emitted("close")).toBeUndefined();
     await field.setValue("555.");
     await wrapper.setProps({ snapshot: { ...groupSnapshot(), revision: 3 } });
-    expect(field.element.value).toBe("");
+    expect(field.element.value).toBe("555.");
     expect(action(200)).toBe(false);
+    await field.trigger("keydown", { key: "Enter" });
+    expect(field.attributes("aria-invalid")).toBe("true");
     expect(onIntent).toHaveBeenCalledTimes(1);
+    await field.trigger("keydown", { key: "Escape" });
+    expect(field.element.value).toBe("");
+    expect(wrapper.emitted("close")).toBeUndefined();
     await flushPromises();
     expect(
       wrapper
@@ -646,9 +664,9 @@ describe("actual shape group aggregate controls", () => {
     const field = input(wrapper, "fontSizePt"),
       element = field.element;
     await field.setValue("123.");
-    expect(
-      number(wrapper, "sizeWidthPt").getComponent(PicturePaintNumber).props("onCommit")(400),
-    ).toBe(true);
+    await input(wrapper, "sizeWidthPt").setValue("400");
+    await input(wrapper, "sizeWidthPt").trigger("keydown", { key: "Enter" });
+    expect(onIntent).toHaveBeenCalledTimes(1);
     const intent = onIntent.mock.calls.at(-1)![0];
     await wrapper.setProps({
       snapshot: {
@@ -1100,3 +1118,54 @@ test.each(["selection", "caret"] as const)(
       expect(wrapper.get("[data-wordart-style-mixed]").text()).toContain("Selected characters");
   },
 );
+
+describe("public Shape pane navigation and necessary feedback", () => {
+  test("public mode/tab controls retain the current field and refuse navigation before the host guard accepts", async () => {
+    let allow = false;
+    const guard = vi.fn(() => allow);
+    const { wrapper, onIntent } = fixture({ beforeTabChange: guard });
+    expect(wrapper.findComponent(RadioGroup).exists()).toBe(true);
+    expect(wrapper.findComponent(Tabs).exists()).toBe(true);
+    const field = input(wrapper, "sizeWidthPt");
+    const originalField = field.element;
+    await field.setValue("240.");
+    const tabs = () => wrapper.findAll<HTMLButtonElement>('[role="tab"]');
+    await tabs()[1]!.trigger("click");
+    expect(tabs()[2]!.attributes("aria-selected")).toBe("true");
+    await textMode(wrapper);
+    expect(wrapper.findComponent(RadioGroup).props("value")).toBe("shape");
+    for (const radio of wrapper.findAllComponents(RadioButton))
+      expect(radio.get<HTMLInputElement>("input").element.checked).toBe(
+        radio.props("value") === "shape",
+      );
+    expect(field.element.value).toBe("240.");
+    allow = true;
+    await tabs()[1]!.trigger("keydown", { key: "Home" });
+    expect(tabs()[0]!.attributes("aria-selected")).toBe("true");
+    await textMode(wrapper);
+    expect(wrapper.findComponent(RadioGroup).props("value")).toBe("text");
+    wrapper
+      .findAllComponents(RadioButton)
+      .find((radio) => radio.props("value") === "shape")!
+      .get<HTMLLabelElement>("label")
+      .element.click();
+    await flushPromises();
+    expect(input(wrapper, "sizeWidthPt").element).toBe(originalField);
+    expect(originalField.value).toBe("240.");
+    expect(onIntent).not.toHaveBeenCalled();
+    expect(guard).toHaveBeenCalled();
+  });
+
+  test("normal shape fill omits generic help while actual capability reasons and material scope remain", async () => {
+    const { wrapper } = fixture({ initialTab: "fill-line" });
+    expect(wrapper.text()).not.toContain("Available controls depend on this drawing");
+    expect(wrapper.text()).not.toContain("Fill paints the selected shape.");
+    expect(wrapper.text()).toContain("Closed shape has no arrowheads");
+    const scope = "Formatting applies to selected characters, not other text.";
+    await wrapper.setProps({ snapshot: { ...snapshot(), scopeDescription: scope } });
+    expect(wrapper.text().split(scope)).toHaveLength(2);
+    const group = { ...groupSnapshot(), scopeDescription: "One material group scope." };
+    await wrapper.setProps({ snapshot: group });
+    expect(wrapper.text().split(group.scopeDescription)).toHaveLength(2);
+  });
+});

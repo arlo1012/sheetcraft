@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, inject } from "vue";
+import { pictureFormatCommonReasons } from "./picture-format-feedback";
+import PictureEffectPresetField from "./PictureEffectPresetField.vue";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import type { PictureFormatLengthUnit } from "../../picture-format-pane-model";
 import type { PictureFormatPaneController } from "./usePictureFormatPane";
-import PictureFormatSection from "./PictureFormatSection.vue";
+import FormatSection from "../../../../shared/format-pane/FormatSection.vue";
 import PictureFormatNumberField from "./PictureFormatNumberField.vue";
 import PictureFormatChoiceField from "./PictureFormatChoiceField.vue";
 import PictureFormatColorField from "./PictureFormatColorField.vue";
@@ -18,6 +20,8 @@ const props = defineProps<{
   controller: PictureFormatPaneController;
   unit: PictureFormatLengthUnit;
 }>();
+const commonReasons = inject(pictureFormatCommonReasons, undefined);
+const showReason = (reason?: string) => reason && !commonReasons?.value.has(reason);
 const shadow = computed(() => props.controller.detailed("shadow"));
 const reflection = computed(() => props.controller.detailed("reflection"));
 const glow = computed(() => props.controller.detailed("glow"));
@@ -27,17 +31,19 @@ const rotation3d = computed(() => props.controller.detailed("rotation3d"));
 </script>
 <template>
   <div class="picture-format-effects">
-    <PictureFormatSection :title="controller.t('shadowSection')">
+    <FormatSection :title="controller.t('shadowSection')">
+      <template v-if="controller.hasDetailedCapabilities.value" #control>
+        <PictureEffectPresetField :controller="controller" category="shadow" />
+      </template>
       <template v-if="controller.hasDetailedCapabilities.value">
         <PictureShadowEditor
+          hide-preset
           :owner-key="shadow.ownerKey"
           :value="shadow.value"
           :disabled="shadow.disabled"
           :t="controller.t"
           :on-commit="shadow.apply"
         />
-        <p v-if="shadow.error" role="alert">{{ shadow.error }}</p>
-        <p v-else-if="shadow.reason">{{ shadow.reason }}</p>
       </template>
       <template v-else>
         <PictureFormatChoiceField :controller="controller" field="shadowPreset" />
@@ -52,18 +58,20 @@ const rotation3d = computed(() => props.controller.detailed("rotation3d"));
         <PictureFormatNumberField :controller="controller" field="shadowDistancePt" :unit="unit" />
         <PictureFormatNumberField :controller="controller" field="shadowAngleDeg" :unit="unit" />
       </template>
-    </PictureFormatSection>
-    <PictureFormatSection :title="controller.t('reflectionSection')">
+    </FormatSection>
+    <FormatSection :title="controller.t('reflectionSection')">
+      <template v-if="controller.hasDetailedCapabilities.value" #control>
+        <PictureEffectPresetField :controller="controller" category="reflection" />
+      </template>
       <template v-if="controller.hasDetailedCapabilities.value">
         <PictureReflectionEditor
+          hide-preset
           :owner-key="reflection.ownerKey"
           :value="reflection.value"
           :disabled="reflection.disabled"
           :t="controller.t"
           :on-commit="reflection.apply"
         />
-        <p v-if="reflection.error" role="alert">{{ reflection.error }}</p>
-        <p v-else-if="reflection.reason">{{ reflection.reason }}</p>
       </template>
       <template v-else>
         <PictureFormatChoiceField :controller="controller" field="reflectionPreset" />
@@ -84,18 +92,20 @@ const rotation3d = computed(() => props.controller.detailed("rotation3d"));
           :unit="unit"
         />
       </template>
-    </PictureFormatSection>
-    <PictureFormatSection :title="controller.t('glowSection')">
+    </FormatSection>
+    <FormatSection :title="controller.t('glowSection')">
+      <template v-if="controller.hasDetailedCapabilities.value" #control>
+        <PictureEffectPresetField :controller="controller" category="glow" />
+      </template>
       <template v-if="controller.hasDetailedCapabilities.value">
         <PictureGlowEditor
+          hide-preset
           :owner-key="glow.ownerKey"
           :value="glow.value"
           :disabled="glow.disabled"
           :t="controller.t"
           :on-commit="glow.apply"
         />
-        <p v-if="glow.error" role="alert">{{ glow.error }}</p>
-        <p v-else-if="glow.reason">{{ glow.reason }}</p>
       </template>
       <template v-else>
         <PictureFormatChoiceField :controller="controller" field="glowPreset" />
@@ -107,25 +117,27 @@ const rotation3d = computed(() => props.controller.detailed("rotation3d"));
           :unit="unit"
         />
       </template>
-    </PictureFormatSection>
-    <PictureFormatSection :title="controller.t('softEdgesSection')">
+    </FormatSection>
+    <FormatSection :title="controller.t('softEdgesSection')">
+      <template v-if="controller.hasDetailedCapabilities.value" #control>
+        <PictureEffectPresetField :controller="controller" category="softEdges" />
+      </template>
       <template v-if="controller.hasDetailedCapabilities.value">
         <PictureSoftEdgesEditor
+          hide-preset
           :owner-key="softEdges.ownerKey"
           :value="softEdges.value"
           :disabled="softEdges.disabled"
           :t="controller.t"
           :on-commit="softEdges.apply"
         />
-        <p v-if="softEdges.error" role="alert">{{ softEdges.error }}</p>
-        <p v-else-if="softEdges.reason">{{ softEdges.reason }}</p>
       </template>
       <template v-else>
         <PictureFormatChoiceField :controller="controller" field="softEdgePreset" />
         <PictureFormatNumberField :controller="controller" field="softEdgeSizePt" :unit="unit" />
       </template>
-    </PictureFormatSection>
-    <PictureFormatSection :title="controller.t('format3dSection')">
+    </FormatSection>
+    <FormatSection :title="controller.t('format3dSection')">
       <template v-if="controller.hasDetailedCapabilities.value">
         <PictureFormat3dEditor
           :owner-key="format3d.ownerKey"
@@ -135,7 +147,7 @@ const rotation3d = computed(() => props.controller.detailed("rotation3d"));
           :on-commit="format3d.apply"
         />
         <p v-if="format3d.error" role="alert">{{ format3d.error }}</p>
-        <p v-else-if="format3d.reason">{{ format3d.reason }}</p>
+        <p v-else-if="showReason(format3d.reason)">{{ format3d.reason }}</p>
       </template>
       <template v-else>
         <h3>{{ controller.t("depthSection") }}</h3>
@@ -149,18 +161,20 @@ const rotation3d = computed(() => props.controller.detailed("rotation3d"));
         <PictureFormatNumberField :controller="controller" field="lightingAngleDeg" :unit="unit" />
         <PictureFormatResetButton :controller="controller" type="reset-3d-format" />
       </template>
-    </PictureFormatSection>
-    <PictureFormatSection :title="controller.t('rotation3dSection')">
+    </FormatSection>
+    <FormatSection :title="controller.t('rotation3dSection')">
+      <template v-if="controller.hasDetailedCapabilities.value" #control>
+        <PictureEffectPresetField :controller="controller" category="rotation3d" />
+      </template>
       <template v-if="controller.hasDetailedCapabilities.value">
         <PictureRotation3dEditor
+          hide-preset
           :owner-key="rotation3d.ownerKey"
           :value="rotation3d.value"
           :disabled="rotation3d.disabled"
           :t="controller.t"
           :on-commit="rotation3d.apply"
         />
-        <p v-if="rotation3d.error" role="alert">{{ rotation3d.error }}</p>
-        <p v-else-if="rotation3d.reason">{{ rotation3d.reason }}</p>
       </template>
       <template v-else>
         <PictureFormatChoiceField :controller="controller" field="rotation3dPreset" />
@@ -181,7 +195,7 @@ const rotation3d = computed(() => props.controller.detailed("rotation3d"));
         />
         <PictureFormatResetButton :controller="controller" type="reset-3d-rotation" />
       </template>
-    </PictureFormatSection>
+    </FormatSection>
   </div>
 </template>
 <style scoped lang="scss">

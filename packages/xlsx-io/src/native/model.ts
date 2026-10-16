@@ -1,3 +1,4 @@
+import type { NativePictureGeometry } from "../picture-frame-geometry.js";
 /** Product-owned, sparse OOXML exchange model. No third-party workbook engine. */
 export type NativeStyle = Record<string, unknown>;
 export type NativeCell = {
@@ -20,6 +21,12 @@ export type NativeImage = { buffer: Uint8Array; extension: "png" | "jpeg" | "gif
 export type NativeImageAnchor = {
   tl: { nativeCol: number; nativeColOff: number; nativeRow: number; nativeRowOff: number };
   ext: { width: number; height: number };
+  placement?:
+    | { kind: "twoCell"; end: NativeImageAnchor["tl"] }
+    | { kind: "absolute"; x: number; y: number };
+  geometry?: NativePictureGeometry;
+  transformOrigin?: { x: number; y: number };
+  lockAspectRatio?: boolean;
   altText?: string;
   /** Source placement context for diagnostics; never serialized into the drawing. */
   issueLocation?: string;

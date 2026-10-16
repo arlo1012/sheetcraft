@@ -1,8 +1,10 @@
+import { displayNumber, commitDisplay, captureDisplayCommit } from "./numeric-test-actions";
+import MenuItem from "../../../../shared/menu/MenuItem.vue";
 import RibbonButton from "../../../../shared/ribbon/RibbonButton.vue";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { computed, defineComponent, h, ref, shallowRef } from "vue";
-import { InputNumber } from "tdesign-vue-next/es/input-number";
+import NumericField from "../../../../shared/numeric-field/NumericField.vue";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import {
   createWorkbook,
@@ -29,6 +31,17 @@ import {
   type PictureSizeEdit,
 } from "../../../../modules/sheet-images/picture-tool-geometry";
 
+async function arrangeEntry(wrapper: VueWrapper, label: string) {
+  if (label === "Group" || label === "Align")
+    return wrapper.get(`.picture-arrange [role="button"][aria-label="${label}"]`);
+  const trigger = wrapper.get('.picture-arrange [role="button"][aria-label="Layer"]');
+  if (trigger.attributes("aria-expanded") !== "true") await trigger.trigger("click");
+  await flushPromises();
+  const item = wrapper.findAllComponents(MenuItem).find((entry) => entry.text() === label);
+  if (!item) throw new Error(`Missing compact layer menu entry: ${label}`);
+  return item;
+}
+
 const mounted: VueWrapper[] = [];
 afterEach(() => {
   mounted.splice(0).forEach((wrapper) => wrapper.unmount());
@@ -47,9 +60,19 @@ function legacyPicture(): LegacyFloatingImage {
   };
 }
 function fixture(image: FloatingImage = legacyPicture()) {
-  const wrapper = mount(PictureToolbar, {
+  let wrapper: VueWrapper;
+  wrapper = mount(PictureToolbar, {
     attachTo: document.body,
-    props: { image, disabled: false, selectionCount: 1, previewOnDoubleClick: true },
+    props: {
+      image,
+      disabled: false,
+      selectionCount: 1,
+      previewOnDoubleClick: true,
+      resizeHandler: (edit) => {
+        wrapper.vm.$emit("resize", edit);
+        return true;
+      },
+    },
     global: { plugins: [createAppI18n("en-US")] },
   });
   mounted.push(wrapper);
@@ -57,8 +80,8 @@ function fixture(image: FloatingImage = legacyPicture()) {
 }
 function dimension(wrapper: Pick<VueWrapper, "findAllComponents">, axis: "width" | "height") {
   return wrapper
-    .findAllComponents(InputNumber)
-    .find((input) => input.attributes("data-picture-size") === axis)!;
+    .findAllComponents(NumericField)
+    .find((input) => input.props("contextAttributes")?.["data-picture-size"] === axis)!;
 }
 
 function ownedFixture(commitResize = false) {
@@ -135,14 +158,14 @@ function ownedFixture(commitResize = false) {
 }
 
 describe("picture ribbon numerical intents", () => {
-  test("shows legacy fallback dimensions and emits pixel intents without mutating geometry", () => {
+  test("shows legacy derived dimensions and acknowledges pixel intents without mutating geometry", () => {
     const image = legacyPicture();
     const before = structuredClone(image);
     const wrapper = fixture(image);
-    expect(dimension(wrapper, "width").props("modelValue")).toBe(90);
-    expect(dimension(wrapper, "height").props("modelValue")).toBe(60);
-    dimension(wrapper, "width").vm.$emit("change", 150);
-    dimension(wrapper, "height").vm.$emit("change", 75);
+    expect(displayNumber(dimension(wrapper, "width"))).toBe(90);
+    expect(displayNumber(dimension(wrapper, "height"))).toBe(60);
+    commitDisplay(dimension(wrapper, "width"), 150);
+    commitDisplay(dimension(wrapper, "height"), 75);
     expect(wrapper.emitted("resize")).toEqual([
       [{ axis: "width", value: 200 }],
       [{ axis: "height", value: 100 }],
@@ -156,11 +179,11 @@ describe("picture ribbon numerical intents", () => {
     const before = structuredClone(image);
     const wrapper = fixture(image);
     await wrapper.setProps({ geometry: { width: 240, height: 100, angleDeg: 37 } });
-    expect(dimension(wrapper, "width").props("modelValue")).toBe(180);
-    expect(dimension(wrapper, "height").props("modelValue")).toBe(75);
+    expect(displayNumber(dimension(wrapper, "width"))).toBe(180);
+    expect(displayNumber(dimension(wrapper, "height"))).toBe(75);
     expect(dimension(wrapper, "width").props("disabled")).toBe(false);
     expect(wrapper.getComponent(Checkbox).props("modelValue")).toBe(false);
-    dimension(wrapper, "height").vm.$emit("change", 120);
+    commitDisplay(dimension(wrapper, "height"), 120);
     wrapper.getComponent(Checkbox).vm.$emit("update:modelValue", true);
     expect(wrapper.emitted("resize")).toEqual([[{ axis: "height", value: 160 }]]);
     expect(wrapper.emitted("aspectRatio")).toEqual([[true]]);
@@ -174,14 +197,14 @@ describe("picture ribbon numerical intents", () => {
     const wrapper = fixture(framedPicture());
     for (const axis of ["width", "height"] as const) {
       const input = dimension(wrapper, axis);
-      expect(input.props("modelValue")).toBeUndefined();
+      expect(displayNumber(input)).toBeUndefined();
       expect(input.props("disabled")).toBe(true);
       expect((input.get("input").element as HTMLInputElement).value).toBe("");
-      input.vm.$emit("change", 100);
+      commitDisplay(input, 100);
     }
     await wrapper.setProps({ geometry: { width: Number.NaN, height: 80, angleDeg: 37 } });
-    expect(dimension(wrapper, "width").props("modelValue")).toBeUndefined();
-    expect(dimension(wrapper, "height").props("modelValue")).toBeUndefined();
+    expect(displayNumber(dimension(wrapper, "width"))).toBeUndefined();
+    expect(displayNumber(dimension(wrapper, "height"))).toBeUndefined();
     expect(wrapper.text()).not.toContain("NaN");
     expect(wrapper.emitted("resize")).toBeUndefined();
   });
@@ -189,15 +212,15 @@ describe("picture ribbon numerical intents", () => {
   test("rejects nonnumeric and out-of-range edits and disabled or multiselection intents", async () => {
     const wrapper = fixture();
     for (const invalid of [undefined, "100", Number.NaN, Infinity, -1, 0, 0.74, 7500.01])
-      dimension(wrapper, "width").vm.$emit("change", invalid);
+      commitDisplay(dimension(wrapper, "width"), invalid);
     for (const invalid of [undefined, "false", "true", 0, 1])
       wrapper.getComponent(Checkbox).vm.$emit("update:modelValue", invalid);
     expect(wrapper.emitted("resize")).toBeUndefined();
     await wrapper.setProps({ disabled: true });
-    dimension(wrapper, "width").vm.$emit("change", 100);
+    commitDisplay(dimension(wrapper, "width"), 100);
     wrapper.getComponent(Checkbox).vm.$emit("update:modelValue", false);
     await wrapper.setProps({ disabled: false, selectionCount: 2 });
-    dimension(wrapper, "height").vm.$emit("change", 100);
+    commitDisplay(dimension(wrapper, "height"), 100);
     wrapper.getComponent(Checkbox).vm.$emit("update:modelValue", false);
     expect(wrapper.emitted("resize")).toBeUndefined();
     expect(wrapper.emitted("aspectRatio")).toBeUndefined();
@@ -206,8 +229,8 @@ describe("picture ribbon numerical intents", () => {
   test("keeps valid size boundaries and the legacy default aspect lock", () => {
     const wrapper = fixture();
     expect(wrapper.getComponent(Checkbox).props("modelValue")).toBe(true);
-    dimension(wrapper, "width").vm.$emit("change", 0.75);
-    dimension(wrapper, "height").vm.$emit("change", 7500);
+    commitDisplay(dimension(wrapper, "width"), 0.75);
+    commitDisplay(dimension(wrapper, "height"), 7500);
     wrapper.getComponent(Checkbox).vm.$emit("update:modelValue", false);
     expect(wrapper.emitted("resize")).toEqual([
       [{ axis: "width", value: 1 }],
@@ -223,8 +246,8 @@ describe("picture ribbon numerical intents", () => {
       error: "Size could not be applied",
     });
     expect(wrapper.get('[role="alert"]').text()).toBe("Size could not be applied");
-    expect(dimension(wrapper, "width").props("modelValue")).toBe(90);
-    expect(dimension(wrapper, "height").props("modelValue")).toBe(60);
+    expect(displayNumber(dimension(wrapper, "width"))).toBe(90);
+    expect(displayNumber(dimension(wrapper, "height"))).toBe(60);
     await wrapper.setProps({ error: undefined });
     expect(wrapper.find('[role="alert"]').exists()).toBe(false);
   });
@@ -235,7 +258,7 @@ describe("picture ribbon numerical intents", () => {
     const aspectRatioHandler = vi.fn(() => false);
     const appearanceHandler = vi.fn(() => false);
     await wrapper.setProps({ resizeHandler, aspectRatioHandler, appearanceHandler });
-    dimension(wrapper, "width").vm.$emit("change", 150);
+    commitDisplay(dimension(wrapper, "width"), 150);
     wrapper.getComponent(Checkbox).vm.$emit("update:modelValue", false);
     wrapper.getComponent(PictureAppearanceTools).vm.$emit("change", { opacity: 0.5 });
     expect(resizeHandler).toHaveBeenCalledExactlyOnceWith({ axis: "width", value: 200 });
@@ -250,15 +273,13 @@ describe("picture ribbon numerical intents", () => {
     const first = vi.fn(() => true);
     const second = vi.fn(() => true);
     await wrapper.setProps({ resizeHandler: first });
-    const oldCallback = dimension(wrapper, "width").vm.$.vnode.props!.onChange as (
-      points: unknown,
-    ) => void;
+    const oldCallback = captureDisplayCommit(dimension(wrapper, "width"));
     await wrapper.setProps({ resizeHandler: second });
     oldCallback(120);
     expect(first).not.toHaveBeenCalled();
     expect(second).not.toHaveBeenCalled();
     expect(wrapper.emitted("resize")).toBeUndefined();
-    dimension(wrapper, "width").vm.$emit("change", 150);
+    commitDisplay(dimension(wrapper, "width"), 150);
     expect(second).toHaveBeenCalledExactlyOnceWith({ axis: "width", value: 200 });
   });
 });
@@ -287,7 +308,8 @@ describe("picture ribbon rendered owner identity", () => {
       expect(resize).toHaveBeenCalledTimes(1);
       expect(resize.mock.calls[0]?.[1]).toEqual({ axis: "width", value: 80 / 3 });
       expect(dimension(rendered, "width").vm.$.uid).toBe(width.vm.$.uid);
-      expect(dimension(rendered, "width").props("modelValue")).toBe(20);
+      expect(displayNumber(dimension(rendered, "width"))).toBeCloseTo(20, 10);
+      expect(input.element.value).toBe("20");
       if (completion === "enter") expect(document.activeElement).toBe(input.element);
     },
   );
@@ -298,13 +320,14 @@ describe("picture ribbon rendered owner identity", () => {
     const width = dimension(rendered, "width");
     const input = width.get<HTMLInputElement>("input");
     input.element.focus();
-    await input.trigger("keydown", { key: "ArrowUp" });
+    await input.trigger("keydown", { key: "ArrowUp", code: "ArrowUp" });
+    await input.trigger("keyup", { key: "ArrowUp", code: "ArrowUp" });
     await flushPromises();
     expect(resize).toHaveBeenCalledTimes(1);
     expect(resize.mock.calls[0]?.[1]).toEqual({ axis: "width", value: 364 / 3 });
     expect(dimension(rendered, "width").vm.$.uid).toBe(width.vm.$.uid);
     expect(document.activeElement).toBe(input.element);
-    const increase = width.get<HTMLButtonElement>(".t-input-number__increase");
+    const increase = width.get<HTMLButtonElement>('button[aria-label="Width (pt) +"]');
     increase.element.focus();
     await increase.trigger("click");
     await flushPromises();
@@ -332,8 +355,8 @@ describe("picture ribbon rendered owner identity", () => {
       const oldHandler = rendered.props("resizeHandler");
       const oldWidth = dimension(rendered, "width");
       const oldHeight = dimension(rendered, "height");
-      const oldWidthCallback = oldWidth.vm.$.vnode.props!.onChange as (points: unknown) => void;
-      const oldHeightCallback = oldHeight.vm.$.vnode.props!.onChange as (points: unknown) => void;
+      const oldWidthCallback = captureDisplayCommit(oldWidth);
+      const oldHeightCallback = captureDisplayCommit(oldHeight);
       const oldAppearance = rendered.getComponent(PictureAppearanceTools);
       const oldAppearanceCallback = oldAppearance.vm.$.vnode.props!.onChange as (patch: {
         opacity: number;
@@ -343,7 +366,7 @@ describe("picture ribbon rendered owner identity", () => {
       expect((oldWidth.get("input").element as HTMLInputElement).value).toBe("90.");
       expect((oldHeight.get("input").element as HTMLInputElement).value).toBe("60.");
       expect(resize).not.toHaveBeenCalled();
-      await oldAppearance.get('[aria-label="Color"]').trigger("click");
+      await oldAppearance.get('[aria-label="Color adjustments"]').trigger("click");
       await flushPromises();
       if (kind === "selection") selectedIds.value = ["legacy"];
       if (kind === "source") {
@@ -352,7 +375,7 @@ describe("picture ribbon rendered owner identity", () => {
       }
       if (kind === "context") context.value = { ...context.value };
       expect(rendered.props("resizeHandler")).toBe(oldHandler);
-      dimension(rendered, "width").vm.$emit("change", 150);
+      commitDisplay(dimension(rendered, "width"), 150);
       rendered.getComponent(Checkbox).vm.$emit("update:modelValue", false);
       rendered.getComponent(PictureAppearanceTools).vm.$emit("change", { opacity: 0.5 });
       expect(resize).not.toHaveBeenCalled();
@@ -370,26 +393,26 @@ describe("picture ribbon rendered owner identity", () => {
       expect(
         rendered
           .getComponent(PictureAppearanceTools)
-          .get('[aria-label="Color"]')
+          .get('[aria-label="Color adjustments"]')
           .attributes("aria-expanded"),
       ).toBe("false");
       expect(dimension(rendered, "width").vm.$.uid).not.toBe(oldWidth.vm.$.uid);
       expect(dimension(rendered, "height").vm.$.uid).not.toBe(oldHeight.vm.$.uid);
       expect((dimension(rendered, "width").get("input").element as HTMLInputElement).value).toBe(
-        "90.00",
+        "90",
       );
       expect((dimension(rendered, "height").get("input").element as HTMLInputElement).value).toBe(
-        "60.00",
+        "60",
       );
-      oldWidth.vm.$emit("change", 180);
-      oldHeight.vm.$emit("change", 120);
+      commitDisplay(oldWidth, 180);
+      commitDisplay(oldHeight, 120);
       oldWidthCallback(180);
       oldHeightCallback(120);
       oldAppearance.vm.$emit("change", { opacity: 0.25 });
       oldAppearanceCallback({ opacity: 0.25 });
       expect(resize).not.toHaveBeenCalled();
       expect(appearance).not.toHaveBeenCalled();
-      dimension(rendered, "width").vm.$emit("change", 150);
+      commitDisplay(dimension(rendered, "width"), 150);
       rendered.getComponent(Checkbox).vm.$emit("update:modelValue", false);
       rendered.getComponent(PictureAppearanceTools).vm.$emit("change", { opacity: 0.5 });
       expect(resize).toHaveBeenCalledExactlyOnceWith(image.value, { axis: "width", value: 200 });
@@ -402,10 +425,10 @@ describe("picture ribbon rendered owner identity", () => {
     const { wrapper, sheet, revision, appearance, context } = ownedFixture();
     const rendered = wrapper.getComponent(PictureToolbar);
     const oldAppearance = rendered.getComponent(PictureAppearanceTools);
-    await oldAppearance.get('[aria-label="Color"]').trigger("click");
+    await oldAppearance.get('[aria-label="Color adjustments"]').trigger("click");
     await flushPromises();
-    const brightness = oldAppearance.findAllComponents(InputNumber)[0]!;
-    brightness.vm.$emit("change", 125);
+    const brightness = oldAppearance.findAllComponents(NumericField)[0]!;
+    commitDisplay(brightness, 125);
     expect(appearance).toHaveBeenCalledExactlyOnceWith({ brightness: 1.25 });
     sheet.floatingImages[0] = {
       ...sheet.floatingImages[0]!,
@@ -414,9 +437,11 @@ describe("picture ribbon rendered owner identity", () => {
     revision.value += 1;
     await wrapper.vm.$nextTick();
     expect(rendered.getComponent(PictureAppearanceTools).vm.$.uid).toBe(oldAppearance.vm.$.uid);
-    expect(oldAppearance.get('[aria-label="Color"]').attributes("aria-expanded")).toBe("true");
-    expect(oldAppearance.findAllComponents(InputNumber)[0]!.vm.$.uid).toBe(brightness.vm.$.uid);
-    brightness.vm.$emit("change", 150);
+    expect(oldAppearance.get('[aria-label="Color adjustments"]').attributes("aria-expanded")).toBe(
+      "true",
+    );
+    expect(oldAppearance.findAllComponents(NumericField)[0]!.vm.$.uid).toBe(brightness.vm.$.uid);
+    commitDisplay(brightness, 150);
     expect(appearance).toHaveBeenNthCalledWith(2, { brightness: 1.5 });
     context.value = { ...context.value };
     await wrapper.vm.$nextTick();
@@ -424,10 +449,10 @@ describe("picture ribbon rendered owner identity", () => {
     expect(
       rendered
         .getComponent(PictureAppearanceTools)
-        .get('[aria-label="Color"]')
+        .get('[aria-label="Color adjustments"]')
         .attributes("aria-expanded"),
     ).toBe("false");
-    brightness.vm.$emit("change", 175);
+    commitDisplay(brightness, 175);
     expect(appearance).toHaveBeenCalledTimes(2);
   });
 });
@@ -461,28 +486,24 @@ describe("framed picture ribbon capability boundary", () => {
       alignmentDisabled: false,
       gridDisabled: false,
     });
-    expect(wrapper.get('.picture-arrange [aria-label="Group"]').attributes("aria-disabled")).toBe(
-      "true",
-    );
+    expect((await arrangeEntry(wrapper, "Group")).attributes("aria-disabled")).toBe("true");
     for (const label of ["Ungroup", "Align"])
-      expect(
-        wrapper.get(`.picture-arrange [aria-label="${label}"]`).attributes("aria-disabled"),
-      ).toBe("false");
+      expect((await arrangeEntry(wrapper, label)).attributes("aria-disabled")).toBe("false");
     await wrapper.setProps({ selectionCount: 2 });
-    await wrapper.get('.picture-arrange [aria-label="Group"]').trigger("click");
+    await (await arrangeEntry(wrapper, "Group")).trigger("click");
     expect(wrapper.emitted("group")).toEqual([[]]);
-    expect(
-      wrapper.get('.picture-arrange [aria-label="Bring to front"]').attributes("aria-disabled"),
-    ).toBe("false");
-    expect(
-      wrapper.get('.picture-arrange [aria-label="Selection pane"]').attributes("aria-disabled"),
-    ).toBe("false");
+    expect((await arrangeEntry(wrapper, "Bring to front")).attributes("aria-disabled")).toBe(
+      "false",
+    );
+    expect((await arrangeEntry(wrapper, "Selection pane")).attributes("aria-disabled")).toBe(
+      "false",
+    );
     for (const event of ["replace", "convertToCell", "crop", "restore", "annotate"])
       expect(wrapper.emitted(event)).toBeUndefined();
     wrapper.getComponent(PictureRotationMenu).vm.$emit("rotate", 1);
     wrapper.getComponent(PictureRotationMenu).vm.$emit("flip", "horizontal");
     wrapper.getComponent(PictureAppearanceTools).vm.$emit("change", { opacity: 0.5 });
-    await wrapper.get('.picture-arrange [aria-label="Bring to front"]').trigger("click");
+    await (await arrangeEntry(wrapper, "Bring to front")).trigger("click");
     expect(wrapper.emitted("rotate")).toEqual([[1]]);
     expect(wrapper.emitted("flip")).toEqual([["horizontal"]]);
     expect(wrapper.emitted("appearance")).toEqual([[{ opacity: 0.5 }]]);
@@ -513,12 +534,8 @@ describe("framed picture ribbon capability boundary", () => {
         "false",
       );
     await wrapper.setProps({ selectionCount: 2 });
-    expect(wrapper.get('.picture-arrange [aria-label="Group"]').attributes("aria-disabled")).toBe(
-      "false",
-    );
-    expect(wrapper.get('.picture-arrange [aria-label="Ungroup"]').attributes("aria-disabled")).toBe(
-      "false",
-    );
+    expect((await arrangeEntry(wrapper, "Group")).attributes("aria-disabled")).toBe("false");
+    expect((await arrangeEntry(wrapper, "Ungroup")).attributes("aria-disabled")).toBe("false");
     expect(wrapper.getComponent(PictureAssetTools).props()).toMatchObject({
       disabled: false,
       busy: false,
@@ -529,16 +546,12 @@ describe("framed picture ribbon capability boundary", () => {
 test("group creation permission is independent of existing ungroup and arrangement", async () => {
   const wrapper = fixture({ ...legacyPicture(), groupId: "existing-group" });
   await wrapper.setProps({ selectionCount: 2, groupCreateDisabled: true });
-  expect(wrapper.get('.picture-arrange [aria-label="Group"]').attributes("aria-disabled")).toBe(
-    "true",
-  );
+  expect((await arrangeEntry(wrapper, "Group")).attributes("aria-disabled")).toBe("true");
   for (const label of ["Ungroup", "Align", "Bring to front"])
-    expect(
-      wrapper.get(`.picture-arrange [aria-label="${label}"]`).attributes("aria-disabled"),
-    ).toBe("false");
+    expect((await arrangeEntry(wrapper, label)).attributes("aria-disabled")).toBe("false");
   wrapper.getComponent(PictureArrangeTools).vm.$emit("group");
   expect(wrapper.emitted("group")).toBeUndefined();
-  await wrapper.get('.picture-arrange [aria-label="Ungroup"]').trigger("click");
+  await (await arrangeEntry(wrapper, "Ungroup")).trigger("click");
   expect(wrapper.emitted("ungroup")).toEqual([[]]);
 });
 
@@ -582,3 +595,49 @@ test("framed annotation requires a captured real-source capability and stale cal
   await annotation.trigger("click");
   expect(annotate).toHaveBeenCalledOnce();
 });
+
+test.each(["image", "owner", "draft", "selection"])(
+  "reflection format routing rejects a stale %s",
+  async (change) => {
+    const image = framedPicture();
+    const wrapper = fixture(image);
+    await wrapper.setProps({ draftOwnerKey: 1, appearanceDraftKey: 1 });
+    const tools = wrapper.getComponent(PictureAppearanceTools);
+    const old = tools.vm.$.vnode.props!.onFormat as () => void;
+    if (change === "image") await wrapper.setProps({ image: { ...image, assetId: "replacement" } });
+    else if (change === "owner") await wrapper.setProps({ draftOwnerKey: 2 });
+    else if (change === "draft") await wrapper.setProps({ appearanceDraftKey: 2 });
+    else await wrapper.setProps({ selectionCount: 2 });
+    old();
+    expect(wrapper.emitted("format")).toBeUndefined();
+    if (change === "selection") await wrapper.setProps({ selectionCount: 1 });
+    wrapper.getComponent(PictureAppearanceTools).vm.$emit("format");
+    expect(wrapper.emitted("format")).toEqual([[]]);
+    expect(wrapper.emitted("appearance")).toBeUndefined();
+    expect(image).toEqual(framedPicture());
+  },
+);
+
+test.each(["image", "owner", "draft", "handler", "disabled"])(
+  "typed effect callbacks reject stale %s and propagate rejection",
+  async (change) => {
+    const image = framedPicture(),
+      wrapper = fixture(image),
+      first = vi.fn(() => true),
+      newer = vi.fn(() => true);
+    await wrapper.setProps({ draftOwnerKey: 1, appearanceDraftKey: 1, effectHandler: first });
+    const old = wrapper.getComponent(PictureAppearanceTools).props("effectHandler")!;
+    const edit = { category: "reflection" as const, value: { kind: "none" as const } };
+    if (change === "image") await wrapper.setProps({ image: { ...image, assetId: "replacement" } });
+    else if (change === "owner") await wrapper.setProps({ draftOwnerKey: 2 });
+    else if (change === "draft") await wrapper.setProps({ appearanceDraftKey: 2 });
+    else if (change === "handler") await wrapper.setProps({ effectHandler: newer });
+    else await wrapper.setProps({ disabled: true });
+    expect(old(edit)).toBe(false);
+    expect(first).not.toHaveBeenCalled();
+    expect(newer).not.toHaveBeenCalled();
+    await wrapper.setProps({ disabled: false, effectHandler: vi.fn(() => false) });
+    expect(wrapper.getComponent(PictureAppearanceTools).props("effectHandler")!(edit)).toBe(false);
+    expect(wrapper.emitted("appearance")).toBeUndefined();
+  },
+);

@@ -34,6 +34,29 @@ function fixture(width = 8, height = 4, failure = false) {
 }
 afterEach(() => vi.unstubAllGlobals());
 describe("picture preflight and original byte identity", () => {
+  test("aborting a pending pixel decode clears its source and releases the URL", async () => {
+    const f = fixture();
+    let src = "";
+    vi.stubGlobal(
+      "Image",
+      class {
+        onload?: () => void;
+        onerror?: () => void;
+        set src(value: string) {
+          src = value;
+        }
+      },
+    );
+    const controller = new AbortController();
+    const pending = prepareImageAsset(new Blob([actualPng]), controller.signal);
+    const rejected = expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    await vi.waitFor(() => expect(src).toBe("blob:encoded"));
+    controller.abort();
+    await rejected;
+    expect(src).toBe("");
+    expect(f.revoke).toHaveBeenCalledExactlyOnceWith("blob:encoded");
+  });
+
   test("an oversized GIF frame offset never reaches the platform decoder", async () => {
     const f = fixture();
     const bytes = actualGif.slice();

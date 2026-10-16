@@ -23,6 +23,7 @@ import { getPivotTableRange } from "@sheetcraft/core/pivot-tables";
 import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
+  getDefaultRowHeight,
   type CellAddress,
   type Sheet,
 } from "@sheetcraft/core/workbook";
@@ -140,6 +141,7 @@ export function getSheetContentExtent(sheet: Sheet): GridExtent {
   }
   if (sheet.floatingImages.length > 0) {
     const geometry = createSheetGeometry({
+      rowHeight: getDefaultRowHeight(sheet),
       rowHeights: sheet.rowHeights,
       columnWidths: sheet.columnWidths,
       columnWidth: sheet.defaultColumnWidth,

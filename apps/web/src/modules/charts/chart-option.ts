@@ -1,3 +1,4 @@
+import { applySeriesLegendIdentity } from "./chart-series-legend";
 import type { EChartsOption, SeriesOption } from "echarts";
 import { formatCellNumberValue } from "@sheetcraft/core/number-format";
 import type { CellNumberFormat } from "@sheetcraft/core/style";
@@ -6,7 +7,10 @@ import {
   type ChartData,
   type SheetChart,
 } from "@sheetcraft/core/sheet-charts";
-import type { ChartPresentationSettings } from "@sheetcraft/core/chart-presentation";
+import {
+  DEFAULT_CHART_PALETTE,
+  type ChartPresentationSettings,
+} from "@sheetcraft/core/chart-presentation";
 import type { ChartComboSeriesChange } from "@sheetcraft/core/chart-combo";
 import { getChartElementCapabilities, getChartElementSettings } from "./chart-elements";
 import { applyChartCommonFormat, getChartComboDataSeriesSettings } from "./chart-format-render";
@@ -15,7 +19,7 @@ import {
   createChartPresentationData,
   getChartRenderPresentation,
 } from "./chart-presentation-render";
-const colors = ["#2563eb", "#16a34a", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#db2777"];
+const colors = DEFAULT_CHART_PALETTE;
 type ChartDimensions = { width: number; height: number };
 
 /** Explicit sources keep each series' original palette slot when reordered. */
@@ -158,7 +162,7 @@ function buildChartOption(
   presentation?: ChartPresentationSettings,
   comboSeriesChanges?: readonly ChartComboSeriesChange[],
 ): EChartsOption {
-  const palette = presentation?.palette ?? colors;
+  const palette = presentation?.palette ?? [...colors];
   const background = presentation?.background ?? "#ffffff";
   if (chart.source !== undefined) {
     if (!["column", "bar", "line", "area", "radar", "combo"].includes(chart.type))
@@ -201,31 +205,6 @@ function buildChartOption(
     textStyle: { fontFamily: "Arial, sans-serif" },
     ...(layout ? { title: layout.title, legend: layout.legend } : {}),
   };
-  if (chart.type === "combo" && common.legend && !Array.isArray(common.legend)) {
-    const seen = new Set<string>();
-    // Native LineSeries always draws a marker in its legend. Explicit plain-line
-    // icons inherit the engine's actual series paint instead of remapping a palette.
-    common.legend.data = data.series.flatMap((series) => {
-      if (seen.has(series.name)) return [];
-      seen.add(series.name);
-      const settings = getChartComboDataSeriesSettings(chart, series, comboSeriesChanges);
-      const saved =
-        series.id === undefined
-          ? undefined
-          : chart.format?.series?.find((entry) => entry.id === series.id);
-      return [
-        {
-          name: series.name,
-          ...(settings.drawType === "line" && !settings.markers
-            ? {
-                icon: "line",
-                itemStyle: { borderColor: "auto", borderWidth: saved?.strokeWidth ?? 2 },
-              }
-            : {}),
-        },
-      ];
-    });
-  }
   if (chart.type === "pie" || chart.type === "doughnut")
     return {
       ...common,
@@ -604,5 +583,9 @@ export function createChartOption(
     option.yAxis = valueAxis(
       percent ? { kind: "percent", fractionDigits: 0 } : uniformFormat(plotted),
     );
-  return applyChartCommonFormat(option, chart, renderedData, comboSeriesChanges);
+  return applySeriesLegendIdentity(
+    applyChartCommonFormat(option, chart, renderedData, comboSeriesChanges),
+    chart,
+    renderedData,
+  );
 }

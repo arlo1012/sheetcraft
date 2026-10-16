@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, useId } from "vue";
+import PictureFormatFeedback from "./PictureFormatFeedback.vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import type { PictureIntrinsicSizeStatus } from "../../usePictureIntrinsicSize";
 import { Input as TInput } from "tdesign-vue-next/es/input";
@@ -11,7 +12,7 @@ import {
   type PictureFormatLengthUnit,
 } from "../../picture-format-pane-model";
 import type { PictureFormatPaneController } from "./usePictureFormatPane";
-import PictureFormatSection from "./PictureFormatSection.vue";
+import FormatSection from "../../../../shared/format-pane/FormatSection.vue";
 import PictureFormatNumberField from "./PictureFormatNumberField.vue";
 import PictureFormatField from "./PictureFormatField.vue";
 import PictureFormatCheckbox from "./PictureFormatCheckbox.vue";
@@ -22,6 +23,7 @@ const props = defineProps<{
   intrinsicStatus?: PictureIntrinsicSizeStatus;
   retryIntrinsic?: () => void;
 }>();
+const anchorFeedbackId = `picture-format-anchor-${useId()}`;
 const anchor = computed(() => props.controller.choice("anchor"));
 const title = computed(() => props.controller.text("altTitle"));
 const description = computed(() => props.controller.text("altDescription"));
@@ -33,7 +35,7 @@ const original = computed(() => {
 </script>
 <template>
   <div class="picture-format-size-properties">
-    <PictureFormatSection :title="controller.t('sizeSection')" initially-open>
+    <FormatSection :title="controller.t('sizeSection')" initially-open>
       <PictureFormatNumberField :controller="controller" field="sizeHeightPt" :unit="unit" />
       <PictureFormatNumberField :controller="controller" field="sizeWidthPt" :unit="unit" />
       <PictureFormatNumberField :controller="controller" field="rotationDeg" :unit="unit" />
@@ -71,12 +73,14 @@ const original = computed(() => {
       </div>
       <p class="picture-format-size-properties__hint">{{ controller.t("sizeHelp") }}</p>
       <PictureFormatResetButton :controller="controller" type="reset-size" />
-    </PictureFormatSection>
-    <PictureFormatSection :title="controller.t('propertiesSection')">
+    </FormatSection>
+    <FormatSection :title="controller.t('propertiesSection')">
       <TRadioGroup
         :model-value="anchor.value"
         :disabled="anchor.disabled"
         :aria-label="controller.t('anchor')"
+        role="radiogroup"
+        :aria-describedby="anchor.error || anchor.reason ? anchorFeedbackId : undefined"
         class="picture-format-size-properties__anchors"
         data-picture-format-field="anchor"
         @change="anchor.select"
@@ -85,14 +89,11 @@ const original = computed(() => {
         <TRadio value="move">{{ controller.t("anchorMove") }}</TRadio>
         <TRadio value="fixed">{{ controller.t("anchorFixed") }}</TRadio>
       </TRadioGroup>
-      <p v-if="anchor.error" role="alert">{{ anchor.error }}</p>
-      <p v-else-if="anchor.reason" class="picture-format-size-properties__hint">
-        {{ anchor.reason }}
-      </p>
+      <PictureFormatFeedback :id="anchorFeedbackId" :reason="anchor.reason" :error="anchor.error" />
       <PictureFormatCheckbox :controller="controller" field="printObject" />
       <PictureFormatCheckbox :controller="controller" field="locked" />
-    </PictureFormatSection>
-    <PictureFormatSection :title="controller.t('altTextSection')">
+    </FormatSection>
+    <FormatSection :title="controller.t('altTextSection')">
       <PictureFormatField
         :label="controller.t('altTitle')"
         :reason="title.reason"
@@ -136,7 +137,7 @@ const original = computed(() => {
             @keydown="description.keydown"
         /></template>
       </PictureFormatField>
-    </PictureFormatSection>
+    </FormatSection>
   </div>
 </template>
 <style scoped lang="scss">

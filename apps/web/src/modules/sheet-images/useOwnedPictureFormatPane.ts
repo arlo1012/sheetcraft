@@ -679,7 +679,10 @@ export function useOwnedPictureFormatPane(options: OwnedPictureFormatPaneOptions
       capabilities.resets!["reset-size"] = { enabled: false, reason };
     }
     if (sourceBearing && cropState && !capabilities.cropShape)
-      capabilities.cropShape = { enabled: !!context };
+      capabilities.cropShape = {
+        enabled: !options.isBusy() && !!context,
+        ...(options.isBusy() ? { reason: options.getDisabledReason?.() } : {}),
+      };
     if (!canEditPictureRoot(lease.sheet, lease.root)) {
       capabilities.cropShape = {
         enabled: false,

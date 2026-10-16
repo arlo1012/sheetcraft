@@ -14,14 +14,15 @@ import { formatCellNumberValue } from "@sheetcraft/core/number-format";
 import type { CellNumberFormat } from "@sheetcraft/core/style";
 import type { ChartData, ChartSeries, SheetChart } from "@sheetcraft/core/sheet-charts";
 import type { ChartPresentationSettings } from "@sheetcraft/core/chart-presentation";
+import type { ChartComboSeriesChange } from "@sheetcraft/core/chart-combo";
 import {
-  resolveChartComboSeriesSettings,
-  type ChartComboSeriesChange,
-  type ChartComboSeriesSettings,
-} from "@sheetcraft/core/chart-combo";
+  effectiveChartMinorGridlines,
+  getChartComboDataSeriesSettings,
+  isChartSecondaryAxisSeries,
+  resolveChartValueAxisState,
+} from "./chart-axis-state";
+export { getChartComboDataSeriesSettings, resolveChartAxisIntervals } from "./chart-axis-state";
 import {
-  chartPercentAxisDomain,
-  chartPercentAxisSettings,
   getChartPresentationTextColor,
   getChartRenderPresentation,
 } from "./chart-presentation-render";
@@ -29,30 +30,6 @@ import {
 type AxisWithoutMainType<T> = T extends unknown ? Omit<T, "mainType"> : never;
 type AxisOption = AxisWithoutMainType<XAXisComponentOption | YAXisComponentOption>;
 type ValueAxisOption = Extract<AxisOption, { type?: "value" }>;
-type ChartAxisIntervals = {
-  min?: number;
-  max?: number;
-  interval?: number;
-  minorDivisions?: number;
-};
-const MAX_AXIS_TICKS = 2048;
-
-/** Range bands remain physical preview identities; saved ID formats are resolved by Core. */
-export function getChartComboDataSeriesSettings(
-  chart: SheetChart,
-  series: ChartSeries,
-  changes?: readonly ChartComboSeriesChange[],
-): ChartComboSeriesSettings {
-  const target = series.rangeBand
-    ? { rangeBand: series.rangeBand }
-    : series.id !== undefined
-      ? { seriesId: series.id }
-      : undefined;
-  return target
-    ? resolveChartComboSeriesSettings(chart, target, changes)
-    : { drawType: "column", axis: "primary", markers: false };
-}
-
 function textStyle(format?: ChartTextFormat) {
   return {
     ...(format?.fontFamily !== undefined ? { fontFamily: format.fontFamily } : {}),
@@ -64,103 +41,6 @@ function textStyle(format?: ChartTextFormat) {
     ...(format?.italic !== undefined
       ? { fontStyle: format.italic ? ("italic" as const) : ("normal" as const) }
       : {}),
-  };
-}
-
-function niceUnit(value: number): number {
-  if (!Number.isFinite(value) || value <= 0) throw new RangeError("Unsafe chart axis extent.");
-  const scale = 10 ** Math.floor(Math.log10(value)) || Number.MIN_VALUE;
-  const fraction = value / scale;
-  const result = scale * (fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10);
-  if (!Number.isFinite(result) || result <= 0) throw new RangeError("Unsafe chart axis unit.");
-  return result;
-}
-
-function axisValues(entries: ChartSeries[], stacked: boolean): number[] {
-  if (!stacked)
-    return entries.flatMap((entry) =>
-      entry.values.filter((value): value is number => value !== null),
-    );
-  const count = Math.max(0, ...entries.map((entry) => entry.values.length));
-  const result: number[] = [];
-  for (let index = 0; index < count; index++) {
-    let positive = 0,
-      negative = 0;
-    for (const entry of entries) {
-      const value = entry.values[index];
-      if (value === null || value === undefined) continue;
-      if (value >= 0) positive += value;
-      else negative += value;
-    }
-    if (!Number.isFinite(positive) || !Number.isFinite(negative))
-      throw new RangeError("Chart stack exceeds the finite axis budget.");
-    result.push(positive, negative);
-  }
-  return result;
-}
-
-/** Derive real intervals only when requested; styles alone retain the renderer's auto scale. */
-export function resolveChartAxisIntervals(
-  settings: ChartValueAxisFormat | undefined,
-  values: readonly number[],
-): ChartAxisIntervals {
-  let minimum = 0,
-    maximum = 0;
-  for (const value of values) {
-    if (!Number.isFinite(value)) throw new RangeError("Chart values must be finite.");
-    minimum = Math.min(minimum, value);
-    maximum = Math.max(maximum, value);
-  }
-  let min = settings?.min ?? minimum,
-    max = settings?.max ?? maximum;
-  if (min === max && settings?.min === undefined && settings?.max === undefined) max = min + 1;
-  if (min >= max) {
-    if (settings?.min === undefined) min = max - Math.max(1, Math.abs(max) * 0.1);
-    else if (settings.max === undefined) max = min + Math.max(1, Math.abs(min) * 0.1);
-  }
-  const extent = max - min;
-  if (!Number.isFinite(extent) || extent <= 0)
-    throw new RangeError("Chart axis bounds do not have a finite positive span.");
-  if (settings?.majorUnit === undefined && settings?.minorUnit === undefined)
-    return {
-      ...(settings?.max !== undefined && min !== minimum ? { min } : {}),
-      ...(settings?.min !== undefined && max !== maximum ? { max } : {}),
-    };
-  const minor = settings.minorUnit;
-  const major =
-    settings.majorUnit ??
-    (minor !== undefined
-      ? minor *
-        Math.min(
-          100,
-          Math.max(1, Math.ceil(niceUnit(Math.max(extent / 5, Number.MIN_VALUE)) / minor)),
-        )
-      : niceUnit(Math.max(extent / 5, Number.MIN_VALUE)));
-  if (!Number.isFinite(major) || major <= 0) throw new RangeError("Unsafe chart axis unit.");
-  if (settings.min === undefined) min = Math.floor(min / major) * major;
-  if (settings.max === undefined) max = Math.ceil(max / major) * major;
-  if (!Number.isFinite(min) || !Number.isFinite(max) || min >= max)
-    throw new RangeError("Unsafe chart axis bounds.");
-  for (const unit of [major, minor]) {
-    if (unit === undefined) continue;
-    const count = Math.ceil((max - min) / unit) + 1;
-    if (!Number.isFinite(count) || count > MAX_AXIS_TICKS)
-      throw new RangeError("Chart axis exceeds the 2048-tick budget.");
-  }
-  const split = minor === undefined ? undefined : major / minor;
-  if (
-    split !== undefined &&
-    (!Number.isFinite(split) ||
-      split < 1 ||
-      split > 100 ||
-      Math.abs(split - Math.round(split)) > Number.EPSILON * 16 * Math.max(1, split))
-  )
-    throw new RangeError("The minor unit must evenly divide the major unit.");
-  return {
-    min,
-    max,
-    interval: major,
-    ...(split !== undefined ? { minorDivisions: Math.round(split) } : {}),
   };
 }
 
@@ -180,12 +60,9 @@ function valueAxis(
   sourceGroupChanged = false,
   percent = false,
 ): ValueAxisOption {
-  if (percent) settings = chartPercentAxisSettings(settings);
-  const percentageDomain = percent ? chartPercentAxisDomain(entries) : undefined;
-  const intervals = resolveChartAxisIntervals(
-    settings,
-    percentageDomain ? [percentageDomain.min, percentageDomain.max] : axisValues(entries, stacked),
-  );
+  const state = resolveChartValueAxisState(settings, entries, stacked, percent);
+  settings = state.settings;
+  const { percentageDomain, intervals } = state;
   const overrideNumber =
     percent ||
     sourceGroupChanged ||
@@ -254,7 +131,7 @@ function valueAxis(
     ...(minorDivisions !== undefined
       ? {
           minorTick: { show: minorDivisions > 1, splitNumber: minorDivisions },
-          minorSplitLine: { show: minorDivisions > 1 },
+          minorSplitLine: { show: effectiveChartMinorGridlines(settings, minorDivisions) },
         }
       : {}),
     ...(settings?.majorGridlines !== undefined
@@ -262,7 +139,10 @@ function valueAxis(
       : {}),
     ...(settings?.minorGridlines !== undefined
       ? {
-          minorSplitLine: { ...base.minorSplitLine, show: settings.minorGridlines },
+          minorSplitLine: {
+            ...base.minorSplitLine,
+            show: effectiveChartMinorGridlines(settings, minorDivisions),
+          },
           ...(settings.minorGridlines
             ? { minorTick: { ...base.minorTick, show: true, splitNumber: minorDivisions ?? 5 } }
             : {}),
@@ -413,9 +293,7 @@ export function applyChartCommonFormat(
   const selectedFormat = (entry: ChartSeries | undefined) =>
     entry?.id !== undefined ? format.series?.find((item) => item.id === entry.id) : undefined;
   const secondary = (entry: ChartSeries) =>
-    combo
-      ? getChartComboDataSeriesSettings(chart, entry, comboSeriesChanges).axis === "secondary"
-      : (bars || lines) && selectedFormat(entry)?.axis === "secondary";
+    isChartSecondaryAxisSeries(chart, entry, format, comboSeriesChanges);
   if (cartesian && format.plot && option.grid && !Array.isArray(option.grid))
     next.grid = {
       ...option.grid,

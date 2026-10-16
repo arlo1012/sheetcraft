@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import type { PictureEffectEdit } from "../picture-effect-edit";
+import { computed, ref } from "vue";
 import { Crop, Eye, ImagePlus, ImageDown, PencilLine, Settings2, RotateCcw } from "lucide-vue-next";
 import { isGroupedPicture, type GroupedPicture } from "@sheetcraft/core/picture-group";
 import type { ImageAppearance } from "@sheetcraft/core/workbook";
@@ -27,9 +28,12 @@ const props = defineProps<{
   replaceHandler: () => void;
   convertHandler?: () => boolean;
   canConvert?: boolean;
-  formatHandler: () => void;
+  formatHandler: (target?: "effects") => void;
   appearanceHandler?: (patch: Partial<ImageAppearance> | undefined) => boolean;
+  effectHandler?: (edit: PictureEffectEdit) => boolean;
+  restoreEffectsFocusTarget?: () => HTMLElement | null;
   ownerKey: string;
+  displayOwnerKey?: string;
 }>();
 if (!isGroupedPicture(props.image))
   throw new TypeError("An owned source ribbon requires a real picture leaf.");
@@ -39,6 +43,11 @@ const emit = defineEmits<{
   export: [format: PictureFileFormat, all?: boolean];
 }>();
 const { t } = useAppI18n();
+const appearanceTools = ref<InstanceType<typeof PictureAppearanceTools>>();
+defineExpose({
+  getEffectsTrigger: (): HTMLElement | null =>
+    props.disabled ? null : (appearanceTools.value?.getEffectsTrigger() ?? null),
+});
 const callbacks = computed(() => {
   const image = props.image,
     key = props.ownerKey,
@@ -50,7 +59,19 @@ const callbacks = computed(() => {
     annotate = props.annotateHandler;
   const restore = props.restoreHandler;
   const appearance = props.appearanceHandler;
+  const effect = props.effectHandler;
   return {
+    effect: (edit: PictureEffectEdit): boolean => {
+      if (
+        image !== props.image ||
+        !isGroupedPicture(props.image) ||
+        key !== props.ownerKey ||
+        props.disabled ||
+        effect !== props.effectHandler
+      )
+        return false;
+      return effect?.(edit) === true;
+    },
     appearance: (patch: Partial<ImageAppearance> | undefined) => {
       if (
         image === props.image &&
@@ -59,7 +80,8 @@ const callbacks = computed(() => {
         !props.disabled &&
         appearance === props.appearanceHandler
       )
-        appearance?.(patch);
+        return appearance?.(patch) === true;
+      return false;
     },
     restore: () => {
       if (
@@ -133,8 +155,9 @@ const callbacks = computed(() => {
       )
         crop?.();
     },
-    format: () => {
+    viewFormat: () => {
       if (
+        !props.busy &&
         image === props.image &&
         isGroupedPicture(props.image) &&
         key === props.ownerKey &&
@@ -142,24 +165,23 @@ const callbacks = computed(() => {
       )
         format();
     },
+    format: (target?: "effects") => {
+      if (
+        !props.disabled &&
+        image === props.image &&
+        isGroupedPicture(props.image) &&
+        key === props.ownerKey &&
+        format === props.formatHandler
+      ) {
+        if (target === "effects") format(target);
+        else format();
+      }
+    },
   };
 });
 </script>
 <template>
   <RibbonToolbar :label="t('image.tools')" data-owned-picture-source-ribbon>
-    <RibbonButton
-      variant="tall"
-      :label="
-        canRestore === false && restoreUnavailableReason
-          ? `${t('image.restoreOriginal')}：${restoreUnavailableReason}`
-          : t('image.restoreOriginal')
-      "
-      :text="t('image.restoreOriginal')"
-      :disabled="disabled || !canRestore || !restoreHandler"
-      data-picture-tool="restore"
-      @activate="callbacks.restore"
-      ><RotateCcw
-    /></RibbonButton>
     <RibbonButton
       variant="tall"
       :label="t('image.replace')"
@@ -178,6 +200,30 @@ const callbacks = computed(() => {
       @activate="callbacks.crop"
       ><Crop
     /></RibbonButton>
+    <RibbonButton
+      variant="tall"
+      :label="
+        canRestore === false && restoreUnavailableReason
+          ? `${t('image.restoreOriginal')}：${restoreUnavailableReason}`
+          : t('image.restoreOriginal')
+      "
+      :text="t('image.restoreOriginal')"
+      :disabled="disabled || !canRestore || !restoreHandler"
+      data-picture-tool="restore"
+      @activate="callbacks.restore"
+      ><RotateCcw
+    /></RibbonButton>
+    <PictureAppearanceTools
+      ref="appearanceTools"
+      :restore-effects-focus-target="restoreEffectsFocusTarget"
+      :key="displayOwnerKey ?? ownerKey"
+      :image="image"
+      :disabled="disabled || !appearanceHandler"
+      :effect-handler="effectHandler ? callbacks.effect : undefined"
+      :appearance-commit-handler="appearanceHandler ? callbacks.appearance : undefined"
+      @change="callbacks.appearance"
+      @format="callbacks.format"
+    />
     <RibbonButton
       variant="tall"
       :label="t('image.preview')"
@@ -215,18 +261,13 @@ const callbacks = computed(() => {
       @batch-size="callbacks.batchSize"
       @export="callbacks.export"
     />
-    <PictureAppearanceTools
-      :key="ownerKey"
-      :image="image"
-      :disabled="disabled || !appearanceHandler"
-      @change="callbacks.appearance"
-    />
     <RibbonButton
       variant="tall"
       :label="t('pictureFormat.paneTitle')"
       :text="t('pictureFormat.paneTitle')"
+      :disabled="!!busy"
       data-picture-tool="format"
-      @activate="callbacks.format"
+      @activate="callbacks.viewFormat"
       ><Settings2
     /></RibbonButton>
   </RibbonToolbar>

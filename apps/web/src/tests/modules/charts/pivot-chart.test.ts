@@ -1,11 +1,11 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
-import { Dialog } from "tdesign-vue-next/es/dialog";
-import { Select } from "tdesign-vue-next/es/select";
+import { Button } from "tdesign-vue-next/es/button";
 import { createWorkbook, getActiveSheet, createSheetEvaluator } from "@sheetcraft/core/workbook";
 import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
+import ChartTypeNavigation from "../../../modules/charts/components/ChartTypeNavigation.vue";
 import ChartEditorDialog from "../../../modules/charts/components/ChartEditorDialog.vue";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { createChartOption } from "../../../modules/charts/chart-option";
@@ -26,7 +26,7 @@ const chart: SheetChart = {
   stacked: false,
   showHidden: false,
 };
-function setup(linked: boolean) {
+async function setup(linked: boolean) {
   const workbook = createWorkbook({ id: "chart-book", sheetId: "sheet" });
   const sheet = getActiveSheet(workbook);
   const drawing: SheetChartDrawing = {
@@ -54,6 +54,7 @@ function setup(linked: boolean) {
     attachTo: document.body,
     props: {
       drawing,
+      mode: "change-type",
       workbook,
       sheet,
       evaluator: createSheetEvaluator(sheet),
@@ -69,6 +70,11 @@ function setup(linked: boolean) {
     },
   });
   mounted.push(wrapper);
+  await wrapper
+    .findAllComponents(Button)
+    .find((button) => button.text() === "Select data")!
+    .trigger("click");
+  await flushPromises();
   return { wrapper, drawing };
 }
 type FormattedOption = {
@@ -80,9 +86,20 @@ type FormattedOption = {
   yAxis: { axisLabel: { formatter: (value: number) => string } };
   xAxis: { axisLabel: { formatter: (value: number) => string } };
 };
+async function confirmChart(wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]): Promise<void> {
+  if (wrapper.findComponent(RangeReferenceInput).exists()) {
+    await wrapper
+      .findAllComponents(Button)
+      .find((button) => button.text() === "Back to chart preview")!
+      .trigger("click");
+    await flushPromises();
+  }
+  document.querySelector<HTMLButtonElement>("[data-chart-confirm]")!.click();
+  await flushPromises();
+}
 describe("pivot charts", () => {
   test("ordinary header captions follow row orientation without changing independent flags", async () => {
-    const f = setup(false);
+    const f = await setup(false);
     const controls = f.wrapper.findAllComponents(Checkbox);
     expect(controls[0]!.text()).toContain("First row contains series names");
     expect(controls[1]!.text()).toContain("First column contains categories");
@@ -92,7 +109,7 @@ describe("pivot charts", () => {
     expect(controls[1]!.text()).toContain("First column contains series names");
     controls[0]!.vm.$emit("update:modelValue", false);
     await flushPromises();
-    f.wrapper.findComponent(Dialog).vm.$emit("confirm");
+    await confirmChart(f.wrapper);
     const result = f.wrapper.emitted("confirm")![0]![0] as SheetChartDrawing;
     expect(result.chart).toMatchObject({ seriesBy: "rows", headerRow: false, headerColumn: true });
     expect(f.drawing.chart).toMatchObject({
@@ -100,10 +117,6 @@ describe("pivot charts", () => {
       headerRow: true,
       headerColumn: true,
     });
-    controls[2]!.vm.$emit("change", false);
-    await flushPromises();
-    expect(controls[0]!.text()).toContain("First row contains series names");
-    expect(controls[1]!.text()).toContain("First column contains categories");
   });
   test.each(
     (["columns", "rows"] as const).flatMap((seriesBy) =>
@@ -114,13 +127,13 @@ describe("pivot charts", () => {
   )(
     "ordinary dialog emits explicit $seriesBy/$headerRow/$headerColumn without changing the input",
     async (option) => {
-      const f = setup(false);
+      const f = await setup(false);
       const controls = f.wrapper.findAllComponents(Checkbox);
       controls[0]!.vm.$emit("update:modelValue", option.headerRow);
       controls[1]!.vm.$emit("update:modelValue", option.headerColumn);
       controls[2]!.vm.$emit("change", option.seriesBy === "rows");
       await flushPromises();
-      f.wrapper.findComponent(Dialog).vm.$emit("confirm");
+      await confirmChart(f.wrapper);
       expect((f.wrapper.emitted("confirm")![0]![0] as SheetChartDrawing).chart).toMatchObject(
         option,
       );
@@ -134,7 +147,7 @@ describe("pivot charts", () => {
   test.each([true, false])(
     "linked=%s keeps source orientation fixed while show-hidden remains editable",
     async (linked) => {
-      const f = setup(linked);
+      const f = await setup(linked);
       expect(f.wrapper.findComponent(RangeReferenceInput).props("disabled")).toBe(linked);
       const checkboxes = f.wrapper.findAllComponents(Checkbox);
       expect(checkboxes.slice(0, 3).map((control) => !!control.props("disabled"))).toEqual([
@@ -146,7 +159,7 @@ describe("pivot charts", () => {
       expect(!!showHidden.props("disabled")).toBe(false);
       showHidden.vm.$emit("update:modelValue", true);
       await flushPromises();
-      f.wrapper.findComponent(Dialog).vm.$emit("confirm");
+      await confirmChart(f.wrapper);
       const result = f.wrapper.emitted("confirm")![0]![0] as SheetChartDrawing;
       expect(result.chart.showHidden).toBe(true);
       expect(result.chart.pivotTableId).toBe(linked ? "pivot" : undefined);
@@ -154,17 +167,16 @@ describe("pivot charts", () => {
     },
   );
   test("linked type changes keep the report link and preview range despite stale locked source text", async () => {
-    const f = setup(true);
+    const f = await setup(true);
     f.wrapper.findComponent(RangeReferenceInput).vm.$emit("update:modelValue", "Missing!A1:C4");
-    f.wrapper.findComponent(Select).vm.$emit("update:modelValue", "line");
+    await f.wrapper
+      .findAllComponents(Button)
+      .find((button) => button.text() === "Back to chart preview")!
+      .trigger("click");
     await flushPromises();
-    const preview = f.wrapper
-      .findComponent({ name: "ChartContent" })
-      .props("drawing") as SheetChartDrawing;
-    expect(preview.chart.range).toEqual(f.drawing.chart.range);
-    expect(preview.chart.pivotTableId).toBe("pivot");
-    expect(preview.chart.type).toBe("line");
-    f.wrapper.findComponent(Dialog).vm.$emit("confirm");
+    f.wrapper.getComponent(ChartTypeNavigation).vm.$emit("select", "line");
+    await flushPromises();
+    await confirmChart(f.wrapper);
     const result = f.wrapper.emitted("confirm")![0]![0] as SheetChartDrawing;
     expect(result.id).toBe(f.drawing.id);
     expect(result.chart).toMatchObject({

@@ -1,14 +1,26 @@
 <script setup lang="ts">
-import { useId } from "vue";
-withDefaults(defineProps<{ label: string; reason?: string; error?: string; stacked?: boolean }>(), {
-  stacked: false,
-});
+import { computed, inject, useId } from "vue";
+import { pictureFormatCommonReasons } from "./picture-format-feedback";
+const props = withDefaults(
+  defineProps<{
+    label: string;
+    reason?: string;
+    error?: string;
+    stacked?: boolean;
+    inline?: boolean;
+  }>(),
+  {
+    stacked: false,
+  },
+);
+const commonReasons = inject(pictureFormatCommonReasons, undefined);
+const sharedReason = computed(() => !!props.reason && commonReasons?.value.has(props.reason));
 const feedbackId = `picture-format-feedback-${useId()}`;
 </script>
 <template>
   <div
     class="picture-format-field"
-    :class="{ 'is-stacked': stacked }"
+    :class="{ 'is-stacked': stacked, 'is-inline': inline }"
     role="group"
     :aria-label="label"
     :aria-describedby="reason || error ? feedbackId : undefined"
@@ -20,7 +32,14 @@ const feedbackId = `picture-format-feedback-${useId()}`;
     <p v-if="error" :id="feedbackId" class="picture-format-field__feedback is-error" role="alert">
       {{ error }}
     </p>
-    <p v-else-if="reason" :id="feedbackId" class="picture-format-field__feedback">{{ reason }}</p>
+    <p
+      v-else-if="reason"
+      :id="feedbackId"
+      class="picture-format-field__feedback"
+      :class="{ 'is-shared': sharedReason }"
+    >
+      {{ reason }}
+    </p>
   </div>
 </template>
 <style scoped lang="scss">
@@ -52,6 +71,18 @@ const feedbackId = `picture-format-feedback-${useId()}`;
   }
   &.is-stacked .picture-format-field__control {
     grid-column: 1;
+  }
+  &.is-inline {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  &.is-inline &__label,
+  &__feedback.is-shared {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   .is-error {
     color: var(--sheetcraft-text-primary);

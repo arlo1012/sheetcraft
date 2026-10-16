@@ -1,8 +1,8 @@
 import {
-  DEFAULT_ROW_HEIGHT,
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
   getDefaultColumnWidth,
+  getDefaultRowHeight,
   type Sheet,
 } from "@sheetcraft/core/workbook";
 import { attr, child, type XmlNode } from "./pivot-xml.js";
@@ -53,7 +53,9 @@ export function nativeDrawingAnchor(
     row,
     offsetY,
     (index) =>
-      sheet.hiddenRows?.has(index) ? 0 : (sheet.rowHeights.get(index) ?? DEFAULT_ROW_HEIGHT),
+      sheet.hiddenRows?.has(index)
+        ? 0
+        : (sheet.rowHeights.get(index) ?? getDefaultRowHeight(sheet)),
     MAX_SHEET_ROWS,
   );
   return {

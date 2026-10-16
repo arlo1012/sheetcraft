@@ -7,6 +7,7 @@ import {
   BringToFront,
   SendToBack,
   List,
+  Layers,
 } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
@@ -22,6 +23,7 @@ import type {
 } from "../usePictureTools";
 const props = defineProps<{
   disabled: boolean;
+  compact?: boolean;
   groupCreateDisabled?: boolean;
   count: number;
   grouped: boolean;
@@ -50,6 +52,33 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
   menuSurfaceRef,
   disabled: computed(() => props.disabled || !!props.alignmentDisabled),
 });
+const layerButtonRef = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
+const layerSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
+const layerMenuId = `picture-layer-${useId()}`;
+const {
+  open: layerOpen,
+  floatingStyles: layerStyles,
+  dismiss: dismissLayer,
+  toggleMenu: toggleLayer,
+  onTriggerKeydown: layerKeydown,
+} = useMenu({
+  triggerRef: computed(() => layerButtonRef.value?.rootElement ?? null),
+  menuSurfaceRef: layerSurfaceRef,
+});
+function layer(action: PictureLayerAction): void {
+  if (props.disabled) return;
+  emit("layer", action);
+  dismissLayer("programmatic", true);
+}
+function ungroup(): void {
+  if (props.disabled || props.groupDisabled || !props.grouped) return;
+  emit("ungroup");
+  dismissLayer("programmatic", true);
+}
+function selectionPane(): void {
+  emit("selectionPane");
+  dismissLayer("programmatic", true);
+}
 function align(action: PictureAlignment): void {
   if (props.disabled || props.alignmentDisabled) return;
   emit("align", action, reference.value);
@@ -64,7 +93,7 @@ function chooseReference(next: PictureAlignmentReference): void {
 </script>
 <template>
   <section class="picture-arrange" role="group" :aria-label="t('picture.arrange')">
-    <div class="picture-arrange__stack">
+    <div v-if="!compact" class="picture-arrange__stack">
       <RibbonButton
         :label="t('picture.group')"
         :text="t('picture.group')"
@@ -82,19 +111,31 @@ function chooseReference(next: PictureAlignmentReference): void {
         ><Ungroup
       /></RibbonButton>
     </div>
-    <RibbonMenuButton
-      ref="buttonRef"
-      variant="tall"
-      :label="t('picture.align')"
-      :text="t('picture.align')"
-      :disabled="disabled || alignmentDisabled"
-      :expanded="open"
-      :menu-id="menuId"
-      @activate="toggleMenu"
-      @keydown="onTriggerKeydown"
-      ><AlignStartVertical
-    /></RibbonMenuButton>
-    <div class="picture-arrange__stack">
+    <div :class="{ 'picture-arrange__stack': compact }">
+      <RibbonButton
+        v-if="compact"
+        :label="t('picture.group')"
+        :text="t('picture.group')"
+        :disabled="disabled || groupDisabled || groupCreateDisabled || count < 2"
+        @activate="
+          !disabled && !groupDisabled && !groupCreateDisabled && count >= 2 && emit('group')
+        "
+        ><Group
+      /></RibbonButton>
+      <RibbonMenuButton
+        ref="buttonRef"
+        :variant="compact ? undefined : 'tall'"
+        :label="t('picture.align')"
+        :text="t('picture.align')"
+        :disabled="disabled || alignmentDisabled"
+        :expanded="open"
+        :menu-id="menuId"
+        @activate="toggleMenu"
+        @keydown="onTriggerKeydown"
+        ><AlignStartVertical
+      /></RibbonMenuButton>
+    </div>
+    <div v-if="!compact" class="picture-arrange__stack">
       <RibbonButton
         :label="t('picture.forward')"
         :text="t('picture.forward')"
@@ -110,7 +151,7 @@ function chooseReference(next: PictureAlignmentReference): void {
         ><SendToBack
       /></RibbonButton>
     </div>
-    <div class="picture-arrange__stack">
+    <div v-if="!compact" class="picture-arrange__stack">
       <RibbonButton
         :label="t('picture.front')"
         :text="t('picture.front')"
@@ -127,12 +168,25 @@ function chooseReference(next: PictureAlignmentReference): void {
       /></RibbonButton>
     </div>
     <RibbonButton
+      v-if="!compact"
       variant="tall"
       :label="t('picture.selectionPane')"
       :text="t('picture.selectionPane')"
       @activate="emit('selectionPane')"
       ><List
     /></RibbonButton>
+    <RibbonMenuButton
+      v-if="compact"
+      ref="layerButtonRef"
+      variant="tall"
+      :label="t('picture.layers')"
+      :text="t('picture.layers')"
+      :expanded="layerOpen"
+      :menu-id="layerMenuId"
+      @activate="toggleLayer"
+      @keydown="layerKeydown"
+      ><Layers
+    /></RibbonMenuButton>
     <Teleport to="body">
       <MenuSurface
         v-if="open"
@@ -188,6 +242,29 @@ function chooseReference(next: PictureAlignmentReference): void {
         <MenuItem :disabled="count < 2" @select="align('equal-size')">{{
           t("picture.equalSize")
         }}</MenuItem>
+      </MenuSurface>
+      <MenuSurface
+        v-if="layerOpen"
+        :id="layerMenuId"
+        ref="layerSurfaceRef"
+        :style="layerStyles"
+        class="picture-arrange__menu"
+        :label="t('picture.layers')"
+      >
+        <MenuItem :disabled="disabled" @select="layer('forward')"
+          ><template #icon><BringToFront /></template>{{ t("picture.forward") }}</MenuItem
+        >
+        <MenuItem :disabled="disabled" @select="layer('backward')"
+          ><template #icon><SendToBack /></template>{{ t("picture.backward") }}</MenuItem
+        >
+        <MenuItem :disabled="disabled" @select="layer('front')">{{ t("picture.front") }}</MenuItem>
+        <MenuItem :disabled="disabled" @select="layer('back')">{{ t("picture.back") }}</MenuItem>
+        <MenuItem :disabled="disabled || groupDisabled || !grouped" @select="ungroup"
+          ><template #icon><Ungroup /></template>{{ t("picture.ungroup") }}</MenuItem
+        >
+        <MenuItem @select="selectionPane"
+          ><template #icon><List /></template>{{ t("picture.selectionPane") }}</MenuItem
+        >
       </MenuSurface>
     </Teleport>
   </section>

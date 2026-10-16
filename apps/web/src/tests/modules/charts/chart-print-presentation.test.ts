@@ -261,6 +261,47 @@ afterEach(() => {
 });
 
 describe("native chart print presentation", () => {
+  test("prints reversed bar legends with duplicate labels, original colors and no internal keys", () => {
+    const source: ChartData = {
+      ...data,
+      series: [
+        { id: "first", colorIndex: 0, name: "Same", values: [2, 4] },
+        { id: "second", colorIndex: 1, name: "Same", values: [3, 5] },
+        { id: "third", colorIndex: 2, name: "Last", values: [4, 6] },
+      ],
+    };
+    const before = structuredClone(source);
+    const result = renderChartPrintPresentation(
+      drawing({ type: "bar", legend: true, elements: { legendPosition: "bottom" } }),
+      source,
+      options,
+    );
+    try {
+      const paints = contexts.get(result.canvas)!.copies[0]!.paints;
+      const texts = paints
+        .filter((paint) => paint.operation === "text")
+        .map((paint) => paint.text ?? "");
+      expect(texts.filter((text) => text === "Same")).toHaveLength(2);
+      expect(texts).toContain("Last");
+      expect(texts.join(" ")).not.toContain("sheetcraft-series:");
+      const native = nativeOptions[0] as {
+        legend: { data: { name: string }[]; formatter: (name: string) => string }[];
+        series: { id: string }[];
+      };
+      expect(
+        native.legend[0]!.data.map((entry) => native.legend[0]!.formatter(entry.name)),
+      ).toEqual(["Last", "Same", "Same"]);
+      expect(native.series.map((entry) => entry.id)).toEqual(["first", "second", "third"]);
+      for (const color of ["#2563eb", "#16a34a", "#f59e0b"])
+        expect(paints.some((paint) => paint.operation === "fill" && paint.fill === color)).toBe(
+          true,
+        );
+      expect(source).toEqual(before);
+    } finally {
+      result.dispose();
+    }
+  });
+
   test("paints real bars and category labels, copies them, then disposes the real engine", () => {
     const snapshot = structuredClone(data);
     const result = renderChartPrintPresentation(drawing(), data, options);

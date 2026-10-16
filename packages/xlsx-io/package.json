@@ -10,6 +10,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./picture-capabilities": {
+      "types": "./dist/picture-capabilities.d.ts",
+      "import": "./dist/picture-capabilities.js"
+    },
+    "./chart-capabilities": {
+      "types": "./dist/chart-capabilities.d.ts",
+      "import": "./dist/chart-capabilities.js"
     }
   },
   "scripts": {

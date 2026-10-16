@@ -89,6 +89,7 @@ export function usePictureCellConversion(options: {
         hiddenRows: [...(sheet.hiddenRows ?? [])],
         hiddenColumns: [...(sheet.hiddenColumns ?? [])],
         defaultColumnWidth: sheet.defaultColumnWidth,
+        defaultRowHeight: sheet.defaultRowHeight,
       });
     const axes = captureAxes();
     const roots = sheet.floatingImages.map(cloneFloatingImage),

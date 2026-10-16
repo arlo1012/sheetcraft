@@ -18,7 +18,7 @@ import {
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { computed, nextTick, ref, useId, watch } from "vue";
 import {
-  DEFAULT_ROW_HEIGHT,
+  getDefaultRowHeight,
   MAX_COLUMN_WIDTH,
   MAX_ROW_HEIGHT,
   MAX_SHEET_COLUMNS,
@@ -215,7 +215,8 @@ function openSizeDialog(axis: SheetDimensionAxis): void {
   const count = axis === "row" ? rowCount.value : columnCount.value;
   // Preserve a hidden dimension's stored manual size instead of presenting 0.
   const dimensions = axis === "row" ? props.sheet.rowHeights : props.sheet.columnWidths;
-  const fallback = axis === "row" ? DEFAULT_ROW_HEIGHT : getDefaultColumnWidth(props.sheet);
+  const fallback =
+    axis === "row" ? getDefaultRowHeight(props.sheet) : getDefaultColumnWidth(props.sheet);
   const size = dimensions.get(index) ?? fallback;
   sizeTarget.value = { axis, index, count, size };
   sizeDraft.value = size;

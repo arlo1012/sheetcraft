@@ -27,6 +27,7 @@ import {
   planChartColumnLineCombo,
   type ChartComboSeriesChange,
 } from "@sheetcraft/core/chart-combo";
+import { inferChartInsertHeaders } from "./chart-insert-headers";
 import { createChartOption } from "./chart-option";
 import { preflightChartDataTable } from "./chart-data-table-preflight";
 import { reconcileChartRangeSeriesForRange } from "@sheetcraft/core/chart-range-series";
@@ -74,6 +75,8 @@ export function useChartActions(options: {
   flush: () => boolean;
   execute: (command: WorkbookCommand) => unknown;
   name: () => string;
+  title?: () => string;
+  onInserted?: (drawingId: string) => void;
   onEditPivot?: (id: string) => void;
 }) {
   const dialog = shallowRef<ChartDialog>();
@@ -192,6 +195,7 @@ export function useChartActions(options: {
     name: string,
     range: CellRange | null,
     anchor: SheetChartDrawing["anchor"],
+    title = name,
   ): SheetChartDrawing {
     return {
       id: idFactory("chart"),
@@ -215,7 +219,7 @@ export function useChartActions(options: {
       chart: {
         type,
         range: range ? { start: { ...range.start }, end: { ...range.end } } : null,
-        title: name,
+        title,
         headerRow: true,
         headerColumn: type !== "scatter",
         seriesBy: "columns",
@@ -244,10 +248,14 @@ export function useChartActions(options: {
       options.name(),
       range,
       selection.start,
+      options.title?.(),
     );
     let invalidSelection = false;
     try {
-      drawing.chart = normalizeSheetChart(drawing.chart);
+      drawing.chart = normalizeSheetChart({
+        ...drawing.chart,
+        ...inferChartInsertHeaders(target.sheet, drawing.chart, options.getEvaluator()),
+      });
     } catch {
       // A too-large selection remains a recoverable source edit, never an
       // invalid chart model passed into the editor's setup or persisted data.
@@ -430,7 +438,12 @@ export function useChartActions(options: {
         else if (dialog.value === target) error.value = true;
         return;
       }
+      const selectInserted = !target.existing && isCurrent(target);
       close(target);
+      // Selection is a view action after the single successful document command.
+      // Never select into a replacement document or superseding dialog.
+      if (selectInserted && !dialog.value && hasTargetIdentity(target))
+        options.onInserted?.(target.drawingId);
     } catch {
       if (dialog.value === target) error.value = true;
     } finally {

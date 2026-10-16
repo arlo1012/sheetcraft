@@ -10,9 +10,11 @@ import { normalizeImageTransform } from "./image-transform.js";
 import {
   comparePictureAxisPoints,
   locatePictureAxisPoint,
+  locateFreePictureAxisPoint,
   normalizePictureAxisPoint,
   projectLegacyPictureAxisOrigin,
   projectPictureAxisPoint,
+  projectFreePictureAxisPoint,
   type PictureCellPoint,
   type PictureSheetMetrics,
 } from "./picture-axis-metrics.js";
@@ -20,10 +22,20 @@ import {
 export type PicturePoint = { x: number; y: number };
 export type PictureFrameSize = { width: number; height: number };
 export type PictureFrameRect = PicturePoint & PictureFrameSize;
+/** Sparse native-marker policy; stored offsets remain pixels, not EMUs. */
+export type PictureRelativeOffsetMode = { offsetMode?: "free-pixels" };
 export type PictureFrameAnchor =
-  | { mode: "move-only"; origin: PictureCellPoint; size: PictureFrameSize }
+  | ({
+      mode: "move-only";
+      origin: PictureCellPoint;
+      size: PictureFrameSize;
+    } & PictureRelativeOffsetMode)
   | { mode: "fixed"; x: number; y: number; size: PictureFrameSize }
-  | { mode: "move-and-size"; start: PictureCellPoint; end: PictureCellPoint };
+  | ({
+      mode: "move-and-size";
+      start: PictureCellPoint;
+      end: PictureCellPoint;
+    } & PictureRelativeOffsetMode);
 /** Source center is expressed in unrotated crop-frame units; signed padding is valid. */
 export type PictureSourceFrame = {
   widthRatio: number;
@@ -62,7 +74,7 @@ function record(value: unknown, keys: readonly string[], name: string): Record<s
   )
     throw new TypeError(`${name} must contain data fields, not accessors.`);
   const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
-  for (const key of Object.keys(value))
+  for (const key of Object.getOwnPropertyNames(value))
     result[key] = Object.getOwnPropertyDescriptor(value, key)!.value as unknown;
   return result;
 }
@@ -98,11 +110,21 @@ function normalizeCellPoint(value: unknown): PictureCellPoint {
 }
 /** Shared worksheet anchor validation for pictures and source-free groups. */
 export function normalizePictureFrameAnchor(value: PictureFrameAnchor): PictureFrameAnchor {
+  if (
+    value &&
+    typeof value === "object" &&
+    "offsetMode" in value &&
+    !Object.hasOwn(value, "offsetMode")
+  )
+    throw new TypeError("Picture anchor offset mode must be an own data field.");
   const a = record(
     value,
-    ["mode", "origin", "size", "x", "y", "start", "end"],
+    ["mode", "origin", "size", "x", "y", "start", "end", "offsetMode"],
     "picture frame anchor",
   );
+  if (Object.hasOwn(a, "offsetMode") && a.offsetMode !== "free-pixels")
+    throw new TypeError("Unknown picture anchor offset mode.");
+  const offsetMode = a.offsetMode === "free-pixels" ? { offsetMode: "free-pixels" as const } : {};
   let anchor: PictureFrameAnchor;
   if (a.mode === "fixed") {
     record(a, ["mode", "x", "y", "size"], "fixed picture anchor");
@@ -113,14 +135,15 @@ export function normalizePictureFrameAnchor(value: PictureFrameAnchor): PictureF
       size: normalizeSize(a.size),
     };
   } else if (a.mode === "move-only") {
-    record(a, ["mode", "origin", "size"], "moving picture anchor");
+    record(a, ["mode", "origin", "size", "offsetMode"], "moving picture anchor");
     anchor = {
       mode: "move-only",
       origin: normalizeCellPoint(a.origin),
+      ...offsetMode,
       size: normalizeSize(a.size),
     };
   } else if (a.mode === "move-and-size") {
-    record(a, ["mode", "start", "end"], "stretching picture anchor");
+    record(a, ["mode", "start", "end", "offsetMode"], "stretching picture anchor");
     const start = normalizeCellPoint(a.start);
     const end = normalizeCellPoint(a.end);
     if (
@@ -128,7 +151,7 @@ export function normalizePictureFrameAnchor(value: PictureFrameAnchor): PictureF
       comparePictureAxisPoints(start.row, end.row) >= 0
     )
       throw new RangeError("Picture logical endpoints must have positive spans on both axes.");
-    anchor = { mode: "move-and-size", start, end };
+    anchor = { mode: "move-and-size", start, end, ...offsetMode };
   } else throw new TypeError("Unknown picture anchor mode.");
   return anchor;
 }
@@ -201,16 +224,21 @@ export function resolvePictureAnchorRect(
   const anchor = normalizePictureFrameAnchor(value);
   if (anchor.mode === "fixed") return assertRect({ x: anchor.x, y: anchor.y, ...anchor.size });
   const start = anchor.mode === "move-only" ? anchor.origin : anchor.start;
-  const x = projectPictureAxisPoint(start.column, metrics.columns);
-  const y = projectPictureAxisPoint(start.row, metrics.rows);
+  const free = anchor.offsetMode === "free-pixels";
+  const project = free ? projectFreePictureAxisPoint : projectPictureAxisPoint;
+  const x = project(start.column, metrics.columns);
+  const y = project(start.row, metrics.rows);
+  // A later grid edit may reverse free offsets without consuming their logical
+  // cell bindings. Collapse only derived spans so widening/unhiding can restore.
+  const span = (value: number) => (free ? Math.max(0, value) : value);
   return assertRect({
     x,
     y,
     ...(anchor.mode === "move-only"
       ? anchor.size
       : {
-          width: projectPictureAxisPoint(anchor.end.column, metrics.columns) - x,
-          height: projectPictureAxisPoint(anchor.end.row, metrics.rows) - y,
+          width: span(project(anchor.end.column, metrics.columns) - x),
+          height: span(project(anchor.end.row, metrics.rows) - y),
         }),
   });
 }
@@ -369,6 +397,9 @@ export function anchorPictureFrameRect(
       ? { width: rect.width, height: rect.height }
       : normalizeSize({ width: rect.width, height: rect.height });
   if (mode === "fixed") return { mode, x: rect.x, y: rect.y, size };
+  const free = preferred?.mode !== "fixed" && preferred?.offsetMode === "free-pixels";
+  const locate = free ? locateFreePictureAxisPoint : locatePictureAxisPoint;
+  const offsetMode = free ? { offsetMode: "free-pixels" as const } : {};
   const preferredStart =
     preferred?.mode === "move-only"
       ? preferred.origin
@@ -377,17 +408,18 @@ export function anchorPictureFrameRect(
         : undefined;
   const preferredEnd = preferred?.mode === "move-and-size" ? preferred.end : undefined;
   const start = {
-    column: locatePictureAxisPoint(rect.x, metrics.columns, preferredStart?.column),
-    row: locatePictureAxisPoint(rect.y, metrics.rows, preferredStart?.row),
+    column: locate(rect.x, metrics.columns, preferredStart?.column),
+    row: locate(rect.y, metrics.rows, preferredStart?.row),
   };
-  if (mode === "move-only") return { mode, origin: start, size };
+  if (mode === "move-only") return { mode, origin: start, size, ...offsetMode };
   if (mode !== "move-and-size") throw new TypeError("Unknown picture anchor mode.");
   return {
     mode,
     start,
+    ...offsetMode,
     end: {
-      column: locatePictureAxisPoint(rect.x + rect.width, metrics.columns, preferredEnd?.column),
-      row: locatePictureAxisPoint(rect.y + rect.height, metrics.rows, preferredEnd?.row),
+      column: locate(rect.x + rect.width, metrics.columns, preferredEnd?.column),
+      row: locate(rect.y + rect.height, metrics.rows, preferredEnd?.row),
     },
   };
 }
@@ -442,6 +474,13 @@ export function resizePictureCropFrame(
   const nextSize = normalizeSize(size);
   const dx = finite(inset.x, "Crop inset x");
   const dy = finite(inset.y, "Crop inset y");
+  if (
+    nextSize.width === resolved.rect.width &&
+    nextSize.height === resolved.rect.height &&
+    dx === 0 &&
+    dy === 0
+  )
+    return normalized;
   const difference = {
     x: (nextSize.width - resolved.rect.width) / 2,
     y: (nextSize.height - resolved.rect.height) / 2,

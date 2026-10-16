@@ -1,5 +1,6 @@
 export const symbolsZhCN = {
   symbolTools: {
+    options: "字体来源、字符详情及自定义字符",
     cellFontUnavailable:
       "工作簿字体 {family} 暂不可用，文字可能显示为替代字形。可在符号窗口重新加载该字体。",
     fontRetry: "重试字体加载",

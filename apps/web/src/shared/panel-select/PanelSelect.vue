@@ -22,6 +22,7 @@ defineSlots<{
 }>();
 
 const open = ref(false);
+const composing = ref(false);
 const control = ref<HTMLElement>();
 const panel = ref<HTMLElement>();
 const panelId = useId();
@@ -57,8 +58,18 @@ function close(): void {
   });
 }
 
+// The library also has a native ArrowDown listener. During IME, keep those
+// keys within the browser composition session without cancelling its default.
+function guardCompositionKeydown(event: KeyboardEvent): void {
+  if (
+    event.target === control.value?.querySelector("input") &&
+    (composing.value || event.isComposing || event.keyCode === 229)
+  )
+    event.stopPropagation();
+}
+
 function onTriggerKeydown(_value: string | number, { e }: { e: KeyboardEvent }): void {
-  if (props.disabled) return;
+  if (props.disabled || composing.value || e.isComposing || e.keyCode === 229) return;
   if (["Enter", " ", "ArrowDown", "ArrowUp"].includes(e.key)) {
     e.preventDefault();
     e.stopPropagation();
@@ -99,7 +110,13 @@ watch(
 </script>
 
 <template>
-  <div ref="control" class="panel-select sheetcraft-panel-select">
+  <div
+    ref="control"
+    class="panel-select sheetcraft-panel-select"
+    @keydown.capture="guardCompositionKeydown"
+    @compositionstart.capture="composing = true"
+    @compositionend.capture="composing = false"
+  >
     <TSelectInput
       :value="{ value: modelValue, label: valueLabel }"
       :disabled="disabled"

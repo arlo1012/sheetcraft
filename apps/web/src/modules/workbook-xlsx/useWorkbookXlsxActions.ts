@@ -5,7 +5,12 @@ import {
   type WorkbookSnapshot,
 } from "@sheetcraft/core/serialization";
 import type { Workbook } from "@sheetcraft/core/workbook";
-import type { ImageAssetStore } from "../image-assets/imageAssetStore";
+import type { ImageAsset, ImageAssetStore } from "../image-assets/imageAssetStore";
+import {
+  prepareImportedXlsxImages,
+  storeImportedXlsxImages,
+  XlsxImportImageError,
+} from "./prepareImportedXlsxImages";
 import type { useWorkbookPersistence } from "../workbook-persistence/useWorkbookPersistence";
 import { prepareXlsxImages, assertXlsxPictureGeometrySupport } from "./prepareXlsxImages";
 import type { XlsxCompatibilityReport } from "./xlsxWorkerProtocol";
@@ -20,6 +25,9 @@ import {
 
 export type XlsxFeedbackKey =
   | "xlsx.feedback.blocked"
+  | "xlsx.feedback.tooLarge"
+  | "xlsx.feedback.invalidImages"
+  | "xlsx.feedback.imageStorageFailed"
   | "chart.elementExportBlocked"
   | "chart.sourceExportBlocked"
   | "chart.formatExportBlocked"
@@ -30,16 +38,18 @@ export type XlsxFeedbackKey =
   | "xlsx.feedback.failed"
   | "xlsx.feedback.finishEditing"
   | "xlsx.feedback.imported"
+  | "xlsx.feedback.importedUnsaved"
   | "xlsx.feedback.stale"
   | "xlsx.feedback.timeout"
   | "xlsx.feedback.unsupportedEncryption"
   | "xlsx.feedback.invalidEncryptedFile";
 
 export type XlsxFeedback = { key: XlsxFeedbackKey; error: boolean; locations?: string };
-export type XlsxConfirmation = "import";
+export type XlsxConfirmation = "import" | "export";
 
 type PendingImport = {
   workbook: Workbook;
+  images: readonly ImageAsset[];
   workbookAtStart: Workbook;
   revisionAtStart: number;
 };
@@ -82,6 +92,8 @@ export function useWorkbookXlsxActions(options: {
   let encryptedImport: { bytes: ArrayBuffer; workbook: Workbook; revision: number } | undefined;
   const confirmation = ref<XlsxConfirmation>();
   const feedback = ref<XlsxFeedback>();
+  const report = shallowRef<XlsxCompatibilityReport>();
+  const pendingExport = shallowRef<{ bytes: Uint8Array; filename: string }>();
   const pendingImport = shallowRef<PendingImport>();
   const workerFactory = options.workerFactory ?? createWorkbookXlsxWorker;
   const download = options.download ?? downloadXlsx;
@@ -103,6 +115,7 @@ export function useWorkbookXlsxActions(options: {
   function clearPending(): void {
     confirmation.value = undefined;
     pendingImport.value = undefined;
+    pendingExport.value = undefined;
     passwordRequired.value = false;
     passwordError.value = false;
     encryptedImport = undefined;
@@ -112,6 +125,7 @@ export function useWorkbookXlsxActions(options: {
     return (
       !disposed &&
       !options.isBlocked?.() &&
+      !options.persistence.loading.value &&
       options.getWorkbook() === pending.workbookAtStart &&
       options.getRevision() === pending.revisionAtStart &&
       !options.hasPendingEdits()
@@ -121,6 +135,7 @@ export function useWorkbookXlsxActions(options: {
   function prepare(): boolean {
     if (isBlocked()) return false;
     feedback.value = undefined;
+    report.value = undefined;
     if (options.flushPendingEdits()) return true;
     feedback.value = { key: "xlsx.feedback.finishEditing", error: true };
     return false;
@@ -178,7 +193,7 @@ export function useWorkbookXlsxActions(options: {
               ".chart.presentation",
               ".chart.stacked",
               ".chart.rectangleSeries",
-            ].some((suffix) => location.endsWith(suffix)),
+            ].some((suffix) => location.endsWith(suffix) || location.includes(`${suffix}.`)),
           )
         : [],
     );
@@ -208,7 +223,7 @@ export function useWorkbookXlsxActions(options: {
   function setChartElementFailure(report?: XlsxCompatibilityReport): boolean {
     const locations = report?.issues.flatMap((issue) =>
       issue.code === "feature-omitted" && issue.severity === "block"
-        ? issue.locations.filter((location) => location.endsWith(".chart.elements"))
+        ? issue.locations.filter((location) => /\.chart\.elements(?:\.[^.]+)?$/u.test(location))
         : [],
     );
     if (!locations?.length) return false;
@@ -222,6 +237,17 @@ export function useWorkbookXlsxActions(options: {
 
   function setFailure(error: unknown): void {
     if (error instanceof XlsxWorkerAbortError || disposed) return;
+    report.value = error instanceof XlsxWorkerFailure ? error.report : undefined;
+    if (error instanceof XlsxImportImageError) {
+      feedback.value = {
+        key:
+          error.code === "storage"
+            ? "xlsx.feedback.imageStorageFailed"
+            : "xlsx.feedback.invalidImages",
+        error: true,
+      };
+      return;
+    }
     if (
       error instanceof XlsxWorkerFailure &&
       (setNumericTotalsFailure(error.report) ||
@@ -266,30 +292,41 @@ export function useWorkbookXlsxActions(options: {
     const requestId = `xlsx-import-${++requestNumber}`;
     busy.value = true;
     feedback.value = undefined;
-    abortController = new AbortController();
+    const controller = new AbortController();
+    abortController = controller;
+    const startedAt = Date.now();
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
     try {
       if (file.size > MAX_XLSX_FILE_BYTES) {
-        feedback.value = { key: "xlsx.feedback.blocked", error: true };
+        feedback.value = { key: "xlsx.feedback.tooLarge", error: true };
         return;
       }
       const bytes = await file.arrayBuffer();
-      if (abortController.signal.aborted) throw new XlsxWorkerAbortError();
+      if (controller.signal.aborted) throw new XlsxWorkerAbortError();
       encryptedImport = { bytes, workbook: workbookAtStart, revision: revisionAtStart };
       const response = await runXlsxWorker(
         workerFactory,
         { id: requestId, type: "decode", bytes: bytes.slice(0), ...(password ? { password } : {}) },
-        { timeoutMs, signal: abortController.signal },
+        { timeoutMs: Math.max(1, timeoutMs - (Date.now() - startedAt)), signal: controller.signal },
       );
       if (disposed || response.type !== "decode") return;
       encryptedImport = undefined;
       passwordRequired.value = false;
       passwordError.value = false;
+      report.value = response.report;
       if (hasBlockingIssue(response.report)) {
         feedback.value = { key: "xlsx.feedback.blocked", error: true };
         return;
       }
+      const workbook = deserializeWorkbook(response.snapshot);
+      const images = await prepareImportedXlsxImages(workbook, response.images, controller.signal);
       const pending = {
-        workbook: deserializeWorkbook(response.snapshot),
+        workbook,
+        images,
         workbookAtStart,
         revisionAtStart,
       } satisfies PendingImport;
@@ -309,9 +346,11 @@ export function useWorkbookXlsxActions(options: {
       } else {
         encryptedImport = undefined;
         passwordRequired.value = false;
-        setFailure(error);
+        if (timedOut) setFailure(new XlsxWorkerTimeoutError());
+        else if (!controller.signal.aborted) setFailure(error);
       }
     } finally {
+      clearTimeout(timeout);
       abortController = undefined;
       busy.value = false;
     }
@@ -337,6 +376,7 @@ export function useWorkbookXlsxActions(options: {
   }
 
   async function exportXlsx(password?: string): Promise<void> {
+    if (isBlocked()) return;
     try {
       assertXlsxPictureGeometrySupport(options.getWorkbook());
     } catch (error) {
@@ -374,6 +414,7 @@ export function useWorkbookXlsxActions(options: {
       );
       clearTimeout(timeout);
       if (disposed || response.type !== "encode") return;
+      report.value = response.report;
       if (hasBlockingIssue(response.report)) {
         if (
           !setNumericTotalsFailure(response.report) &&
@@ -387,6 +428,11 @@ export function useWorkbookXlsxActions(options: {
         return;
       }
       const bytes = new Uint8Array(response.bytes);
+      if (response.report.issues.some((issue) => issue.severity === "warning")) {
+        pendingExport.value = { bytes, filename };
+        confirmation.value = "export";
+        return;
+      }
       await download(bytes, filename);
       if (!disposed) feedback.value = { key: "xlsx.feedback.exported", error: false };
     } catch (error) {
@@ -404,21 +450,52 @@ export function useWorkbookXlsxActions(options: {
       options.persistence.error?.value === "unsupported-picture-frame" ||
       options.persistence.error?.value === "unsupported-shape-frame"
     ) {
+      clearPending();
+      report.value = undefined;
       feedback.value = { key: "xlsx.feedback.blocked", error: true };
       return;
     }
-    if (busy.value || !pendingImport.value) return;
+    if (busy.value) return;
+    if (confirmation.value === "export" && pendingExport.value) {
+      busy.value = true;
+      const pending = pendingExport.value;
+      try {
+        await download(pending.bytes, pending.filename);
+        if (!disposed) feedback.value = { key: "xlsx.feedback.exported", error: false };
+      } catch (error) {
+        setFailure(error);
+      } finally {
+        busy.value = false;
+        clearPending();
+      }
+      return;
+    }
+    const pending = pendingImport.value;
+    if (!pending) return;
     busy.value = true;
+    const controller = new AbortController();
+    abortController = controller;
     try {
-      if (!canApplyImport(pendingImport.value)) {
+      if (!canApplyImport(pending)) {
         feedback.value = { key: "xlsx.feedback.stale", error: true };
         return;
       }
-      await options.persistence.replaceDocument(pendingImport.value.workbook);
-      if (!disposed) feedback.value = { key: "xlsx.feedback.imported", error: false };
+      await storeImportedXlsxImages(pending.images, options.assetStore, controller.signal);
+      if (controller.signal.aborted) throw new XlsxWorkerAbortError();
+      // Resource reads/writes yield; recheck edits and document identity before replacement.
+      if (!canApplyImport(pending)) {
+        feedback.value = { key: "xlsx.feedback.stale", error: true };
+        return;
+      }
+      await options.persistence.replaceDocument(pending.workbook);
+      if (!disposed)
+        feedback.value = options.persistence.error?.value
+          ? { key: "xlsx.feedback.importedUnsaved", error: true }
+          : { key: "xlsx.feedback.imported", error: false };
     } catch (error) {
       setFailure(error);
     } finally {
+      abortController = undefined;
       busy.value = false;
       clearPending();
     }
@@ -435,6 +512,7 @@ export function useWorkbookXlsxActions(options: {
   function dismissFeedback(): void {
     if (busy.value || confirmation.value) return;
     feedback.value = undefined;
+    report.value = undefined;
   }
 
   onScopeDispose(() => {
@@ -450,6 +528,7 @@ export function useWorkbookXlsxActions(options: {
     submitPassword,
     confirmation: readonly(confirmation),
     feedback: readonly(feedback),
+    report: readonly(report),
     importXlsx,
     exportXlsx,
     confirm,

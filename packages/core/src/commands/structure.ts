@@ -1461,6 +1461,8 @@ function validateSheetAxisSlice(
   validateCommandPayload("slice", command.slice, () =>
     replaceSheetSparseState(validationSheet, {
       cells: command.slice.cells,
+      defaultRowHeight: sheet.defaultRowHeight,
+      defaultColumnWidth: sheet.defaultColumnWidth,
       rowHeights: command.axis === "row" ? command.slice.dimensions : [],
       columnWidths: command.axis === "column" ? command.slice.dimensions : [],
       freezePanes: command.slice.metadata.freezePanes,
@@ -2519,6 +2521,7 @@ export function applyMoveSheetAxisCommand(
     hiddenColumns: previousState.hiddenColumns?.map((index) =>
       command.axis === "column" ? mapIndex(index) : index,
     ),
+    defaultRowHeight: previousState.defaultRowHeight,
     defaultColumnWidth: previousState.defaultColumnWidth,
     freezePanes: metadata.freezePanes,
     filter: metadata.filter,

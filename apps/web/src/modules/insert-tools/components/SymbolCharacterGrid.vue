@@ -13,8 +13,8 @@ const emit = defineEmits<{ select: [codePoint: number]; insert: [codePoint: numb
 const viewport = ref<HTMLElement>();
 const columns = ref(17);
 const scrollTop = ref(0);
-const viewportHeight = ref(216);
-const rowHeight = 36;
+const viewportHeight = ref(180);
+const rowHeight = 30;
 const id = `symbol-grid-${useId().replaceAll(":", "")}`;
 const selectedIndex = computed(() =>
   props.selected === undefined ? -1 : props.points.indexOf(props.selected),
@@ -92,7 +92,7 @@ onMounted(() => {
   if (typeof ResizeObserver !== "undefined" && viewport.value) {
     observer = new ResizeObserver(([entry]) => {
       if (!entry) return;
-      columns.value = Math.max(4, Math.floor(entry.contentRect.width / 36));
+      columns.value = Math.max(4, Math.floor(entry.contentRect.width / 32));
       viewportHeight.value = Math.max(72, entry.contentRect.height);
     });
     observer.observe(viewport.value);
@@ -134,6 +134,7 @@ onBeforeUnmount(() => observer?.disconnect());
           tabindex="-1"
           :aria-colindex="column + 1"
           :aria-selected="selected === cp"
+          :class="{ 'is-selected': selected === cp }"
           :aria-label="name(cp)"
           :title="name(cp)"
           :style="{ fontFamily: family }"
@@ -148,14 +149,14 @@ onBeforeUnmount(() => observer?.disconnect());
   </div>
 </template>
 <style scoped lang="scss">
+@use "../../../shared/gallery/gallery-choice" as gallery;
+@use "../../../shared/option-list/option-list" as option-list;
 .symbol-dialog__grid {
-  height: 216px;
+  @include option-list.surface;
+  height: 180px;
   min-height: 108px;
-  overflow: auto;
+  flex: 1 0 180px;
   overscroll-behavior: contain;
-  border: 1px solid var(--sheetcraft-border-default);
-  border-radius: 4px;
-  background: var(--sheetcraft-surface-default);
 }
 .symbol-grid__canvas {
   position: relative;
@@ -163,24 +164,13 @@ onBeforeUnmount(() => observer?.disconnect());
 .symbol-grid__row {
   position: absolute;
   inset-inline: 0;
-  height: 36px;
+  height: 30px;
   display: grid;
 }
 button {
+  @include gallery.choice(0);
   min-width: 0;
-  padding: 0;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--sheetcraft-text-primary);
   font-size: 23px;
-  line-height: 32px;
-  cursor: pointer;
-  &:hover {
-    background: var(--sheetcraft-surface-hover);
-  }
-  &[aria-selected="true"] {
-    border-color: var(--sheetcraft-action-primary);
-    background: var(--sheetcraft-surface-hover);
-  }
+  line-height: 28px;
 }
 </style>

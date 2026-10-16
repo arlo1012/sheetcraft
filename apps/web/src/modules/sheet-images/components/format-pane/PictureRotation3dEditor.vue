@@ -18,6 +18,7 @@ import PictureFormatField from "./PictureFormatField.vue";
 import PicturePaintNumber from "./PicturePaintNumber.vue";
 const props = defineProps<{
   ownerKey: string;
+  hidePreset?: boolean;
   value?: Choice<PictureRotation3d>;
   disabled?: boolean;
   /** Block projection values without trapping a safe None/Inherit reset. */
@@ -87,6 +88,7 @@ function selectPreset(id: string) {
 <template>
   <div class="picture-rotation3d-editor">
     <PicturePresetGallery
+      v-if="!hidePreset"
       :owner-key="ownerKey"
       :groups="presetGroups"
       :selected-id="presetId"

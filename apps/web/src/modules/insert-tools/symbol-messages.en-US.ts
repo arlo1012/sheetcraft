@@ -1,5 +1,6 @@
 export const symbolsEnUS = {
   symbolTools: {
+    options: "Font sources, character details and custom text",
     cellFontUnavailable:
       "Workbook font {family} is unavailable; text may use fallback glyphs. Reload that font in the Symbols dialog.",
     fontRetry: "Retry font loading",

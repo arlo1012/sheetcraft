@@ -86,6 +86,7 @@ export type ShapeClipboardTransferConfirmation = {
 function geometryFingerprint(sheet: Sheet): string {
   return JSON.stringify({
     defaultColumnWidth: sheet.defaultColumnWidth,
+    defaultRowHeight: sheet.defaultRowHeight,
     rowHeights: [...sheet.rowHeights],
     columnWidths: [...sheet.columnWidths],
     hiddenRows: [...(sheet.hiddenRows ?? [])],

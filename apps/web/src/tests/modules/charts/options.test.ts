@@ -1,6 +1,9 @@
+import { withDisplayedSeriesNames } from "./chart-render-labels";
 import { describe, expect, test } from "vitest";
 import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
-import { createChartOption } from "../../../modules/charts/chart-option";
+import { createChartOption as createNativeOption } from "../../../modules/charts/chart-option";
+const createChartOption = (...args: Parameters<typeof createNativeOption>) =>
+  withDisplayedSeriesNames(createNativeOption(...args));
 const chart: SheetChart = {
   type: "column",
   range: null,

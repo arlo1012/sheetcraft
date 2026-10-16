@@ -410,6 +410,51 @@ describe("controlled shape rich text surface", () => {
     expect(f.input.textContent).toBe("abCD");
     expect(f.update.mock.calls.at(-1)![0].source).toEqual(source());
   });
+  test("delegates keyboard and native history requests to the shared leased draft stream", async () => {
+    const historyStep = vi.fn((_direction: "undo" | "redo") => true);
+    const f = await fixture({ historyStep });
+    writeTextDomSelection(f.input, { start: 0, end: 4, direction: "backward" });
+    expect((await key(f.input, "z", { ctrlKey: true })).defaultPrevented).toBe(true);
+    expect((await key(f.input, "z", { metaKey: true, shiftKey: true })).defaultPrevented).toBe(
+      true,
+    );
+    expect((await key(f.input, "y", { ctrlKey: true })).defaultPrevented).toBe(true);
+    expect((await beforeinput(f.input, "historyUndo")).defaultPrevented).toBe(true);
+    expect((await beforeinput(f.input, "historyRedo")).defaultPrevented).toBe(true);
+    expect(historyStep.mock.calls).toEqual([["undo"], ["redo"], ["redo"], ["undo"], ["redo"]]);
+    expect(f.update).not.toHaveBeenCalled();
+    expect(f.input.textContent).toBe("abCD");
+    expect(readTextDomSelection(f.input)).toEqual({ start: 0, end: 4, direction: "backward" });
+    expect(f.wrapper.emitted("selection")?.at(-1)?.[0]).toMatchObject({
+      selection: { start: 0, end: 4, direction: "backward" },
+    });
+  });
+
+  test("a rejected shared history step does not fall back to the input's private undo stream", async () => {
+    const historyStep = vi.fn((_direction: "undo" | "redo") => false);
+    const f = await fixture({ historyStep });
+    await beforeinput(f.input, "insertText", "X");
+    const count = f.update.mock.calls.length;
+    await key(f.input, "z", { ctrlKey: true });
+    expect(historyStep).toHaveBeenCalledWith("undo");
+    expect(f.update).toHaveBeenCalledTimes(count);
+    expect(f.input.textContent).toBe("abXCD");
+  });
+
+  test.each(["readOnly", "composition"] as const)(
+    "%s blocks delegated history without submitting or losing source text",
+    async (blocked) => {
+      const historyStep = vi.fn((_direction: "undo" | "redo") => true);
+      const f = await fixture({ historyStep, readOnly: blocked === "readOnly" });
+      if (blocked === "composition") f.input.dispatchEvent(compositionEvent("compositionstart"));
+      await key(f.input, "z", { ctrlKey: true });
+      await beforeinput(f.input, "historyUndo");
+      expect(historyStep).not.toHaveBeenCalled();
+      expect(f.update).not.toHaveBeenCalled();
+      expect(f.input.textContent).toBe("abCD");
+    },
+  );
+
   test("collapsed pending-format changes create history without changing source", async () => {
     const f = await fixture();
     await f.wrapper.setProps({ pendingFormat: { underline: true } });

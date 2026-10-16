@@ -1,4 +1,6 @@
+import { normalizeDetailedPictureStyle } from "@sheetcraft/core/picture-detailed-style";
 import type {
+  Choice,
   PictureShadow,
   PictureReflection,
   PictureGlow,
@@ -101,4 +103,23 @@ export function createPictureRotation3d(
           shearX: current?.projection === projection ? current.shearX : 0.2,
           shearY: current?.projection === projection ? current.shearY : 0,
         };
+}
+
+/** One explicit local effect choice; never a replacement for the entire appearance. */
+export type PictureEffectEdit =
+  | { category: "shadow"; value: Choice<PictureShadow> }
+  | { category: "reflection"; value: Choice<PictureReflection> }
+  | { category: "glow"; value: Choice<PictureGlow> }
+  | { category: "softEdges"; value: Choice<PictureSoftEdges> }
+  | { category: "rotation3d"; value: Choice<PictureRotation3d> };
+
+export function normalizePictureEffectEdit(edit: PictureEffectEdit): PictureEffectEdit {
+  const category = edit.category;
+  if (!["shadow", "reflection", "glow", "softEdges", "rotation3d"].includes(category))
+    throw new TypeError("Unknown picture effect category.");
+  const value = edit.value;
+  if (!value) throw new TypeError("An explicit picture effect choice is required.");
+  const style = normalizeDetailedPictureStyle({ [category]: value });
+  if (!style?.[category]) throw new TypeError("Invalid picture effect choice.");
+  return { category, value: style[category] } as PictureEffectEdit;
 }

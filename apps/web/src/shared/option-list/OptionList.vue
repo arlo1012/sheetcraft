@@ -16,19 +16,30 @@ const emit = defineEmits<{
   select: [value: Option["value"]];
   activate: [value: Option["value"]];
 }>();
-defineSlots<{ option?: (props: { option: Option }) => unknown; empty?: () => unknown }>();
+defineSlots<{
+  option?: (props: { option: Option }) => unknown;
+  icon?: (props: { option: Option }) => unknown;
+  empty?: () => unknown;
+}>();
 const listRef = ref<HTMLElement>();
 const itemAttribute = computed(() => props.itemDataAttribute ?? "data-option-list-value");
 const selectedIndex = computed(() =>
   props.options.findIndex((option) => option.value === props.modelValue),
 );
 const matchedIndex = computed(() => {
-  const match = findOptionMatch(props.options, props.searchText ?? "");
+  const match = findOptionMatch(
+    props.options.filter((option) => !option.disabled),
+    props.searchText ?? "",
+  );
   return match ? props.options.indexOf(match) : -1;
 });
-const activeIndex = computed(() =>
-  matchedIndex.value >= 0 ? matchedIndex.value : selectedIndex.value,
+const enabledIndices = computed(() =>
+  props.options.flatMap((option, index) => (option.disabled ? [] : [index])),
 );
+const activeIndex = computed(() => {
+  const preferred = matchedIndex.value >= 0 ? matchedIndex.value : selectedIndex.value;
+  return enabledIndices.value.includes(preferred) ? preferred : (enabledIndices.value[0] ?? -1);
+});
 watch(
   [activeIndex, () => props.options],
   () => {
@@ -48,26 +59,55 @@ watch(
   { immediate: true },
 );
 function onKeydown(event: KeyboardEvent): void {
-  if (!props.options.length) return;
-  const index = Math.max(0, activeIndex.value);
+  if (
+    event.defaultPrevented ||
+    event.isComposing ||
+    event.keyCode === 229 ||
+    !enabledIndices.value.length
+  )
+    return;
+  const enabled = enabledIndices.value;
+  const index = Math.max(0, enabled.indexOf(activeIndex.value));
   const next =
     event.key === "Home"
       ? 0
       : event.key === "End"
-        ? props.options.length - 1
+        ? enabled.length - 1
         : event.key === "ArrowDown"
-          ? (index + 1) % props.options.length
+          ? (index + 1) % enabled.length
           : event.key === "ArrowUp"
-            ? (index - 1 + props.options.length) % props.options.length
+            ? (index - 1 + enabled.length) % enabled.length
             : -1;
   if (next < 0) return;
   event.preventDefault();
-  emit("select", props.options[next]!.value);
-  void nextTick(() => listRef.value?.querySelectorAll<HTMLButtonElement>("button")[next]?.focus());
+  const optionIndex = enabled[next]!;
+  emit("select", props.options[optionIndex]!.value);
+  void nextTick(() =>
+    listRef.value?.querySelectorAll<HTMLButtonElement>("button")[optionIndex]?.focus(),
+  );
+}
+function selectOption(value: Option["value"]): boolean {
+  const option = props.options.find((option) => option.value === value);
+  if (!option || option.disabled) return false;
+  emit("select", value);
+  return true;
+}
+function onOptionEnter(event: KeyboardEvent, value: Option["value"]): void {
+  if (
+    event.isComposing ||
+    event.keyCode === 229 ||
+    !props.options.some((option) => option.value === value && !option.disabled)
+  )
+    return;
+  event.preventDefault();
+  confirmOption(value);
+}
+function activateOption(value: Option["value"]): void {
+  if (props.options.some((option) => option.value === value && !option.disabled))
+    emit("activate", value);
 }
 function confirmOption(value: Option["value"]): void {
-  emit("select", value);
-  emit("activate", value);
+  if (selectOption(value)) activateOption(value);
 }
 </script>
 <template>
@@ -90,16 +130,21 @@ function confirmOption(value: Option["value"]): void {
         type="button"
         role="option"
         :aria-selected="modelValue === option.value"
-        :tabindex="index === Math.max(0, activeIndex) ? 0 : -1"
-        :class="{ 'is-located': index === matchedIndex }"
+        :tabindex="index === activeIndex ? 0 : -1"
+        :disabled="option.disabled"
+        :aria-disabled="option.disabled || undefined"
+        :class="{ 'is-located': index === matchedIndex, 'has-icon': !!$slots.icon }"
         :data-option-list-match="index === matchedIndex ? '' : undefined"
-        :style="{ color: option.color }"
+        :style="{ color: option.disabled ? undefined : option.color }"
         :title="option.label"
         :[itemAttribute]="option.value"
-        @click="emit('select', option.value)"
-        @keydown.enter.prevent="confirmOption(option.value)"
-        @dblclick="emit('activate', option.value)"
+        @click="selectOption(option.value)"
+        @keydown.enter="onOptionEnter($event, option.value)"
+        @dblclick="activateOption(option.value)"
       >
+        <span v-if="$slots.icon" class="option-list__icon" aria-hidden="true"
+          ><slot name="icon" :option="option"
+        /></span>
         <slot name="option" :option="option">{{ option.label }}</slot>
       </button>
     </div>
@@ -119,6 +164,20 @@ function confirmOption(value: Option["value"]): void {
 
   button {
     @include option-list.item;
+    &.has-icon {
+      display: flex;
+      align-items: center;
+      gap: var(--sheetcraft-space-2);
+    }
+  }
+  &__icon {
+    display: inline-flex;
+    flex: none;
+    :deep(svg) {
+      width: var(--sheetcraft-action-icon-size);
+      height: var(--sheetcraft-action-icon-size);
+      stroke-width: var(--sheetcraft-icon-stroke-width);
+    }
   }
   &.is-ellipsis {
     .option-list__items {

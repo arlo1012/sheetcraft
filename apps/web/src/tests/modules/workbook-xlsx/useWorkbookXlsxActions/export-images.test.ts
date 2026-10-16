@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { framedPicture } from "../../sheet-images/framed-picture-fixture";
 import { effectScope, ref } from "vue";
 import { describe, expect, test, vi } from "vitest";
@@ -79,7 +80,75 @@ function mountActions(assetStore?: ImageAssetStore, timeoutMs?: number) {
   };
 }
 
+function chartDrawing(): SheetChartDrawing {
+  return {
+    id: "chart",
+    kind: "chart",
+    name: "Chart",
+    anchor: { row: 0, column: 0 },
+    offsetX: 0,
+    offsetY: 0,
+    width: 480,
+    height: 300,
+    text: "",
+    shape: "rectangle",
+    fill: "#ffffff",
+    stroke: "#000000",
+    strokeWidth: 1,
+    color: "#000000",
+    fontSize: 14,
+    bold: false,
+    italic: false,
+    rotation: 0,
+    chart: {
+      type: "column",
+      range: null,
+      title: "Chart",
+      headerRow: true,
+      headerColumn: true,
+      seriesBy: "columns",
+      legend: true,
+      labels: false,
+      stacked: false,
+      showHidden: false,
+      elements: { titlePosition: "overlay" },
+    },
+  };
+}
+
 describe("XLSX export image preparation", () => {
+  test.each(["column", "bar", "line"] as const)(
+    "native-capable %s element choices reach worker export and download",
+    async (type) => {
+      const f = mountActions();
+      const sheet = getActiveSheet(f.workbook);
+      setCellContent(sheet, { row: 0, column: 0 }, null);
+      const drawing = chartDrawing();
+      drawing.chart.type = type;
+      drawing.chart.range = { start: { row: 0, column: 0 }, end: { row: 3, column: 2 } };
+      drawing.chart.labels = type !== "line";
+      drawing.chart.elements = {
+        titlePosition: "overlay",
+        legendPosition: "topRight",
+        legendOverlay: true,
+        ...(type !== "line" ? { labelPosition: "outsideEnd" as const } : {}),
+        dataTable: "none",
+        labelContent: "value",
+        labelScope: "all",
+      };
+      sheet.drawings = [drawing];
+      const before = serializeWorkbook(f.workbook);
+      await f.actions.exportXlsx();
+      expect(f.flushPendingEdits).toHaveBeenCalledOnce();
+      expect(f.workerFactory).toHaveBeenCalledOnce();
+      expect(f.postMessage).toHaveBeenCalledOnce();
+      expect(f.download).toHaveBeenCalledOnce();
+      expect(f.actions.feedback.value?.error).not.toBe(true);
+      expect(serializeWorkbook(f.workbook)).toEqual(before);
+      f.scope.stop();
+    },
+  );
+
   test.each([
     "elements",
     "source",
@@ -94,39 +163,8 @@ describe("XLSX export image preparation", () => {
     async (field) => {
       const get = vi.fn(async () => imageAsset()),
         f = mountActions({ get, put: vi.fn() });
-      const drawing: SheetChartDrawing = {
-        id: "chart",
-        kind: "chart",
-        name: "Chart",
-        anchor: { row: 0, column: 0 },
-        offsetX: 0,
-        offsetY: 0,
-        width: 480,
-        height: 300,
-        text: "",
-        shape: "rectangle",
-        fill: "#ffffff",
-        stroke: "#000000",
-        strokeWidth: 1,
-        color: "#000000",
-        fontSize: 14,
-        bold: false,
-        italic: false,
-        rotation: 0,
-        chart: {
-          type: "column",
-          range: null,
-          title: "Chart",
-          headerRow: true,
-          headerColumn: true,
-          seriesBy: "columns",
-          legend: true,
-          labels: false,
-          stacked: false,
-          showHidden: false,
-          elements: { titlePosition: "overlay" },
-        },
-      };
+      const drawing = chartDrawing();
+      if (field === "elements") drawing.chart.elements = { titlePosition: "none" };
       if (field === "source") {
         delete drawing.chart.elements;
         drawing.chart.source = { kind: "series", categories: { kind: "generated" }, series: [] };
@@ -174,7 +212,7 @@ describe("XLSX export image preparation", () => {
                   ? "chart.sourceExportBlocked"
                   : "chart.elementExportBlocked",
         error: true,
-        locations: `Sheet1.drawings["chart"].chart.${field === "combo" ? "type" : field}`,
+        locations: `Sheet1.drawings["chart"].chart.${field === "combo" ? "type" : field === "elements" ? "elements.titlePosition" : field}`,
       });
       expect(f.flushPendingEdits).not.toHaveBeenCalled();
       expect(get).not.toHaveBeenCalled();
@@ -187,7 +225,9 @@ describe("XLSX export image preparation", () => {
   test("unsupported frame export rejects before committing a cell draft, worker or resource work", async () => {
     const get = vi.fn(async () => imageAsset()),
       f = mountActions({ get, put: vi.fn() });
-    getActiveSheet(f.workbook).floatingImages = [framedPicture()];
+    const unsupported = framedPicture();
+    unsupported.frame.source.widthRatio = 0.5;
+    getActiveSheet(f.workbook).floatingImages = [unsupported];
     const before = serializeWorkbook(f.workbook);
     await f.actions.exportXlsx();
     expect(f.actions.feedback.value).toEqual({ key: "xlsx.feedback.blocked", error: true });
@@ -197,6 +237,53 @@ describe("XLSX export image preparation", () => {
     expect(f.download).not.toHaveBeenCalled();
     expect(serializeWorkbook(f.workbook)).toEqual(before);
     f.scope.stop();
+  });
+  test("a supported 37-degree frame reaches the worker with original image bytes", async () => {
+    const bytes = new Uint8Array(
+      readFileSync("src/tests/modules/workbook-xlsx/fixtures/asymmetric-native-source.png"),
+    );
+    const asset: ImageAsset = {
+      id: "asset",
+      mimeType: "image/png",
+      width: 160,
+      height: 96,
+      blob: new Blob([bytes], { type: "image/png" }),
+    };
+    const get = vi.fn(async () => asset);
+    const f = mountActions({ get, put: vi.fn() });
+    const canvas = vi.spyOn(HTMLCanvasElement.prototype, "getContext");
+    try {
+      const sheet = getActiveSheet(f.workbook);
+      setCellContent(sheet, { row: 0, column: 0 }, null);
+      const supported = framedPicture();
+      expect(supported.frame.angleDeg).toBe(37);
+      sheet.floatingImages = [supported];
+      const before = serializeWorkbook(f.workbook);
+      await f.actions.exportXlsx();
+      expect(f.flushPendingEdits).toHaveBeenCalledOnce();
+      expect(get).toHaveBeenCalledExactlyOnceWith("asset");
+      expect(f.workerFactory).toHaveBeenCalledOnce();
+      expect(f.postMessage).toHaveBeenCalledOnce();
+      const request = f.postMessage.mock.calls[0]![0];
+      if (request.type !== "encode") throw new Error("Expected encode request.");
+      expect(request.snapshot).toEqual(before);
+      expect(request.images).toHaveLength(1);
+      expect(request.images![0]).toMatchObject({
+        assetId: "asset",
+        extension: "png",
+        width: 160,
+        height: 96,
+      });
+      expect(new Uint8Array(request.images![0]!.bytes)).toEqual(bytes);
+      expect(request.images![0]!.transform).toBeUndefined();
+      expect(canvas).not.toHaveBeenCalled();
+      expect(f.download).toHaveBeenCalledOnce();
+      expect(f.actions.feedback.value).toEqual({ key: "xlsx.feedback.exported", error: false });
+      expect(serializeWorkbook(f.workbook)).toEqual(before);
+    } finally {
+      canvas.mockRestore();
+      f.scope.stop();
+    }
   });
   test("sends image bytes and the same point-in-time snapshot to the worker before downloading", async () => {
     const asset = imageAsset();

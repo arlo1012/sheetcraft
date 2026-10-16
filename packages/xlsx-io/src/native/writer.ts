@@ -160,7 +160,9 @@ function sheetXml(
   const properties = sheet.properties.tabColor?.argb
     ? `<sheetPr>${`<tabColor rgb="${xml(sheet.properties.tabColor.argb)}"/>`}</sheetPr>`
     : "";
-  const format = `<sheetFormatPr defaultRowHeight="${sheet.properties.defaultRowHeight ?? 15}"${sheet.properties.defaultColWidth !== undefined ? ` defaultColWidth="${sheet.properties.defaultColWidth}"` : ""}/>`;
+  // A Core default height is an explicit pixel dimension. Without customHeight,
+  // WPS resets sparse/unmaterialized rows to its font-derived 15pt default.
+  const format = `<sheetFormatPr defaultRowHeight="${sheet.properties.defaultRowHeight ?? 15}"${sheet.properties.defaultRowHeight !== undefined ? ' customHeight="1"' : ""}${sheet.properties.defaultColWidth !== undefined ? ` defaultColWidth="${sheet.properties.defaultColWidth}"` : ""}/>`;
   const columns = [...sheet.columns.values()]
     .sort((a, b) => a.number - b.number)
     .filter((column) => column.width !== undefined || column.hidden !== undefined);

@@ -3,7 +3,7 @@ import { computed, onUnmounted, ref, watch } from "vue";
 import type { PictureFormatTranslate } from "../../picture-format-pane-model";
 import { useWorkbookTheme } from "../../../../shared/color/workbook-theme-context";
 import PanelSelect from "../../../../shared/panel-select/PanelSelect.vue";
-import GallerySection from "../../../../shared/gallery/GallerySection.vue";
+import PicturePresetChoices from "./PicturePresetChoices.vue";
 import { picturePresetPreview } from "../../picture-preset-preview";
 import PictureFormatField from "./PictureFormatField.vue";
 import type {
@@ -21,6 +21,9 @@ const props = withDefaults(
     columns?: number;
     label?: string;
     emptyLabel?: string;
+    inline?: boolean;
+    reason?: string;
+    error?: string;
   }>(),
   { columns: 3 },
 );
@@ -60,8 +63,10 @@ function selectionAction(id: string, close: () => void) {
       props.onSelect !== handler ||
       !flattened.value.some((item) => item.id === id)
     )
-      return;
-    if (handler(id) === true) close();
+      return false;
+    if (handler(id) !== true) return false;
+    close();
+    return true;
   };
 }
 watch(
@@ -89,36 +94,14 @@ function open(value: boolean) {
   generation++;
   opening.value = value ? props.ownerKey : undefined;
 }
-function keydown(event: KeyboardEvent) {
-  if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key))
-    return;
-  const button = event.target as HTMLButtonElement;
-  if (button.tagName !== "BUTTON") return;
-  const container = event.currentTarget as HTMLElement,
-    buttons = [...container.querySelectorAll<HTMLButtonElement>("button:not([disabled])")],
-    index = buttons.indexOf(button);
-  if (index < 0) return;
-  const delta =
-    event.key === "ArrowLeft"
-      ? -1
-      : event.key === "ArrowRight"
-        ? 1
-        : event.key === "ArrowUp"
-          ? -props.columns
-          : props.columns;
-  const next =
-    event.key === "Home"
-      ? 0
-      : event.key === "End"
-        ? buttons.length - 1
-        : Math.max(0, Math.min(buttons.length - 1, index + delta));
-  event.preventDefault();
-  event.stopPropagation();
-  buttons[next]?.focus();
-}
 </script>
 <template>
-  <PictureFormatField :label="label ?? t('preset')">
+  <PictureFormatField
+    :label="label ?? t('preset')"
+    :inline="inline"
+    :reason="reason"
+    :error="error"
+  >
     <PanelSelect
       :key="`${ownerKey}:${callbackGeneration}`"
       :model-value="selectedId"
@@ -134,82 +117,38 @@ function keydown(event: KeyboardEvent) {
           :src="preview(selected)"
           alt=""
           class="picture-preset-gallery__selected"
-        /><span>{{
-          selected ? itemLabel(selected) : (emptyLabel ?? t("effectCustom"))
-        }}</span></template
+        /><span
+          class="picture-preset-gallery__value"
+          :title="selected ? itemLabel(selected) : (emptyLabel ?? t('effectCustom'))"
+          >{{ selected ? itemLabel(selected) : (emptyLabel ?? t("effectCustom")) }}</span
+        ></template
       >
-      <template #panel="{ close }"
-        ><div class="picture-preset-gallery" @keydown="keydown">
-          <GallerySection v-for="group in groups" :key="group.labelKey" :title="t(group.labelKey)"
-            ><div
-              class="picture-preset-gallery__grid"
-              :style="{ '--picture-preset-columns': columns }"
-              role="group"
-              :aria-label="t(group.labelKey)"
-            >
-              <button
-                v-for="item in group.items"
-                :key="item.id"
-                type="button"
-                :disabled="disabled"
-                :aria-label="itemLabel(item)"
-                :title="itemLabel(item)"
-                :aria-pressed="item.id === selectedId"
-                :onClick="selectionAction(item.id, close)"
-              >
-                <img v-if="preview(item)" :src="preview(item)" alt="" /><span v-else>{{
-                  itemLabel(item)
-                }}</span>
-              </button>
-            </div></GallerySection
-          >
-        </div></template
-      >
+      <template #panel="{ close }">
+        <PicturePresetChoices
+          :owner-key="`${ownerKey}:${callbackGeneration}`"
+          :groups="groups"
+          :selected-id="selectedId"
+          :disabled="disabled"
+          :columns="columns"
+          :t="t"
+          :on-select="(id) => selectionAction(id, close)()"
+        />
+      </template>
     </PanelSelect>
   </PictureFormatField>
 </template>
 <style scoped lang="scss">
-.picture-preset-gallery {
-  width: 228px;
-  max-width: calc(100vw - 24px);
-  max-height: min(480px, 65vh);
-  overflow: auto;
-  overscroll-behavior: contain;
-  &__grid {
-    display: grid;
-    grid-template-columns: repeat(var(--picture-preset-columns), minmax(0, 1fr));
-    gap: 6px;
-  }
-  &__grid button {
-    display: grid;
-    place-items: center;
-    min-width: 0;
-    height: 52px;
-    padding: 5px;
-    border: 1px solid var(--sheetcraft-border-subtle);
-    border-radius: var(--sheetcraft-radius-small);
-    background: var(--sheetcraft-surface-panel);
-    font: inherit;
-    color: inherit;
-    cursor: pointer;
-    overflow: hidden;
-  }
-  &__grid button:hover:not(:disabled) {
-    background: var(--sheetcraft-surface-hover);
-  }
-  &__grid button[aria-pressed="true"] {
-    outline: 2px solid var(--sheetcraft-text-primary);
-    outline-offset: -2px;
-  }
-  &__grid img {
-    max-width: 100%;
-    max-height: 40px;
-    object-fit: contain;
-  }
-  &__selected {
-    max-width: 28px;
-    max-height: 20px;
-    object-fit: contain;
-  }
+.picture-preset-gallery__value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.picture-preset-gallery__selected {
+  flex: 0 0 auto;
+  max-width: 28px;
+  max-height: 20px;
+  object-fit: contain;
 }
 </style>

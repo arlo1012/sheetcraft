@@ -5,12 +5,45 @@ import type { ChartDesignIntent, ChartVariant, CommonChartType } from "../chart-
 
 const props = defineProps<{
   type: CommonChartType;
+  presentation?: "menu" | "dialog";
   variant?: ChartVariant;
   disabled: boolean;
   apply: (intent: ChartDesignIntent) => boolean;
 }>();
 const { t } = useAppI18n();
 const failed = ref(false);
+const root = ref<HTMLElement>();
+function variantTabIndex(value: ChartVariant): number | undefined {
+  return props.presentation === "dialog"
+    ? props.variant === value || (!props.variant && value === "standard")
+      ? 0
+      : -1
+    : undefined;
+}
+
+function onKeydown(event: KeyboardEvent): void {
+  if (
+    props.presentation !== "dialog" ||
+    event.isComposing ||
+    !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)
+  )
+    return;
+  const buttons = [
+    ...(root.value?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? []),
+  ];
+  if (!buttons.length) return;
+  const index = buttons.indexOf(event.target as HTMLButtonElement);
+  const next =
+    event.key === "Home"
+      ? 0
+      : event.key === "End"
+        ? buttons.length - 1
+        : (index + (["ArrowRight", "ArrowDown"].includes(event.key) ? 1 : -1) + buttons.length) %
+          buttons.length;
+  event.preventDefault();
+  buttons[next]?.focus();
+  buttons[next]?.click();
+}
 watch(
   () => props.apply,
   () => {
@@ -35,12 +68,20 @@ const percentKey = computed(() => `chart.variant.${props.type}.percentStacked` a
 </script>
 
 <template>
-  <div class="chart-subtype-controls" role="group" :aria-label="t('chart.subtypes')">
+  <div
+    ref="root"
+    class="chart-subtype-controls"
+    :class="{ 'is-dialog': presentation === 'dialog' }"
+    :role="presentation === 'dialog' ? 'radiogroup' : 'group'"
+    :aria-label="t('chart.subtypes')"
+    @keydown="onKeydown"
+  >
     <div class="chart-subtype-controls__choices">
       <button
         type="button"
-        role="menuitemradio"
+        :role="presentation === 'dialog' ? 'radio' : 'menuitemradio'"
         :aria-checked="variant === 'standard'"
+        :tabindex="variantTabIndex('standard')"
         :aria-disabled="disabled"
         :disabled="disabled"
         :title="t(standardKey)"
@@ -74,8 +115,9 @@ const percentKey = computed(() => `chart.variant.${props.type}.percentStacked` a
       </button>
       <button
         type="button"
-        role="menuitemradio"
+        :role="presentation === 'dialog' ? 'radio' : 'menuitemradio'"
         :aria-checked="variant === 'stacked'"
+        :tabindex="variantTabIndex('stacked')"
         :aria-disabled="disabled"
         :disabled="disabled"
         :title="t(stackedKey)"
@@ -105,8 +147,9 @@ const percentKey = computed(() => `chart.variant.${props.type}.percentStacked` a
       </button>
       <button
         type="button"
-        role="menuitemradio"
+        :role="presentation === 'dialog' ? 'radio' : 'menuitemradio'"
         :aria-checked="variant === 'percentStacked'"
+        :tabindex="variantTabIndex('percentStacked')"
         :aria-disabled="disabled"
         :disabled="disabled"
         :title="t(percentKey)"
@@ -137,8 +180,9 @@ const percentKey = computed(() => `chart.variant.${props.type}.percentStacked` a
       <template v-if="type === 'line'">
         <button
           type="button"
-          role="menuitemradio"
+          :role="presentation === 'dialog' ? 'radio' : 'menuitemradio'"
           :aria-checked="variant === 'standardMarkers'"
+          :tabindex="variantTabIndex('standardMarkers')"
           :aria-disabled="disabled"
           :disabled="disabled"
           :title="t('chart.variant.line.standardMarkers')"
@@ -159,8 +203,9 @@ const percentKey = computed(() => `chart.variant.${props.type}.percentStacked` a
         </button>
         <button
           type="button"
-          role="menuitemradio"
+          :role="presentation === 'dialog' ? 'radio' : 'menuitemradio'"
           :aria-checked="variant === 'stackedMarkers'"
+          :tabindex="variantTabIndex('stackedMarkers')"
           :aria-disabled="disabled"
           :disabled="disabled"
           :title="t('chart.variant.line.stackedMarkers')"
@@ -188,8 +233,9 @@ const percentKey = computed(() => `chart.variant.${props.type}.percentStacked` a
         </button>
         <button
           type="button"
-          role="menuitemradio"
+          :role="presentation === 'dialog' ? 'radio' : 'menuitemradio'"
           :aria-checked="variant === 'percentStackedMarkers'"
+          :tabindex="variantTabIndex('percentStackedMarkers')"
           :aria-disabled="disabled"
           :disabled="disabled"
           :title="t('chart.variant.line.percentStackedMarkers')"
@@ -256,6 +302,30 @@ const percentKey = computed(() => `chart.variant.${props.type}.percentStacked` a
   }
   span {
     white-space: nowrap;
+  }
+  &.is-dialog {
+    width: 100%;
+    .chart-subtype-controls__choices {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    button {
+      flex: 0 0 108px;
+      min-height: 76px;
+      align-content: start;
+    }
+    svg {
+      width: 66px;
+      height: 40px;
+    }
+    span {
+      white-space: normal;
+      text-wrap: balance;
+    }
+    .chart-subtype-controls__hint {
+      display: none;
+    }
   }
   &__hint,
   &__error {

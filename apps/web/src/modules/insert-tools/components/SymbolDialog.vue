@@ -6,6 +6,15 @@ import { Select } from "tdesign-vue-next/es/select";
 import { Button } from "tdesign-vue-next/es/button";
 import { Tabs, TabPanel } from "tdesign-vue-next/es/tabs";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
+import { PrimaryTable } from "tdesign-vue-next/es/table";
+import type {
+  PrimaryTableCol,
+  RowEventContext,
+  TableRowAttributes,
+  TableRowData,
+} from "tdesign-vue-next/es/table/type";
+import OptionList from "../../../shared/option-list/OptionList.vue";
+import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import SymbolCharacterGrid from "./SymbolCharacterGrid.vue";
 import SymbolFontSourceControls from "./SymbolFontSourceControls.vue";
@@ -508,20 +517,58 @@ function reset(): void {
   shortcutInput.value = "";
   resetVisible.value = false;
 }
-function listKey(event: KeyboardEvent, kind: "special" | "custom"): void {
+const specialOptions = computed(() =>
+  SPECIAL_SYMBOLS.map((entry, index) => ({
+    value: String(index),
+    label: t(`symbolTools.${entry.label}`),
+    text: entry.text,
+  })),
+);
+function selectSpecial(value: string): void {
+  specialIndex.value = Number(value);
+}
+function activateSpecial(value: string): void {
+  selectSpecial(value);
+  void insert();
+}
+const customRows = computed(() =>
+  preferences.value.custom.map((entry, index) => ({ index, entry })),
+);
+const customColumns = computed<PrimaryTableCol[]>(() => [
+  { colKey: "symbol", title: t("symbolTools.custom"), width: "50%" },
+  { colKey: "shortcut", title: t("symbolTools.shortcut"), width: "50%" },
+]);
+const customRowAttributes: TableRowAttributes<TableRowData> = ({ rowIndex }) => ({
+  role: "option",
+  "aria-selected": String(customIndex.value === rowIndex),
+  "data-row-index": rowIndex,
+  tabindex: customIndex.value === rowIndex ? 0 : -1,
+});
+function selectCustomRows(keys: Array<string | number>): void {
+  if (typeof keys[0] === "number") customIndex.value = keys[0];
+}
+function activateCustomRow({ row, e }: RowEventContext<TableRowData>): void {
+  if (e.target instanceof Element && e.target.closest("input, label, button")) return;
+  customIndex.value = Number(row.index);
+  void insert();
+}
+function onCustomListKey(event: KeyboardEvent): void {
   if ((event.target as HTMLElement).tagName === "INPUT") return;
-  const index = kind === "special" ? specialIndex : customIndex;
-  const count = kind === "special" ? SPECIAL_SYMBOLS.length : preferences.value.custom.length;
+  const count = preferences.value.custom.length;
+  if (!count) return;
   if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
     event.preventDefault();
-    index.value =
+    customIndex.value =
       event.key === "Home"
         ? 0
         : event.key === "End"
           ? count - 1
-          : Math.max(0, Math.min(count - 1, index.value + (event.key === "ArrowDown" ? 1 : -1)));
+          : Math.max(
+              0,
+              Math.min(count - 1, customIndex.value + (event.key === "ArrowDown" ? 1 : -1)),
+            );
     const row = (event.currentTarget as HTMLElement).querySelector<HTMLElement>(
-      `[data-row-index="${index.value}"]`,
+      `[data-row-index="${customIndex.value}"]`,
     );
     row?.focus({ preventScroll: true });
     row?.scrollIntoView?.({ block: "nearest" });
@@ -538,9 +585,18 @@ function listKey(event: KeyboardEvent, kind: "special" | "custom"): void {
     placement="center"
     :confirm-on-enter="false"
     :header="t('drawing.symbol')"
-    width="min(720px, calc(100vw - 24px))"
-    :confirm-btn="{ content: t('symbolTools.insert'), disabled: !canInsert }"
-    :cancel-btn="t(inserted ? 'symbolTools.close' : 'symbolTools.cancel')"
+    width="min(652px, calc(100vw - 24px))"
+    :confirm-btn="{
+      content: t('symbolTools.insert'),
+      theme: 'primary',
+      variant: 'base',
+      disabled: !canInsert,
+    }"
+    :cancel-btn="{
+      content: t(inserted || tab === 'custom' ? 'symbolTools.close' : 'symbolTools.cancel'),
+      theme: 'default',
+      variant: 'base',
+    }"
     :close-on-overlay-click="false"
     @confirm="insert"
     @close="close"
@@ -552,25 +608,25 @@ function listKey(event: KeyboardEvent, kind: "special" | "custom"): void {
         <TabPanel value="custom" :label="t('symbolTools.custom')" />
       </Tabs>
       <div class="symbol-dialog__body">
-        <SymbolFontSourceControls
-          :loading="loading"
-          :default-font-family="defaultFontFamily"
-          :restore-error="fontRestoreError"
-          @register="registerLocalFont"
-        />
         <section
           v-show="tab === 'symbols'"
           class="symbol-dialog__page"
           :aria-label="t('symbolTools.symbols')"
         >
           <div class="symbol-dialog__fields">
-            <label
+            <label class="symbol-dialog__field"
               ><span>{{ t("symbolTools.font") }}</span
-              ><Select v-model="fontId" :options="fontOptions" filterable :disabled="loading"
+              ><Select
+                size="small"
+                v-model="fontId"
+                :options="fontOptions"
+                filterable
+                :disabled="loading"
             /></label>
-            <label v-if="codeFormat === 'unicode-hex'"
+            <label class="symbol-dialog__field" v-if="codeFormat === 'unicode-hex'"
               ><span>{{ t("symbolTools.subset") }}</span
               ><Select
+                size="small"
                 :value="subset"
                 :options="subsetOptions"
                 filterable
@@ -580,6 +636,7 @@ function listKey(event: KeyboardEvent, kind: "special" | "custom"): void {
           </div>
           <div class="symbol-dialog__search">
             <Input
+              size="small"
               v-model="query"
               :placeholder="t('symbolTools.search')"
               :aria-label="t('symbolTools.search')"
@@ -597,7 +654,7 @@ function listKey(event: KeyboardEvent, kind: "special" | "custom"): void {
           </div>
           <div
             v-else-if="normalCoverageUnknown && !allUnicode"
-            class="symbol-dialog__status"
+            class="symbol-dialog__coverage-warning"
             role="status"
           >
             {{ t("symbolTools.unverifiedFont", { family: defaultFontFamily ?? "" }) }}
@@ -617,19 +674,6 @@ function listKey(event: KeyboardEvent, kind: "special" | "custom"): void {
           />
           <div v-else class="symbol-dialog__status" role="status">
             {{ t("symbolTools.noResults") }}
-          </div>
-          <div v-if="catalog && (allUnicode || font)" class="symbol-dialog__hint">
-            {{
-              allUnicode
-                ? t("symbolTools.allCoverage")
-                : t(
-                    font?.source === "local" ? "symbolTools.localCoverage" : "symbolTools.coverage",
-                    {
-                      count: points.length,
-                      version: catalog?.version ?? "17.0.0",
-                    },
-                  )
-            }}
           </div>
           <div class="symbol-dialog__recent-label">
             <span>{{ t("symbolTools.recent") }}</span
@@ -659,18 +703,19 @@ function listKey(event: KeyboardEvent, kind: "special" | "custom"): void {
             }}</span>
           </div>
           <div class="symbol-dialog__fields">
-            <label
+            <label class="symbol-dialog__field"
               ><span>{{ t("symbolTools.code") }}</span
               ><Input
+                size="small"
                 :value="codeInput"
                 :status="invalidCode ? 'error' : undefined"
                 :aria-invalid="invalidCode"
                 @change="navigateCode(String($event))"
                 @enter="insert"
             /></label>
-            <label
+            <label class="symbol-dialog__field"
               ><span>{{ t("symbolTools.from") }}</span
-              ><Select v-model="codeFormat" :options="formatOptions"
+              ><Select size="small" v-model="codeFormat" :options="formatOptions"
             /></label>
           </div>
           <div v-if="invalidCode" class="symbol-dialog__error" role="alert">
@@ -679,109 +724,93 @@ function listKey(event: KeyboardEvent, kind: "special" | "custom"): void {
           <div v-if="codeFormat !== 'unicode-hex'" class="symbol-dialog__hint">
             {{ t("symbolTools.encodingNote") }}
           </div>
-          <label class="symbol-dialog__literal"
-            ><span>{{ t("symbolTools.literal") }}</span
-            ><Input
-              v-model="literal"
-              :maxlength="16"
-              :placeholder="t('symbolTools.literalHint')"
-              @change="
-                literalActive = true;
-                selectionOverride = undefined;
-              "
-              @enter="insert"
-          /></label>
         </section>
         <section
           v-show="tab === 'special'"
           class="symbol-dialog__page"
           :aria-label="t('symbolTools.special')"
         >
-          <div
-            class="symbol-dialog__list"
-            role="listbox"
-            :aria-label="t('symbolTools.special')"
-            @keydown="listKey($event, 'special')"
+          <OptionList
+            class="symbol-dialog__special-list"
+            :model-value="String(specialIndex)"
+            :options="specialOptions"
+            :label="t('symbolTools.special')"
+            item-data-attribute="data-symbol-special"
+            @select="selectSpecial"
+            @activate="activateSpecial"
           >
-            <button
-              v-for="(item, index) in SPECIAL_SYMBOLS"
-              :key="item.text"
-              type="button"
-              role="option"
-              :aria-selected="specialIndex === index"
-              :tabindex="specialIndex === index ? 0 : -1"
-              :data-row-index="index"
-              @click="specialIndex = index"
-              @dblclick="
-                specialIndex = index;
-                insert();
-              "
-            >
+            <template #icon="{ option }">
               <span
                 class="symbol-dialog__list-glyph"
-                :style="{ fontFamily: selectedFamily(item.text) }"
-                >{{ /\s/u.test(item.text) ? "␣" : item.text }}</span
-              ><span>{{ t(`symbolTools.${item.label}`) }}</span
-              ><code>U+{{ symbolCharacterCode(item.text.codePointAt(0)!) }}</code>
-            </button>
-          </div>
-          <p class="symbol-dialog__hint">{{ t("symbolTools.specialNote") }}</p>
+                :title="`U+${symbolCharacterCode(option.text.codePointAt(0)!)}`"
+                :style="{ fontFamily: selectedFamily(option.text) }"
+                >{{ /\s/u.test(option.text) ? "␣" : option.text }}</span
+              >
+            </template>
+          </OptionList>
         </section>
         <section
           v-show="tab === 'custom'"
           class="symbol-dialog__page"
           :aria-label="t('symbolTools.custom')"
         >
-          <div class="symbol-dialog__list-heading">
-            <span>{{ t("symbolTools.custom") }}</span
-            ><span>{{ t("symbolTools.shortcut") }}</span>
-          </div>
           <div
-            class="symbol-dialog__list symbol-dialog__custom-list"
+            class="symbol-dialog__custom-list"
             role="listbox"
             :aria-label="t('symbolTools.custom')"
-            @keydown="listKey($event, 'custom')"
+            @keydown="onCustomListKey"
           >
-            <div
-              v-for="(item, index) in preferences.custom"
-              :key="symbolIdentity(item)"
-              role="option"
-              :aria-selected="customIndex === index"
-              :tabindex="customIndex === index ? 0 : -1"
-              :data-row-index="index"
-              @click="customIndex = index"
-              @dblclick="
-                customIndex = index;
-                insert();
-              "
-            >
-              <Checkbox
-                :checked="item.visible"
-                :aria-label="`${t('symbolTools.visible')}: ${item.text}`"
-                @click.stop
-                @dblclick.stop
-                @change="toggleVisible(index, !!$event)"
-              />
-              <span class="symbol-dialog__list-glyph" :style="{ fontFamily: item.fontFamily }">{{
-                /\s/u.test(item.text) ? "␣" : item.text
-              }}</span
-              ><span class="symbol-dialog__custom-font">{{
-                item.fontFamily
-                  ? localFontLabels[item.fontFamily]
-                    ? `${localFontLabels[item.fontFamily]} · ${item.fontFamily.slice(-6)}`
-                    : item.fontFamily
-                  : t("symbolTools.inherited")
-              }}</span
-              ><kbd>{{ item.shortcut }}</kbd>
-            </div>
-            <p v-if="!preferences.custom.length" class="symbol-dialog__hint">
-              {{ t("symbolTools.emptyCustom") }}
-            </p>
+            <TableHeightWrapper v-slot="{ height }">
+              <PrimaryTable
+                class="sheetcraft-table--mini"
+                row-key="index"
+                :data="customRows"
+                :columns="customColumns"
+                :row-attributes="customRowAttributes"
+                :active-row-keys="[customIndex]"
+                active-row-type="single"
+                :disable-space-inactive-row="true"
+                :height="height"
+                :bordered="false"
+                size="small"
+                table-layout="fixed"
+                hover
+                :empty="t('symbolTools.emptyCustom')"
+                @active-change="selectCustomRows"
+                @row-dblclick="activateCustomRow"
+              >
+                <template #symbol="{ row }">
+                  <span class="symbol-dialog__custom-symbol">
+                    <span @click.stop @dblclick.stop>
+                      <Checkbox
+                        :checked="row.entry.visible"
+                        :aria-label="`${t('symbolTools.visible')}: ${row.entry.text}`"
+                        @change="toggleVisible(row.index, !!$event)"
+                      />
+                    </span>
+                    <span
+                      class="symbol-dialog__list-glyph"
+                      :title="
+                        row.entry.fontFamily
+                          ? (localFontLabels[row.entry.fontFamily] ?? row.entry.fontFamily)
+                          : t('symbolTools.inherited')
+                      "
+                      :style="{ fontFamily: row.entry.fontFamily }"
+                      >{{ /\s/u.test(row.entry.text) ? "␣" : row.entry.text }}</span
+                    >
+                  </span>
+                </template>
+                <template #shortcut="{ row }"
+                  ><kbd>{{ row.entry.shortcut }}</kbd></template
+                >
+              </PrimaryTable>
+            </TableHeightWrapper>
           </div>
           <div class="symbol-dialog__shortcut">
-            <label
+            <label class="symbol-dialog__field"
               ><span>{{ t("symbolTools.shortcut") }}</span
               ><Input
+                size="small"
                 :value="shortcutInput"
                 readonly
                 :placeholder="t('symbolTools.shortcutCapture')"
@@ -824,22 +853,6 @@ function listKey(event: KeyboardEvent, kind: "special" | "custom"): void {
             }}</Button>
           </div>
         </section>
-        <div class="symbol-dialog__preview" :aria-label="t('symbolTools.preview')">
-          <span class="symbol-dialog__preview-glyph" :style="{ fontFamily: previewFontFamily }">{{
-            current ? (/^\s+$/u.test(current.text) ? "␣" : current.text) : "—"
-          }}</span>
-          <div>
-            <strong>{{ current ? currentCode : t("symbolTools.noSelection") }}</strong
-            ><span>{{ currentName }}</span
-            ><span v-if="currentAliases">{{ currentAliases }}</span
-            ><span v-if="currentMetadata">{{ currentMetadata }}</span
-            ><span>{{
-              current?.fontFamily
-                ? (localFontLabels[current.fontFamily] ?? current.fontFamily)
-                : t("symbolTools.inherited")
-            }}</span>
-          </div>
-        </div>
         <div v-if="displayFontStatus === 'error'" role="alert" class="symbol-dialog__error">
           {{ t("symbolTools.fontFailed") }}
           <Button theme="default" variant="text" @click="retryFont">{{
@@ -866,21 +879,85 @@ function listKey(event: KeyboardEvent, kind: "special" | "custom"): void {
         >
           {{ t("symbolTools.uncovered") }}
         </div>
+        <p v-if="allUnicode && tab === 'symbols'" class="symbol-dialog__hint" role="status">
+          {{ t("symbolTools.allCoverage") }}
+        </p>
         <div v-if="storageError" role="status" class="symbol-dialog__hint">
           {{ t("symbolTools.storageError") }}
         </div>
-        <Button
-          v-if="tab !== 'custom'"
-          class="symbol-dialog__add"
-          theme="default"
-          variant="base"
-          :disabled="!current || alreadyCustom || preferences.custom.length >= SYMBOL_CUSTOM_LIMIT"
-          @click="addCustom"
-          >{{ t(alreadyCustom ? "symbolTools.added" : "symbolTools.addCustom") }}</Button
+        <span
+          v-if="preferences.custom.length >= SYMBOL_CUSTOM_LIMIT"
+          class="symbol-dialog__hint"
+          role="status"
+          >{{ t("symbolTools.customFull") }}</span
         >
-        <span v-if="preferences.custom.length >= SYMBOL_CUSTOM_LIMIT" class="symbol-dialog__hint">{{
-          t("symbolTools.customFull")
-        }}</span>
+        <div v-if="tab !== 'custom'" class="symbol-dialog__page-actions">
+          <Button
+            theme="default"
+            variant="base"
+            :disabled="
+              !current || alreadyCustom || preferences.custom.length >= SYMBOL_CUSTOM_LIMIT
+            "
+            data-symbol-add-custom
+            @click="addCustom"
+            >{{ t(alreadyCustom ? "symbolTools.added" : "symbolTools.addCustom") }}</Button
+          >
+        </div>
+        <details class="symbol-dialog__extensions" :open="!!fontRestoreError">
+          <summary>{{ t("symbolTools.options") }}</summary>
+          <div class="symbol-dialog__extension-content">
+            <SymbolFontSourceControls
+              v-show="tab === 'symbols'"
+              :loading="loading"
+              :default-font-family="defaultFontFamily"
+              :restore-error="fontRestoreError"
+              @register="registerLocalFont"
+            />
+            <div v-if="catalog && !allUnicode && font" class="symbol-dialog__hint">
+              {{
+                t(font.source === "local" ? "symbolTools.localCoverage" : "symbolTools.coverage", {
+                  count: points.length,
+                  version: catalog.version,
+                })
+              }}
+            </div>
+            <div class="symbol-dialog__preview" :aria-label="t('symbolTools.preview')">
+              <span
+                class="symbol-dialog__preview-glyph"
+                :style="{ fontFamily: previewFontFamily }"
+                >{{ current ? (/^\s+$/u.test(current.text) ? "␣" : current.text) : "—" }}</span
+              >
+              <div>
+                <strong>{{ current ? currentCode : t("symbolTools.noSelection") }}</strong
+                ><span>{{ currentName }}</span
+                ><span v-if="currentAliases">{{ currentAliases }}</span
+                ><span v-if="currentMetadata">{{ currentMetadata }}</span
+                ><span>{{
+                  current?.fontFamily
+                    ? (localFontLabels[current.fontFamily] ?? current.fontFamily)
+                    : t("symbolTools.inherited")
+                }}</span>
+              </div>
+            </div>
+            <div v-show="tab === 'symbols'">
+              <label class="symbol-dialog__literal symbol-dialog__field"
+                ><span>{{ t("symbolTools.literal") }}</span
+                ><Input
+                  v-model="literal"
+                  :maxlength="16"
+                  :placeholder="t('symbolTools.literalHint')"
+                  @change="
+                    literalActive = true;
+                    selectionOverride = undefined;
+                  "
+                  @enter="insert"
+              /></label>
+            </div>
+            <p v-if="tab === 'special'" class="symbol-dialog__hint">
+              {{ t("symbolTools.specialNote") }}
+            </p>
+          </div>
+        </details>
       </div>
     </div>
   </Dialog>
@@ -889,8 +966,8 @@ function listKey(event: KeyboardEvent, kind: "special" | "custom"): void {
     placement="center"
     :header="t('symbolTools.reset')"
     width="min(440px, calc(100vw - 24px))"
-    :confirm-btn="t('symbolTools.resetConfirm')"
-    :cancel-btn="t('symbolTools.cancel')"
+    :confirm-btn="{ content: t('symbolTools.resetConfirm'), theme: 'primary', variant: 'base' }"
+    :cancel-btn="{ content: t('symbolTools.cancel'), theme: 'default', variant: 'base' }"
     :close-on-overlay-click="false"
     @confirm="reset"
     @close="resetVisible = false"
@@ -898,32 +975,43 @@ function listKey(event: KeyboardEvent, kind: "special" | "custom"): void {
   >
 </template>
 <style scoped lang="scss">
+@use "../../../shared/gallery/gallery-choice" as gallery;
+@use "../../../shared/option-list/option-list" as option-list;
 .symbol-dialog {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  font-size: 12px;
-  line-height: 20px;
+  font-size: var(--sheetcraft-font-size-body-medium);
+  line-height: var(--sheetcraft-line-height-body-medium);
   &__body {
-    display: grid;
-    gap: 10px;
-    max-height: calc(100dvh - 230px);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    height: 380px;
+    max-height: calc(100dvh - 190px);
     min-height: 120px;
     overflow: auto;
-    padding-block: 12px 2px;
     overscroll-behavior: contain;
   }
   &__page {
-    display: grid;
-    gap: 10px;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 120px;
     min-width: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    > * {
+      flex-shrink: 0;
+    }
   }
   &__fields {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 16px;
   }
-  label {
+  &__field {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -945,15 +1033,15 @@ function listKey(event: KeyboardEvent, kind: "special" | "custom"): void {
   }
   &__hint {
     color: var(--sheetcraft-text-secondary);
-    font-size: 12px;
-    line-height: 18px;
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
     margin: 0;
     overflow-wrap: anywhere;
   }
   &__error {
     color: var(--sheetcraft-text-primary);
-    font-size: 12px;
-    line-height: 18px;
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
   }
   &__status {
     display: flex;
@@ -961,9 +1049,9 @@ function listKey(event: KeyboardEvent, kind: "special" | "custom"): void {
     justify-content: center;
     align-items: center;
     gap: 12px;
-    min-height: 216px;
+    min-height: 108px;
+    flex: 1 0 108px;
     color: var(--sheetcraft-text-secondary);
-    border: 1px solid var(--sheetcraft-border-default);
   }
   &__recent-label {
     display: flex;
@@ -971,63 +1059,42 @@ function listKey(event: KeyboardEvent, kind: "special" | "custom"): void {
     justify-content: space-between;
   }
   &__recent {
+    @include option-list.surface;
     display: flex;
     min-height: 36px;
-    overflow-x: auto;
-    border: 1px solid var(--sheetcraft-border-default);
-    border-radius: 4px;
     align-items: center;
     button {
+      @include gallery.choice(0);
       flex: 0 0 34px;
+      height: 34px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      height: 34px;
-      padding: 0;
       font-size: 21px;
-      border: 0;
-      background: transparent;
-      color: var(--sheetcraft-text-primary);
-      cursor: pointer;
-      &:hover {
-        background: var(--sheetcraft-surface-hover);
-      }
+      line-height: 28px;
     }
   }
-  &__list {
+  &__special-list {
     height: 300px;
-    overflow: auto;
-    border: 1px solid var(--sheetcraft-border-default);
-    border-radius: 4px;
-    > button,
-    > [role="option"] {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      width: 100%;
-      min-height: 36px;
-      padding: 4px 10px;
-      border: 1px solid transparent;
-      background: transparent;
-      color: var(--sheetcraft-text-primary);
-      text-align: start;
-      font: inherit;
-      cursor: pointer;
-      &[aria-selected="true"] {
-        background: var(--sheetcraft-surface-hover);
-        border-color: var(--sheetcraft-action-primary);
-      }
-      &:hover {
-        background: var(--sheetcraft-surface-hover);
-      }
-      code,
-      kbd {
-        margin-inline-start: auto;
-        white-space: nowrap;
-        color: var(--sheetcraft-text-secondary);
-        font-size: 12px;
-      }
-    }
+    min-height: 120px;
+    flex: 1 1 120px;
+  }
+  &__custom-symbol {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  &__custom-list {
+    height: 280px;
+    min-height: 120px;
+    flex: 1 1 120px;
+    overflow: hidden;
+  }
+  &__coverage-warning {
+    padding: 8px 10px;
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
   }
   &__list-glyph {
     flex: 0 0 36px;
@@ -1039,23 +1106,11 @@ function listKey(event: KeyboardEvent, kind: "special" | "custom"): void {
     font-size: 23px;
     line-height: 28px;
   }
-  &__list-heading {
-    display: flex;
-    justify-content: space-between;
-    padding-inline: 10px;
-    font-weight: 500;
-  }
-  &__custom-font {
-    color: var(--sheetcraft-text-secondary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
   &__shortcut {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    label {
+    > .symbol-dialog__field {
       flex: 1 1 240px;
     }
   }
@@ -1081,8 +1136,8 @@ function listKey(event: KeyboardEvent, kind: "special" | "custom"): void {
       > span {
         overflow-wrap: anywhere;
         color: var(--sheetcraft-text-secondary);
-        font-size: 12px;
-        line-height: 18px;
+        font-size: var(--sheetcraft-font-size-body-small);
+        line-height: var(--sheetcraft-line-height-body-small);
       }
     }
     strong {
@@ -1098,8 +1153,29 @@ function listKey(event: KeyboardEvent, kind: "special" | "custom"): void {
     line-height: 42px;
     overflow: hidden;
   }
-  &__add {
-    justify-self: start;
+  &__extensions {
+    flex: 0 0 auto;
+    min-width: 0;
+    border-top: 1px solid var(--sheetcraft-border-default);
+    > summary {
+      padding-block: 3px;
+      color: var(--sheetcraft-text-secondary);
+      cursor: pointer;
+      font-size: var(--sheetcraft-font-size-body-small);
+      line-height: var(--sheetcraft-line-height-body-small);
+    }
+    &[open] {
+      max-height: 220px;
+      overflow: auto;
+    }
+  }
+  &__extension-content {
+    display: grid;
+    gap: 8px;
+    padding-block: 6px;
+  }
+  &__page-actions {
+    flex: none;
   }
 }
 @media (max-width: 580px) {
@@ -1110,7 +1186,7 @@ function listKey(event: KeyboardEvent, kind: "special" | "custom"): void {
       gap: 8px;
     }
     &__body {
-      max-height: calc(100dvh - 230px);
+      max-height: calc(100dvh - 190px);
     }
     &__custom-actions > :last-child {
       margin-inline-start: 0;

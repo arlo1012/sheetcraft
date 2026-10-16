@@ -1,3 +1,5 @@
+import { commitDisplay, captureDisplayCommit } from "../numeric-test-actions";
+import MenuItem from "../../../../../shared/menu/MenuItem.vue";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { flushPromises, type VueWrapper } from "@vue/test-utils";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
@@ -9,6 +11,17 @@ import PictureViewMenu from "../../../../../modules/sheet-images/components/Pict
 import ImageInsertMenu from "../../../../../modules/home-tools/components/ImageInsertMenu.vue";
 import RibbonButton from "../../../../../shared/ribbon/RibbonButton.vue";
 import { dimension, fixture, listener } from "./fixture";
+
+async function arrangeEntry(wrapper: VueWrapper, label: string) {
+  if (label === "Group" || label === "Align")
+    return wrapper.get(`.picture-arrange [role="button"][aria-label="${label}"]`);
+  const trigger = wrapper.get('.picture-arrange [role="button"][aria-label="Layer"]');
+  if (trigger.attributes("aria-expanded") !== "true") await trigger.trigger("click");
+  await flushPromises();
+  const item = wrapper.findAllComponents(MenuItem).find((entry) => entry.text() === label);
+  if (!item) throw new Error(`Missing compact layer menu entry: ${label}`);
+  return item;
+}
 
 const mounted: VueWrapper[] = [];
 afterEach(() => {
@@ -23,8 +36,8 @@ describe("owned group ribbon context ownership", () => {
       const { image, wrapper, resizeHandler, aspectRatioHandler } = fixture();
       mounted.push(wrapper);
       const width = dimension(wrapper, "width");
-      const oldChange = listener(width.vm.$.vnode.props?.onChange);
-      const oldEnter = listener(width.vm.$.vnode.props?.onEnter);
+      const oldChange = captureDisplayCommit(width);
+      const oldEnter = captureDisplayCommit(width);
       const oldAspect = listener(
         wrapper.getComponent(Checkbox).vm.$.vnode.props?.["onUpdate:modelValue"],
       );
@@ -47,10 +60,10 @@ describe("owned group ribbon context ownership", () => {
       if (change !== "handlers") {
         expect(dimension(wrapper, "width").vm.$.uid).not.toBe(width.vm.$.uid);
         expect((dimension(wrapper, "width").get("input").element as HTMLInputElement).value).toBe(
-          "90.00",
+          "90",
         );
       }
-      dimension(wrapper, "width").vm.$emit("change", 150);
+      commitDisplay(dimension(wrapper, "width"), 150);
       wrapper.getComponent(Checkbox).vm.$emit("update:modelValue", true);
       const currentResize = change === "handlers" ? nextResize : resizeHandler;
       const currentAspect = change === "handlers" ? nextAspect : aspectRatioHandler;
@@ -63,7 +76,7 @@ describe("owned group ribbon context ownership", () => {
     const { wrapper, resizeHandler, aspectRatioHandler } = fixture();
     mounted.push(wrapper);
     await wrapper.setProps({ draftOwnerKey: undefined });
-    const oldChange = listener(dimension(wrapper, "width").vm.$.vnode.props?.onChange);
+    const oldChange = captureDisplayCommit(dimension(wrapper, "width"));
     const oldAspect = listener(
       wrapper.getComponent(Checkbox).vm.$.vnode.props?.["onUpdate:modelValue"],
     );
@@ -121,12 +134,8 @@ describe("owned group ribbon source-free capabilities", () => {
       count: 1,
       grouped: true,
     });
-    expect(wrapper.get('.picture-arrange [aria-label="Group"]').attributes("aria-disabled")).toBe(
-      "true",
-    );
-    expect(wrapper.get('.picture-arrange [aria-label="Ungroup"]').attributes("aria-disabled")).toBe(
-      "false",
-    );
+    expect((await arrangeEntry(wrapper, "Group")).attributes("aria-disabled")).toBe("true");
+    expect((await arrangeEntry(wrapper, "Ungroup")).attributes("aria-disabled")).toBe("false");
     expect(wrapper.getComponent(PictureRotationMenu).props("disabled")).toBe(false);
     for (const component of [PictureAppearanceTools, PictureViewMenu, ImageInsertMenu])
       expect(wrapper.findComponent(component).exists()).toBe(false);
@@ -145,9 +154,9 @@ describe("owned group ribbon source-free capabilities", () => {
     wrapper.getComponent(PictureRotationMenu).vm.$emit("rotate", 1);
     wrapper.getComponent(PictureRotationMenu).vm.$emit("flip", "horizontal");
     wrapper.getComponent(PictureArrangeTools).vm.$emit("align", "grid", "last-selected");
-    await wrapper.get('.picture-arrange [aria-label="Ungroup"]').trigger("click");
-    await wrapper.get('.picture-arrange [aria-label="Bring to front"]').trigger("click");
-    await wrapper.get('.picture-arrange [aria-label="Selection pane"]').trigger("click");
+    await (await arrangeEntry(wrapper, "Ungroup")).trigger("click");
+    await (await arrangeEntry(wrapper, "Bring to front")).trigger("click");
+    await (await arrangeEntry(wrapper, "Selection pane")).trigger("click");
     await wrapper.get('[data-picture-group-action="format"]').trigger("click");
     expect(wrapper.emitted("rotate")).toEqual([[1]]);
     expect(wrapper.emitted("flip")).toEqual([["horizontal"]]);
@@ -168,12 +177,10 @@ describe("owned group ribbon source-free capabilities", () => {
     mounted.push(wrapper);
     await wrapper.setProps({ selectionCount: 3 });
     expect(wrapper.getComponent(PictureArrangeTools).props("count")).toBe(3);
-    expect(wrapper.get('.picture-arrange [aria-label="Group"]').attributes("aria-disabled")).toBe(
-      "false",
-    );
+    expect((await arrangeEntry(wrapper, "Group")).attributes("aria-disabled")).toBe("false");
     expect(dimension(wrapper, "width").props("disabled")).toBe(true);
     expect(wrapper.getComponent(Checkbox).props("disabled")).toBe(true);
-    await wrapper.get('.picture-arrange [aria-label="Group"]').trigger("click");
+    await (await arrangeEntry(wrapper, "Group")).trigger("click");
     expect(wrapper.emitted("group")).toEqual([[]]);
   });
 
@@ -194,7 +201,7 @@ describe("owned group ribbon source-free capabilities", () => {
     await wrapper.get('[data-picture-group-action="format"]').trigger("click");
     for (const event of ["rotate", "flip", "group", "ungroup", "align", "layer", "format"])
       expect(wrapper.emitted(event)).toBeUndefined();
-    await wrapper.get('.picture-arrange [aria-label="Selection pane"]').trigger("click");
+    await (await arrangeEntry(wrapper, "Selection pane")).trigger("click");
     expect(wrapper.emitted("selectionPane")).toEqual([[]]);
   });
 });

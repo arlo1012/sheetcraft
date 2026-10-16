@@ -139,6 +139,7 @@ function sheetGeometryKey(sheet: Sheet): string {
     [...(sheet.hiddenRows ?? [])],
     [...(sheet.hiddenColumns ?? [])],
     sheet.defaultColumnWidth,
+    sheet.defaultRowHeight,
   ]);
 }
 

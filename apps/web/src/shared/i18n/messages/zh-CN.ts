@@ -749,6 +749,14 @@ export const zhCN = {
       selectFile: "选择 XLSX 工作簿",
     },
     feedback: {
+      importedUnsavedTitle: "已导入，尚未保存",
+      importedUnsaved:
+        "已打开导入的工作簿，但本地副本保存失败。请保留此页面并另存备份或重试保存，原始文件未被修改。",
+      tooLarge: "此 XLSX 文件超过 25 MB 导入限制，当前文档未被替换。",
+      invalidImages:
+        "文件中的图片缺失、损坏、格式不受支持或超过图片大小限制，已停止导入，当前文档未被替换。",
+      imageStorageFailed:
+        "无法在浏览器中安全保存图片，请检查可用存储空间后重试，当前文档未被替换。",
       errorTitle: "XLSX 操作未能完成",
       imported: "已导入 XLSX，撤销历史从此文件重新开始。",
       exported: "已开始下载 XLSX 文件，当前文档和原文件均未被修改。",
@@ -763,7 +771,49 @@ export const zhCN = {
       numericTableTotals:
         "表格总计行包含数字常量，已停止 XLSX 导出：{locations}。Excel 可能修复这些单元格并改变表格公式。当前工作簿未被修改，仍可保存 JSON 工作簿备份。",
     },
+    report: {
+      title: "兼容性详情",
+      importWarning: "导入后的工作簿将忽略或改变以下内容。取消可保留当前文档。",
+      blockedDescription:
+        "兼容性检查发现无法安全处理的内容，已停止本次操作，请查看以下受影响的位置。",
+      warning: "将改变或忽略",
+      block: "已阻止",
+      count: "数量：{count}",
+      locationUnknown: "未提供具体位置。",
+      moreLocations: "另有 {count} 处受影响的位置未列出。",
+      unknownIssue: "暂不支持的内容（{code}）",
+      issues: {
+        archiveInvalid: "文件包结构损坏",
+        archiveLimit: "文件包超过大小或复杂度限制",
+        archiveEncrypted: "不支持此文件包的加密方式",
+        archiveCompression: "不支持此文件包的压缩方式",
+        archivePath: "文件包含不安全的路径",
+        macroContent: "宏无法保留",
+        drawingOrMedia: "绘图或媒体内容无法保留",
+        externalContent: "外部链接或内容无法保留",
+        chartCacheNormalized: "图表缓存值将被规范化",
+        formulaCacheDiscarded: "公式缓存值将被舍弃",
+        formulaNotCalculated: "部分公式没有可用的计算结果",
+        filterOmitted: "筛选设置无法保留",
+        filterTableNormalized: "筛选或表格设置将被调整",
+        numericTableTotals: "表格总计行的数字常量无法安全导出",
+        advancedFilterCriteriaOmitted: "高级筛选条件无法保留",
+        imageOmitted: "图片无法保留",
+        styleOmitted: "部分样式无法保留",
+        numberFormatOmitted: "数字格式无法保留",
+        numberFormatDegraded: "数字格式将被简化",
+        dimensionApproximated: "行高或列宽将使用近似值",
+        pictureGeometryApproximated: "图片位置或尺寸可能使用近似值或发生变化",
+        dateNormalized: "日期值将被规范化",
+        cellValueOmitted: "单元格值无法保留",
+        featureOmitted: "部分工作簿功能无法保留",
+      },
+    },
     confirm: {
+      exportTitle: "继续导出存在兼容性差异的文件？",
+      exportDescription:
+        "下载的 XLSX 将包含以下变化，请确认后再继续。当前工作簿和原始文件均不会被修改。",
+      exportConfirm: "继续并下载",
       importTitle: "导入 XLSX 工作簿？",
       importDescription: "导入后将替换当前文档及本地保存的副本，并清空撤销历史。确定导入吗？",
       importConfirm: "确认替换并导入",
@@ -1636,6 +1686,8 @@ export const zhCN = {
     colorValue: "颜色 {value}",
   },
   picture: {
+    numericViewerReadOnly: "此查看器不支持数值编辑。",
+    layers: "层级",
     pageLayoutUnsupported: "页布局暂不支持新版图片或组合，请使用普通视图。",
     groupReflectionUnsupported: "当前图片倒影样式暂不能放入新版图片或组合，原图片和样式未改动。",
     memberCutUnsupported: "暂不支持剪切组内成员；可以复制成员，或先解组后剪切。",

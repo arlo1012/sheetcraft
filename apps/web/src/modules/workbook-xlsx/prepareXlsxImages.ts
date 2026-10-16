@@ -1,7 +1,16 @@
+import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
+import {
+  isSupportedNativePictureFrame,
+  assertNativePictureSourceOrientation,
+} from "@sheetcraft/xlsx-io/picture-capabilities";
+import {
+  unsupportedNativeChartElements,
+  unsupportedNativeChartStyles,
+} from "@sheetcraft/xlsx-io/chart-capabilities";
 import { isPictureGroup } from "@sheetcraft/core/picture-group";
 import { PICTURE_PROPERTY_KEYS, type PictureProperties } from "@sheetcraft/core/picture-properties";
 import { formatFormulaAddress } from "@sheetcraft/core/formula";
-import { requireLegacyPicture } from "../sheet-images/picture-document-support";
+import { requireStandalonePicture } from "../sheet-images/picture-document-support";
 import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import { XlsxWorkerFailure } from "./workbookXlsxWorker";
 import { deserializeWorkbook, type WorkbookSnapshot } from "@sheetcraft/core/serialization";
@@ -19,7 +28,13 @@ import type { XlsxWorkerImage } from "./xlsxWorkerProtocol";
 const MAX_RENDER_SIDE = 4096;
 const MAX_RENDER_PIXELS = 16 * 1024 * 1024;
 
-type ImageReference = Readonly<{ assetId: string; transform?: ImageTransform }>;
+type ImageReference = Readonly<{
+  assetId: string;
+  transform?: ImageTransform;
+  nativeFrame?: boolean;
+  nativeGeometry?: boolean;
+  issueLocation?: string;
+}>;
 type EncodedImage = "png" | "jpeg" | "gif";
 
 function abortError(): Error {
@@ -105,16 +120,21 @@ export function assertXlsxPictureGeometrySupport(workbook: Workbook): void {
           issues: [{ code: "feature-omitted", severity: "block", count: 1, locations: [location] }],
         });
       }
-      if (drawing.kind === "chart" && "format" in drawing.chart) {
-        const location = `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.format`;
-        throw new XlsxWorkerFailure(
-          "Detailed chart formatting is not yet supported by XLSX export.",
-          {
-            issues: [
-              { code: "feature-omitted", severity: "block", count: 1, locations: [location] },
-            ],
-          },
-        );
+      if (drawing.kind === "chart") {
+        const fields = unsupportedNativeChartStyles(drawing.chart);
+        if (fields.length) {
+          const locations = fields.map(
+            (field) => `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.${field}`,
+          );
+          throw new XlsxWorkerFailure(
+            "Some chart style settings are not supported by XLSX export.",
+            {
+              issues: [
+                { code: "feature-omitted", severity: "block", count: locations.length, locations },
+              ],
+            },
+          );
+        }
       }
       if (drawing.kind === "chart" && "seriesFilter" in drawing.chart) {
         const location = `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.seriesFilter`;
@@ -141,10 +161,10 @@ export function assertXlsxPictureGeometrySupport(workbook: Workbook): void {
 
       if (
         drawing.kind === "chart" &&
-        ("presentation" in drawing.chart ||
-          (drawing.chart.stacked && ["column", "bar", "line", "area"].includes(drawing.chart.type)))
+        drawing.chart.stacked &&
+        ["column", "bar", "line", "area"].includes(drawing.chart.type)
       ) {
-        const field = "presentation" in drawing.chart ? "presentation" : "stacked";
+        const field = "stacked";
         const location = `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.${field}`;
         throw new XlsxWorkerFailure(
           "Chart subtypes and detailed presentation are not yet supported by XLSX export.",
@@ -166,17 +186,27 @@ export function assertXlsxPictureGeometrySupport(workbook: Workbook): void {
           },
         );
       }
-      if (drawing.kind !== "chart" || !("elements" in drawing.chart)) continue;
-      const location = `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.elements`;
-      throw new XlsxWorkerFailure("Chart element settings are not yet supported by XLSX export.", {
-        issues: [{ code: "feature-omitted", severity: "block", count: 1, locations: [location] }],
+      if (drawing.kind !== "chart") continue;
+      const fields = unsupportedNativeChartElements(drawing.chart);
+      if (!fields.length) continue;
+      const locations = fields.map(
+        (field) => `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.${field}`,
+      );
+      throw new XlsxWorkerFailure("Some chart element settings are not supported by XLSX export.", {
+        issues: [
+          { code: "feature-omitted", severity: "block", count: locations.length, locations },
+        ],
       });
     }
     for (const image of sheet.floatingImages) {
-      if (isFramedPictureObject(image) || isPictureGroup(image)) {
+      if (
+        isPictureGroup(image) ||
+        (isFramedPictureObject(image) &&
+          !isSupportedNativePictureFrame(image, createPictureSheetMetrics(sheet)))
+      ) {
         const location = `${sheet.name}.floatingImages[${JSON.stringify(image.id)}].frame`;
         throw new XlsxWorkerFailure(
-          `Frame-aware pictures and owned groups are not yet supported by XLSX export at ${location}.`,
+          `Picture geometry or appearance is outside the supported native rectangle slice at ${location}.`,
           {
             issues: [
               { code: "feature-omitted", severity: "block", count: 1, locations: [location] },
@@ -185,10 +215,11 @@ export function assertXlsxPictureGeometrySupport(workbook: Workbook): void {
         );
       }
       assertProperties(image, `${sheet.name}.floatingImages[${JSON.stringify(image.id)}]`);
-      assertAppearance(
-        image.transform,
-        `${sheet.name}.floatingImages[${JSON.stringify(image.id)}]`,
-      );
+      if (!isFramedPictureObject(image))
+        assertAppearance(
+          image.transform,
+          `${sheet.name}.floatingImages[${JSON.stringify(image.id)}]`,
+        );
     }
     for (const [key, cell] of sheet.cells) {
       if (cell.content?.kind !== "image") continue;
@@ -232,10 +263,23 @@ function collectImageReferences(snapshot: WorkbookSnapshot): readonly ImageRefer
       });
     }
     for (const root of sheet.floatingImages) {
-      const image = requireLegacyPicture(root);
+      const image = requireStandalonePicture(root);
       references.push({
         assetId: image.assetId,
-        transform: normalizeImageTransform(image.transform),
+        ...(isFramedPictureObject(image)
+          ? {
+              nativeFrame: true,
+              nativeGeometry:
+                image.frame.angleDeg !== 0 ||
+                !!image.frame.flipHorizontal ||
+                !!image.frame.flipVertical ||
+                image.frame.source.widthRatio !== 1 ||
+                image.frame.source.heightRatio !== 1 ||
+                image.frame.source.offsetXRatio !== 0 ||
+                image.frame.source.offsetYRatio !== 0,
+              issueLocation: `${sheet.name}.floatingImages[${JSON.stringify(image.id)}]`,
+            }
+          : { transform: normalizeImageTransform(image.transform) }),
       });
     }
   }
@@ -347,12 +391,35 @@ async function prepareVariant(
   asset: ImageAsset,
   transform: ImageTransform | undefined,
   signal: AbortSignal | undefined,
+  reference: ImageReference,
 ): Promise<Pick<XlsxWorkerImage, "bytes" | "extension" | "width" | "height">> {
   const extension = extensionFor(asset.mimeType);
+  const unsupported = (message: string): never => {
+    throw new XlsxWorkerFailure(message, {
+      issues: [
+        {
+          code: "feature-omitted",
+          severity: "block",
+          count: 1,
+          locations: [`${reference.issueLocation ?? reference.assetId}.source`],
+        },
+      ],
+    });
+  };
+  if (reference.nativeFrame && (!extension || transform))
+    unsupported("Native picture frames require original PNG, JPEG or GIF bytes.");
   if (extension && !transform) {
     assertNotAborted(signal);
+    const bytes = await abortable(asset.blob.arrayBuffer(), signal);
+    if (reference.nativeGeometry) {
+      try {
+        assertNativePictureSourceOrientation(new Uint8Array(bytes), extension);
+      } catch {
+        unsupported("Native picture geometry cannot verify this source's orientation metadata.");
+      }
+    }
     return {
-      bytes: await abortable(asset.blob.arrayBuffer(), signal),
+      bytes,
       extension,
       width: asset.width,
       height: asset.height,
@@ -374,7 +441,18 @@ export async function prepareXlsxImages(
   const variants = new Map<string, ImageReference>();
   for (const reference of references) {
     const key = imageKey(reference.assetId, reference.transform);
-    if (!variants.has(key)) variants.set(key, reference);
+    const previous = variants.get(key);
+    variants.set(
+      key,
+      previous
+        ? {
+            ...previous,
+            nativeFrame: previous.nativeFrame || reference.nativeFrame,
+            nativeGeometry: previous.nativeGeometry || reference.nativeGeometry,
+            issueLocation: previous.issueLocation ?? reference.issueLocation,
+          }
+        : reference,
+    );
   }
   const assets = new Map<string, ImageAsset>();
   const result: XlsxWorkerImage[] = [];
@@ -386,7 +464,7 @@ export async function prepareXlsxImages(
       if (!asset) throw new Error(`XLSX export is missing image asset ${reference.assetId}.`);
       assets.set(reference.assetId, asset);
     }
-    const prepared = await prepareVariant(asset, reference.transform, signal);
+    const prepared = await prepareVariant(asset, reference.transform, signal, reference);
     result.push({
       assetId: reference.assetId,
       ...(reference.transform ? { transform: reference.transform } : {}),

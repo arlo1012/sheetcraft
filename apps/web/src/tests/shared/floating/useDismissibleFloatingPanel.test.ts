@@ -103,3 +103,47 @@ describe("useDismissibleFloatingPanel", () => {
     second.host.remove();
   });
 });
+
+test.each(["restore", "not-requested", "moved", "disabled", "disconnected"])(
+  "explicit replacement focus contract: %s",
+  async (kind) => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const replacement = document.createElement("button");
+    const other = document.createElement("button");
+    host.append(replacement, other);
+    if (kind === "disabled") replacement.disabled = true;
+    let close!: () => void;
+    const Fixture = defineComponent({
+      setup() {
+        const trigger = ref<HTMLElement | null>(null),
+          panel = ref<HTMLElement | null>(null);
+        const open = ref(true),
+          showTrigger = ref(true);
+        const { dismiss } = useDismissibleFloatingPanel(trigger, panel, open, {
+          restoreFocusTarget: () => replacement,
+          onDismiss: () => {
+            open.value = false;
+            showTrigger.value = false;
+          },
+        });
+        close = () => dismiss("programmatic", kind !== "not-requested");
+        return () =>
+          h("div", [
+            showTrigger.value ? h("button", { ref: trigger }) : null,
+            open.value ? h("button", { ref: panel, "data-panel": "" }) : null,
+          ]);
+      },
+    });
+    const wrapper = mount(Fixture, { attachTo: host });
+    (wrapper.get("[data-panel]").element as HTMLElement).focus();
+    close();
+    if (kind === "moved") other.focus();
+    if (kind === "disconnected") replacement.remove();
+    await nextTick();
+    expect(document.activeElement === replacement).toBe(kind === "restore");
+    if (kind === "moved") expect(document.activeElement).toBe(other);
+    wrapper.unmount();
+    host.remove();
+  },
+);

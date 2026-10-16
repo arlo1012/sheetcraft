@@ -23,13 +23,21 @@ async function handleRequest(request: XlsxWorkerRequest): Promise<void> {
         ? codec.decryptOfficeFile(input, request.password ?? "")
         : input;
       const result = await codec.decodeXlsx(plaintext);
-      respond({
-        id: request.id,
-        ok: true,
-        type: "decode",
-        snapshot: serializeWorkbook(result.workbook),
-        report: result.report,
-      });
+      const images = result.images?.map((image) => ({
+        ...image,
+        bytes: new Uint8Array(image.bytes).buffer,
+      }));
+      respond(
+        {
+          id: request.id,
+          ok: true,
+          type: "decode",
+          snapshot: serializeWorkbook(result.workbook),
+          ...(images?.length ? { images } : {}),
+          report: result.report,
+        },
+        images?.map((image) => image.bytes),
+      );
       return;
     }
     const result = await codec.encodeXlsx(deserializeWorkbook(request.snapshot), {

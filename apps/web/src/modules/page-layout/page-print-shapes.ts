@@ -22,7 +22,7 @@ import { shapeFrameLocalToWorld, type ShapeFrameRect } from "@sheetcraft/core/sh
 import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
-  DEFAULT_ROW_HEIGHT,
+  getDefaultRowHeight,
   getDefaultColumnWidth,
   type Sheet,
   type SheetEvaluator,
@@ -325,7 +325,7 @@ export function createPrintShapeMetrics(
   const geometry = createSheetGeometry({
     rowCount: MAX_SHEET_ROWS,
     columnCount: MAX_SHEET_COLUMNS,
-    rowHeight: DEFAULT_ROW_HEIGHT,
+    rowHeight: getDefaultRowHeight(sheet),
     columnWidth: getDefaultColumnWidth(sheet),
     rowHeights: sheet.rowHeights,
     columnWidths: sheet.columnWidths,
@@ -339,7 +339,7 @@ export function createPrintShapeMetrics(
   });
   const rows = createRowVisibilityIndex({
     rowCount: MAX_SHEET_ROWS,
-    defaultRowHeight: DEFAULT_ROW_HEIGHT,
+    defaultRowHeight: getDefaultRowHeight(sheet),
     rowHeights: sheet.rowHeights,
     hiddenRows: sheet.hiddenRows,
     hiddenIntervals: createSheetHiddenRowIntervals(sheet, evaluator),

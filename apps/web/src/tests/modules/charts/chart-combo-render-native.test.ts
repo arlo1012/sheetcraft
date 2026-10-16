@@ -52,8 +52,12 @@ describe("actual ECharts bounded column–line layout", () => {
       legend: [
         {
           data: [
-            { name: "apple" },
-            { name: "pear", icon: "line", itemStyle: { borderColor: "auto", borderWidth: 5 } },
+            { name: 'sheetcraft-series:["id","apple"]' },
+            {
+              name: 'sheetcraft-series:["id","pear"]',
+              icon: "line",
+              itemStyle: { borderColor: "auto", borderWidth: 5 },
+            },
           ],
         },
       ],

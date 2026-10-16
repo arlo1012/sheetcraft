@@ -498,25 +498,44 @@ onBeforeUnmount(() => {
         <Radio value="text">{{ t("picture.text") }}</Radio>
       </RadioGroup>
       <div class="picture-annotation__options">
-        <label>{{ t("picture.annotationColor") }}<input v-model="color" type="color" /></label>
         <label
-          >{{ t("picture.strokeWidth")
-          }}<InputNumber v-model="stroke" :min="1" :max="20" size="small"
+          >{{ t("picture.annotationColor")
+          }}<input v-model="color" type="color" :disabled="busy || confirming"
         /></label>
+        <div class="picture-annotation__field" role="group" :aria-label="t('picture.strokeWidth')">
+          <span>{{ t("picture.strokeWidth") }}</span>
+          <InputNumber
+            v-model="stroke"
+            :min="1"
+            :max="20"
+            size="small"
+            theme="column"
+            class="sheetcraft-input-number--persistent-controls"
+            :disabled="busy || confirming"
+            :aria-label="t('picture.strokeWidth')"
+          />
+        </div>
         <template v-if="tool === 'text'">
           <Input
             v-model="text"
             :maxlength="1000"
+            :disabled="busy || confirming"
             :placeholder="t('picture.text')"
             :aria-label="t('picture.text')"
           />
-          <InputNumber
-            v-model="fontSize"
-            :min="8"
-            :max="96"
-            size="small"
-            :aria-label="t('picture.fontSize')"
-          />
+          <div class="picture-annotation__field" role="group" :aria-label="t('picture.fontSize')">
+            <span>{{ t("picture.fontSize") }}</span>
+            <InputNumber
+              v-model="fontSize"
+              :min="8"
+              :max="96"
+              size="small"
+              theme="column"
+              class="sheetcraft-input-number--persistent-controls"
+              :disabled="busy || confirming"
+              :aria-label="t('picture.fontSize')"
+            />
+          </div>
         </template>
         <Button size="small" :disabled="!canUndo || busy || confirming" @click="undo">{{
           t("picture.undoAnnotation")
@@ -573,7 +592,8 @@ onBeforeUnmount(() => {
     align-items: center;
     flex-wrap: wrap;
     gap: 8px;
-    label {
+    label,
+    .picture-annotation__field {
       display: flex;
       align-items: center;
       gap: 6px;

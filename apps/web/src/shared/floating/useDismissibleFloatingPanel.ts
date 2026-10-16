@@ -9,8 +9,45 @@ export type FloatingDismissReason = "escape" | "outside-pointer" | "outside-focu
 
 export type DismissibleFloatingPanelOptions = FloatingPanelOptions & {
   additionalInside?: () => Iterable<HTMLElement | null | undefined>;
+  restoreFocusTarget?: () => HTMLElement | null | undefined;
   onDismiss: (payload: { reason: FloatingDismissReason; restoreFocus: boolean }) => void;
 };
+
+/** Resolve an explicitly owned replacement only if the original target was removed. */
+export function restoreFocusAfterRemount(
+  previousTarget: HTMLElement | SVGElement,
+  resolveTarget: () => HTMLElement | null | undefined,
+  canRestore: () => boolean = () => true,
+  activeBefore: Element | null = document.activeElement,
+): void {
+  let focusMoved = false;
+  const onFocusMoved = (event: FocusEvent) => {
+    if (event.target !== activeBefore && event.target !== document.body) focusMoved = true;
+  };
+  const onPointerMoved = () => {
+    focusMoved = true;
+  };
+  document.addEventListener("focusin", onFocusMoved);
+  document.addEventListener("pointerdown", onPointerMoved);
+  void nextTick(() => {
+    try {
+      const active = document.activeElement;
+      if (
+        previousTarget.isConnected ||
+        !canRestore() ||
+        focusMoved ||
+        (active !== activeBefore && active !== document.body && active !== null)
+      )
+        return;
+      const replacement = resolveTarget();
+      if (replacement?.isConnected && !replacement.matches(":disabled, [aria-disabled='true']"))
+        replacement.focus();
+    } finally {
+      document.removeEventListener("focusin", onFocusMoved);
+      document.removeEventListener("pointerdown", onPointerMoved);
+    }
+  });
+}
 
 // Teleported children are siblings in the DOM. Track opening order so one Escape
 // closes only the most recently opened panel, regardless of listener mount order.
@@ -22,7 +59,7 @@ export function useDismissibleFloatingPanel(
   open: Readonly<Ref<boolean>>,
   options: DismissibleFloatingPanelOptions,
 ) {
-  const { additionalInside, onDismiss, ...floatingOptions } = options;
+  const { additionalInside, restoreFocusTarget, onDismiss, ...floatingOptions } = options;
   const floatingPanel = useFloatingPanel(reference, floating, open, floatingOptions);
   let focusDismissArmed = false;
   const panelId = Symbol("floating-panel");
@@ -50,12 +87,15 @@ export function useDismissibleFloatingPanel(
       return;
     }
     const focusTarget = reference.value;
+    const activeBefore = document.activeElement;
     onDismiss({ reason, restoreFocus });
     if (restoreFocus && (focusTarget instanceof HTMLElement || focusTarget instanceof SVGElement)) {
       void nextTick(() => {
-        // Do not steal focus from a menu reopened before this dismissal flushes.
+        // Preserve the existing connected-trigger contract.
         if (!open.value && focusTarget.isConnected) focusTarget.focus();
       });
+      if (restoreFocusTarget)
+        restoreFocusAfterRemount(focusTarget, restoreFocusTarget, () => !open.value, activeBefore);
     }
   }
 

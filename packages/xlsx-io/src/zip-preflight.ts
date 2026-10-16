@@ -125,6 +125,13 @@ function inspectXmlPart(name: string, xml: string, report: CompatibilityReportBu
     },
   );
   if (hasExternalNonHyperlinkRelationship) report.add("external-content", "block", name);
+  if (
+    name.endsWith(".rels") &&
+    /Type\s*=\s*["'][^"']*\/(?:richValue[^"']*|rdRichValue[^"']*|cellImage[^"']*)["']/i.test(
+      normalized,
+    )
+  )
+    report.add("drawing-or-media", "block", name);
   if (/macroenabled|vbaproject|oleobject|activex|embeddedpackage/i.test(normalized))
     report.add("macro-content", "block", name);
 
@@ -329,7 +336,8 @@ export async function preflightXlsxArchive(
   const names = new Set(materialEntries.map((entry) => entry.name.toLowerCase()));
   if ([...names].some((name) => name === "xl/vbaproject.bin" || name.endsWith(".xlsm")))
     fail("macro-content", report);
-  if ([...names].some((name) => name.startsWith("xl/media/"))) fail("drawing-or-media", report);
+  if ([...names].some((name) => name.startsWith("xl/richdata/") || name === "xl/cellimages.xml"))
+    fail("drawing-or-media", report);
   if (
     [...names].some(
       (name) => name.startsWith("xl/externallinks/") || name.includes("encryptedpackage"),
@@ -352,17 +360,25 @@ export async function preflightXlsxArchive(
         relationshipEntries[part] ??
         (await verifyActualUncompressedSize(entry, bytes, signal, true));
       if (!content) return undefined;
-      const xml = decodeXml(content);
-      if (xml === null) fail("archive-invalid", report, part);
-      inspectXmlPart(part, xml, report);
+      if (part.toLowerCase().endsWith(".xml") || part.toLowerCase().endsWith(".rels")) {
+        const xml = decodeXml(content);
+        if (xml === null) fail("archive-invalid", report, part);
+        inspectXmlPart(part, xml, report);
+      }
       relationshipEntries[part] = content;
       return content;
     };
     supportedPivotParts = await collectSupportedPivotParts(relationshipEntries, readPart);
-    supportedChartParts = (await collectNativeChartParts(relationshipEntries, readPart)).parts;
+    supportedChartParts = (
+      await collectNativeChartParts(
+        relationshipEntries,
+        readPart,
+        materialEntries.map((entry) => entry.name),
+      )
+    ).parts;
   } catch (error) {
     if (error instanceof XlsxAbortError || error instanceof XlsxCompatibilityError) throw error;
-    if (error instanceof UnsupportedChartDrawingError) fail("drawing-or-media", report);
+    if (error instanceof UnsupportedChartDrawingError) fail("drawing-or-media", report, error.part);
     fail("archive-invalid", report);
   }
   if (

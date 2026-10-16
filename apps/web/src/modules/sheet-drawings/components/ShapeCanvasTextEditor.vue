@@ -7,6 +7,9 @@ import {
   type ShapeTextCharacterFormat,
 } from "@sheetcraft/core/shape-text-character-runs";
 import type { ShapeTextRichDraft } from "../shape-text-edit-model";
+import { useHistoryShortcutBoundary } from "../../../shared/keyboard/useHistoryShortcutBoundary";
+import { useFocusBoundary } from "../../../shared/focus/useFocusBoundary";
+import { ownsShapeTextEditTarget } from "../shape-text-edit-ownership";
 import { shapeTextDraftSource } from "../shape-text-edit-model";
 import { drawingShapeTextBaseCharacterFormat } from "../shape-text-options";
 import ShapeRichTextInput from "./ShapeRichTextInput.vue";
@@ -49,6 +52,8 @@ const props = withDefaults(
     ) => boolean;
     composition: (active: boolean) => boolean;
     commit: () => boolean;
+    historyStep?: (direction: "undo" | "redo") => boolean;
+    focusFieldDraft?: () => boolean;
     cancel: () => void;
     escape?: () => boolean | void;
     initialSelection?: {
@@ -60,7 +65,6 @@ const props = withDefaults(
   { locale: "en-US", disabled: false, composing: false, stale: false, scale: 1 },
 );
 const emit = defineEmits<{ requestCommit: [reason: "blur"]; clipboardCopy: [] }>();
-const root = ref<HTMLElement>();
 const input = ref<HTMLTextAreaElement>();
 const richInput = ref<InstanceType<typeof ShapeRichTextInput>>();
 const editableElement = computed(() => richInput.value?.rootElement ?? input.value);
@@ -84,7 +88,10 @@ const blockStyle = computed(() => {
   try {
     return shapeCanvasTextBlockStyle(
       props.drawing,
-      layoutDrawingShapeText({ ...props.drawing, text: localDraft.value }),
+      layoutDrawingShapeText({
+        ...props.drawing,
+        text: props.rich ? props.draft : localDraft.value,
+      }),
       props.scale,
     );
   } catch {
@@ -103,25 +110,25 @@ const labels = computed(() =>
     ? {
         text: "编辑形状文本",
         actions: "形状文本操作",
-        apply: "应用",
-        cancel: "取消",
+        apply: "重试保存",
+        cancel: "放弃更改",
         rejected: "无法应用更改。已保留你的文本。",
         stale: "此形状或选区已更改。你可以复制保留的文本。",
         sourcePreview:
-          "编辑时，渐变、图案、图片填充、复杂轮廓及文字效果使用源文本预览。应用后保留完整外观。",
-        warpSourcePreview: "编辑的是变形前的源文字。应用后保留当前艺术字变形。",
+          "编辑时，渐变、图案、图片填充、复杂轮廓及文字效果使用源文本预览。结束编辑后保留完整外观。",
+        warpSourcePreview: "编辑的是变形前的源文字。结束编辑后保留当前艺术字变形。",
       }
     : {
         text: "Edit shape text",
         actions: "Shape text actions",
-        apply: "Apply",
-        cancel: "Cancel",
+        apply: "Retry Save",
+        cancel: "Discard Changes",
         rejected: "The change could not be applied. Your text has been kept.",
         stale: "The shape or selection changed. You can copy the retained text.",
         warpSourcePreview:
-          "Edit the straight source text. Applying preserves the current WordArt transform.",
+          "Edit the straight source text. Completing editing preserves the current WordArt transform.",
         sourcePreview:
-          "While editing, gradients, patterns, image fills, detailed outlines and text effects use a source text preview. Applied text keeps its full appearance.",
+          "While editing, gradients, patterns, image fills, detailed outlines and text effects use a source text preview. Completed text keeps its full appearance.",
       },
 );
 const failure = computed(
@@ -154,9 +161,9 @@ function captureSelection(): void {
   props.setSelection?.(selection);
 }
 function focus(expectedSession = props.sessionId): void {
-  if (expectedSession !== props.sessionId) return;
+  if (expectedSession !== props.sessionId || props.focusFieldDraft?.()) return;
   if (richInput.value) {
-    richInput.value.focus(selection);
+    richInput.value.focus(props.initialSelection ?? selection);
     return;
   }
   if (!input.value) return;
@@ -169,17 +176,12 @@ function focus(expectedSession = props.sessionId): void {
     selection.direction,
   );
 }
+function requestFocus(event: Event): void {
+  event.preventDefault();
+  focus();
+}
 function owns(target: EventTarget | null): boolean {
-  if (!(target instanceof Node)) return false;
-  if (root.value?.contains(target) || toolbar.value?.contains(target)) return true;
-  // A pane and its explicitly ARIA-controlled popups belong to this draft owner.
-  // Generic menus never qualify, so unrelated worksheet interactions still commit.
-  const owner = `[data-shape-text-edit-session="${props.sessionId}"]`;
-  if (target instanceof Element && target.closest(owner)) return true;
-  for (const control of document.querySelectorAll(`${owner} [aria-controls]`))
-    for (const id of (control.getAttribute("aria-controls") ?? "").split(/\s+/))
-      if (id && document.getElementById(id)?.contains(target)) return true;
-  return false;
+  return ownsShapeTextEditTarget(target, props.sessionId);
 }
 function reset(): void {
   localDraft.value = props.draft;
@@ -403,6 +405,11 @@ const actions = computed(() => {
       if (current()) captureSelection();
     },
     finishCompositionBlur: requestBlurCommit,
+    leaveBoundary: () => {
+      if (!current()) return;
+      blurPending = true;
+      requestBlurCommit();
+    },
     apply,
     cancel: () => {
       if (!current()) return;
@@ -410,6 +417,13 @@ const actions = computed(() => {
       cancel();
     },
   };
+});
+
+useFocusBoundary({ owns, onLeave: () => actions.value.leaveBoundary() });
+useHistoryShortcutBoundary({
+  owns,
+  composing: () => composing.value,
+  step: (direction) => props.historyStep?.(direction),
 });
 
 // v-on maps bind the captured functions directly. Cached inline member handlers
@@ -446,12 +460,12 @@ defineExpose({ focus });
 <template>
   <div
     :key="sessionId"
-    ref="root"
     v-on="frameEvents"
     class="shape-canvas-text-editor"
     :style="frameStyle"
     :data-shape-text-edit-session="sessionId"
     data-shape-canvas-text-editor
+    @shape-text-request-focus.stop="requestFocus"
     @pointerdown.stop
     @pointerup.stop
     @mousedown.stop
@@ -495,6 +509,7 @@ defineExpose({ focus });
       data-shape-canvas-text-input
       :update="richActions.update"
       :composition="richActions.composition"
+      :history-step="historyStep"
       v-on="{
         selection: richActions.selection,
         error: richActions.error,
@@ -527,6 +542,7 @@ defineExpose({ focus });
   </div>
   <Teleport to="body">
     <FloatingPanelSurface
+      v-if="failure"
       :key="sessionId"
       ref="surface"
       v-on="toolbarEvents"

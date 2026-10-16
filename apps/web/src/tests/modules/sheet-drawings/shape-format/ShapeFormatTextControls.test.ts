@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { Select } from "tdesign-vue-next/es/select";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { createAppI18n } from "../../../../shared/i18n";
-import FontFormatField from "../../../../modules/home-tools/components/FontFormatField.vue";
+import FontFormatField from "../../../../shared/cell-text/FontFormatField.vue";
 import ShapeFormatTextBox from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatTextBox.vue";
 import ShapeFormatChoiceField from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatChoiceField.vue";
 import ShapeFormatCheckbox from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatCheckbox.vue";
@@ -115,7 +115,7 @@ function fixture(options: { locale?: "en-US" | "zh-CN"; accepted?: boolean } = {
       attachTo: document.body,
       global: {
         plugins: [createAppI18n(options.locale ?? "en-US")],
-        stubs: { FontFormatField: true, FontSettingsAction: true },
+        stubs: { FontSettingsAction: true },
       },
     },
   );
@@ -222,15 +222,18 @@ describe("shape text layout and paragraph controls", () => {
     const size = f.wrapper.get<HTMLInputElement>('[data-shape-format-field="fontSizePt"] input');
     const element = size.element;
     await size.setValue("24.");
+    await size.trigger("blur");
+    expect(f.onIntent).not.toHaveBeenCalled(); // Same canonical value never creates a command.
+    await size.setValue("25.");
     choice(f.wrapper, "textDirection").vm.$emit("change", "vertical-rl");
     await flushPromises();
     const intent = f.onIntent.mock.calls.at(-1)![0];
     await f.revise({ textDirection: "vertical-rl" }, intent.intentId);
     expect(size.element).toBe(element);
-    expect(size.element.value).toBe("24.");
+    expect(size.element.value).toBe("25.");
     await size.trigger("blur");
     expect(f.onIntent).toHaveBeenLastCalledWith(
-      expect.objectContaining({ field: "fontSizePt", value: 24, baseRevision: 3 }),
+      expect.objectContaining({ field: "fontSizePt", value: 25, baseRevision: 3 }),
     );
   });
   test("wrap, overflow, and resize-to-fit remain three independent intents", async () => {
@@ -333,9 +336,12 @@ describe("shape font exact-resource preparation", () => {
     await f.revise({ paragraphAlignment: "center" }, intent.intentId);
     complete();
     await flushPromises();
-    expect(f.onIntent).toHaveBeenCalledTimes(1);
+    expect(f.onIntent).toHaveBeenCalledTimes(2);
+    expect(f.onIntent).toHaveBeenLastCalledWith(
+      expect.objectContaining({ field: "fontFamily", value: "Noto Sans", baseRevision: 3 }),
+    );
     expect(font(f.wrapper).props("modelValue")).toBe("Noto Sans");
-    expect(f.wrapper.text()).toContain(
+    expect(f.wrapper.text()).not.toContain(
       "The selection or drawing changed. Review the current values and try again.",
     );
   });
@@ -372,8 +378,14 @@ describe("shape font exact-resource preparation", () => {
           ([intent]) => intent.type === "set-field" && intent.value === "Noto Sans",
         ),
       ).toBe(false);
-      if (boundary === "selection" || boundary === "revision" || boundary === "newer-font")
+      if (boundary === "selection" || boundary === "newer-font")
         expect(font(f.wrapper).props("modelValue")).toBe("Arial");
+      if (boundary === "revision") {
+        expect(font(f.wrapper).props("modelValue")).toBe("Noto Sans");
+        expect(f.wrapper.text()).toContain("The selection or drawing changed.");
+        await font(f.wrapper).trigger("keydown", { key: "Escape" });
+        expect(font(f.wrapper).props("modelValue")).toBe("Arial");
+      }
       if (boundary === "escape") expect(font(f.wrapper).props("modelValue")).toBe("");
     },
   );

@@ -23,6 +23,7 @@ export {
   type XlsxEncodeResult,
   type XlsxEncodeOptions,
   type XlsxImageAsset,
+  type XlsxImportedImage,
 } from "./types.js";
 
 function assertNotAborted(options: XlsxDecodeOptions | undefined): void {

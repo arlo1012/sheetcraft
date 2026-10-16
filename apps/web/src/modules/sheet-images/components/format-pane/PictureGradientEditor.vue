@@ -184,6 +184,7 @@ function numberProps(
           stopOwner,
         )
       "
+      :display-precision="12"
       unit="%"
     />
     <PicturePaintNumber

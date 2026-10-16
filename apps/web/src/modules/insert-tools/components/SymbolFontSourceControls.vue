@@ -4,14 +4,12 @@ import { Button } from "tdesign-vue-next/es/button";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { Select } from "tdesign-vue-next/es/select";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
+import FontSettingsAction from "../../../shared/cell-text/FontSettingsAction.vue";
 import type {
   LocalSymbolFont,
   LocalSymbolFontErrorCode,
 } from "../../../shared/cell-text/local-font-source";
-import {
-  requestSystemFontChoices,
-  useLocalSymbolFonts,
-} from "../../../shared/cell-text/local-font-source";
+import { useLocalSymbolFonts } from "../../../shared/cell-text/local-font-source";
 const props = defineProps<{
   loading: boolean;
   defaultFontFamily?: string;
@@ -19,7 +17,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ register: [font: LocalSymbolFont, select: boolean] }>();
 const { t } = useAppI18n();
-const { choices: systemChoices, queryStatus } = useLocalSymbolFonts();
+const { choices: systemChoices } = useLocalSymbolFonts();
 const systemChoice = ref("");
 watch(
   systemChoices,
@@ -35,17 +33,6 @@ const localBusy = ref(false);
 const localError = ref<LocalSymbolFontErrorCode>();
 const localLoaded = ref<false | "session" | "saved">(false);
 const operationEmptyMessage = ref<MessageKey>();
-const queryFeedback = ref(false);
-const emptyMessage = computed<MessageKey | undefined>(() =>
-  queryFeedback.value && queryStatus.value.state === "ready"
-    ? systemChoices.value.length
-      ? undefined
-      : "symbolTools.noLocalFonts"
-    : operationEmptyMessage.value,
-);
-watch(queryStatus, (status) => {
-  if (queryFeedback.value && status.state === "ready") localError.value = undefined;
-});
 const fontFileInput = ref<HTMLInputElement>();
 let mounted = true;
 onBeforeUnmount(() => {
@@ -55,7 +42,6 @@ watch(
   () => props.restoreError,
   (error) => {
     if (error) {
-      queryFeedback.value = false;
       localError.value = error;
       localSourcesVisible.value = true;
     }
@@ -83,31 +69,11 @@ function setLocalError(error: unknown): void {
       ? (error.code as LocalSymbolFontErrorCode)
       : "malformed";
 }
-async function requestLocalFonts(): Promise<void> {
-  if (localBusy.value) return;
-  localSourcesVisible.value = true;
-  localBusy.value = true;
-  localError.value = undefined;
-  localLoaded.value = false;
-  queryFeedback.value = true;
-  operationEmptyMessage.value = undefined;
-  try {
-    const choices = await requestSystemFontChoices();
-    if (!mounted) return;
-    if (!choices.length) operationEmptyMessage.value = "symbolTools.noLocalFonts";
-    systemChoice.value = choices.find((item) => item.family === props.defaultFontFamily)?.id ?? "";
-  } catch (error) {
-    if (mounted) setLocalError(error);
-  } finally {
-    if (mounted) localBusy.value = false;
-  }
-}
 async function loadSelectedLocalFont(): Promise<void> {
   if (!systemChoice.value || localBusy.value) return;
   localBusy.value = true;
   localError.value = undefined;
   localLoaded.value = false;
-  queryFeedback.value = false;
   operationEmptyMessage.value = undefined;
   try {
     const item = await (
@@ -135,7 +101,6 @@ async function importFontFile(event: Event): Promise<void> {
   localBusy.value = true;
   localError.value = undefined;
   localLoaded.value = false;
-  queryFeedback.value = false;
   operationEmptyMessage.value = undefined;
   try {
     const item = await (
@@ -157,7 +122,6 @@ async function restoreLocalFonts(): Promise<void> {
   localBusy.value = true;
   localError.value = undefined;
   localLoaded.value = false;
-  queryFeedback.value = false;
   operationEmptyMessage.value = undefined;
   let source: typeof import("../../../shared/cell-text/local-font-source") | undefined;
   try {
@@ -181,16 +145,9 @@ async function restoreLocalFonts(): Promise<void> {
 }
 </script>
 <template>
-  <div class="symbol-font-sources">
+  <div class="symbol-font-sources" role="group" :aria-label="t('symbolTools.localFonts')">
     <div class="symbol-dialog__font-source-actions">
-      <Button
-        theme="default"
-        variant="text"
-        size="small"
-        :disabled="localBusy || loading"
-        @click="requestLocalFonts"
-        >{{ t("symbolTools.localFonts") }}</Button
-      >
+      <FontSettingsAction @open="localSourcesVisible = true" />
       <Button
         theme="default"
         variant="text"
@@ -210,11 +167,10 @@ async function restoreLocalFonts(): Promise<void> {
       <input ref="fontFileInput" type="file" accept=".ttf,.otf" hidden @change="importFontFile" />
     </div>
     <section
-      v-if="localSourcesVisible"
+      v-if="localSourcesVisible || systemChoices.length"
       class="symbol-dialog__font-sources"
       :aria-label="t('symbolTools.localFonts')"
     >
-      <p class="symbol-dialog__hint">{{ t("symbolTools.fontPrivacy") }}</p>
       <Checkbox v-model="rememberLocalFont">{{ t("symbolTools.rememberFont") }}</Checkbox>
       <div v-if="systemChoices.length" class="symbol-dialog__font-source-actions">
         <Select
@@ -231,7 +187,9 @@ async function restoreLocalFonts(): Promise<void> {
           >{{ t("symbolTools.loadLocalFont") }}</Button
         >
       </div>
-      <p v-if="emptyMessage" class="symbol-dialog__hint" role="status">{{ t(emptyMessage) }}</p>
+      <p v-if="operationEmptyMessage" class="symbol-dialog__hint" role="status">
+        {{ t(operationEmptyMessage) }}
+      </p>
       <p v-if="localBusy" class="symbol-dialog__hint" role="status">
         {{ t("symbolTools.localLoading") }}
       </p>

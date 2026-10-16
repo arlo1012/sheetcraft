@@ -7,6 +7,7 @@ export const pictureFormatZhCN = {
     paneTitle: "设置图片格式",
     close: "关闭图片格式窗格",
     noSelection: "请选择要设置格式的图片。",
+    singlePictureEffects: "请选择一张图片以编辑详细效果。",
     fillLineTab: "填充与线条",
     effectsTab: "效果",
     sizePropertiesTab: "大小与属性",

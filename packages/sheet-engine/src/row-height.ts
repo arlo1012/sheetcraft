@@ -62,6 +62,8 @@ export type AutoRowHeightInput = {
   columnWidths: ReadonlyMap<number, number>;
   /** Width used by columns without a stored manual dimension. */
   defaultColumnWidth?: number;
+  /** Height floor used by rows without a stored manual dimension. */
+  defaultRowHeight?: number;
   rowCount: number;
   columnCount: number;
   defaultFontFamily?: string;
@@ -106,11 +108,12 @@ export function measureWrappedCellHeight(
   font: AutoRowHeightFont,
   measurer: TextMeasurer,
   wrapText = true,
+  defaultRowHeight = DEFAULT_ROW_HEIGHT,
 ): number {
   const textDocument = typeof value === "string" ? { text: value } : value;
   const { text } = textDocument;
   if (!text) {
-    return DEFAULT_ROW_HEIGHT;
+    return defaultRowHeight;
   }
   const availableWidth = Math.max(
     1,
@@ -124,13 +127,14 @@ export function measureWrappedCellHeight(
       font,
       measurer,
       wrapText,
+      defaultRowHeight,
     );
   }
   const lineCount = Math.min(
     splitCellTextLines(text, availableWidth, font, measurer, wrapText).length,
     getMaximumLineCount(font),
   );
-  return getHeightForLineCount(lineCount, font);
+  return getHeightForLineCount(lineCount, font, defaultRowHeight);
 }
 
 function getMaximumLineCount(font: AutoRowHeightFont): number {
@@ -143,11 +147,15 @@ function getMaximumLineCount(font: AutoRowHeightFont): number {
   );
 }
 
-function getHeightForLineCount(lineCount: number, font: AutoRowHeightFont): number {
+function getHeightForLineCount(
+  lineCount: number,
+  font: AutoRowHeightFont,
+  defaultRowHeight: number,
+): number {
   return Math.min(
     MAX_ROW_HEIGHT,
     Math.max(
-      DEFAULT_ROW_HEIGHT,
+      defaultRowHeight,
       Math.ceil(
         lineCount * font.size * WRAPPED_CELL_LINE_HEIGHT +
           WRAPPED_CELL_VERTICAL_PADDING +
@@ -250,6 +258,7 @@ function measureCellHeight(
   style: Readonly<CellStyle> | undefined,
   font: AutoRowHeightFont,
   measurer: TextMeasurer,
+  defaultRowHeight: number,
 ): number {
   const { text } = textDocument;
   const availableWidth = getAvailableTextWidth(columnWidth, style, measurer);
@@ -263,6 +272,7 @@ function measureCellHeight(
       measuredFont,
       measurer,
       wraps,
+      defaultRowHeight,
     );
   }
   const lines = splitCellTextLines(text, availableWidth, measuredFont, measurer, wraps);
@@ -275,6 +285,7 @@ function measureCellHeight(
     return getHeightForLineCount(
       Math.min(graphemeCount, getMaximumLineCount(measuredFont)),
       measuredFont,
+      defaultRowHeight,
     );
   }
   if (typeof textRotation === "number" && textRotation !== 0) {
@@ -288,7 +299,7 @@ function measureCellHeight(
     return Math.min(
       MAX_ROW_HEIGHT,
       Math.max(
-        DEFAULT_ROW_HEIGHT,
+        defaultRowHeight,
         Math.ceil(rotatedHeight + WRAPPED_CELL_VERTICAL_PADDING + WRAPPED_CELL_GRIDLINE_WIDTH),
       ),
     );
@@ -296,14 +307,15 @@ function measureCellHeight(
   return getHeightForLineCount(
     Math.min(lines.length, getMaximumLineCount(measuredFont)),
     measuredFont,
+    defaultRowHeight,
   );
 }
 
-function getHeightForTextExtent(height: number): number {
+function getHeightForTextExtent(height: number, defaultRowHeight: number): number {
   return Math.min(
     MAX_ROW_HEIGHT,
     Math.max(
-      DEFAULT_ROW_HEIGHT,
+      defaultRowHeight,
       Math.ceil(height + WRAPPED_CELL_VERTICAL_PADDING + WRAPPED_CELL_GRIDLINE_WIDTH),
     ),
   );
@@ -313,6 +325,7 @@ function getAttributedStackedHeight(
   textDocument: CellTextDocument,
   font: AutoRowHeightFont,
   measurer: TextMeasurer,
+  defaultRowHeight: number,
 ): number {
   let maximum = font.size * WRAPPED_CELL_LINE_HEIGHT;
   for (const paragraph of splitAttributedTextLines(textDocument, Infinity, font, measurer, false)) {
@@ -334,7 +347,7 @@ function getAttributedStackedHeight(
     maximum = Math.max(maximum, height);
     if (maximum >= MAX_ROW_HEIGHT) break;
   }
-  return getHeightForTextExtent(maximum);
+  return getHeightForTextExtent(maximum, defaultRowHeight);
 }
 
 function measureAttributedCellHeight(
@@ -344,9 +357,10 @@ function measureAttributedCellHeight(
   font: AutoRowHeightFont,
   measurer: TextMeasurer,
   wraps: boolean,
+  defaultRowHeight: number,
 ): number {
   if (style?.textRotation === "vertical")
-    return getAttributedStackedHeight(textDocument, font, measurer);
+    return getAttributedStackedHeight(textDocument, font, measurer, defaultRowHeight);
   const lines = splitAttributedTextLines(textDocument, availableWidth, font, measurer, wraps);
   const heights = getAttributedTextLayoutLineHeights(
     textDocument,
@@ -363,9 +377,12 @@ function measureAttributedCellHeight(
   if (typeof rotation === "number" && rotation !== 0) {
     const radians = (Math.abs(rotation) * Math.PI) / 180;
     const textWidth = wraps ? availableWidth : Math.max(0, ...lines.map((line) => line.width));
-    return getHeightForTextExtent(textWidth * Math.sin(radians) + textHeight * Math.cos(radians));
+    return getHeightForTextExtent(
+      textWidth * Math.sin(radians) + textHeight * Math.cos(radians),
+      defaultRowHeight,
+    );
   }
-  return getHeightForTextExtent(textHeight);
+  return getHeightForTextExtent(textHeight, defaultRowHeight);
 }
 
 function getMeasuredExtentsFingerprint(
@@ -396,6 +413,7 @@ export function createAutoRowHeightCalculator(measurer: TextMeasurer): AutoRowHe
       const currentCellKeys = new Set<string>();
       const rowHeights = new Map<number, number>();
       const defaultFontFamily = input.defaultFontFamily ?? DEFAULT_CELL_FONT_FAMILY;
+      const defaultRowHeight = input.defaultRowHeight ?? DEFAULT_ROW_HEIGHT;
 
       for (const [key, cell] of input.cells) {
         const address = parseCellKey(key);
@@ -440,17 +458,18 @@ export function createAutoRowHeightCalculator(measurer: TextMeasurer): AutoRowHe
           style?.textRotation,
           style?.textDirection,
           input.measurementVersion ?? 0,
+          defaultRowHeight,
           getMeasuredExtentsFingerprint(textDocument, font, measurer),
         ]);
         const cached = cellHeights.get(key);
         const height =
           cached?.fingerprint === fingerprint
             ? cached.height
-            : measureCellHeight(textDocument, columnWidth, style, font, measurer);
+            : measureCellHeight(textDocument, columnWidth, style, font, measurer, defaultRowHeight);
         if (!cached || cached.fingerprint !== fingerprint) {
           cellHeights.set(key, { fingerprint, height });
         }
-        if (height > DEFAULT_ROW_HEIGHT) {
+        if (height > defaultRowHeight) {
           rowHeights.set(address.row, Math.max(rowHeights.get(address.row) ?? 0, height));
         }
       }

@@ -150,6 +150,7 @@ function title(item: SymbolInsertion): string {
                 :title="title(item)"
                 :aria-label="title(item)"
                 :aria-disabled="disabled || busy"
+                :disabled="disabled || busy"
                 :style="{ fontFamily: item.fontFamily }"
                 @click="insert(item)"
               >
@@ -172,6 +173,7 @@ function title(item: SymbolInsertion): string {
                 :title="title(item)"
                 :aria-label="title(item)"
                 :aria-disabled="disabled || busy"
+                :disabled="disabled || busy"
                 :style="{ fontFamily: item.fontFamily }"
                 @click="insert(item)"
               >
@@ -197,6 +199,8 @@ function title(item: SymbolInsertion): string {
 </template>
 <style scoped lang="scss">
 @use "../../../shared/ribbon/ribbon-layout" as ribbon;
+@use "../../../shared/gallery/gallery-choice" as gallery;
+@use "../../../shared/option-list/option-list" as option-list;
 .symbol-menu-tool {
   @include ribbon.tool;
 }
@@ -215,26 +219,16 @@ function title(item: SymbolInsertion): string {
   color: var(--sheetcraft-text-secondary);
 }
 .symbol-menu__grid {
+  @include option-list.scrollbar;
   display: grid;
   grid-template-columns: repeat(9, minmax(0, 1fr));
   margin-top: 6px;
   button {
+    @include gallery.choice(0);
     min-width: 0;
     height: 32px;
-    padding: 0;
-    background: transparent;
-    border: 0;
-    color: var(--sheetcraft-text-primary);
     font-size: 21px;
     line-height: 28px;
-    cursor: pointer;
-    &:hover {
-      background: var(--sheetcraft-surface-hover);
-    }
-    &[aria-disabled="true"] {
-      opacity: 0.5;
-      cursor: default;
-    }
   }
 }
 </style>

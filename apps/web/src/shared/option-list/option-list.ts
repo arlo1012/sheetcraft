@@ -1,6 +1,7 @@
 export type OptionListOption<Value extends string = string> = Readonly<{
   value: Value;
   label: string;
+  disabled?: boolean;
   color?: string;
   aliases?: readonly string[];
 }>;

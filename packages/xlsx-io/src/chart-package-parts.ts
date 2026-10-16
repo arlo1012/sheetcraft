@@ -1,4 +1,18 @@
+import { isIdentityNativePictureGeometry } from "./picture-frame-geometry.js";
+import { assertNativePictureSourceOrientation } from "./picture-source-orientation.js";
 import { XMLParser } from "fast-xml-parser";
+import {
+  inspectNativePicture,
+  inspectXlsxRasterMedia,
+  rejectNativePicture,
+  MAX_XLSX_IMAGE_ASSETS,
+  MAX_XLSX_PICTURE_OBJECTS,
+  MAX_XLSX_TOTAL_IMAGE_BYTES,
+  type NativePicture,
+  type NativePictureBackground,
+  type PictureAnchorKind,
+} from "./picture-reader.js";
+import type { XlsxImportedImage } from "./types.js";
 import { strFromU8 } from "fflate/browser";
 import {
   attr,
@@ -18,6 +32,10 @@ const PACKAGE_NS = "http://schemas.openxmlformats.org/package/2006/relationships
 const TYPES_NS = "http://schemas.openxmlformats.org/package/2006/content-types";
 const STYLE_NS = "http://schemas.microsoft.com/office/drawing/2012/chartStyle";
 const MC_NS = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+const C15_NS = "http://schemas.microsoft.com/office/drawing/2012/chart";
+const LABEL_EXTENSION_URI = "{CE6537A1-D6FC-4f65-9D91-7224C49458BB}";
+const LABEL_SERIES_PATH = "chartSpace/chart/plotArea/barChart/ser/dLbls";
+const C15_LABEL_PATH = `${LABEL_SERIES_PATH}/extLst/ext`;
 const C14_NS = "http://schemas.microsoft.com/office/drawing/2007/8/2/chart";
 const WPS_CHART_NS = "https://web.wps.cn/et/2018/main";
 const WPS_CHART_PROPERTIES_URI = "{0b15fc19-7d7d-44ad-8c2d-2c3a37ce22c3}";
@@ -28,10 +46,47 @@ const preservedParser = new XMLParser({
   parseTagValue: false,
   trimValues: false,
 });
+const orderedParser = new XMLParser({
+  ignoreAttributes: false,
+  parseTagValue: false,
+  preserveOrder: true,
+});
 
-export class UnsupportedChartDrawingError extends Error {}
+export class UnsupportedChartDrawingError extends Error {
+  part?: string;
+}
 function reject(): never {
   throw new UnsupportedChartDrawingError("Unsupported native chart drawing.");
+}
+
+/** XML child order is drawing paint order, even when anchor kinds are interleaved. */
+function orderedAnchors(bytes: Uint8Array, drawing: XmlNode) {
+  const raw = orderedParser.parse(strFromU8(bytes)) as Record<string, unknown>[];
+  const root = raw.find((node) =>
+    Object.keys(node).some((key) => key.split(":").at(-1) === "wsDr"),
+  );
+  const rootKey = root && Object.keys(root).find((key) => key.split(":").at(-1) === "wsDr");
+  const children = rootKey && root?.[rootKey];
+  if (!Array.isArray(children)) return reject();
+  const counts = { oneCellAnchor: 0, twoCellAnchor: 0, absoluteAnchor: 0 };
+  const byKind = {
+    oneCellAnchor: nodes(drawing.oneCellAnchor),
+    twoCellAnchor: nodes(drawing.twoCellAnchor),
+    absoluteAnchor: nodes(drawing.absoluteAnchor),
+  };
+  const result: { anchorKind: PictureAnchorKind; anchor: XmlNode }[] = [];
+  for (const node of children as Record<string, unknown>[]) {
+    for (const key of Object.keys(node)) {
+      if (key === ":@" || key === "#text") continue;
+      const name = key.split(":").at(-1)!;
+      if (!Object.hasOwn(counts, name)) return reject();
+      const anchorKind = name as PictureAnchorKind;
+      const anchor = byKind[anchorKind][counts[anchorKind]++];
+      if (!anchor) return reject();
+      result.push({ anchorKind, anchor });
+    }
+  }
+  return result;
 }
 const values = (value: unknown): unknown[] =>
   Array.isArray(value) ? value : value === undefined ? [] : [value];
@@ -56,6 +111,22 @@ function strictRoot(
   namespace: string,
   allowedNamespaces = [namespace],
   relationshipIds = false,
+  part?: string,
+): XmlNode {
+  try {
+    return inspectStrictRoot(bytes, name, namespace, allowedNamespaces, relationshipIds);
+  } catch (error) {
+    if (error instanceof UnsupportedChartDrawingError && error.part === undefined)
+      error.part = part;
+    throw error;
+  }
+}
+function inspectStrictRoot(
+  bytes: Uint8Array,
+  name: string,
+  namespace: string,
+  allowedNamespaces: readonly string[],
+  relationshipIds: boolean,
 ): XmlNode {
   const local = parseXml(bytes);
   const raw = preservedParser.parse(strFromU8(bytes)) as XmlNode;
@@ -105,6 +176,7 @@ function strictRoot(
     "roundedCorners",
     "autoTitleDeleted",
     "dLbls",
+    "dLblPos",
     "delete",
     "showLegendKey",
     "showVal",
@@ -112,6 +184,7 @@ function strictRoot(
     "showSerName",
     "showPercent",
     "showBubbleSize",
+    "showLeaderLines",
     "varyColors",
     "invertIfNegative",
     "gapWidth",
@@ -225,6 +298,13 @@ function strictRoot(
     "wsDr",
     "oneCellAnchor",
     "twoCellAnchor",
+    "absoluteAnchor",
+    "pos",
+    "pic",
+    "nvPicPr",
+    "cNvPicPr",
+    "blipFill",
+    "spPr",
     "from",
     "to",
     "col",
@@ -237,6 +317,18 @@ function strictRoot(
     "cNvGraphicFramePr",
     "xfrm",
     "clientData",
+  ]);
+  const pictureArtElements = new Set([
+    "picLocks",
+    "blip",
+    "srcRect",
+    "stretch",
+    "fillRect",
+    "prstGeom",
+    "avLst",
+    "xfrm",
+    "off",
+    "ext",
   ]);
   const walk = (
     key: string,
@@ -256,14 +348,55 @@ function strictRoot(
       }
       const [prefix, localName] = key.includes(":") ? key.split(":") : ["", key];
       const ns = bindings.get(prefix!) ?? "";
-      // Observed WPS post-save straight lines add this inert solid-dash leaf.
-      // Admit only its exact series line-style location/value, not general dash
-      // payloads or a new drawing/column/style extension escape hatch.
+      // WPS materializes visible ordinary column/bar label settings per series.
+      // This admits only its observed inert extension, never the c15 namespace generally.
+      const path = ancestors.join("/");
+      const ordinary =
+        namespace === CHART_NS && child(local, "chartSpace").pivotSource === undefined;
+      const empty =
+        Object.keys(node).every((key) => key.startsWith("@_xmlns") || key === "#text") &&
+        (node["#text"] === undefined || String(node["#text"]).trim() === "");
+      const falseFlag =
+        node["@_val"] === "0" &&
+        Object.keys(node).every(
+          (key) => key.startsWith("@_xmlns") || key === "@_val" || key === "#text",
+        ) &&
+        (node["#text"] === undefined || String(node["#text"]).trim() === "");
+      const inertLabelLeaf =
+        ordinary &&
+        ns === C15_NS &&
+        path === C15_LABEL_PATH &&
+        ((["layout", "leaderLines"].includes(localName!) && empty) ||
+          (localName === "showLeaderLines" && falseFlag));
+      if (
+        namespace === CHART_NS &&
+        ((ns === CHART_NS &&
+          localName === "showLeaderLines" &&
+          (!ordinary || path !== LABEL_SERIES_PATH || !falseFlag)) ||
+          (path === C15_LABEL_PATH && !inertLabelLeaf) ||
+          (localName === "ext" &&
+            path === `${LABEL_SERIES_PATH}/extLst` &&
+            (!ordinary ||
+              ns !== CHART_NS ||
+              node["@_uri"] !== LABEL_EXTENSION_URI ||
+              Object.keys(node).some(
+                (key) => key.startsWith("@_") && !key.startsWith("@_xmlns") && key !== "@_uri",
+              ) ||
+              (node["#text"] !== undefined && String(node["#text"]).trim() !== ""))))
+      )
+        reject();
+      // Observed WPS post-save straight lines add this inert solid-dash leaf
+      // to the series stroke and, with explicit RGB marker paint, marker stroke.
+      // Admit only those exact ordinary-line locations/value, never arbitrary dash.
       if (
         namespace === CHART_NS &&
         localName === "prstDash" &&
         (ns !== ART_NS ||
-          ancestors.join("/") !== "chartSpace/chart/plotArea/lineChart/ser/spPr/ln" ||
+          !ordinary ||
+          ![
+            "chartSpace/chart/plotArea/lineChart/ser/spPr/ln",
+            "chartSpace/chart/plotArea/lineChart/ser/marker/spPr/ln",
+          ].includes(ancestors.join("/")) ||
           node["@_val"] !== "solid" ||
           Object.keys(node).some(
             (key) => key !== "@_val" && key !== "#text" && !key.startsWith("@_xmlns"),
@@ -272,13 +405,17 @@ function strictRoot(
       )
         reject();
       if (
-        !allowedNamespaces.includes(ns) ||
+        (!allowedNamespaces.includes(ns) && !inertLabelLeaf) ||
         (root && (localName !== name || ns !== namespace)) ||
         (((namespace === CHART_NS && chartElements.has(localName!)) ||
           (namespace === DRAWING_NS && localName === "chart")) &&
           ns !== CHART_NS &&
-          !(namespace === CHART_NS && localName === "style" && ns === C14_NS)) ||
-        (namespace === DRAWING_NS && drawingElements.has(localName!) && ns !== DRAWING_NS) ||
+          !(namespace === CHART_NS && localName === "style" && ns === C14_NS) &&
+          !inertLabelLeaf) ||
+        (namespace === DRAWING_NS &&
+          drawingElements.has(localName!) &&
+          ns !== DRAWING_NS &&
+          !(localName === "xfrm" && parent === "spPr" && ns === ART_NS)) ||
         (namespace === DRAWING_NS &&
           ns === DRAWING_NS &&
           !drawingElements.has(localName!) &&
@@ -288,10 +425,19 @@ function strictRoot(
           ns !== ART_NS) ||
         (namespace === DRAWING_NS &&
           localName === "ext" &&
-          ns !== (parent === "oneCellAnchor" ? DRAWING_NS : parent === "xfrm" ? ART_NS : "")) ||
+          ns !==
+            (["oneCellAnchor", "absoluteAnchor"].includes(parent)
+              ? DRAWING_NS
+              : parent === "xfrm"
+                ? ART_NS
+                : "")) ||
         (namespace === DRAWING_NS &&
           ns === ART_NS &&
-          !["graphic", "graphicData", "off", "ext"].includes(localName!)) ||
+          !["graphic", "graphicData", ...pictureArtElements].includes(localName!)) ||
+        (namespace === DRAWING_NS &&
+          pictureArtElements.has(localName!) &&
+          !["xfrm", "off", "ext"].includes(localName!) &&
+          ns !== ART_NS) ||
         (namespace === CHART_NS && ns === ART_NS && !artElements.has(localName!)) ||
         (namespace === CHART_NS && artElements.has(localName!) && ns !== ART_NS) ||
         (namespace === CHART_NS && ns === C14_NS && !c14Elements.has(localName!)) ||
@@ -313,10 +459,11 @@ function strictRoot(
           !["prstDash", "spAutoFit"].includes(localName!))
       )
         reject();
-      if (namespace === DRAWING_NS && localName === "chart") {
+      if (namespace === DRAWING_NS && (localName === "chart" || localName === "blip")) {
         const ids = Object.keys(node).filter(
           (attribute) =>
-            attribute.startsWith("@_") && attribute.slice(2).split(":").at(-1) === "id",
+            attribute.startsWith("@_") &&
+            attribute.slice(2).split(":").at(-1) === (localName === "blip" ? "embed" : "id"),
         );
         if (
           ids.length !== 1 ||
@@ -332,7 +479,9 @@ function strictRoot(
         const attributeNs = bindings.get(rawName.split(":")[0]!);
         if (
           attributeNs !== "http://www.w3.org/XML/1998/namespace" &&
-          (!relationshipIds || attributeNs !== REL_NS || rawName.split(":")[1] !== "id")
+          (!relationshipIds ||
+            attributeNs !== REL_NS ||
+            !["id", "embed"].includes(rawName.split(":")[1]!))
         )
           reject();
       }
@@ -345,7 +494,7 @@ function strictRoot(
   return single(local, name);
 }
 
-function worksheetDrawingId(bytes: Uint8Array): string {
+function worksheetDrawingId(bytes: Uint8Array, elementName = "drawing"): string {
   const raw = preservedParser.parse(strFromU8(bytes)) as XmlNode;
   const rootKey = Object.keys(raw).find((key) => key.split(":").at(-1) === "worksheet");
   if (!rootKey) return reject();
@@ -358,7 +507,7 @@ function worksheetDrawingId(bytes: Uint8Array): string {
     }
   };
   bind(root);
-  const key = Object.keys(root).find((key) => key.split(":").at(-1) === "drawing");
+  const key = Object.keys(root).find((key) => key.split(":").at(-1) === elementName);
   if (!key) return reject();
   const drawing = single(root, key);
   bind(drawing);
@@ -395,23 +544,41 @@ export type NativeChartPart = {
 export type NativeChartPackage = {
   parts: ReadonlySet<string>;
   charts: readonly NativeChartPart[];
+  pictures: readonly NativePicture[];
+  backgrounds: readonly NativePictureBackground[];
+  images: readonly XlsxImportedImage[];
 };
 
-/** Admit a chart-only relationship graph; unrelated drawing/media parts never inherit admission. */
+/** Admit only consumed chart/picture relationships; unrelated drawing/media parts never inherit admission. */
 export async function collectNativeChartParts(
   entries: Record<string, Uint8Array>,
   readPart: (part: string) => Promise<Uint8Array | undefined>,
+  archiveNames: readonly string[] = Object.keys(entries),
 ): Promise<NativeChartPackage> {
   const parts = new Set<string>();
   const charts: NativeChartPart[] = [];
+  const pictures: NativePicture[] = [];
+  const backgrounds: NativePictureBackground[] = [];
+  const images: XlsxImportedImage[] = [];
+  const media = new Map<string, XlsxImportedImage>();
+  const orientationChecked = new WeakSet<Uint8Array>();
+  const consumedImageRelationships = new Set<string>();
+  let mediaBytes = 0;
   const hasDrawing = Object.entries(entries).some(
     ([part, bytes]) =>
       (/^xl\/worksheets\/[^/]+\.xml$/i.test(part) &&
-        values(child(parseXml(bytes), "worksheet").drawing).length > 0) ||
-      (part.toLowerCase() === "[content_types].xml" && strFromU8(bytes).includes(DRAWING_MIME)) ||
-      (part.endsWith(".rels") && strFromU8(bytes).includes(`${REL_NS}/drawing`)),
+        (values(child(parseXml(bytes), "worksheet").drawing).length > 0 ||
+          values(child(parseXml(bytes), "worksheet").picture).length > 0)) ||
+      (part.toLowerCase() === "[content_types].xml" &&
+        (strFromU8(bytes).includes(DRAWING_MIME) || strFromU8(bytes).includes("image/"))) ||
+      (part.endsWith(".rels") &&
+        ["drawing", "image"].some((kind) => strFromU8(bytes).includes(`${REL_NS}/${kind}`))),
   );
-  if (!hasDrawing) return { parts, charts };
+  if (!hasDrawing) {
+    if (archiveNames.some((name) => /^xl\/media\//i.test(name) && !name.endsWith("/")))
+      rejectNativePicture("xl/media");
+    return { parts, charts, pictures, backgrounds, images };
+  }
   const read = async (part: string): Promise<Uint8Array> => {
     const bytes = await readPart(part);
     if (!bytes) return reject();
@@ -424,7 +591,7 @@ export async function collectNativeChartParts(
     const result = new Map<string, Relation>();
     if (!bytes) return result;
     entries[path] = bytes;
-    const root = strictRoot(bytes, "Relationships", PACKAGE_NS);
+    const root = strictRoot(bytes, "Relationships", PACKAGE_NS, [PACKAGE_NS], false, path);
     only(root, ["Relationship"]);
     if (values(root.Relationship).length !== nodes(root.Relationship).length) reject();
     for (const relation of nodes(root.Relationship)) {
@@ -451,8 +618,22 @@ export async function collectNativeChartParts(
     }
     return result;
   };
-  const typeRoot = strictRoot(await read("[Content_Types].xml"), "Types", TYPES_NS);
+  const typeRoot = strictRoot(
+    await read("[Content_Types].xml"),
+    "Types",
+    TYPES_NS,
+    [TYPES_NS],
+    false,
+    "[Content_Types].xml",
+  );
   const types = new Map<string, string>();
+  const defaultTypes = new Map<string, string>();
+  for (const declaration of nodes(typeRoot.Default)) {
+    const extension = attr(declaration, "Extension").toLowerCase();
+    if (!/^[a-z0-9]+$/.test(extension) || defaultTypes.has(extension)) reject();
+    defaultTypes.set(extension, attr(declaration, "ContentType"));
+  }
+  if (values(typeRoot.Default).length !== nodes(typeRoot.Default).length) reject();
   if (values(typeRoot.Override).length !== nodes(typeRoot.Override).length) reject();
   for (const override of nodes(typeRoot.Override)) {
     const part = attr(override, "PartName");
@@ -468,6 +649,23 @@ export async function collectNativeChartParts(
     if (types.get(part.toLowerCase()) !== mime) reject();
     parts.add(part.toLowerCase());
   };
+  const readImage = async (part: string): Promise<XlsxImportedImage> => {
+    const key = part.toLowerCase();
+    const existing = media.get(key);
+    if (existing) return existing;
+    if (images.length >= MAX_XLSX_IMAGE_ASSETS) rejectNativePicture(part, true);
+    const mime = types.get(key) ?? defaultTypes.get(key.split(".").at(-1)!) ?? "";
+    const bytes = await read(part);
+    const extension = inspectXlsxRasterMedia(bytes, mime, part);
+    mediaBytes += bytes.byteLength;
+    if (mediaBytes > MAX_XLSX_TOTAL_IMAGE_BYTES) rejectNativePicture(part, true);
+    const resource = { assetId: `xlsx-image-${images.length + 1}`, bytes, extension };
+    if ((await rels(part)).size) rejectNativePicture(relationshipPath(part));
+    images.push(resource);
+    media.set(key, resource);
+    parts.add(key);
+    return resource;
+  };
   const workbook = child(parseXml(await read("xl/workbook.xml")), "workbook");
   const workbookRels = await rels("xl/workbook.xml");
   const claimed = new Set<string>();
@@ -478,6 +676,28 @@ export async function collectNativeChartParts(
     const worksheetBytes = await read(sheetPart);
     const worksheet = child(parseXml(worksheetBytes), "worksheet");
     const sheetRels = await rels(sheetPart, true);
+    const backgroundNodes = values(worksheet.picture);
+    const imageRelationships = [...sheetRels.entries()].filter(
+      ([, relation]) => relation.type === `${REL_NS}/image`,
+    );
+    if (backgroundNodes.length || imageRelationships.length) {
+      if (backgroundNodes.length !== 1 || imageRelationships.length !== 1)
+        rejectNativePicture(`${sheetPart}.picture`);
+      const id = worksheetDrawingId(worksheetBytes, "picture");
+      const relationship = sheetRels.get(id);
+      if (!relationship || relationship.type !== `${REL_NS}/image`)
+        rejectNativePicture(`${sheetPart}.picture`);
+      const background = child(worksheet, "picture");
+      only(background, []);
+      if (
+        Object.keys(background).some(
+          (key) => key.startsWith("@_") && !key.startsWith("@_xmlns") && key !== "@_id",
+        )
+      )
+        rejectNativePicture(`${sheetPart}.picture`);
+      backgrounds.push({ sheetIndex, assetId: (await readImage(relationship.target)).assetId });
+      consumedImageRelationships.add(`${relationshipPath(sheetPart)}#${id}`);
+    }
     const drawingNodes = values(worksheet.drawing);
     const drawingRels = [...sheetRels.values()].filter((relation) =>
       relation.type.endsWith("/drawing"),
@@ -493,27 +713,63 @@ export async function collectNativeChartParts(
       reject();
     const drawingPart = drawingRelation.target;
     claimed.add(drawingPart.toLowerCase());
+    const drawingBytes = await read(drawingPart);
     const drawing = strictRoot(
-      await read(drawingPart),
+      drawingBytes,
       "wsDr",
       DRAWING_NS,
       [DRAWING_NS, ART_NS, CHART_NS],
       true,
+      drawingPart,
     );
-    only(drawing, ["oneCellAnchor", "twoCellAnchor"]);
+    only(drawing, ["oneCellAnchor", "twoCellAnchor", "absoluteAnchor"]);
     const drawingRelations = await rels(drawingPart);
     const used = new Set<string>();
     const objectIds = new Set<string>();
-    const anchors = (["oneCellAnchor", "twoCellAnchor"] as const).flatMap((anchorKind) =>
-      nodes(drawing[anchorKind]).map((anchor) => ({ anchorKind, anchor })),
-    );
+    const anchors = orderedAnchors(drawingBytes, drawing);
     if (
       anchors.length !==
-      values(drawing.oneCellAnchor).length + values(drawing.twoCellAnchor).length
+      values(drawing.oneCellAnchor).length +
+        values(drawing.twoCellAnchor).length +
+        values(drawing.absoluteAnchor).length
     )
       reject();
     if (!anchors.length) reject();
     for (const { anchorKind, anchor } of anchors) {
+      if (anchor.pic !== undefined) {
+        if (pictures.length >= MAX_XLSX_PICTURE_OBJECTS) rejectNativePicture(drawingPart, true);
+        const picture = inspectNativePicture(
+          anchorKind,
+          anchor,
+          `${drawingPart}.pictures[${pictures.length + 1}]`,
+        );
+        if (objectIds.has(String(picture.objectId))) rejectNativePicture(drawingPart);
+        objectIds.add(String(picture.objectId));
+        const relationship = drawingRelations.get(picture.relationshipId);
+        if (!relationship || relationship.type !== `${REL_NS}/image`)
+          rejectNativePicture(drawingPart);
+        used.add(picture.relationshipId);
+        consumedImageRelationships.add(
+          `${relationshipPath(drawingPart)}#${picture.relationshipId}`,
+        );
+        const image = await readImage(relationship.target);
+        if (
+          picture.geometry &&
+          !isIdentityNativePictureGeometry(picture.geometry) &&
+          !orientationChecked.has(image.bytes)
+        ) {
+          try {
+            assertNativePictureSourceOrientation(image.bytes, image.extension);
+            orientationChecked.add(image.bytes);
+          } catch {
+            rejectNativePicture(`${picture.location}.source-orientation`);
+          }
+        }
+        const { relationshipId: _relationshipId, ...data } = picture;
+        pictures.push({ ...data, sheetIndex, assetId: image.assetId });
+        continue;
+      }
+      if (anchorKind === "absoluteAnchor") reject();
       only(anchor, [
         "from",
         anchorKind === "oneCellAnchor" ? "ext" : "to",
@@ -564,13 +820,14 @@ export async function collectNativeChartParts(
       used.add(id);
       claimed.add(relation.target.toLowerCase());
       const chartPart = relation.target;
-      const chartSpace = strictRoot(await read(chartPart), "chartSpace", CHART_NS, [
+      const chartSpace = strictRoot(
+        await read(chartPart),
+        "chartSpace",
         CHART_NS,
-        ART_NS,
-        MC_NS,
-        C14_NS,
-        WPS_CHART_NS,
-      ]);
+        [CHART_NS, ART_NS, MC_NS, C14_NS, WPS_CHART_NS],
+        false,
+        chartPart,
+      );
       only(chartSpace, [
         "date1904",
         "lang",
@@ -649,6 +906,9 @@ export async function collectNativeChartParts(
       const line = plot.lineChart !== undefined;
       if (line && (plot.barChart !== undefined || kind !== "ordinary")) reject();
       const bar = single(plot, line ? "lineChart" : "barChart");
+      // C1 ordinary label placement does not expand the PivotChart reader.
+      if (kind === "pivot" && nodes(bar.dLbls).some((labels) => labels.dLblPos !== undefined))
+        reject();
       only(
         bar,
         line
@@ -683,12 +943,22 @@ export async function collectNativeChartParts(
       if (values(bar.ser).length !== series.length) reject();
       if (!series.length || series.length > 10000) reject();
       for (const [index, seriesNode] of series.entries()) {
+        if (
+          kind === "pivot" &&
+          nodes(seriesNode.dLbls).some((labels) => labels.dLblPos !== undefined)
+        )
+          reject();
         only(
           seriesNode,
           line
             ? ["idx", "order", "tx", "spPr", "marker", "dLbls", "cat", "val", "smooth"]
             : ["idx", "order", "tx", "spPr", "invertIfNegative", "dLbls", "cat", "val"],
         );
+        if (line) {
+          const marker = single(seriesNode, "marker");
+          // The observed marker stroke belongs to one shape, never competing spPr payloads.
+          if (marker.spPr !== undefined) single(marker, "spPr");
+        }
         if (
           attr(single(seriesNode, "idx"), "val") !== String(index) ||
           attr(single(seriesNode, "order"), "val") !== String(index)
@@ -711,10 +981,14 @@ export async function collectNativeChartParts(
           reject();
         companionTypes.add(relation.type);
         claimed.add(relation.target.toLowerCase());
-        strictRoot(await read(relation.target), style ? "chartStyle" : "colorStyle", STYLE_NS, [
+        strictRoot(
+          await read(relation.target),
+          style ? "chartStyle" : "colorStyle",
           STYLE_NS,
-          ART_NS,
-        ]);
+          [STYLE_NS, ART_NS],
+          false,
+          relation.target,
+        );
         if ((await rels(relation.target)).size) reject();
         admit(
           relation.target,
@@ -748,5 +1022,26 @@ export async function collectNativeChartParts(
   }
   // Content-type aliases outside xl/drawings are subject to the same orphan block.
   for (const [part, mime] of types) if (mime === DRAWING_MIME && !parts.has(part)) reject();
-  return { parts, charts };
+  for (const name of archiveNames)
+    if (
+      !name.endsWith("/") &&
+      (/^xl\/media\//i.test(name) ||
+        (
+          types.get(name.toLowerCase()) ?? defaultTypes.get(name.split(".").at(-1)!.toLowerCase())
+        )?.startsWith("image/")) &&
+      !parts.has(name.toLowerCase())
+    )
+      rejectNativePicture(name);
+  for (const [part, mime] of types)
+    if (mime.startsWith("image/") && !parts.has(part)) rejectNativePicture(part);
+  for (const [part, bytes] of Object.entries(entries)) {
+    if (!part.endsWith(".rels")) continue;
+    for (const relation of nodes(child(parseXml(bytes), "Relationships").Relationship))
+      if (
+        attr(relation, "Type").endsWith("/image") &&
+        !consumedImageRelationships.has(`${part}#${attr(relation, "Id")}`)
+      )
+        rejectNativePicture(`${part}#${attr(relation, "Id")}`);
+  }
+  return { parts, charts, pictures, backgrounds, images };
 }

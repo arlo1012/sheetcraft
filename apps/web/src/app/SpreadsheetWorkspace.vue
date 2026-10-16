@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { routeRibbonHistoryShortcut } from "./ribbon-history-shortcuts";
+import type { PictureEffectEdit } from "../modules/sheet-images/picture-effect-edit";
 import type { PictureContextSourceAction } from "../modules/sheet-images/picture-context-source-action";
 import { canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import { getCellContent, getCellStyle, createWorkbookEvaluator } from "@sheetcraft/core/workbook";
@@ -109,6 +111,8 @@ import { useOwnedPictureFormatPane } from "../modules/sheet-images/useOwnedPictu
 import { onBeforeUnmount } from "vue";
 import { createPicturePaintAssetSource } from "../modules/sheet-images/picture-paint-asset-source";
 import type { PictureFormatLabelKey } from "../modules/sheet-images/picture-format-pane-model";
+import { restoreFocusAfterRemount } from "../shared/floating/useDismissibleFloatingPanel";
+import { usePictureEffectsFocusReturn } from "../modules/sheet-images/usePictureEffectsFocusReturn";
 import { usePictureToolbarOwner } from "../modules/sheet-images/usePictureToolbarOwner";
 import {
   normalizeSheetDrawing,
@@ -183,12 +187,23 @@ import { createTextBoxReferenceResolver } from "../modules/sheet-drawings/textbo
 import { useTextBoxReference } from "../modules/sheet-drawings/useTextBoxReference";
 import TextBoxReferenceDialog from "../modules/sheet-drawings/components/TextBoxReferenceDialog.vue";
 import DrawingEditorDialog from "../modules/sheet-drawings/components/DrawingEditorDialog.vue";
+import {
+  shapeFormatOwnerKey,
+  type ShapeFormatTab,
+} from "../modules/sheet-drawings/shape-format-pane-model";
 import ShapeFormatPane from "../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
+import ShapeTextRibbonTools from "../modules/sheet-drawings/components/ShapeTextRibbonTools.vue";
+import { useShapeRibbonFormat } from "../modules/sheet-drawings/useShapeRibbonFormat";
 import ShapeToolsToolbar from "../modules/sheet-drawings/components/ShapeToolsToolbar.vue";
 import ShapeSelectionPane from "../modules/sheet-drawings/components/ShapeSelectionPane.vue";
 import { useShapeObjectControls } from "../modules/sheet-drawings/useShapeObjectControls";
 import { useOwnedShapeGroupFormatPane } from "../modules/sheet-drawings/useOwnedShapeGroupFormatPane";
 import { useOwnedShapeConnectorFormatPane } from "../modules/sheet-drawings/useOwnedShapeConnectorFormatPane";
+import { ownsShapeTextEditTarget } from "../modules/sheet-drawings/shape-text-edit-ownership";
+import {
+  createShapeTextFieldDrafts,
+  shapeTextFieldDraftsKey,
+} from "../modules/sheet-drawings/shape-text-field-drafts";
 import { useShapeTextEditSession } from "../modules/sheet-drawings/useShapeTextEditSession";
 import type { ShapeCanvasTextEditRequest } from "../modules/sheet-drawings/shape-canvas-text-edit-contract";
 import { preflightShapeConnectorPaint } from "../modules/sheet-drawings/shape-connector-paint-preflight";
@@ -1611,6 +1626,8 @@ const chartActions = useChartActions({
   flush: () => cellEditSession.finish(),
   execute: executeCommand,
   name: () => t("chart.tools"),
+  title: () => t("chart.defaultTitle"),
+  onInserted: (drawingId) => sheetGridRef.value?.selectDrawing(drawingId),
   onEditPivot: openPivotFields,
 });
 const { dialog: chartDialog, editing: editingChart, error: chartError } = chartActions;
@@ -1799,7 +1816,21 @@ const selectChartReference = computed(() => {
     };
     chartPicker.value = picker;
     const result = await selected;
-    if (chartPicker.value === picker) chartPicker.value = undefined;
+    const ownedPicker = chartPicker.value === picker;
+    if (ownedPicker) chartPicker.value = undefined;
+    const canRestoreExisting = () =>
+      !!dialog.existing &&
+      dialog.isCurrent() &&
+      !loading.value &&
+      !fileBusy.value &&
+      !xlsxBusy.value &&
+      canUseSheetPermission(dialog.sheet, "editObjects");
+    if (ownedPicker && canRestoreExisting()) {
+      // Grid picking may clear selection; restore only this still-current edit owner.
+      await nextTick();
+      if (chartPickerId === picker.id && !chartPicker.value && canRestoreExisting())
+        sheetGridRef.value?.selectDrawing(dialog.existing!.id);
+    }
     return dialog.isCurrent() ? result : undefined;
   };
 });
@@ -2065,7 +2096,12 @@ const xlsxActions = useWorkbookXlsxActions({
   hasPendingEdits: () => cellEditSession.hasPendingEdit() || hasPendingGridEdit(),
   isBlocked: () => fileBusy.value || confirmation.value !== undefined || imageBusy.value,
 });
-const { busy: xlsxBusy, confirmation: xlsxConfirmation, feedback: xlsxFeedback } = xlsxActions;
+const {
+  busy: xlsxBusy,
+  confirmation: xlsxConfirmation,
+  feedback: xlsxFeedback,
+  report: xlsxReport,
+} = xlsxActions;
 
 const shapeTextImages = createCanvasImageCache(() => {});
 onBeforeUnmount(shapeTextImages.dispose);
@@ -2211,6 +2247,8 @@ const shapeConnectorFormatPane = useOwnedShapeConnectorFormatPane({
   }),
 });
 const shapeTextEditSelection = shallowRef<{ start: number; end: number }>();
+const shapeTextFieldDrafts = createShapeTextFieldDrafts();
+provide(shapeTextFieldDraftsKey, shapeTextFieldDrafts);
 const shapeTextEdit = useShapeTextEditSession({
   getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
   getWorkbook: () => session.workbook,
@@ -2220,6 +2258,8 @@ const shapeTextEdit = useShapeTextEditSession({
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
   flush: () => sheetGridRef.value?.flushPendingCellEdit() ?? cellEditSession.finish(),
   replaceCollection: drawingActions.replaceCollection,
+  flushFieldDrafts: (id) => shapeTextFieldDrafts.flush(`shape-text-${id}`).accepted,
+  focusFieldDraft: (id) => shapeTextFieldDrafts.focusRejected(`shape-text-${id}`),
 });
 const shapeTextEditCallbacks = computed(() => {
   const current = shapeTextEdit.snapshot.value;
@@ -2234,6 +2274,12 @@ const shapeTextCharacterPane = useShapeTextCharacterFormatPane({
   getLocale: () => (locale.value === "zh-CN" ? "zh-CN" : "en-US"),
 });
 function startShapeTextEdit(request: ShapeCanvasTextEditRequest): boolean {
+  const keepPropertiesOpen = !!(
+    shapeTextCharacterPane.snapshot.value ||
+    shapeFormatPane.snapshot.value ||
+    shapeGroupFormatPane.snapshot.value ||
+    shapeConnectorFormatPane.snapshot.value
+  );
   const previous = shapeTextEdit.snapshot.value;
   if (previous && !shapeTextEdit.commit(previous.sessionId)) return false;
   if (!shapeTextEdit.begin(request.root, request.path)) return false;
@@ -2249,7 +2295,8 @@ function startShapeTextEdit(request: ShapeCanvasTextEditRequest): boolean {
     ...shapeTextEditSelection.value,
     direction: request.selection === "all" ? "forward" : "none",
   });
-  shapeTextCharacterPane.open();
+  if (keepPropertiesOpen) shapeTextCharacterPane.open();
+  else shapeTextCharacterPane.close();
   shapeFormatPane.close();
   shapeGroupFormatPane.close();
   shapeConnectorFormatPane.close();
@@ -2516,7 +2563,8 @@ function selectedShapeGroupChanged(rootId: string | null, path: ShapeGroupPath |
 }
 const shapePaintAssets = createShapePaintAssetSource({
   getSnapshot: () =>
-    shapeTextCharacterPane.snapshot.value ??
+    shapeTextCharacterPane.ribbonSnapshot.value ??
+    shapeRibbonFormat.snapshot.value ??
     shapeConnectorFormatPane.snapshot.value ??
     shapeGroupFormatPane.snapshot.value ??
     shapeFormatPane.snapshot.value,
@@ -2563,6 +2611,23 @@ watch(
   },
   { immediate: true },
 );
+const shapePaneRequestedTab = ref<ShapeFormatTab>("fill-line");
+function beforeShapeFormatTabChange(tab: ShapeFormatTab): boolean {
+  const edit = shapeTextEdit.snapshot.value;
+  if (!edit || (tab !== "size-properties" && tab !== "effects")) return true;
+  const rootId = edit.sourceRootId,
+    path = edit.path,
+    sheet = activeSheet.value;
+  if (sheetGridRef.value?.flushPendingShapeTextEdit() === false || activeSheet.value !== sheet)
+    return false;
+  const root = sheet.drawings?.find((value) => value.id === rootId);
+  if (!root) return false;
+  const opened =
+    root.kind === "shapeGroup" ? shapeGroupFormatPane.open(root, path) : shapeFormatPane.open(root);
+  if (!opened) return false;
+  shapePaneRequestedTab.value = tab;
+  return true;
+}
 function openShapeFormat(drawing: SheetGraphicDrawing | SheetFramedGraphicDrawing) {
   if (drawing.kind === "shape" && drawing.shapeConnector) {
     if (shapeConnectorFormatPane.open(drawing)) {
@@ -2678,6 +2743,94 @@ function formatShapeObjectPath(path: ShapeGroupPath): boolean {
     shapeConnectorFormatPane.root.value?.id === root.id
   );
 }
+const shapeRibbonFormat = useShapeRibbonFormat({
+  getPaths: () => selectedShapeObjectPaths.value,
+  isTextEditing: () => !!shapeTextEdit.snapshot.value,
+  root: {
+    getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
+    getWorkbook: () => session.workbook,
+    getSheet: () => activeSheet.value,
+    getGeneration: () => workbookGeneration.value,
+    getRevision: () => workbookRevision.value,
+    isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+    flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
+    update: drawingActions.update,
+    isAssetAvailable: (id) => imageAssetUrls.value.has(id) || shapePaintAssets.has(id),
+    getUnsupportedReason: () => t("pictureFormat.capabilityReasons.unsupportedFeature"),
+  },
+  group: {
+    getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
+    getWorkbook: () => session.workbook,
+    getSheet: () => activeSheet.value,
+    getGeneration: () => workbookGeneration.value,
+    getRevision: () => workbookRevision.value,
+    isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+    flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
+    replaceCollection: drawingActions.replaceCollection,
+    replaceCollectionPreservingGeometry: drawingActions.replaceCollectionPreservingGeometry,
+    isAssetAvailable: (id) => imageAssetUrls.value.has(id) || shapePaintAssets.has(id),
+    getUnsupportedReason: () => t("pictureFormat.capabilityReasons.unsupportedFeature"),
+    getCameraUnsupportedReason: () => t("drawing.groupCameraConnectorUnavailable"),
+  },
+});
+const shapeRibbonSnapshot = computed(() =>
+  shapeTextEdit.snapshot.value
+    ? shapeTextCharacterPane.ribbonSnapshot.value
+    : shapeRibbonFormat.snapshot.value,
+);
+const shapeRibbonCapabilities = computed(() =>
+  shapeTextEdit.snapshot.value
+    ? shapeTextCharacterPane.capabilities.value
+    : shapeRibbonFormat.capabilities.value,
+);
+function shapeRibbonIntent(intent: Parameters<typeof shapeRibbonFormat.onIntent>[0]): boolean {
+  return shapeTextEdit.snapshot.value
+    ? shapeTextCharacterPane.onIntent(intent)
+    : shapeRibbonFormat.onIntent(intent);
+}
+function selectedShapeFieldLease(snapshot: NonNullable<typeof shapeRibbonFormat.snapshot.value>) {
+  const owner = shapeFormatOwnerKey(snapshot.owner),
+    fieldOwner = snapshot.owner.sessionId,
+    workbook = session.workbook,
+    sheet = activeSheet.value,
+    generation = workbookGeneration.value,
+    paths = JSON.stringify(selectedShapeObjectPaths.value);
+  const current = () => {
+    const selected = shapeRibbonFormat.snapshot.value;
+    return (
+      !shapeTextEdit.snapshot.value &&
+      session.workbook === workbook &&
+      activeSheet.value === sheet &&
+      workbookGeneration.value === generation &&
+      JSON.stringify(selectedShapeObjectPaths.value) === paths &&
+      !!selected &&
+      shapeFormatOwnerKey(selected.owner) === owner
+    );
+  };
+  return { fieldOwner, current };
+}
+function ownsSelectedShapeFieldTarget(target: EventTarget | null): boolean {
+  const snapshot = shapeRibbonFormat.snapshot.value;
+  if (!snapshot || !(target instanceof Node) || !target.isConnected) return false;
+  const lease = selectedShapeFieldLease(snapshot);
+  return (
+    lease.current() && shapeTextFieldDrafts.ownsTarget(lease.fieldOwner, target) && lease.current()
+  );
+}
+function flushSelectedShapeFieldDrafts(snapshot = shapeRibbonFormat.snapshot.value): boolean {
+  if (!snapshot) return true;
+  const lease = selectedShapeFieldLease(snapshot);
+  // A successful field command may advance revision. Its exact selection owner must survive.
+  return (
+    lease.current() && shapeTextFieldDrafts.flush(lease.fieldOwner).accepted && lease.current()
+  );
+}
+function beforeShapeContextChange(): boolean {
+  const edit = shapeTextEdit.snapshot.value;
+  return edit
+    ? shapeTextFieldDrafts.flush(`shape-text-${edit.sessionId}`).accepted
+    : flushSelectedShapeFieldDrafts();
+}
 const shapeObjectControls = useShapeObjectControls({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -2691,6 +2844,39 @@ const shapeObjectControls = useShapeObjectControls({
   format: formatShapeObjectPath,
   replaceCollection: drawingActions.replaceCollection,
   replaceVisibilityCollection: drawingActions.replaceVisibilityCollection,
+});
+const shapeRibbonObjectTools = computed(() => {
+  const tools = shapeObjectControls.snapshot.value;
+  if (!tools) return undefined;
+  const lease = shapeTextEdit.snapshot.value;
+  const request = (action: "format" | "selection" | Parameters<typeof tools.actionHandler>[0]) => {
+    if (lease && action === "format") {
+      if (shapeTextEdit.snapshot.value?.sessionId !== lease.sessionId) return false;
+      shapeTextCharacterPane.open();
+      return true;
+    }
+    if (lease) {
+      if (
+        shapeTextEdit.snapshot.value?.sessionId !== lease.sessionId ||
+        sheetGridRef.value?.flushPendingShapeTextEdit() === false
+      )
+        return false;
+    }
+    const current = shapeObjectControls.snapshot.value;
+    if (!current) return false;
+    return action === "format"
+      ? current.formatHandler()
+      : action === "selection"
+        ? current.selectionPaneHandler()
+        : current.actionHandler(action);
+  };
+  return {
+    ...tools,
+    locale: locale.value === "zh-CN" ? ("zh-CN" as const) : ("en-US" as const),
+    actionHandler: (action: Parameters<typeof tools.actionHandler>[0]) => request(action),
+    formatHandler: () => request("format"),
+    selectionPaneHandler: () => request("selection"),
+  };
 });
 watch(
   () => [activeSheet.value, workbookGeneration.value],
@@ -3043,8 +3229,46 @@ const selectedOwnedPictureLeaf = computed(() => {
     return;
   }
 });
+const pictureToolbarRef = ref<InstanceType<typeof PictureToolbar> | null>(null);
+const pictureOwnedLeafRibbonRef = ref<InstanceType<typeof PictureOwnedLeafRibbon> | null>(null);
+const pictureEffectsFocusReturn = usePictureEffectsFocusReturn({
+  getOwner: () => {
+    void workbookRevision.value;
+    const sheet = activeSheet.value;
+    const leaf = selectedOwnedPictureLeaf.value;
+    const targets = leaf
+      ? [{ id: selectedPictureIds.value[0]!, assetId: leaf.node.assetId }]
+      : selectedPictureIds.value.map((id) => {
+          const image = sheet.floatingImages.find((entry) => entry.id === id);
+          return image && !isPictureGroup(image) ? { id, assetId: image.assetId } : undefined;
+        });
+    if (!targets.length || targets.some((target) => !target)) return undefined;
+    return {
+      workbook: session.workbook,
+      sheet,
+      generation: pictureOwnerGeneration.value,
+      mode: leaf ? "owned" : "standalone",
+      targets: targets as { id: string; assetId: string }[],
+      path: leaf ? leaf.path : null,
+    };
+  },
+  isBlocked: () =>
+    gridInert.value ||
+    imageBusy.value ||
+    Boolean(activeRangePicker.value) ||
+    cellEditSession.state.active ||
+    cellEditSession.state.composing ||
+    Boolean(shapeTextEdit.snapshot.value) ||
+    Boolean(equationEdit.snapshot.value) ||
+    (sheetGridRef.value?.hasActivePictureCrop() ?? false),
+  getTarget: (mode) =>
+    mode === "owned"
+      ? (pictureOwnedLeafRibbonRef.value?.getEffectsTrigger() ?? null)
+      : (pictureToolbarRef.value?.getEffectsTrigger() ?? null),
+});
 const pictureFormatVisible = ref(false);
 const pictureFormatComponentRef = ref<InstanceType<typeof PictureFormatPane> | null>(null);
+const pictureFormatInitialTab = ref<"effects" | "size-properties">("size-properties");
 const pictureFormatInitialPaint = ref<"fill" | "line" | undefined>();
 const pictureIntrinsicOwner = computed<readonly unknown[]>((previous) => {
   const next = [
@@ -3131,6 +3355,15 @@ const pictureOriginalResetOwner = computed(() => {
     },
   };
 });
+function pictureFormatBusy(): boolean {
+  return loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value;
+}
+function beforePictureFormatPaneInteraction(): boolean {
+  if (pictureFormatBusy()) return false;
+  // Viewing a protected object's settings must never flush a pending crop edit.
+  if (!canEditPictureSelection(activeSheet.value, selectedPictureIds.value)) return true;
+  return beforePictureFormatInteraction();
+}
 function beforePictureFormatInteraction(): boolean {
   const workbook = session.workbook,
     sheet = activeSheet.value,
@@ -3209,23 +3442,33 @@ function openOwnedPictureFormat(
   path?: PictureGroupPath,
   owner = activeSheet.value,
   paint?: "fill" | "line",
+  target?: "effects",
 ): void {
-  if (owner !== activeSheet.value) return;
+  if (owner !== activeSheet.value || pictureFormatBusy()) return;
   if (path) selectedOwnedPicturePath.value = path.length > 1 ? [...path] : null;
-  if (!pictureFormatVisible.value) pictureFormatInitialPaint.value = paint;
+  if (!pictureFormatVisible.value) {
+    pictureFormatInitialPaint.value = paint;
+    pictureFormatInitialTab.value = target ?? "size-properties";
+  }
   pictureFormatVisible.value = true;
   if (paint) pictureFormatComponentRef.value?.showPaint(paint);
+  else if (target === "effects") pictureFormatComponentRef.value?.showEffects();
 }
 function closeOwnedPictureFormat(): void {
   pictureFormatVisible.value = false;
   pictureFormatPane.close();
 }
 let sourceRibbonSequence = 0;
+let sourceRibbonDisplaySequence = 0;
+let sourceRibbonDisplayOwner: readonly unknown[] | undefined;
 const pictureSourceRibbonOwner = computed(() => {
   void workbookRevision.value;
   const leaf = selectedOwnedPictureLeaf.value,
     image = leaf?.node ?? selectedPicture.value;
-  if (!image || isPictureGroup(image)) return;
+  if (!image || isPictureGroup(image)) {
+    sourceRibbonDisplayOwner = undefined;
+    return;
+  }
   const workbook = session.workbook,
     sheet = activeSheet.value,
     generation = pictureOwnerGeneration.value,
@@ -3233,8 +3476,29 @@ const pictureSourceRibbonOwner = computed(() => {
   const path = leaf?.path,
     selected = [...selectedPictureIds.value],
     context = sheetGridRef.value?.getPictureFrameContext(sheet);
+  // Command leases refresh with frame context. Rendering identity must not:
+  // late layout notifications otherwise remove a trigger already safely focused.
+  const displayOwner = [
+    workbook,
+    sheet,
+    generation,
+    revision,
+    JSON.stringify(selected),
+    JSON.stringify(path ?? null),
+    image.id,
+    image.assetId,
+  ];
+  if (
+    !sourceRibbonDisplayOwner ||
+    !displayOwner.every((value, index) => value === sourceRibbonDisplayOwner![index])
+  ) {
+    sourceRibbonDisplayOwner = displayOwner;
+    sourceRibbonDisplaySequence++;
+  }
+  const displayKey = `picture-source-display-${sourceRibbonDisplaySequence}`;
   const key = `picture-source-owner-${++sourceRibbonSequence}`;
-  const current = () =>
+  const current = (): boolean =>
+    key === pictureSourceRibbonOwner.value?.key &&
     workbook === session.workbook &&
     sheet === activeSheet.value &&
     generation === pictureOwnerGeneration.value &&
@@ -3245,9 +3509,14 @@ const pictureSourceRibbonOwner = computed(() => {
     context?.metrics === sheetGridRef.value?.getPictureFrameContext(sheet)?.metrics;
   return {
     key,
+    displayKey,
     appearance: (patch: Partial<ImageAppearance> | undefined) => {
       if (!current() || !beforePictureFormatInteraction()) return false;
       return pictureTools.applyAppearance(patch);
+    },
+    effect: (edit: PictureEffectEdit) => {
+      if (!current() || !beforePictureFormatInteraction()) return false;
+      return pictureTools.applyEffect(edit);
     },
     save: () => {
       if (current()) void pictureAssetTools.exportPictures("png");
@@ -3264,8 +3533,8 @@ const pictureSourceRibbonOwner = computed(() => {
     replace: () => {
       if (current()) void imageActions.requestReplace(image.id, path);
     },
-    format: () => {
-      if (current()) openOwnedPictureFormat(path, sheet);
+    format: (target?: "effects") => {
+      if (current()) openOwnedPictureFormat(path, sheet, undefined, target);
     },
   };
 });
@@ -3305,6 +3574,7 @@ const pictureToolbarOwner = usePictureToolbarOwner({
   resize: pictureTools.resizeOne,
   aspectRatio: pictureTools.setAspectRatio,
   appearance: pictureTools.applyAppearance,
+  effect: pictureTools.applyEffect,
 });
 watch([pictureOwnerGeneration, selectedPictureId], pictureTools.clearFeedback, { flush: "sync" });
 const pictureDialogs = usePictureDialogSessions({
@@ -3342,7 +3612,8 @@ function openDocumentEncryption(): void {
 }
 async function exportEncryptedDocument(password: string): Promise<void> {
   await xlsxActions.exportXlsx(password);
-  if (xlsxFeedback.value?.key === "xlsx.feedback.exported") encryptDocumentVisible.value = false;
+  if (xlsxFeedback.value?.key === "xlsx.feedback.exported" || xlsxConfirmation.value === "export")
+    encryptDocumentVisible.value = false;
 }
 watch(workbookGeneration, () => {
   encryptDocumentVisible.value = false;
@@ -4072,12 +4343,16 @@ function onWorkspaceShapeTextOutsideAction(event: PointerEvent | MouseEvent): vo
     }
   }
   const current = shapeTextEdit.snapshot.value;
-  if (
-    !current ||
-    (event.target instanceof Element &&
-      event.target.closest(`[data-shape-text-edit-session="${current.sessionId}"]`))
-  )
+  if (!current) {
+    const selected = shapeRibbonFormat.snapshot.value;
+    if (!selected || ownsSelectedShapeFieldTarget(event.target)) return;
+    if (!flushSelectedShapeFieldDrafts(selected)) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
     return;
+  }
+  if (ownsShapeTextEditTarget(event.target, current.sessionId)) return;
   if (sheetGridRef.value?.flushPendingShapeTextEdit() === false) {
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -4111,6 +4386,27 @@ function onWorkspaceNativeTextCopy(event: ClipboardEvent): void {
   });
 }
 function onWorkspaceKeydown(event: KeyboardEvent): void {
+  const effectsFocusReturn = pictureEffectsFocusReturn.value;
+  const effectsTrigger = effectsFocusReturn();
+  const fromEffectsTrigger = event.target instanceof Node && effectsTrigger?.contains(event.target);
+  const activeBeforeHistory = document.activeElement;
+  if (
+    routeRibbonHistoryShortcut(event, {
+      blocked: gridInert.value || imageBusy.value || !!activeRangePicker.value,
+      editing:
+        cellEditSession.state.active ||
+        cellEditSession.state.composing ||
+        !!shapeTextEdit.snapshot.value ||
+        !!equationEdit.snapshot.value,
+      cropping: sheetGridRef.value?.hasActivePictureCrop() ?? false,
+      undo,
+      redo,
+    })
+  ) {
+    if (fromEffectsTrigger && effectsTrigger)
+      restoreFocusAfterRemount(effectsTrigger, effectsFocusReturn, () => true, activeBeforeHistory);
+    return;
+  }
   const math = equationEdit.snapshot.value;
   if (
     math &&
@@ -4158,12 +4454,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     return;
   }
   const currentShapeTextEdit = shapeTextEdit.snapshot.value;
-  if (
-    event.target instanceof Element &&
-    (event.target.closest("[data-shape-canvas-text-editor], [data-shape-canvas-text-toolbar]") ||
-      (currentShapeTextEdit &&
-        event.target.closest(`[data-shape-text-edit-session="${currentShapeTextEdit.sessionId}"]`)))
-  )
+  if (currentShapeTextEdit && ownsShapeTextEditTarget(event.target, currentShapeTextEdit.sessionId))
     return;
   if (shapeTextEdit.snapshot.value && sheetGridRef.value?.flushPendingShapeTextEdit() === false) {
     event.preventDefault();
@@ -4409,6 +4700,16 @@ watch(
       :has-chart="!!chartObjectContext"
       :has-image="!!selectedPicture"
       :has-shape="!!shapeObjectControls.snapshot.value?.paths.length"
+      :before-shape-context-change="beforeShapeContextChange"
+      :has-shape-text="
+        !!shapeRibbonSnapshot &&
+        (shapeRibbonSnapshot.values.fontSizePt !== undefined ||
+          shapeRibbonSnapshot.mixedFields?.includes('fontSizePt') === true)
+      "
+      :shape-text-session-id="shapeTextEdit.snapshot.value?.sessionId"
+      :shape-context-key="
+        JSON.stringify([activeSheet.id, workbookGeneration, selectedShapeObjectPaths])
+      "
       :has-equation="!!equationEdit.snapshot.value"
       :pivot-id="activePivot?.id"
       :hyperlink-disabled="
@@ -4612,7 +4913,20 @@ watch(
         </div>
       </template>
       <template #shape-tools>
+        <ShapeTextRibbonTools
+          v-if="shapeRibbonSnapshot"
+          mode="drawing"
+          :snapshot="shapeRibbonSnapshot"
+          :capabilities="shapeRibbonCapabilities"
+          :on-intent="shapeRibbonIntent"
+          :session-id="shapeTextEdit.snapshot.value?.sessionId"
+          :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
+          :t="pictureFormatLabel"
+          :load-paint-asset="shapePaintAssets.load"
+          :object-tools="shapeRibbonObjectTools"
+        />
         <ShapeToolsToolbar
+          v-else
           v-if="shapeObjectControls.snapshot.value"
           :owner-key="shapeObjectControls.snapshot.value.ownerKey"
           :disabled="shapeObjectControls.snapshot.value.disabled"
@@ -4631,8 +4945,23 @@ watch(
           :selection-pane-handler="shapeObjectControls.snapshot.value.selectionPaneHandler"
         />
       </template>
+      <template #shape-text-tools>
+        <ShapeTextRibbonTools
+          v-if="shapeRibbonSnapshot"
+          mode="text"
+          :snapshot="shapeRibbonSnapshot"
+          :capabilities="shapeRibbonCapabilities"
+          :on-intent="shapeRibbonIntent"
+          :session-id="shapeTextEdit.snapshot.value?.sessionId"
+          :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
+          :t="pictureFormatLabel"
+          :load-paint-asset="shapePaintAssets.load"
+        />
+      </template>
       <template #image-tools>
         <PictureToolbar
+          ref="pictureToolbarRef"
+          :restore-effects-focus-target="pictureEffectsFocusReturn"
           :can-restore="pictureOriginalResetOwner.available"
           :restore-handler="pictureOriginalResetOwner.apply"
           :restore-unavailable-reason="pictureOriginalResetOwner.reason"
@@ -4668,6 +4997,7 @@ watch(
           :resize-handler="pictureToolbarOwner?.resize"
           :aspect-ratio-handler="pictureToolbarOwner?.aspectRatio"
           :appearance-handler="pictureToolbarOwner?.appearance"
+          :effect-handler="pictureToolbarOwner?.effect"
           :convert-handler="pictureSourceRibbonOwner?.convert"
           :can-convert="pictureSourceRibbonOwner?.canConvert"
           :replace-handler="pictureSourceRibbonOwner?.replace"
@@ -4680,7 +5010,7 @@ watch(
           :crop-handler="pictureSourceRibbonOwner?.crop"
           @insert-image="imageActions.requestInsert"
           @crop="sheetGridRef?.cropImage()"
-          @format="openOwnedPictureFormat()"
+          @format="openOwnedPictureFormat(undefined, activeSheet, undefined, $event)"
           @rotate="sheetGridRef?.rotateImage($event)"
           @flip="sheetGridRef?.flipImage($event)"
           @restore="sheetGridRef?.restoreImage()"
@@ -4702,15 +5032,19 @@ watch(
           @convert-to-cell="pictureCellConversion.request(selectedPicture.id)"
         />
         <PictureOwnedLeafRibbon
+          ref="pictureOwnedLeafRibbonRef"
+          :restore-effects-focus-target="pictureEffectsFocusReturn"
           :can-restore="pictureOriginalResetOwner.available"
           :restore-handler="pictureOriginalResetOwner.apply"
           :restore-unavailable-reason="pictureOriginalResetOwner.reason"
           v-if="selectedOwnedPictureLeaf && pictureSourceRibbonOwner"
-          :key="pictureSourceRibbonOwner.key"
+          :key="pictureSourceRibbonOwner.displayKey"
+          :display-owner-key="pictureSourceRibbonOwner.displayKey"
           :image="selectedOwnedPictureLeaf.node"
           :busy="loading || fileBusy || xlsxBusy || imageBusy"
           :owner-key="pictureSourceRibbonOwner.key"
           :appearance-handler="pictureSourceRibbonOwner.appearance"
+          :effect-handler="pictureSourceRibbonOwner.effect"
           :replace-handler="pictureSourceRibbonOwner.replace"
           :format-handler="pictureSourceRibbonOwner.format"
           :can-replace="pictureSourceRibbonOwner.canReplace"
@@ -5693,6 +6027,7 @@ watch(
       />
       <XlsxFileFeedback
         :feedback="xlsxFeedback"
+        :report="xlsxReport"
         :confirmation="xlsxConfirmation"
         :busy="xlsxBusy"
         @confirm="xlsxActions.confirm"
@@ -5925,6 +6260,7 @@ watch(
           :equation-edit-snapshot="equationEdit.snapshot.value"
           :equation-edit-callbacks="equationEdit.callbacks.value"
           :equation-placeholders-hidden="equationPlaceholdersHidden"
+          :owns-selected-shape-field-target="ownsSelectedShapeFieldTarget"
           :shape-text-edit-snapshot="shapeTextEdit.snapshot.value"
           :shape-text-edit-callbacks="shapeTextEditCallbacks"
           :shape-text-edit-start="startShapeTextEdit"
@@ -6037,13 +6373,14 @@ watch(
       <PictureFormatPane
         ref="pictureFormatComponentRef"
         :initial-paint="pictureFormatInitialPaint"
+        :initial-tab="pictureFormatInitialTab"
         :intrinsic-status="pictureIntrinsic.status.value"
         :retry-intrinsic="pictureIntrinsicRetry"
         v-if="pictureFormatVisible"
         :snapshot="pictureFormatPane.snapshot.value"
         :capabilities="pictureFormatPane.capabilities.value"
         :on-intent="pictureFormatPane.onIntent"
-        :before-interaction="beforePictureFormatInteraction"
+        :before-interaction="beforePictureFormatPaneInteraction"
         :load-paint-asset="picturePaintAssets.load"
         :options="{
           lineMode: [
@@ -6124,8 +6461,9 @@ watch(
               shapeTextCharacterPane.snapshot.value.drawing.wordArt
               ? 'text-fill-line'
               : 'text-box'
-            : 'fill-line'
+            : shapePaneRequestedTab
         "
+        :before-tab-change="beforeShapeFormatTabChange"
         :data-shape-text-edit-session="shapeTextEdit.snapshot.value?.sessionId"
         @close="
           shapeTextCharacterPane.close();
@@ -6463,6 +6801,7 @@ watch(
     v-if="chartDialog"
     :key="chartDialog.dialogId"
     :drawing="chartDialog.initial"
+    :mode="chartDialog.existing ? 'change-type' : 'insert'"
     :combo-recipe="chartDialog.comboRecipe"
     :workbook="chartDialog.workbook"
     :sheet="chartDialog.sheet"

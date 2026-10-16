@@ -50,6 +50,10 @@ const props = withDefaults(
     hasTable?: boolean;
     hasImage?: boolean;
     hasShape?: boolean;
+    hasShapeText?: boolean;
+    shapeTextSessionId?: number;
+    shapeContextKey?: string;
+    beforeShapeContextChange?: () => boolean;
     hasEquation?: boolean;
     hasChart?: boolean;
     pivotId?: string;
@@ -111,6 +115,7 @@ type Category =
   | "insert"
   | "image"
   | "shape"
+  | "shape-text"
   | "equation"
   | "chart"
   | "pivot-analysis"
@@ -126,7 +131,14 @@ const proofreadingOpen = ref(false);
 const activeCategory = ref<Category>("home");
 let previousCategory: Exclude<
   Category,
-  "table" | "image" | "shape" | "equation" | "chart" | "pivot-analysis" | "pivot-design"
+  | "table"
+  | "image"
+  | "shape"
+  | "shape-text"
+  | "equation"
+  | "chart"
+  | "pivot-analysis"
+  | "pivot-design"
 > = "home";
 const homeTab = ref<HTMLButtonElement>();
 const insertTab = ref<HTMLButtonElement>();
@@ -136,6 +148,7 @@ const imageTab = ref<HTMLButtonElement>();
 const equationTab = ref<HTMLButtonElement>();
 const chartTab = ref<HTMLButtonElement>();
 const shapeTab = ref<HTMLButtonElement>();
+const shapeTextTab = ref<HTMLButtonElement>();
 const pageTab = ref<HTMLButtonElement>();
 const formulaTab = ref<HTMLButtonElement>();
 const dataTab = ref<HTMLButtonElement>();
@@ -150,6 +163,7 @@ watch(activeCategory, (category) => {
     category !== "table" &&
     category !== "image" &&
     category !== "shape" &&
+    category !== "shape-text" &&
     category !== "equation" &&
     category !== "chart" &&
     category !== "pivot-analysis" &&
@@ -173,12 +187,25 @@ watch(
 );
 
 watch(
-  () => props.hasShape,
-  (hasShape) => {
-    if (hasShape) {
-      if (!props.hasEquation && !props.hasChart) activeCategory.value = "shape";
-    } else if (activeCategory.value === "shape") activeCategory.value = previousCategory;
+  () =>
+    [props.hasShape, props.hasShapeText, props.shapeTextSessionId, props.shapeContextKey] as const,
+  ([visible, text, session, owner], previous) => {
+    if (!visible) {
+      if (activeCategory.value === "shape" || activeCategory.value === "shape-text")
+        activeCategory.value = previousCategory;
+      return;
+    }
+    if (props.hasEquation || props.hasChart) return;
+    if (
+      text &&
+      session !== undefined &&
+      (session !== previous?.[2] || !previous?.[0] || !previous?.[1])
+    )
+      activeCategory.value = "shape-text";
+    else if (!previous?.[0] || owner !== previous?.[3]) activeCategory.value = "shape";
+    else if (!text && activeCategory.value === "shape-text") activeCategory.value = "shape";
   },
+  { immediate: true },
 );
 watch(
   () => props.hasEquation,
@@ -207,35 +234,42 @@ watch(
       activeCategory.value = previousCategory;
   },
 );
+function selectShapeContext(category: "shape" | "shape-text") {
+  if (props.beforeShapeContextChange?.() === false) return;
+  activeCategory.value = category;
+}
 function onCategoryKeydown(event: KeyboardEvent): void {
   if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
   event.preventDefault();
   const categories: Category[] = ["home", "insert", "page", "formulas", "data", "review", "view"];
   const tabs = [homeTab, insertTab, pageTab, formulaTab, dataTab, reviewTab, viewTab];
-  if (props.hasTable) {
-    categories.push("table");
-    tabs.push(tableTab);
-  }
   if (props.pivotId) {
     categories.push("pivot-analysis", "pivot-design");
     tabs.push(pivotAnalysisTab, pivotDesignTab);
   }
-  if (props.hasImage) {
-    categories.push("image");
-    tabs.push(imageTab);
-  }
-
-  if (props.hasShape) {
-    categories.push("shape");
-    tabs.push(shapeTab);
+  if (props.hasChart) {
+    categories.push("chart");
+    tabs.push(chartTab);
   }
   if (props.hasEquation) {
     categories.push("equation");
     tabs.push(equationTab);
   }
-  if (props.hasChart) {
-    categories.push("chart");
-    tabs.push(chartTab);
+  if (props.hasShape) {
+    categories.push("shape");
+    tabs.push(shapeTab);
+  }
+  if (props.hasShape && props.hasShapeText) {
+    categories.push("shape-text");
+    tabs.push(shapeTextTab);
+  }
+  if (props.hasImage) {
+    categories.push("image");
+    tabs.push(imageTab);
+  }
+  if (props.hasTable) {
+    categories.push("table");
+    tabs.push(tableTab);
   }
   if (proofreadingOpen.value) {
     categories.push("proofreading");
@@ -248,6 +282,11 @@ function onCategoryKeydown(event: KeyboardEvent): void {
       : event.key === "End"
         ? categories.length - 1
         : (current + (event.key === "ArrowRight" ? 1 : -1) + categories.length) % categories.length;
+  if (
+    (activeCategory.value === "shape" || activeCategory.value === "shape-text") &&
+    props.beforeShapeContextChange?.() === false
+  )
+    return;
   activeCategory.value = categories[index]!;
   void nextTick(() => tabs[index]?.value?.focus());
 }
@@ -274,6 +313,7 @@ defineSlots<{
   "insert-tools"?: () => unknown;
   "image-tools"?: () => unknown;
   "shape-tools"?: () => unknown;
+  "shape-text-tools"?: () => unknown;
   "equation-tools"?: () => unknown;
   "chart-tools"?: () => unknown;
   "pivot-analysis-tools"?: () => unknown;
@@ -285,7 +325,11 @@ defineSlots<{
 </script>
 
 <template>
-  <header class="spreadsheet-ribbon" :aria-label="t('ribbon.label')">
+  <header
+    data-workbook-history-surface="ribbon"
+    class="spreadsheet-ribbon"
+    :aria-label="t('ribbon.label')"
+  >
     <div class="spreadsheet-ribbon__categories">
       <nav class="spreadsheet-ribbon__category-list" :aria-label="t('ribbon.categories')">
         <div
@@ -471,14 +515,32 @@ defineSlots<{
             class="spreadsheet-ribbon__category spreadsheet-ribbon__category--contextual"
             :class="{ 'is-active': activeCategory === 'shape' }"
             data-ribbon-category="shape"
+            :data-shape-text-edit-session="shapeTextSessionId"
             type="button"
             role="tab"
             :aria-selected="activeCategory === 'shape'"
             :aria-controls="`${tabId}-panel`"
             :tabindex="activeCategory === 'shape' ? 0 : -1"
-            @click="activeCategory = 'shape'"
+            @click="selectShapeContext('shape')"
           >
             {{ locale === "zh-CN" ? "绘图工具" : "Drawing Tools" }}
+          </button>
+          <button
+            v-if="hasShape && hasShapeText"
+            :id="`${tabId}-shape-text`"
+            ref="shapeTextTab"
+            class="spreadsheet-ribbon__category spreadsheet-ribbon__category--contextual"
+            :class="{ 'is-active': activeCategory === 'shape-text' }"
+            data-ribbon-category="shape-text"
+            :data-shape-text-edit-session="shapeTextSessionId"
+            type="button"
+            role="tab"
+            :aria-selected="activeCategory === 'shape-text'"
+            :aria-controls="`${tabId}-panel`"
+            :tabindex="activeCategory === 'shape-text' ? 0 : -1"
+            @click="selectShapeContext('shape-text')"
+          >
+            {{ locale === "zh-CN" ? "文本工具" : "Text Tools" }}
           </button>
           <button
             v-if="hasImage"
@@ -608,6 +670,7 @@ defineSlots<{
       </HomeFormatToolbar>
       <slot v-else-if="activeCategory === 'image'" name="image-tools" />
       <slot v-else-if="activeCategory === 'shape'" name="shape-tools" />
+      <slot v-else-if="activeCategory === 'shape-text'" name="shape-text-tools" />
       <slot v-else-if="activeCategory === 'equation'" name="equation-tools" />
       <slot v-else-if="activeCategory === 'chart'" name="chart-tools" />
       <slot v-else-if="activeCategory === 'pivot-analysis'" name="pivot-analysis-tools" />

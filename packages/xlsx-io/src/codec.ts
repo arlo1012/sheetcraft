@@ -1,8 +1,15 @@
+import { unsupportedNativeChartStyles } from "./native-chart-style-capabilities.js";
+import { isNativePictureThemeSuppression } from "./picture-capabilities.js";
+import { reportUnsupportedNativeChartElements } from "./native-chart-elements.js";
 import { hasShapeObjectFrame } from "@sheetcraft/core/sheet-drawings";
+import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import { validateImportedCalculatedColumns } from "./table-calculated-columns.js";
 import { readXlsxPivotTables } from "./pivot-tables.js";
 import { collectNativeChartParts } from "./chart-package-parts.js";
 import { readXlsxColumnCharts } from "./column-chart-reader.js";
+import { readXlsxPictures } from "./picture-reader.js";
+import { readXlsxTextRunStyleLosses } from "./text-run-loss.js";
+import type { XlsxDecodeResult } from "./types.js";
 import { readXlsxPivotCharts } from "./pivot-chart-reader.js";
 import { readXlsxSparklines } from "./sparklines.js";
 import { readXlsxProtection } from "./protection.js";
@@ -33,6 +40,7 @@ import {
 import {
   createWorkbookEvaluator,
   getDefaultColumnWidth,
+  getDefaultRowHeight,
   normalizeCellHyperlink,
   normalizeCellNote,
   normalizeCellStyleForBinding,
@@ -58,9 +66,11 @@ import {
   DEFAULT_COLUMN_WIDTH,
   DEFAULT_ROW_HEIGHT,
   MAX_COLUMN_WIDTH,
+  MAX_ROW_HEIGHT,
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
   MIN_COLUMN_WIDTH,
+  MIN_ROW_HEIGHT,
   createSheet,
 } from "@sheetcraft/core/workbook";
 import { CompatibilityReportBuilder } from "./report.js";
@@ -599,9 +609,7 @@ function readContent(
   return undefined;
 }
 
-export async function decodeWithNativeXlsx(
-  bytes: Uint8Array,
-): Promise<{ workbook: Workbook; report: XlsxCompatibilityReport }> {
+export async function decodeWithNativeXlsx(bytes: Uint8Array): Promise<XlsxDecodeResult> {
   const report = new CompatibilityReportBuilder();
   const rawNumericValues = readRawWorksheetNumericValues(bytes);
   const rawFormulas = readRawWorksheetFormulas(bytes);
@@ -610,6 +618,7 @@ export async function decodeWithNativeXlsx(
   const rawConditionalFormats = readXlsxConditionalFormatMetadata(bytes, report);
   const rawTables = readXlsxTableMetadata(bytes, report);
   const archive = unzipSync(bytes);
+  const textRunStyleLosses = readXlsxTextRunStyleLosses(archive);
   const cellStyles = readXlsxCellStyles(archive["xl/styles.xml"], archive["xl/theme/theme1.xml"]);
   const namedStyleBindings = readXlsxNamedCellStyleBindings(archive["xl/styles.xml"]);
   const themeStyleBindings = readXlsxThemeStyleBindings(archive["xl/styles.xml"]);
@@ -642,6 +651,8 @@ export async function decodeWithNativeXlsx(
       sourceSheet.name || `Sheet${sheetIndex + 1}`,
       `xlsx-sheet-${sheetIndex + 1}`,
     );
+    for (const reference of textRunStyleLosses[sheetIndex] ?? [])
+      add(report, "style-omitted", `${sheet.name}!${reference}.fontRuns`);
     const cells: Array<{
       address: { row: number; column: number };
       content?: CellContent;
@@ -672,6 +683,18 @@ export async function decodeWithNativeXlsx(
             Math.min(MAX_COLUMN_WIDTH, excelColumnWidthToPixels(sourceDefaultColumnWidth)),
           )
         : DEFAULT_COLUMN_WIDTH;
+    const sourceDefaultRowHeight = sourceSheet.properties.defaultRowHeight;
+    const sourceDefaultRowPixels =
+      typeof sourceDefaultRowHeight === "number" && Number.isFinite(sourceDefaultRowHeight)
+        ? (sourceDefaultRowHeight * 4) / 3
+        : DEFAULT_ROW_HEIGHT;
+    const roundedDefaultRowHeight = Math.round(sourceDefaultRowPixels);
+    const defaultRowHeight = Math.max(
+      MIN_ROW_HEIGHT,
+      Math.min(MAX_ROW_HEIGHT, roundedDefaultRowHeight),
+    );
+    if (!Number.isInteger(sourceDefaultRowPixels) || defaultRowHeight !== roundedDefaultRowHeight)
+      add(report, "dimension-approximated", `${sourceSheet.name}.defaultRowHeight`);
     for (const row of sourceSheet.model?.rows ?? []) {
       const rowNumber = row.number;
       if (typeof rowNumber !== "number" || !Number.isInteger(rowNumber) || rowNumber < 1) continue;
@@ -692,8 +715,8 @@ export async function decodeWithNativeXlsx(
       if (typeof row.height === "number") {
         const coreHeight = (row.height * 4) / 3;
         const roundedHeight = Math.round(coreHeight);
-        const size = Math.max(16, Math.min(512, roundedHeight));
-        if (size !== DEFAULT_ROW_HEIGHT) rowHeights.push({ index: rowIndex, size });
+        const size = Math.max(MIN_ROW_HEIGHT, Math.min(MAX_ROW_HEIGHT, roundedHeight));
+        if (size !== defaultRowHeight) rowHeights.push({ index: rowIndex, size });
         if (!Number.isInteger(coreHeight) || size !== roundedHeight)
           add(report, "dimension-approximated", `${sourceSheet.name}!${rowNumber}`);
       }
@@ -828,11 +851,6 @@ export async function decodeWithNativeXlsx(
     }
     const columnSizes = new Map(columnWidths.map(({ index, size }) => [index, size]));
     const rowSizes = new Map(rowHeights.map(({ index, size }) => [index, size]));
-    const sourceDefaultRowHeight = sourceSheet.properties.defaultRowHeight;
-    const defaultRowHeight =
-      typeof sourceDefaultRowHeight === "number" && Number.isFinite(sourceDefaultRowHeight)
-        ? (sourceDefaultRowHeight * 4) / 3
-        : DEFAULT_ROW_HEIGHT;
     const offsetBefore = (index: number, sizes: ReadonlyMap<number, number>, fallback: number) => {
       let offset = 0;
       for (let current = 0; current < index; current += 1) offset += sizes.get(current) ?? fallback;
@@ -899,6 +917,7 @@ export async function decodeWithNativeXlsx(
       hiddenRows,
       hiddenColumns,
       defaultColumnWidth,
+      defaultRowHeight,
       freezePanes,
       filter: restoreMergedCellFilterSupport(
         sheetFilterOutsideTables(
@@ -979,7 +998,12 @@ export async function decodeWithNativeXlsx(
   const nativeCharts = await collectNativeChartParts(archive, async (part) => archive[part]);
   readXlsxPivotCharts(workbook, nativeCharts.charts, pivots, report);
   readXlsxColumnCharts(workbook, nativeCharts.charts, report);
-  return { workbook, report: report.build() };
+  readXlsxPictures(workbook, nativeCharts.pictures, nativeCharts.backgrounds, report);
+  return {
+    workbook,
+    report: report.build(),
+    ...(nativeCharts.images.length ? { images: nativeCharts.images } : {}),
+  };
 }
 
 function writeStyle(
@@ -1118,6 +1142,7 @@ export async function encodeWithNativeXlsx(
       assertSupportedXlsxPicture(
         image,
         `${sheet.name}.floatingImages[${JSON.stringify(image.id)}]`,
+        sheet,
       );
     for (const [key, cell] of sheet.cells) {
       if (cell.content?.kind !== "image") continue;
@@ -1129,8 +1154,8 @@ export async function encodeWithNativeXlsx(
       );
     }
   }
-  // Element placement is internal document data until the native chart writer can
-  // encode it. Block before resource reads instead of exporting a different chart.
+  // Admit only native-capable element leaves before any resource reads.
+  // Other chart features keep their independent, fail-closed guards.
   let customChartSource = false;
   let detailedChartFormat = false;
   for (const sheet of sheets) {
@@ -1147,14 +1172,17 @@ export async function encodeWithNativeXlsx(
         );
         continue;
       }
-      if (drawing.kind === "chart" && "format" in drawing.chart) {
-        detailedChartFormat = true;
-        report.add(
-          "feature-omitted",
-          "block",
-          `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.format`,
-        );
-        continue;
+      if (drawing.kind === "chart") {
+        const styleIssues = unsupportedNativeChartStyles(drawing.chart);
+        for (const field of styleIssues) {
+          detailedChartFormat = true;
+          report.add(
+            "feature-omitted",
+            "block",
+            `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.${field}`,
+          );
+        }
+        if (styleIssues.length) continue;
       }
       if (drawing.kind === "chart" && "seriesFilter" in drawing.chart) {
         detailedChartFormat = true;
@@ -1170,14 +1198,6 @@ export async function encodeWithNativeXlsx(
           "feature-omitted",
           "block",
           `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.rectangleSeries`,
-        );
-      }
-      if (drawing.kind === "chart" && "presentation" in drawing.chart) {
-        detailedChartFormat = true;
-        report.add(
-          "feature-omitted",
-          "block",
-          `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.presentation`,
         );
       }
       if (
@@ -1200,11 +1220,11 @@ export async function encodeWithNativeXlsx(
           `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.source`,
         );
       }
-      if (drawing.kind !== "chart" || !("elements" in drawing.chart)) continue;
-      report.add(
-        "feature-omitted",
-        "block",
-        `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.elements`,
+      if (drawing.kind !== "chart") continue;
+      reportUnsupportedNativeChartElements(
+        drawing.chart,
+        `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart`,
+        report,
       );
     }
   }
@@ -1214,7 +1234,7 @@ export async function encodeWithNativeXlsx(
         ? "Chart subtypes and detailed presentation are not yet supported by XLSX export."
         : customChartSource
           ? "Custom chart series sources are not yet supported by XLSX export."
-          : "Chart element settings are not yet supported by XLSX export.",
+          : "Some chart element settings are not supported by XLSX export.",
       report.build(),
     );
   assertSupportedXlsxTableTotals(sheets, report);
@@ -1322,7 +1342,7 @@ export async function encodeWithNativeXlsx(
     output.state = sheet.properties.hidden ? "hidden" : "visible";
     // Pinned tabs are a local UI ordering feature with no standard XLSX field.
     if (sheet.properties.pinned) add(report, "feature-omitted", `${sheet.name}.pinned`);
-    output.properties.defaultRowHeight = (DEFAULT_ROW_HEIGHT * 3) / 4;
+    output.properties.defaultRowHeight = (getDefaultRowHeight(sheet) * 3) / 4;
     output.properties.defaultColWidth = pixelsToExcelColumnWidth(getDefaultColumnWidth(sheet));
     if (sheet.properties.tabColor) {
       output.properties.tabColor = {
@@ -1403,8 +1423,11 @@ export async function encodeWithNativeXlsx(
       if (row === undefined || column === undefined) continue;
       const issueLocation = `${sheet.name}!${address(row, column)}`;
       const outputCell = output.getCell(address(row, column));
-      if (cell.content?.kind === "literal") outputCell.value = cell.content.value;
-      else if (cell.content?.kind === "formula") {
+      if (cell.content?.kind === "literal") {
+        outputCell.value = cell.content.value;
+        if (cell.content.fontRuns?.length)
+          add(report, "style-omitted", `${issueLocation}.fontRuns`);
+      } else if (cell.content?.kind === "formula") {
         if (isSimulationTableFormula(cell.content.formula.source)) {
           outputCell.value = formulaSnapshotValue(evaluator.getComputedValue({ row, column }));
           add(report, "feature-omitted", issueLocation);
@@ -1468,9 +1491,37 @@ export async function encodeWithNativeXlsx(
       assertSupportedXlsxPicture(
         image,
         `${sheet.name}.floatingImages[${JSON.stringify(image.id)}]`,
+        sheet,
       );
-      if (image.hidden) continue;
-      const issueLocation = `${sheet.name}!${address(image.anchor.row, image.anchor.column)}`;
+      if (image.hidden) {
+        add(
+          report,
+          "image-omitted",
+          `${sheet.name}.floatingImages[${JSON.stringify(image.id)}].hidden`,
+        );
+        continue;
+      }
+      const issueLocation = isFramedPictureObject(image)
+        ? `${sheet.name}.floatingImages[${JSON.stringify(image.id)}]`
+        : `${sheet.name}!${address(image.anchor.row, image.anchor.column)}`;
+      const effects = workbook.theme?.effects;
+      const appearance = image.transform?.appearance;
+      // Pictures do not reference the workbook's native effect-style library.
+      // Diagnose only inherited effects actually visible in the Core renderer;
+      // an explicit own shadow replaces the inherited shadow on legacy images.
+      if (
+        effects &&
+        !isNativePictureThemeSuppression(image.transform) &&
+        ((effects.shadow !== "none" && !appearance?.shadow && (appearance?.opacity ?? 1) > 0) ||
+          (effects.reflection && (appearance?.opacity ?? 1) > 0) ||
+          effects.bevel ||
+          effects.outlineWidth > 0)
+      )
+        add(
+          report,
+          "style-omitted",
+          `${sheet.name}.floatingImages[${JSON.stringify(image.id)}].inheritedThemeEffects`,
+        );
       imageExporter.addFloatingImage(output, sheet, image, issueLocation);
     }
     // Leave wrapped content rows without a fixed height for Excel to fit on load.
@@ -1478,7 +1529,7 @@ export async function encodeWithNativeXlsx(
     const autoFitRows = getAutoFitRowNumbers(sheet);
     for (const row of output.model?.rows ?? []) {
       if (row.number !== undefined && row.height === undefined && !autoFitRows.has(row.number))
-        output.getRow(row.number).height = (DEFAULT_ROW_HEIGHT * 3) / 4;
+        output.getRow(row.number).height = (getDefaultRowHeight(sheet) * 3) / 4;
     }
   }
   const bytes = await target.xlsx.writeBuffer();

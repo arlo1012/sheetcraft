@@ -61,3 +61,34 @@ export function normalizeChartPresentation(value: unknown): ChartPresentationSet
   if (Object.hasOwn(source, "background")) result.background = color(source.background);
   return result;
 }
+
+/** Product-owned default palette, shared by Web rendering and native export. */
+export const DEFAULT_CHART_PALETTE: readonly string[] = Object.freeze([
+  "#2563eb",
+  "#16a34a",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#06b6d4",
+  "#db2777",
+]);
+
+/**
+ * Match the renderer's name cache without inventing stable source identities.
+ * Undefined alone means automatic paint; callers provide valid nonempty paints.
+ * This equals ECharts' truthy-paint check within the admitted product color domain.
+ */
+export function resolveChartSeriesColors<T>(
+  entries: readonly { name: string; color?: T }[],
+  palette: readonly T[],
+): Array<T | undefined> {
+  const names = new Map<string, T>();
+  let next = 0;
+  return entries.map(({ name, color }) => {
+    if (color !== undefined) return color;
+    if (name && names.has(name)) return names.get(name);
+    const selected = palette[next++ % palette.length];
+    if (name && selected !== undefined) names.set(name, selected);
+    return selected;
+  });
+}

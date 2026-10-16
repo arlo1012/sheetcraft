@@ -1,17 +1,14 @@
 <script setup lang="ts">
+import type { PictureEffectEdit } from "../picture-effect-edit";
 import { computed, nextTick, ref, useId, watch } from "vue";
-import {
-  Palette,
-  Square,
-  Sparkles,
-  Blend,
-  RotateCcw,
-  Pipette,
-  Frame,
-  SlidersHorizontal,
-} from "lucide-vue-next";
-import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
-import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
+import { Palette, Square, RotateCcw, Pipette, Frame, SlidersHorizontal } from "lucide-vue-next";
+import NumericField from "../../../shared/numeric-field/NumericField.vue";
+import type {
+  NumericCandidate,
+  NumericCommitResult,
+  NumericFieldSpec,
+} from "../../../shared/numeric-field/types";
+import PictureEffectsMenu from "./PictureEffectsMenu.vue";
 import { type FloatingImage, type ImageAppearance } from "@sheetcraft/core/workbook";
 import { isPictureGroup } from "@sheetcraft/core";
 import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
@@ -41,7 +38,14 @@ import {
   requireStandalonePicture,
   UnsupportedPictureDocumentError,
 } from "../picture-document-support";
-const props = defineProps<{ image: FloatingImage | GroupedPicture; disabled: boolean }>();
+const props = defineProps<{
+  image: FloatingImage | GroupedPicture;
+  disabled: boolean;
+  formatDisabled?: boolean;
+  effectHandler?: (edit: PictureEffectEdit) => boolean;
+  appearanceCommitHandler?: (patch: Partial<ImageAppearance>) => boolean;
+  restoreEffectsFocusTarget?: () => HTMLElement | null;
+}>();
 function requireAppearanceSource(image: FloatingImage | GroupedPicture) {
   if (isGroupedPicture(image)) return image;
   if (isGroupedGroup(image))
@@ -53,48 +57,55 @@ requireAppearanceSource(props.image);
 const sourceImage = computed(() => requireAppearanceSource(props.image));
 const emit = defineEmits<{
   change: [patch: Partial<ImageAppearance> | undefined];
+  format: [target?: "effects"];
 }>();
 const { t } = useAppI18n();
+const effectsMenu = ref<InstanceType<typeof PictureEffectsMenu>>();
+defineExpose({
+  getEffectsTrigger: (): HTMLElement | null =>
+    props.disabled ? null : (effectsMenu.value?.getEffectsTrigger() ?? null),
+});
 type Mode =
+  | "corrections"
+  | "more"
   | "design"
   | "filters"
   | "color"
-  | "effects"
   | "border"
   | "transparency"
   | "transparentColor";
 const mode = ref<Mode>("color");
-const designButton = ref<InstanceType<typeof RibbonMenuButton>>();
-const filtersButton = ref<InstanceType<typeof RibbonMenuButton>>();
+const moreButton = ref<InstanceType<typeof RibbonMenuButton>>();
+const correctionsButton = ref<InstanceType<typeof RibbonMenuButton>>();
 const colorButton = ref<InstanceType<typeof RibbonMenuButton>>();
-const effectButton = ref<InstanceType<typeof RibbonMenuButton>>();
 const borderButton = ref<InstanceType<typeof RibbonMenuButton>>();
-const transparencyButton = ref<InstanceType<typeof RibbonMenuButton>>();
 const transparentColorButton = ref<InstanceType<typeof RibbonMenuButton>>();
 const triggerRef = computed(() => {
   switch (mode.value) {
+    case "more":
     case "design":
-      return designButton.value?.rootElement ?? null;
     case "filters":
-      return filtersButton.value?.rootElement ?? null;
+    case "transparency":
+      return moreButton.value?.rootElement ?? null;
+    case "corrections":
+      return correctionsButton.value?.rootElement ?? null;
     case "color":
       return colorButton.value?.rootElement ?? null;
-    case "effects":
-      return effectButton.value?.rootElement ?? null;
     case "border":
       return borderButton.value?.rootElement ?? null;
-    case "transparency":
-      return transparencyButton.value?.rootElement ?? null;
     case "transparentColor":
       return transparentColorButton.value?.rootElement ?? null;
   }
 });
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `picture-appearance-${useId()}`;
+let menuGeneration = 0;
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef,
   menuSurfaceRef,
   disabled: computed(() => props.disabled),
+  onOpen: () => menuGeneration++,
+  onDismiss: () => menuGeneration++,
 });
 const appearance = computed(() => sourceImage.value.transform?.appearance ?? {});
 const workbookTheme = useWorkbookTheme();
@@ -116,7 +127,11 @@ const isFramed = computed(() => {
   const image = sourceImage.value;
   return isGroupedPicture(image) || isFramedPictureObject(image);
 });
-const label = computed(() => t(`picture.${mode.value}`));
+const label = computed(() =>
+  t(
+    `picture.${mode.value === "corrections" ? "adjustments" : mode.value === "more" ? "style" : mode.value}`,
+  ),
+);
 watch(
   [
     () => props.image.id,
@@ -152,22 +167,98 @@ function change(patch: Partial<ImageAppearance>): boolean {
   emit("change", patch);
   return true;
 }
-function number(key: "brightness" | "contrast" | "saturation" | "opacity", value: unknown): void {
-  if (typeof value !== "number" || !Number.isFinite(value)) return;
-  change({ [key]: key === "opacity" ? 1 - value / 100 : value / 100 });
+type AppearanceNumber = "brightness" | "contrast" | "saturation" | "opacity" | "borderWidth";
+function numberValue(key: AppearanceNumber): number {
+  return key === "borderWidth" ? outlineWidth.value : (appearance.value[key] ?? 1);
+}
+const ratioSpec: NumericFieldSpec = {
+  displayUnit: "%",
+  toDisplay: (value) => value * 100,
+  fromDisplay: (value) => value / 100,
+  displayPrecision: 0,
+  displayStep: 1,
+  canonicalBounds: { min: 0, max: 2 },
+};
+const opacitySpec: NumericFieldSpec = {
+  displayUnit: "%",
+  toDisplay: (value) => (1 - value) * 100,
+  fromDisplay: (value) => 1 - value / 100,
+  displayPrecision: 0,
+  displayStep: 1,
+  canonicalBounds: { min: 0, max: 1 },
+};
+const borderSpec: NumericFieldSpec = {
+  displayUnit: "px",
+  displayPrecision: 2,
+  displayStep: 1,
+  canonicalBounds: { min: 0, max: 20 },
+};
+function numberSpec(key: AppearanceNumber): NumericFieldSpec {
+  return key === "opacity" ? opacitySpec : key === "borderWidth" ? borderSpec : ratioSpec;
+}
+const numberCallbacks = computed(() => {
+  void open.value;
+  const source = sourceImage.value,
+    generation = menuGeneration,
+    handler = props.appearanceCommitHandler;
+  function commit(key: AppearanceNumber, candidate: NumericCandidate): NumericCommitResult {
+    requireAppearanceSource(props.image);
+    if (
+      candidate.kind !== "value" ||
+      props.disabled ||
+      !open.value ||
+      !handler ||
+      source !== sourceImage.value ||
+      generation !== menuGeneration ||
+      handler !== props.appearanceCommitHandler
+    )
+      return { accepted: false, error: t("picture.operationFailed") };
+    const bounds = numberSpec(key).canonicalBounds;
+    if (
+      !Number.isFinite(candidate.value) ||
+      (bounds?.min !== undefined && candidate.value < bounds.min) ||
+      (bounds?.max !== undefined && candidate.value > bounds.max)
+    )
+      return { accepted: false, error: t("pictureFormat.outOfRange") };
+    const patch =
+      key === "borderWidth"
+        ? pictureOutlineWidthPatch(appearance.value, candidate.value)
+        : { [key]: candidate.value };
+    return handler(patch) === true
+      ? { accepted: true }
+      : { accepted: false, error: t("picture.operationFailed") };
+  }
+  return {
+    brightness: (value: NumericCandidate) => commit("brightness", value),
+    contrast: (value: NumericCandidate) => commit("contrast", value),
+    saturation: (value: NumericCandidate) => commit("saturation", value),
+    opacity: (value: NumericCandidate) => commit("opacity", value),
+    borderWidth: (value: NumericCandidate) => commit("borderWidth", value),
+  };
+});
+function numberOwnerKey(key: AppearanceNumber): string {
+  return `${sourceImage.value.id}:${sourceImage.value.assetId}:${menuGeneration}:${key}`;
 }
 function preset(patch: Partial<ImageAppearance>): void {
   if (change(patch)) dismiss("programmatic", true);
-}
-function borderWidth(value: unknown): void {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 20) return;
-  change(pictureOutlineWidthPatch(appearance.value, value));
 }
 function outlineSelect(rgb: string | null, reference?: ThemeColorReference): void {
   change(
     pictureOutlineColorPatch(appearance.value, picturePaintColorFromSelection(rgb, reference)),
   );
 }
+const openFormat = computed(() => {
+  void open.value;
+  const image = sourceImage.value,
+    generation = menuGeneration;
+  return (): void => {
+    requireAppearanceSource(props.image);
+    if (props.disabled || !open.value || image !== props.image || generation !== menuGeneration)
+      return;
+    dismiss("programmatic", true);
+    emit("format");
+  };
+});
 function reset(): void {
   requireAppearanceSource(props.image);
   if (props.disabled) return;
@@ -181,65 +272,75 @@ function reset(): void {
     role="group"
     :aria-label="t('picture.style')"
   >
-    <RibbonMenuButton
-      ref="colorButton"
-      variant="tall"
-      :label="t('picture.color')"
-      :text="t('picture.color')"
-      :disabled="disabled"
-      :expanded="open && mode === 'color'"
-      :menu-id="menuId"
-      @activate="toggle('color')"
-      @keydown="keydown('color', $event)"
-      ><Palette
-    /></RibbonMenuButton>
-    <RibbonMenuButton
-      ref="transparentColorButton"
-      variant="tall"
-      :label="t('picture.transparentColor')"
-      :text="t('picture.transparentColor')"
-      :disabled="disabled"
-      :expanded="open && mode === 'transparentColor'"
-      :menu-id="menuId"
-      @activate="toggle('transparentColor')"
-      @keydown="keydown('transparentColor', $event)"
-      ><Pipette
-    /></RibbonMenuButton>
-    <RibbonMenuButton
-      ref="effectButton"
-      variant="tall"
-      :label="t('picture.effects')"
-      :text="t('picture.effects')"
-      :disabled="disabled"
-      :expanded="open && mode === 'effects'"
-      :menu-id="menuId"
-      @activate="toggle('effects')"
-      @keydown="keydown('effects', $event)"
-      ><Sparkles
-    /></RibbonMenuButton>
-    <RibbonMenuButton
-      ref="borderButton"
-      variant="tall"
-      :label="t('picture.border')"
-      :text="t('picture.border')"
-      :disabled="disabled"
-      :expanded="open && mode === 'border'"
-      :menu-id="menuId"
-      @activate="toggle('border')"
-      @keydown="keydown('border', $event)"
-      ><Square
-    /></RibbonMenuButton>
     <div class="picture-appearance__stack">
       <RibbonMenuButton
-        ref="transparencyButton"
-        :label="t('picture.transparency')"
-        :text="t('picture.transparency')"
+        ref="transparentColorButton"
+        :label="t('picture.transparentColor')"
+        :text="t('picture.transparentColor')"
         :disabled="disabled"
-        :expanded="open && mode === 'transparency'"
+        :expanded="open && mode === 'transparentColor'"
         :menu-id="menuId"
-        @activate="toggle('transparency')"
-        @keydown="keydown('transparency', $event)"
-        ><Blend
+        @activate="toggle('transparentColor')"
+        @keydown="keydown('transparentColor', $event)"
+        ><Pipette
+      /></RibbonMenuButton>
+      <RibbonMenuButton
+        ref="colorButton"
+        :label="t('picture.color')"
+        :text="t('picture.color')"
+        :disabled="disabled"
+        :expanded="open && mode === 'color'"
+        :menu-id="menuId"
+        @activate="toggle('color')"
+        @keydown="keydown('color', $event)"
+        ><Palette
+      /></RibbonMenuButton>
+    </div>
+    <div class="picture-appearance__stack">
+      <RibbonMenuButton
+        ref="correctionsButton"
+        :label="t('picture.adjustments')"
+        :text="t('picture.adjustments')"
+        :disabled="disabled"
+        :expanded="open && mode === 'corrections'"
+        :menu-id="menuId"
+        @activate="toggle('corrections')"
+        @keydown="keydown('corrections', $event)"
+        ><SlidersHorizontal
+      /></RibbonMenuButton>
+      <RibbonMenuButton
+        ref="moreButton"
+        :label="t('picture.style')"
+        :text="t('picture.style')"
+        :disabled="disabled"
+        :expanded="open && ['more', 'design', 'filters', 'transparency'].includes(mode)"
+        :menu-id="menuId"
+        @activate="toggle('more')"
+        @keydown="keydown('more', $event)"
+        ><Frame
+      /></RibbonMenuButton>
+    </div>
+    <PictureEffectsMenu
+      ref="effectsMenu"
+      :restore-effects-focus-target="restoreEffectsFocusTarget"
+      :source="sourceImage"
+      :format-disabled="formatDisabled"
+      :appearance="appearance"
+      :disabled="disabled"
+      :effect-handler="effectHandler"
+      @format="emit('format', 'effects')"
+    />
+    <div class="picture-appearance__stack">
+      <RibbonMenuButton
+        ref="borderButton"
+        :label="t('picture.border')"
+        :text="t('picture.border')"
+        :disabled="disabled"
+        :expanded="open && mode === 'border'"
+        :menu-id="menuId"
+        @activate="toggle('border')"
+        @keydown="keydown('border', $event)"
+        ><Square
       /></RibbonMenuButton>
       <RibbonButton
         :label="t('picture.resetStyle')"
@@ -249,30 +350,6 @@ function reset(): void {
         ><RotateCcw
       /></RibbonButton>
     </div>
-    <RibbonMenuButton
-      ref="designButton"
-      variant="tall"
-      :label="t('picture.design')"
-      :text="t('picture.design')"
-      :disabled="disabled"
-      :expanded="open && mode === 'design'"
-      :menu-id="menuId"
-      @activate="toggle('design')"
-      @keydown="keydown('design', $event)"
-      ><Frame
-    /></RibbonMenuButton>
-    <RibbonMenuButton
-      ref="filtersButton"
-      variant="tall"
-      :label="t('picture.filters')"
-      :text="t('picture.filters')"
-      :disabled="disabled"
-      :expanded="open && mode === 'filters'"
-      :menu-id="menuId"
-      @activate="toggle('filters')"
-      @keydown="keydown('filters', $event)"
-      ><SlidersHorizontal
-    /></RibbonMenuButton>
     <Teleport to="body">
       <MenuSurface
         v-if="open"
@@ -283,7 +360,16 @@ function reset(): void {
         :label="label"
       >
         <template #body>
-          <template v-if="mode === 'color'">
+          <p
+            v-if="
+              !appearanceCommitHandler && ['corrections', 'border', 'transparency'].includes(mode)
+            "
+            class="picture-appearance__hint"
+            role="status"
+          >
+            {{ t("picture.numericViewerReadOnly") }}
+          </p>
+          <template v-if="mode === 'corrections'">
             <GallerySection :title="t('picture.adjustments')">
               <div
                 class="picture-appearance__field"
@@ -291,14 +377,22 @@ function reset(): void {
                 :aria-label="t('picture.brightness')"
               >
                 <span>{{ t("picture.brightness") }}</span
-                ><TInputNumber
-                  :model-value="(appearance.brightness ?? 1) * 100"
-                  :min="0"
-                  :max="200"
-                  theme="column"
-                  class="sheetcraft-input-number--persistent-controls"
-                  size="small"
-                  @change="number('brightness', $event)"
+                ><NumericField
+                  :owner-key="numberOwnerKey('brightness')"
+                  :value="{ kind: 'value', value: numberValue('brightness') }"
+                  :spec="numberSpec('brightness')"
+                  :label="t('picture.brightness')"
+                  :disabled="disabled"
+                  :read-only="!appearanceCommitHandler"
+                  :hide-reason="!appearanceCommitHandler"
+                  :reason="
+                    !appearanceCommitHandler ? t('picture.numericViewerReadOnly') : undefined
+                  "
+                  :invalid-message="t('pictureFormat.outOfRange')"
+                  :rejected-message="t('picture.operationFailed')"
+                  :stale-message="t('pictureFormat.staleOwner')"
+                  presentation="column"
+                  :on-commit="numberCallbacks.brightness"
                 />
               </div>
               <div
@@ -307,14 +401,22 @@ function reset(): void {
                 :aria-label="t('picture.contrast')"
               >
                 <span>{{ t("picture.contrast") }}</span
-                ><TInputNumber
-                  :model-value="(appearance.contrast ?? 1) * 100"
-                  :min="0"
-                  :max="200"
-                  theme="column"
-                  class="sheetcraft-input-number--persistent-controls"
-                  size="small"
-                  @change="number('contrast', $event)"
+                ><NumericField
+                  :owner-key="numberOwnerKey('contrast')"
+                  :value="{ kind: 'value', value: numberValue('contrast') }"
+                  :spec="numberSpec('contrast')"
+                  :label="t('picture.contrast')"
+                  :disabled="disabled"
+                  :read-only="!appearanceCommitHandler"
+                  :hide-reason="!appearanceCommitHandler"
+                  :reason="
+                    !appearanceCommitHandler ? t('picture.numericViewerReadOnly') : undefined
+                  "
+                  :invalid-message="t('pictureFormat.outOfRange')"
+                  :rejected-message="t('picture.operationFailed')"
+                  :stale-message="t('pictureFormat.staleOwner')"
+                  presentation="column"
+                  :on-commit="numberCallbacks.contrast"
                 />
               </div>
               <div
@@ -323,14 +425,22 @@ function reset(): void {
                 :aria-label="t('picture.saturation')"
               >
                 <span>{{ t("picture.saturation") }}</span
-                ><TInputNumber
-                  :model-value="(appearance.saturation ?? 1) * 100"
-                  :min="0"
-                  :max="200"
-                  theme="column"
-                  class="sheetcraft-input-number--persistent-controls"
-                  size="small"
-                  @change="number('saturation', $event)"
+                ><NumericField
+                  :owner-key="numberOwnerKey('saturation')"
+                  :value="{ kind: 'value', value: numberValue('saturation') }"
+                  :spec="numberSpec('saturation')"
+                  :label="t('picture.saturation')"
+                  :disabled="disabled"
+                  :read-only="!appearanceCommitHandler"
+                  :hide-reason="!appearanceCommitHandler"
+                  :reason="
+                    !appearanceCommitHandler ? t('picture.numericViewerReadOnly') : undefined
+                  "
+                  :invalid-message="t('pictureFormat.outOfRange')"
+                  :rejected-message="t('picture.operationFailed')"
+                  :stale-message="t('pictureFormat.staleOwner')"
+                  presentation="column"
+                  :on-commit="numberCallbacks.saturation"
                 />
               </div>
             </GallerySection>
@@ -343,14 +453,20 @@ function reset(): void {
               :aria-label="t('picture.borderWidth')"
             >
               <span>{{ t("picture.borderWidth") }}</span
-              ><TInputNumber
-                :model-value="outlineWidth"
-                :min="0"
-                :max="20"
-                theme="column"
-                class="sheetcraft-input-number--persistent-controls"
-                size="small"
-                @change="borderWidth"
+              ><NumericField
+                :owner-key="numberOwnerKey('borderWidth')"
+                :value="{ kind: 'value', value: numberValue('borderWidth') }"
+                :spec="numberSpec('borderWidth')"
+                :label="t('picture.borderWidth')"
+                :disabled="disabled"
+                :read-only="!appearanceCommitHandler"
+                :hide-reason="!appearanceCommitHandler"
+                :reason="!appearanceCommitHandler ? t('picture.numericViewerReadOnly') : undefined"
+                :invalid-message="t('pictureFormat.outOfRange')"
+                :rejected-message="t('picture.operationFailed')"
+                :stale-message="t('pictureFormat.staleOwner')"
+                presentation="column"
+                :on-commit="numberCallbacks.borderWidth"
               />
             </div>
           </GallerySection>
@@ -372,27 +488,30 @@ function reset(): void {
               :aria-label="t('picture.transparency')"
             >
               <span>%</span
-              ><TInputNumber
-                :model-value="Math.round((1 - (appearance.opacity ?? 1)) * 100)"
-                :min="0"
-                :max="100"
-                theme="column"
-                class="sheetcraft-input-number--persistent-controls"
-                size="small"
-                @change="number('opacity', $event)"
+              ><NumericField
+                :owner-key="numberOwnerKey('opacity')"
+                :value="{ kind: 'value', value: numberValue('opacity') }"
+                :spec="numberSpec('opacity')"
+                :label="t('picture.transparency')"
+                :disabled="disabled"
+                :read-only="!appearanceCommitHandler"
+                :hide-reason="!appearanceCommitHandler"
+                :reason="!appearanceCommitHandler ? t('picture.numericViewerReadOnly') : undefined"
+                :invalid-message="t('pictureFormat.outOfRange')"
+                :rejected-message="t('picture.operationFailed')"
+                :stale-message="t('pictureFormat.staleOwner')"
+                presentation="column"
+                :on-commit="numberCallbacks.opacity"
               />
             </div>
           </GallerySection>
-          <GallerySection v-else-if="mode === 'effects'" :title="t('picture.effects')">
-            <TCheckbox
-              :model-value="!!appearance.reflection"
-              :disabled="isFramed || disabled"
-              @update:model-value="change({ reflection: Boolean($event) })"
-              >{{ t("picture.reflection") }}</TCheckbox
-            >
-          </GallerySection>
         </template>
         <template #footer>
+          <template v-if="mode === 'more'">
+            <MenuItem @select="toggle('design')">{{ t("picture.design") }}</MenuItem>
+            <MenuItem @select="toggle('filters')">{{ t("picture.filters") }}</MenuItem>
+            <MenuItem @select="toggle('transparency')">{{ t("picture.transparency") }}</MenuItem>
+          </template>
           <template v-if="mode === 'design'">
             <MenuItem
               @select="
@@ -408,8 +527,11 @@ function reset(): void {
               @select="preset({ border: undefined, shadow: 'soft', reflection: undefined })"
               >{{ t("picture.designShadow") }}</MenuItem
             >
+            <MenuItem v-if="isFramed" :disabled="disabled" @select="openFormat">
+              {{ t("picture.reflection") }} · {{ t("pictureFormat.paneTitle") }}
+            </MenuItem>
             <MenuItem
-              :disabled="isFramed"
+              v-else
               @select="
                 preset({
                   border: { color: '#D9E2F3', width: 2 },
@@ -518,13 +640,7 @@ function reset(): void {
               >{{ t("picture.vivid") }}</MenuItem
             >
           </template>
-          <template v-else-if="mode === 'effects'">
-            <MenuItem @select="preset({ shadow: 'soft' })">{{ t("picture.softShadow") }}</MenuItem>
-            <MenuItem @select="preset({ shadow: 'hard' })">{{ t("picture.hardShadow") }}</MenuItem>
-            <MenuItem @select="preset({ shadow: undefined, reflection: undefined })">{{
-              t("picture.noEffects")
-            }}</MenuItem>
-          </template>
+
           <MenuItem v-else-if="mode === 'border'" @select="preset({ border: undefined })">{{
             t("picture.noBorder")
           }}</MenuItem>

@@ -18,6 +18,91 @@ afterEach(() => {
 
 describe("XLSX feedback", () => {
   test.each(["en-US", "zh-CN"] as const)(
+    "shows import/export loss counts, locations and explicit continue/cancel actions (%s)",
+    async (locale) => {
+      const wrapper = mount(XlsxFileFeedback, {
+        attachTo: createFeedbackHost(),
+        global: { plugins: [createAppI18n(locale)] },
+        props: {
+          busy: false,
+          confirmation: "import",
+          report: {
+            issues: [
+              {
+                code: "image-omitted",
+                severity: "warning",
+                count: 12,
+                locations: ["Sheet1!B2", "Sheet1.floatingImages[logo]"],
+              },
+              { code: "future-feature", severity: "warning", count: 1, locations: [] },
+            ],
+          },
+        },
+      });
+      mounted.push(wrapper);
+      await flushPromises();
+      const body = new DOMWrapper(document.body);
+      const report = body.get("[data-xlsx-confirmation-report]");
+      expect(report.text()).toContain("12");
+      expect(report.text()).toContain("10");
+      expect(report.text()).toContain("Sheet1!B2");
+      expect(report.text()).toContain("Sheet1.floatingImages[logo]");
+      expect(report.text()).toContain("future-feature");
+      expect(report.text()).not.toContain("xlsx.report");
+      expect(body.findAll("[data-xlsx-issue]")).toHaveLength(2);
+      await wrapper.setProps({ confirmation: "export" });
+      await flushPromises();
+      const confirm = body
+        .findAll("button")
+        .find(
+          (button) =>
+            button.text() === (locale === "en-US" ? "Continue and download" : "继续并下载"),
+        );
+      expect(confirm).toBeDefined();
+      await confirm!.trigger("click");
+      expect(wrapper.emitted("confirm")).toHaveLength(1);
+      const cancel = body
+        .findAll("button")
+        .find((button) => button.text() === (locale === "en-US" ? "Cancel" : "取消"));
+      await cancel!.trigger("click");
+      expect(wrapper.emitted("cancel")).toHaveLength(1);
+    },
+  );
+
+  test("shows blocking details without offering a continue action", async () => {
+    const wrapper = mount(XlsxFileFeedback, {
+      attachTo: createFeedbackHost(),
+      global: { plugins: [createAppI18n("en-US")] },
+      props: {
+        busy: false,
+        feedback: { key: "xlsx.feedback.blocked", error: true },
+        report: {
+          issues: [
+            {
+              code: "feature-omitted",
+              severity: "block",
+              count: 1,
+              locations: ["Sheet1.drawings[chart].chart.type"],
+            },
+          ],
+        },
+      },
+    });
+    mounted.push(wrapper);
+    await flushPromises();
+    const body = new DOMWrapper(document.body);
+    expect(body.get("[data-xlsx-error]").text()).toContain("Compatibility checks");
+    expect(body.get("[data-xlsx-error-report]").text()).toContain(
+      "Sheet1.drawings[chart].chart.type",
+    );
+    expect(body.get("[data-xlsx-error-report]").text()).toContain("Blocked");
+    expect(body.find(".t-dialog__footer").exists()).toBe(false);
+    await body.get(".t-dialog__close").trigger("click");
+    expect(wrapper.emitted("dismiss")).toHaveLength(1);
+    expect(wrapper.emitted("confirm")).toBeUndefined();
+  });
+
+  test.each(["en-US", "zh-CN"] as const)(
     "renders a numeric total's location and JSON backup guidance (%s)",
     async (locale) => {
       const wrapper = mount(XlsxFileFeedback, {
@@ -42,7 +127,7 @@ describe("XLSX feedback", () => {
       expect(wrapper.emitted("dismiss")).toHaveLength(1);
     },
   );
-  test("only asks to replace the document when importing without compatibility details", async () => {
+  test("asks to replace the document without extra details for a lossless import", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const host = createFeedbackHost();
     const wrapper = mount(XlsxFileFeedback, {

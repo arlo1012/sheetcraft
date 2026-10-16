@@ -45,6 +45,26 @@ export function createWorkbookXlsxWorker(): XlsxWorkerPort {
   }) as unknown as XlsxWorkerPort;
 }
 
+function isCompatibilityReport(value: unknown): value is XlsxCompatibilityReport {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    !Array.isArray((value as XlsxCompatibilityReport).issues)
+  )
+    return false;
+  return (value as XlsxCompatibilityReport).issues.every(
+    (issue) =>
+      issue &&
+      typeof issue.code === "string" &&
+      issue.code.length > 0 &&
+      (issue.severity === "warning" || issue.severity === "block") &&
+      Number.isSafeInteger(issue.count) &&
+      issue.count > 0 &&
+      Array.isArray(issue.locations) &&
+      issue.locations.every((location) => typeof location === "string"),
+  );
+}
+
 export function runXlsxWorker(
   factory: XlsxWorkerFactory,
   request: XlsxWorkerRequest,
@@ -97,13 +117,21 @@ export function runXlsxWorker(
         return;
       }
       if (!response.ok) {
-        if (!response.error || typeof response.error.message !== "string") {
+        if (
+          !response.error ||
+          typeof response.error.message !== "string" ||
+          (response.error.report !== undefined && !isCompatibilityReport(response.error.report))
+        ) {
           settle(new XlsxWorkerFailure("XLSX worker returned an invalid message."));
           return;
         }
         settle(
           new XlsxWorkerFailure(response.error.message, response.error.report, response.error.code),
         );
+        return;
+      }
+      if (!isCompatibilityReport(response.report)) {
+        settle(new XlsxWorkerFailure("XLSX worker returned an invalid compatibility report."));
         return;
       }
       if (response.type !== request.type) {

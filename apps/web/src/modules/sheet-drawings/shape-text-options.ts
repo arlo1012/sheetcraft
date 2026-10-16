@@ -13,6 +13,12 @@ import { normalizeShapeStyle, type ShapeDetailedStyle } from "@sheetcraft/core/s
 import { DEFAULT_WORKBOOK_THEME, type WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import { resolvePictureColor } from "../../shared/images/picture-paint-color";
 
+/** Typography-only carrier shared by genuine framed/owned sources and render projections. */
+type ShapeTextTypographySource = Pick<
+  SheetGraphicDrawing,
+  "text" | "shapeText" | "fontSize" | "bold" | "italic" | "color"
+>;
+
 /** This is the existing application text stack, not a claimed available font face. */
 export const INHERITED_SHAPE_FONT_FAMILY =
   'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
@@ -89,13 +95,13 @@ export function withDrawingShapeBodyStyle(
   return { ...next, shapeStyle: normalized };
 }
 
-export function getDrawingShapeTextFamily(drawing: SheetGraphicDrawing): string {
+export function getDrawingShapeTextFamily(drawing: Pick<SheetGraphicDrawing, "shapeText">): string {
   return drawing.shapeText?.fontFamily ?? INHERITED_SHAPE_FONT_FAMILY;
 }
 
 /** One transient projection of the authoritative string and its sparse typography. */
 export function drawingShapeTextCharacterSource(
-  drawing: SheetGraphicDrawing,
+  drawing: Pick<SheetGraphicDrawing, "text" | "shapeText">,
 ): ShapeTextCharacterSource {
   return {
     text: drawing.text,
@@ -103,7 +109,7 @@ export function drawingShapeTextCharacterSource(
   };
 }
 export function drawingShapeTextBaseCharacterFormat(
-  drawing: SheetGraphicDrawing,
+  drawing: ShapeTextTypographySource,
 ): ShapeTextCharacterFormat {
   const style = drawing.shapeText?.style;
   return normalizeShapeTextCharacterFormat({

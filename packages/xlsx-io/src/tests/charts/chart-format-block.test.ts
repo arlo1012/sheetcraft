@@ -5,13 +5,11 @@ import { nativeColumnFixture } from "./native-column-fixture.js";
 
 describe("detailed chart format export safety gate", () => {
   test.each([
-    {},
-    { title: { color: "#ff0000" } },
-    { valueAxis: { min: 20, max: 180, majorUnit: 40 } },
-    { bar: { gapWidth: 50, overlap: 50 } },
+    [{ valueAxis: { min: 20 } }, "format.valueAxis.min"],
+    [{ bar: { gapWidth: 50, overlap: 50 } }, "format.bar"],
   ] as const)(
     "blocks new format presence %j before resource reads with no workbook changes",
-    async (format) => {
+    async (format, path) => {
       const f = nativeColumnFixture();
       f.drawing.chart.format = format;
       const before = serializeWorkbook(f.workbook),
@@ -30,7 +28,7 @@ describe("detailed chart format export safety gate", () => {
               code: "feature-omitted",
               severity: "block",
               count: 1,
-              locations: ['Data.drawings["column-chart"].chart.format'],
+              locations: [`Data.drawings["column-chart"].chart.${path}`],
             },
           ],
         },

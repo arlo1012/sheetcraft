@@ -52,6 +52,7 @@ import { normalizeImageTransform, type ImageTransform } from "./image-transform.
 import {
   createSheet,
   DEFAULT_COLUMN_WIDTH,
+  DEFAULT_ROW_HEIGHT,
   createSheetSparseState,
   getWorkbookSheets,
   normalizeSheetName,
@@ -331,6 +332,10 @@ export type WorkbookSnapshotV83 = Omit<WorkbookSnapshotV82, "version"> & { versi
 export type WorkbookSnapshotV84 = Omit<WorkbookSnapshotV83, "version"> & { version: 84 };
 /** Conditional envelope for bounded 2D column–line combo routing, including dormant draw types. */
 export type WorkbookSnapshotV85 = Omit<WorkbookSnapshotV84, "version"> & { version: 85 };
+/** Conditional envelope for relative picture-root anchors with free pixel offsets. */
+export type WorkbookSnapshotV86 = Omit<WorkbookSnapshotV85, "version"> & { version: 86 };
+/** Conditional envelope for a sheet-owned non-24px sparse default row height. */
+export type WorkbookSnapshotV87 = Omit<WorkbookSnapshotV86, "version"> & { version: 87 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -374,13 +379,16 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV82
   | WorkbookSnapshotV83
   | WorkbookSnapshotV84
-  | WorkbookSnapshotV85;
-type WorkbookWritePayload = Omit<WorkbookSnapshotV85, "version"> & {
+  | WorkbookSnapshotV85
+  | WorkbookSnapshotV86
+  | WorkbookSnapshotV87;
+type WorkbookWritePayload = Omit<WorkbookSnapshotV87, "version"> & {
   version: WorkbookSnapshot["version"];
 };
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
+  defaultRowHeight?: number;
   defaultColumnWidth?: number;
   dataValidations?: SheetDataValidation[];
   outlineGroups?: SheetOutlineGroup[];
@@ -479,7 +487,9 @@ type SnapshotVersion =
   | 82
   | 83
   | 84
-  | 85;
+  | 85
+  | 86
+  | 87;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -1081,6 +1091,16 @@ function pictureDataField(value: unknown, key: string): unknown {
   if (!("value" in descriptor))
     throw new TypeError(`Picture ${key} must be a data field, not an accessor.`);
   return descriptor.value;
+}
+/**
+ * Only worksheet roots own anchors; grouped children use owner-local frames instead.
+ * Inspect raw field presence before normalization can discard an invalid/default value.
+ * Do not read offsetMode: an accessor or an own undefined still cannot enter old protocols.
+ */
+function hasPictureFreePixelOffsetField(image: unknown): boolean {
+  const frame = pictureDataField(image, "frame");
+  const anchor = pictureDataField(frame, "anchor");
+  return !!anchor && typeof anchor === "object" && "offsetMode" in anchor;
 }
 /** Raw bounded traversal preserves field presence, including default-valued fields of old payloads. */
 function hasPicturePropertyFields(image: unknown): boolean {
@@ -1895,6 +1915,9 @@ function parseSparseState(
           ),
         }
       : {}),
+    ...(Object.hasOwn(record, "defaultRowHeight")
+      ? { defaultRowHeight: asInteger(record.defaultRowHeight, `${path}.defaultRowHeight`) }
+      : {}),
     ...(Object.hasOwn(record, "defaultColumnWidth")
       ? { defaultColumnWidth: asInteger(record.defaultColumnWidth, `${path}.defaultColumnWidth`) }
       : {}),
@@ -1970,6 +1993,19 @@ function parseSparseState(
 
 function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sheet {
   const source = asRecord(value, path);
+  const rowDefaultDescriptor = Object.getOwnPropertyDescriptor(source, "defaultRowHeight");
+  if (!rowDefaultDescriptor && "defaultRowHeight" in source)
+    return fail(`${path}.defaultRowHeight`, "Default row heights must be own data fields.");
+  if (rowDefaultDescriptor && !("value" in rowDefaultDescriptor))
+    return fail(
+      `${path}.defaultRowHeight`,
+      "Default row heights must be data fields, not accessors.",
+    );
+  if (version !== undefined && version < 87 && rowDefaultDescriptor)
+    return fail(
+      `${path}.defaultRowHeight`,
+      "Sheet default row heights require snapshot version 87.",
+    );
   const record: UnknownRecord = Object.create(null) as UnknownRecord;
   const drawingDescriptor = Object.getOwnPropertyDescriptor(source, "drawings");
   if (!drawingDescriptor && "drawings" in source)
@@ -1980,6 +2016,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
   if (pictureDescriptor && !("value" in pictureDescriptor))
     return fail(`${path}.floatingImages`, "Pictures must be data fields.");
   Object.assign(record, source);
+  if (rowDefaultDescriptor) record.defaultRowHeight = rowDefaultDescriptor.value;
   if (drawingDescriptor && drawingDescriptor.value !== undefined) {
     try {
       record.drawings = readPictureDataArray(
@@ -2007,6 +2044,23 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
         error instanceof Error ? error.message : "Invalid picture collection.",
       );
     }
+  }
+  let hasPictureFreePixelOffset = false;
+  try {
+    if (Array.isArray(record.floatingImages)) {
+      for (const image of record.floatingImages) {
+        if (!hasPictureFreePixelOffsetField(image)) continue;
+        if (version !== undefined && version < 86)
+          return fail(
+            `${path}.floatingImages`,
+            "Free pixel picture offsets require snapshot version 86.",
+          );
+        hasPictureFreePixelOffset = true;
+      }
+    }
+  } catch (error) {
+    if (error instanceof WorkbookDomainError) throw error;
+    return fail(path, error instanceof Error ? error.message : "Invalid picture anchor.");
   }
   let hasShapeGroupEffects = false;
   let hasExtendedShapeGroupEffects = false;
@@ -2465,6 +2519,8 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasChartRectangleSeries) version = 83;
     if (hasChartSeriesFilter) version = 84;
     if (hasChartCombo) version = 85;
+    if (hasPictureFreePixelOffset) version = 86;
+    if (Object.hasOwn(record, "defaultRowHeight")) version = 87;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -2535,7 +2591,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
 }
 
 export function serializeSheet(sheet: Sheet): SheetSnapshot {
-  const { drawings, pivotTables, ...state } = createSheetSparseState(sheet);
+  const { drawings, pivotTables, defaultRowHeight, ...state } = createSheetSparseState(sheet);
   return {
     ...(drawings?.length ? { drawings } : {}),
     ...(pivotTables?.length ? { pivotTables } : {}),
@@ -2543,6 +2599,9 @@ export function serializeSheet(sheet: Sheet): SheetSnapshot {
     name: sheet.name,
     properties: { ...sheet.properties },
     ...state,
+    ...(defaultRowHeight !== undefined && defaultRowHeight !== DEFAULT_ROW_HEIGHT
+      ? { defaultRowHeight }
+      : {}),
     hiddenRows: state.hiddenRows ?? [],
     hiddenColumns: state.hiddenColumns ?? [],
     defaultColumnWidth: state.defaultColumnWidth ?? DEFAULT_COLUMN_WIDTH,
@@ -2874,6 +2933,9 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     )
   )
     snapshot.version = 85;
+  if (sheets.some((sheet) => sheet.floatingImages.some(hasPictureFreePixelOffsetField)))
+    snapshot.version = 86;
+  if (sheets.some((sheet) => sheet.defaultRowHeight !== undefined)) snapshot.version = 87;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -2966,7 +3028,9 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 82 &&
     record.version !== 83 &&
     record.version !== 84 &&
-    record.version !== 85
+    record.version !== 85 &&
+    record.version !== 86 &&
+    record.version !== 87
   ) {
     throw new WorkbookDomainError(
       {

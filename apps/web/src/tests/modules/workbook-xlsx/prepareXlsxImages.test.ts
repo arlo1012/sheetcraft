@@ -1,9 +1,14 @@
 import { framedPicture } from "../sheet-images/framed-picture-fixture";
+import type { PictureFrameAnchor } from "@sheetcraft/core/picture-frame";
+import type { FramedFloatingImage } from "@sheetcraft/core/picture-object";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import { createWorkbook, getActiveSheet, setCellContent } from "@sheetcraft/core/workbook";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { ImageAsset, ImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
-import { prepareXlsxImages } from "../../../modules/workbook-xlsx/prepareXlsxImages";
+import {
+  prepareXlsxImages,
+  assertXlsxPictureGeometrySupport,
+} from "../../../modules/workbook-xlsx/prepareXlsxImages";
 
 function imageAsset(id: string, mimeType = "image/png", width = 80, height = 40): ImageAsset {
   return {
@@ -70,6 +75,103 @@ afterEach(() => {
 });
 
 describe("prepareXlsxImages", () => {
+  test.each<PictureFrameAnchor>([
+    { mode: "fixed", x: 140, y: 62, size: { width: 120, height: 80 } },
+    {
+      mode: "move-only",
+      origin: { row: { index: 2, offset: 4 }, column: { index: 1, offset: 8 } },
+      size: { width: 120, height: 80 },
+    },
+    {
+      mode: "move-and-size",
+      start: { row: { index: 2, offset: 4 }, column: { index: 1, offset: 8 } },
+      end: { row: { index: 5, offset: 12 }, column: { index: 3, offset: 16 } },
+    },
+  ])(
+    "preserves a basic $mode frame and original image bytes without rasterization",
+    async (anchor) => {
+      const { workbook, sheet } = imageSnapshot();
+      const image = framedPicture();
+      image.frame.angleDeg = 0;
+      image.frame.anchor = anchor;
+      image.transform = {
+        appearance: {
+          suppressThemeEffects: { shadow: true, outline: true, reflection: true, bevel: true },
+        },
+      };
+      sheet.floatingImages = [image];
+      const before = serializeWorkbook(workbook);
+      const assets = store(imageAsset("asset"));
+      const decode = vi.fn();
+      vi.stubGlobal("Image", decode);
+      const prepared = await prepareXlsxImages(before, assets);
+      expect(prepared).toHaveLength(1);
+      expect(prepared[0]).toMatchObject({
+        assetId: "asset",
+        extension: "png",
+        width: 80,
+        height: 40,
+      });
+      expect(prepared[0]?.transform).toBeUndefined();
+      expect(new Uint8Array(prepared[0]!.bytes)).toEqual(new Uint8Array([1, 2, 3]));
+      expect(decode).not.toHaveBeenCalled();
+      expect(serializeWorkbook(workbook)).toEqual(before);
+      expect(image.frame.anchor).toEqual(anchor);
+    },
+  );
+
+  test.each([
+    [
+      "negative crop / padding",
+      (image: FramedFloatingImage) => {
+        image.frame.source.widthRatio = 0.5;
+      },
+    ],
+    [
+      "source offset",
+      (image: FramedFloatingImage) => {
+        image.frame.source.offsetXRatio = 0.1;
+      },
+    ],
+    [
+      "hidden",
+      (image: FramedFloatingImage) => {
+        image.hidden = true;
+      },
+    ],
+    [
+      "legacy group",
+      (image: FramedFloatingImage) => {
+        image.groupId = "group";
+      },
+    ],
+    [
+      "empty transform",
+      (image: FramedFloatingImage) => {
+        image.transform = {};
+      },
+    ],
+    [
+      "appearance",
+      (image: FramedFloatingImage) => {
+        image.transform = { appearance: { opacity: 0.5 } } as never;
+      },
+    ],
+    [
+      "object title",
+      (image: FramedFloatingImage) => {
+        image.altTitle = "Original title";
+      },
+    ],
+  ] as const)("still blocks frame %s before normalization can discard it", (_name, change) => {
+    const { workbook, sheet } = imageSnapshot();
+    const image = framedPicture();
+    image.frame.angleDeg = 0;
+    change(image);
+    sheet.floatingImages = [image];
+    expect(() => assertXlsxPictureGeometrySupport(workbook)).toThrow();
+  });
+
   test.each(["cell", "floating"] as const)(
     "%s object properties are blocked before asset preparation",
     async (kind) => {
@@ -177,7 +279,9 @@ describe("prepareXlsxImages", () => {
   );
   test("frame geometry is blocked before asset reads, decoding, URLs or raster preparation", async () => {
     const { workbook, sheet } = imageSnapshot();
-    sheet.floatingImages = [framedPicture()];
+    const unsupported = framedPicture();
+    unsupported.frame.source.widthRatio = 0.5;
+    sheet.floatingImages = [unsupported];
     const assets = store(imageAsset("asset")),
       urls = { createObjectURL: vi.fn(), revokeObjectURL: vi.fn() };
     vi.stubGlobal("URL", urls);

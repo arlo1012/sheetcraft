@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, useId } from "vue";
+import PictureFormatFeedback from "./PictureFormatFeedback.vue";
 import type { PictureFormatLengthUnit } from "../../picture-format-pane-model";
 import type { PictureFormatPaneController } from "./usePictureFormatPane";
-import PictureFormatSection from "./PictureFormatSection.vue";
+import FormatSection from "../../../../shared/format-pane/FormatSection.vue";
 import PictureFormatNumberField from "./PictureFormatNumberField.vue";
 import PictureFormatChoiceField from "./PictureFormatChoiceField.vue";
 import PictureFormatColorField from "./PictureFormatColorField.vue";
@@ -13,8 +14,8 @@ const props = defineProps<{
   unit: PictureFormatLengthUnit;
   initialPaint?: "fill" | "line";
 }>();
-const fillSection = ref<InstanceType<typeof PictureFormatSection> | null>(null);
-const lineSection = ref<InstanceType<typeof PictureFormatSection> | null>(null);
+const fillSection = ref<InstanceType<typeof FormatSection> | null>(null);
+const lineSection = ref<InstanceType<typeof FormatSection> | null>(null);
 defineExpose({
   showCategory: (category: "fill" | "line") => {
     (category === "fill" ? fillSection.value : lineSection.value)?.expand();
@@ -30,6 +31,8 @@ const lineModes = computed(() => {
     ]
   );
 });
+const fillFeedbackId = `picture-format-fill-${useId()}`;
+const lineFeedbackId = `picture-format-line-${useId()}`;
 const fill = computed(() => props.controller.detailed("fill"));
 const line = computed(() => props.controller.detailed("line"));
 </script>
@@ -42,24 +45,29 @@ const line = computed(() => props.controller.detailed("line"));
     >
       {{ controller.t("groupMemberPaintScope") }}
     </p>
-    <PictureFormatSection
+    <FormatSection
       ref="fillSection"
       :title="controller.t('fillSection')"
       :initially-open="initialPaint === 'fill'"
     >
       <template v-if="controller.hasDetailedCapabilities.value">
-        <PicturePaintEditor
-          :owner-key="fill.ownerKey"
-          :value="fill.value"
-          :mixed="controller.snapshot.value?.mixedDetailed?.includes('fill')"
-          :disabled="fill.disabled"
-          :t="controller.t"
-          :source-asset-id="controller.snapshot.value?.owner.assetId"
-          :load-asset="controller.loadPaintAsset"
-          :on-commit="fill.apply"
-        />
-        <p v-if="fill.error" role="alert">{{ fill.error }}</p>
-        <p v-else-if="fill.reason">{{ fill.reason }}</p>
+        <div
+          role="group"
+          :aria-label="controller.t('fillSection')"
+          :aria-describedby="fill.error || fill.reason ? fillFeedbackId : undefined"
+        >
+          <PicturePaintEditor
+            :owner-key="fill.ownerKey"
+            :value="fill.value"
+            :mixed="controller.snapshot.value?.mixedDetailed?.includes('fill')"
+            :disabled="fill.disabled"
+            :t="controller.t"
+            :source-asset-id="controller.snapshot.value?.owner.assetId"
+            :load-asset="controller.loadPaintAsset"
+            :on-commit="fill.apply"
+          />
+          <PictureFormatFeedback :id="fillFeedbackId" :reason="fill.reason" :error="fill.error" />
+        </div>
       </template>
       <template v-else>
         <PictureFormatChoiceField :controller="controller" field="fillMode" />
@@ -71,21 +79,26 @@ const line = computed(() => props.controller.detailed("line"));
         />
         <PictureFormatChoiceField :controller="controller" field="fillGradientPreset" />
       </template>
-    </PictureFormatSection>
-    <PictureFormatSection ref="lineSection" :title="controller.t('lineSection')" initially-open>
+    </FormatSection>
+    <FormatSection ref="lineSection" :title="controller.t('lineSection')" initially-open>
       <template v-if="controller.hasDetailedCapabilities.value">
-        <PictureLineEditor
-          :owner-key="line.ownerKey"
-          :value="line.value"
-          :mixed="controller.snapshot.value?.mixedDetailed?.includes('line')"
-          :disabled="line.disabled"
-          :t="controller.t"
-          :source-asset-id="controller.snapshot.value?.owner.assetId"
-          :load-asset="controller.loadPaintAsset"
-          :on-commit="line.apply"
-        />
-        <p v-if="line.error" role="alert">{{ line.error }}</p>
-        <p v-else-if="line.reason">{{ line.reason }}</p>
+        <div
+          role="group"
+          :aria-label="controller.t('lineSection')"
+          :aria-describedby="line.error || line.reason ? lineFeedbackId : undefined"
+        >
+          <PictureLineEditor
+            :owner-key="line.ownerKey"
+            :value="line.value"
+            :mixed="controller.snapshot.value?.mixedDetailed?.includes('line')"
+            :disabled="line.disabled"
+            :t="controller.t"
+            :source-asset-id="controller.snapshot.value?.owner.assetId"
+            :load-asset="controller.loadPaintAsset"
+            :on-commit="line.apply"
+          />
+          <PictureFormatFeedback :id="lineFeedbackId" :reason="line.reason" :error="line.error" />
+        </div>
       </template>
       <template v-else>
         <PictureFormatChoiceField :controller="controller" field="lineMode" :options="lineModes" />
@@ -102,6 +115,6 @@ const line = computed(() => props.controller.detailed("line"));
         <PictureFormatChoiceField :controller="controller" field="lineCap" />
         <PictureFormatChoiceField :controller="controller" field="lineJoin" />
       </template>
-    </PictureFormatSection>
+    </FormatSection>
   </div>
 </template>

@@ -1,31 +1,44 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, useId } from "vue";
+import PictureFormatFeedback from "./PictureFormatFeedback.vue";
 import PictureCropShapeMenu from "../PictureCropShapeMenu.vue";
 import { useAppI18n } from "../../../../shared/i18n";
 import type { PictureFormatLengthUnit } from "../../picture-format-pane-model";
 import type { PictureFormatPaneController } from "./usePictureFormatPane";
-import PictureFormatSection from "./PictureFormatSection.vue";
+import FormatSection from "../../../../shared/format-pane/FormatSection.vue";
 import PictureFormatNumberField from "./PictureFormatNumberField.vue";
 import PictureFormatResetButton from "./PictureFormatResetButton.vue";
 const props = defineProps<{
   controller: PictureFormatPaneController;
   unit: PictureFormatLengthUnit;
 }>();
+const shapeFeedbackId = `picture-format-shape-${useId()}`;
 const shape = computed(() => props.controller.cropShape());
 const { t } = useAppI18n();
 </script>
 <template>
   <div class="picture-format-picture">
-    <PictureFormatSection :title="controller.t('cropSection')" initially-open>
-      <PictureCropShapeMenu
-        :owner-id="shape.ownerKey"
-        :current="shape.value"
-        :disabled="shape.disabled"
-        :handler="shape.apply"
-        :labels="{ trigger: t('image.cropShape'), applyRejected: controller.t('applyRejected') }"
-      />
-      <p v-if="shape.error" role="alert">{{ shape.error }}</p>
-      <p v-else-if="shape.disabled && shape.reason">{{ shape.reason }}</p>
+    <FormatSection :title="controller.t('cropSection')" initially-open>
+      <div
+        role="group"
+        :aria-label="t('image.cropShape')"
+        :aria-describedby="
+          shape.error || (shape.disabled && shape.reason) ? shapeFeedbackId : undefined
+        "
+      >
+        <PictureCropShapeMenu
+          :owner-id="shape.ownerKey"
+          :current="shape.value"
+          :disabled="shape.disabled"
+          :handler="shape.apply"
+          :labels="{ trigger: t('image.cropShape'), applyRejected: controller.t('applyRejected') }"
+        />
+        <PictureFormatFeedback
+          :id="shapeFeedbackId"
+          :reason="shape.disabled ? shape.reason : undefined"
+          :error="shape.error"
+        />
+      </div>
       <h3>{{ controller.t("sourcePosition") }}</h3>
       <PictureFormatNumberField :controller="controller" field="sourceWidthPt" :unit="unit" />
       <PictureFormatNumberField :controller="controller" field="sourceHeightPt" :unit="unit" />
@@ -38,7 +51,7 @@ const { t } = useAppI18n();
       <PictureFormatNumberField :controller="controller" field="cropTopPt" :unit="unit" />
       <p>{{ controller.t("cropHelp") }}</p>
       <PictureFormatResetButton :controller="controller" type="reset-crop" />
-    </PictureFormatSection>
+    </FormatSection>
     <div class="picture-format-picture__appearance-reset">
       <PictureFormatResetButton :controller="controller" type="reset-picture" />
     </div>

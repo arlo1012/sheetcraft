@@ -203,6 +203,7 @@ describe("picture theme-suppression native admission", () => {
       expect(output.addImage).toHaveBeenCalledExactlyOnceWith(0, {
         tl: { nativeCol: 2, nativeColOff: 28575, nativeRow: 3, nativeRowOff: 38100 },
         ext: { width: 120, height: 80 },
+        transformOrigin: { x: 1857375, y: 723900 },
         altText: "Synthetic",
         issueLocation: 'Synthetic!C4.floatingImages["picture"].altText',
       });

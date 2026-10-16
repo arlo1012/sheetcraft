@@ -3,7 +3,7 @@ import { ref, watch, onBeforeUnmount } from "vue";
 import type { SheetCameraDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
-import { DEFAULT_ROW_HEIGHT, getDefaultColumnWidth } from "@sheetcraft/core/workbook";
+import { getDefaultRowHeight, getDefaultColumnWidth } from "@sheetcraft/core/workbook";
 import { createSheetGeometry } from "@sheetcraft/sheet-engine/geometry";
 import { createRowVisibilityIndex } from "@sheetcraft/sheet-engine/visibility";
 import { createSheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
@@ -56,7 +56,7 @@ function render() {
   const geometry = createSheetGeometry({
     rowCount,
     columnCount,
-    rowHeight: DEFAULT_ROW_HEIGHT,
+    rowHeight: getDefaultRowHeight(sheet),
     columnWidth: getDefaultColumnWidth(sheet),
     rowHeights: sheet.rowHeights,
     columnWidths: sheet.columnWidths,
@@ -70,7 +70,7 @@ function render() {
   });
   const rows = createRowVisibilityIndex({
     rowCount,
-    defaultRowHeight: DEFAULT_ROW_HEIGHT,
+    defaultRowHeight: getDefaultRowHeight(sheet),
     rowHeights: sheet.rowHeights,
     hiddenRows: sheet.hiddenRows,
     hiddenIntervals: createSheetHiddenRowIntervals(sheet, props.evaluator),
@@ -135,6 +135,7 @@ watch(
     canvas.value,
     props.drawing,
     props.sheet,
+    getDefaultRowHeight(props.sheet),
     props.revision,
     props.imageAssetUrls,
     props.theme,

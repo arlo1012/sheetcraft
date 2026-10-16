@@ -434,6 +434,12 @@ describe("stale Chart sources and owners", () => {
       },
     ],
     [
+      "default row height",
+      (sheet: Sheet) => {
+        sheet.defaultRowHeight = 20;
+      },
+    ],
+    [
       "hidden row in place",
       (sheet: Sheet) => {
         sheet.hiddenRows!.add(0);

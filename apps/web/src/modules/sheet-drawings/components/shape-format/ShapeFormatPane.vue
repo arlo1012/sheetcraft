@@ -2,6 +2,8 @@
 import { computed, nextTick, ref, useId, watch } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
+import { RadioGroup as TRadioGroup, RadioButton as TRadioButton } from "tdesign-vue-next/es/radio";
+import { Tabs as TTabs, TabPanel as TTabPanel } from "tdesign-vue-next/es/tabs";
 import { PaintBucket, Ruler, Sparkles, Type, X } from "lucide-vue-next";
 import type { PictureFormatLengthUnit } from "../../../sheet-images/picture-format-pane-model";
 import type { ShapeFormatMode, ShapeFormatTab } from "../../shape-format-pane-model";
@@ -17,6 +19,7 @@ const props = withDefaults(
       initialTab?: ShapeFormatTab;
       initialUnit?: PictureFormatLengthUnit;
       beforeInteraction?: () => boolean;
+      beforeTabChange?: (tab: ShapeFormatTab) => boolean;
     }
   >(),
   { initialMode: "shape", initialTab: "size-properties", initialUnit: "pt", locale: "en-US" },
@@ -51,7 +54,6 @@ const tab = computed({
 });
 const unit = ref<PictureFormatLengthUnit>(props.initialUnit);
 const paneId = `shape-format-pane-${useId()}`;
-const tabButtons = ref<HTMLButtonElement[]>([]);
 const shapeFillRef = ref<InstanceType<typeof ShapeFormatFillLine>>(),
   textFillRef = ref<InstanceType<typeof ShapeFormatFillLine>>();
 const tabs = computed<readonly ShapeFormatTab[]>(() =>
@@ -74,6 +76,27 @@ function changeUnit(value: unknown) {
     unit.value = value;
   }
 }
+function selectTab(value: ShapeFormatTab): boolean {
+  try {
+    if (props.beforeTabChange?.(value) === false) return false;
+  } catch {
+    return false;
+  }
+  mode.value = value.startsWith("text-") ? "text" : "shape";
+  tab.value = value;
+  return true;
+}
+function selectMode(value: unknown, context: { e: Event }) {
+  if (
+    (value === "shape" || value === "text") &&
+    !selectTab(value === "shape" ? shapeTab.value : textTab.value)
+  )
+    context.e.preventDefault();
+}
+function changeTab(value: unknown) {
+  if (typeof value === "string" && tabs.value.includes(value as ShapeFormatTab))
+    selectTab(value as ShapeFormatTab);
+}
 function close() {
   controller.cancel();
   emit("cancel");
@@ -86,6 +109,14 @@ function keydown(event: KeyboardEvent) {
   }
 }
 async function tabKeydown(event: KeyboardEvent) {
+  if (
+    event.isComposing ||
+    event.keyCode === 229 ||
+    !(event.target instanceof Element) ||
+    !event.target.closest('[role="tab"]')
+  )
+    return;
+  const root = event.currentTarget as HTMLElement;
   const index = tabs.value.indexOf(tab.value);
   const next =
     event.key === "ArrowRight"
@@ -99,9 +130,9 @@ async function tabKeydown(event: KeyboardEvent) {
             : undefined;
   if (next === undefined) return;
   event.preventDefault();
-  tab.value = tabs.value[next]!;
+  if (!selectTab(tabs.value[next]!)) return;
   await nextTick();
-  tabButtons.value[next]?.focus();
+  root.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus();
 }
 let blockedInteraction = false;
 function beforeInteraction(event: Event) {
@@ -159,27 +190,22 @@ defineExpose({
           snapshot.drawing.name
         }}</span>
       </div>
-      <TButton variant="text" shape="square" size="small" :aria-label="t('close')" @click="close"
-        ><X :size="16"
-      /></TButton>
+      <TButton variant="text" shape="square" size="small" :aria-label="t('close')" @click="close">
+        <template #icon><X class="sheetcraft-action-icon" aria-hidden="true" /></template>
+      </TButton>
     </header>
-    <div
+    <TRadioGroup
       class="shape-format-pane__modes"
-      role="group"
+      :value="mode"
+      variant="default-filled"
       :aria-label="controller.s.value('paneTitle')"
+      @change="selectMode"
     >
-      <button type="button" :aria-pressed="mode === 'shape'" @click="mode = 'shape'">
-        {{ controller.s.value("shapeOptions") }}
-      </button>
-      <button
-        v-if="!isConnector"
-        type="button"
-        :aria-pressed="mode === 'text'"
-        @click="mode = 'text'"
-      >
-        {{ controller.s.value("textOptions") }}
-      </button>
-    </div>
+      <TRadioButton value="shape">{{ controller.s.value("shapeOptions") }}</TRadioButton>
+      <TRadioButton v-if="!isConnector" value="text">{{
+        controller.s.value("textOptions")
+      }}</TRadioButton>
+    </TRadioGroup>
     <div
       class="shape-format-pane__tabs"
       role="tablist"
@@ -188,62 +214,57 @@ defineExpose({
       "
       @keydown="tabKeydown"
     >
-      <button
-        :id="`${paneId}-${tabs[0]}-tab`"
-        :ref="
-          (element) => {
-            tabButtons[0] = element as HTMLButtonElement;
-          }
-        "
-        type="button"
-        role="tab"
-        :aria-selected="tab === tabs[0]"
-        :aria-controls="`${paneId}-${tabs[0]}-panel`"
-        :tabindex="tab === tabs[0] ? 0 : -1"
-        @click="tab = tabs[0]!"
-      >
-        <PaintBucket :size="16" aria-hidden="true" /><span>{{
-          mode === "shape" ? t("fillLineTab") : controller.s.value("textFillOutline")
-        }}</span>
-      </button>
-      <button
-        :id="`${paneId}-${tabs[1]}-tab`"
-        :ref="
-          (element) => {
-            tabButtons[1] = element as HTMLButtonElement;
-          }
-        "
-        type="button"
-        role="tab"
-        :aria-selected="tab === tabs[1]"
-        :aria-controls="`${paneId}-${tabs[1]}-panel`"
-        :tabindex="tab === tabs[1] ? 0 : -1"
-        @click="tab = tabs[1]!"
-      >
-        <Sparkles :size="16" aria-hidden="true" /><span>{{ t("effectsTab") }}</span>
-      </button>
-      <button
-        :id="`${paneId}-${tabs[2]}-tab`"
-        :ref="
-          (element) => {
-            tabButtons[2] = element as HTMLButtonElement;
-          }
-        "
-        type="button"
-        role="tab"
-        :aria-selected="tab === tabs[2]"
-        :aria-controls="`${paneId}-${tabs[2]}-panel`"
-        :tabindex="tab === tabs[2] ? 0 : -1"
-        @click="tab = tabs[2]!"
-      >
-        <Ruler v-if="mode === 'shape'" :size="16" aria-hidden="true" /><Type
-          v-else
-          :size="16"
-          aria-hidden="true"
-        /><span>{{
-          mode === "shape" ? t("sizePropertiesTab") : controller.s.value("textBox")
-        }}</span>
-      </button>
+      <TTabs class="sheetcraft-tabs--compact" :value="tab" @change="changeTab">
+        <TTabPanel :value="tabs[0]" :destroy-on-hide="false">
+          <template #label>
+            <button
+              :id="`${paneId}-${tabs[0]}-tab`"
+              type="button"
+              class="shape-format-pane__tab-label"
+              role="tab"
+              :aria-selected="tab === tabs[0]"
+              :aria-controls="`${paneId}-${tabs[0]}-panel`"
+              :tabindex="tab === tabs[0] ? 0 : -1"
+            >
+              <PaintBucket class="sheetcraft-action-icon" aria-hidden="true" />
+              {{ mode === "shape" ? t("fillLineTab") : controller.s.value("textFillOutline") }}
+            </button>
+          </template>
+        </TTabPanel>
+        <TTabPanel :value="tabs[1]" :destroy-on-hide="false">
+          <template #label>
+            <button
+              :id="`${paneId}-${tabs[1]}-tab`"
+              type="button"
+              class="shape-format-pane__tab-label"
+              role="tab"
+              :aria-selected="tab === tabs[1]"
+              :aria-controls="`${paneId}-${tabs[1]}-panel`"
+              :tabindex="tab === tabs[1] ? 0 : -1"
+            >
+              <Sparkles class="sheetcraft-action-icon" aria-hidden="true" />
+              {{ t("effectsTab") }}
+            </button>
+          </template>
+        </TTabPanel>
+        <TTabPanel :value="tabs[2]" :destroy-on-hide="false">
+          <template #label>
+            <button
+              :id="`${paneId}-${tabs[2]}-tab`"
+              type="button"
+              class="shape-format-pane__tab-label"
+              role="tab"
+              :aria-selected="tab === tabs[2]"
+              :aria-controls="`${paneId}-${tabs[2]}-panel`"
+              :tabindex="tab === tabs[2] ? 0 : -1"
+            >
+              <Ruler v-if="mode === 'shape'" class="sheetcraft-action-icon" aria-hidden="true" />
+              <Type v-else class="sheetcraft-action-icon" aria-hidden="true" />
+              {{ mode === "shape" ? t("sizePropertiesTab") : controller.s.value("textBox") }}
+            </button>
+          </template>
+        </TTabPanel>
+      </TTabs>
     </div>
     <div v-if="snapshot" class="shape-format-pane__units">
       <span>{{ t("units") }}</span
@@ -281,7 +302,12 @@ defineExpose({
           </p>
           <p v-if="snapshot.scopeDescription">{{ snapshot.scopeDescription }}</p>
         </div>
-        <p class="shape-format-pane__hint">{{ controller.s.value("capabilityNote") }}</p>
+        <p
+          v-if="!controller.isGroup.value && snapshot.scopeDescription"
+          class="shape-format-pane__hint"
+        >
+          {{ snapshot.scopeDescription }}
+        </p>
         <p v-if="controller.error.value" class="shape-format-pane__error" role="alert">
           {{ controller.error.value }}
         </p>
@@ -341,6 +367,8 @@ defineExpose({
   </aside>
 </template>
 <style scoped lang="scss">
+@use "../../../../shared/tabs/tab-label";
+
 .shape-format-pane {
   box-sizing: border-box;
   display: flex;
@@ -355,8 +383,8 @@ defineExpose({
   background: var(--sheetcraft-surface-panel);
   color: var(--sheetcraft-text-primary);
   font-family: var(--sheetcraft-font-sans);
-  font-size: 12px;
-  line-height: 20px;
+  font-size: var(--sheetcraft-font-size-body-medium);
+  line-height: var(--sheetcraft-line-height-body-medium);
   &__header {
     display: flex;
     align-items: center;
@@ -368,9 +396,9 @@ defineExpose({
     min-width: 0;
     display: grid;
     strong {
-      font-size: 14px;
-      line-height: 22px;
-      font-weight: 600;
+      font-size: var(--sheetcraft-font-size-title-small);
+      line-height: var(--sheetcraft-line-height-title-small);
+      font-weight: var(--sheetcraft-font-weight-semibold);
     }
     span {
       overflow: hidden;
@@ -380,63 +408,13 @@ defineExpose({
     }
   }
   &__modes {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 2px;
-    padding: 3px;
     margin: 0 12px 6px;
-    border-radius: var(--sheetcraft-radius-small);
-    background: var(--sheetcraft-surface-hover);
-    button {
-      min-width: 0;
-      border: 0;
-      border-radius: var(--sheetcraft-radius-small);
-      padding: 5px;
-      background: transparent;
-      color: inherit;
-      font: inherit;
-      cursor: pointer;
-    }
-    button[aria-pressed="true"] {
-      background: var(--sheetcraft-surface-panel);
-      font-weight: 600;
-    }
   }
   &__tabs {
-    display: grid;
-    grid-template-columns: 1.2fr 0.8fr 1.4fr;
-    gap: 2px;
     margin: 0 8px;
-    border-bottom: 1px solid var(--sheetcraft-border-subtle);
-    button {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-width: 0;
-      gap: 2px;
-      border: 0;
-      border-bottom: 2px solid transparent;
-      padding: 8px 2px 6px;
-      background: transparent;
-      color: inherit;
-      font: inherit;
-      cursor: pointer;
-      border-radius: var(--sheetcraft-radius-small) var(--sheetcraft-radius-small) 0 0;
-    }
-    button:hover {
-      background: var(--sheetcraft-surface-hover);
-    }
-    button[aria-selected="true"] {
-      border-bottom-color: var(--sheetcraft-text-primary);
-      font-weight: 500;
-    }
-    span {
-      max-width: 100%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
+  }
+  &__tab-label {
+    @include tab-label.label($with-icon: true);
   }
   &__units {
     display: flex;
@@ -462,18 +440,18 @@ defineExpose({
   &__error {
     color: var(--sheetcraft-text-secondary);
     margin: 8px 0;
-    font-size: 12px;
-    line-height: 18px;
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
     overflow-wrap: anywhere;
   }
   &__scope {
     margin: 8px 0;
     color: var(--sheetcraft-text-secondary);
-    font-size: 12px;
-    line-height: 18px;
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
     strong {
       color: var(--sheetcraft-text-primary);
-      font-weight: 500;
+      font-weight: var(--sheetcraft-font-weight-medium);
     }
     p {
       margin: 3px 0 0;

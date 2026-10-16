@@ -1,6 +1,7 @@
 import { mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import PictureOwnedLeafRibbon from "../../../../modules/sheet-images/components/PictureOwnedLeafRibbon.vue";
+import PictureAppearanceTools from "../../../../modules/sheet-images/components/PictureAppearanceTools.vue";
 import PictureAssetTools from "../../../../modules/sheet-images/components/PictureAssetTools.vue";
 import PictureToolbar from "../../../../modules/sheet-images/components/PictureToolbar.vue";
 import RibbonButton from "../../../../shared/ribbon/RibbonButton.vue";
@@ -47,12 +48,31 @@ describe("actual owned leaf source ribbon", () => {
     expect(f.wrapper.text()).toContain("更改图片");
     expect(f.wrapper.attributes("data-owned-picture-source-ribbon")).toBeDefined();
   });
-  test("permission/busy refusal disables replacement but permits read-only properties", async () => {
+  test("protected editing refusal permits explicit read-only properties", async () => {
     const f = fixture();
     await f.wrapper.setProps({ disabled: true });
     await button(f.wrapper, "replace").trigger("click");
     await button(f.wrapper, "format").trigger("click");
     expect(f.replace).not.toHaveBeenCalled();
+    expect(f.format).toHaveBeenCalledOnce();
+  });
+  test("busy blocks explicit viewing and effects formatting", async () => {
+    const f = fixture();
+    const old = button(f.wrapper, "format").vm.$.vnode.props!.onActivate as () => void;
+    await f.wrapper.setProps({ busy: true, disabled: true });
+    expect(button(f.wrapper, "format").props("disabled")).toBe(true);
+    await button(f.wrapper, "format").trigger("click");
+    old();
+    expect(f.format).not.toHaveBeenCalled();
+  });
+  test("protected viewing does not enable the Effects edit entry", async () => {
+    const f = fixture();
+    const tools = f.wrapper.getComponent(PictureAppearanceTools);
+    const editFormat = tools.vm.$.vnode.props!.onFormat as () => void;
+    await f.wrapper.setProps({ disabled: true });
+    editFormat();
+    expect(f.format).not.toHaveBeenCalled();
+    await button(f.wrapper, "format").trigger("click");
     expect(f.format).toHaveBeenCalledOnce();
   });
   test("captured callbacks cannot borrow a reopened owner or a later source handler", async () => {

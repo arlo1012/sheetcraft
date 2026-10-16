@@ -206,7 +206,7 @@ async function footer(
     root === "picker"
       ? ".range-reference-picker"
       : root === "editor"
-        ? ".chart-editor"
+        ? ".chart-selector"
         : `[data-chart-${root}-dialog]`;
   const dialog = document.querySelector(selector)?.closest(".t-dialog");
   expect(dialog, `Missing ${root} native dialog`).toBeDefined();
@@ -1181,5 +1181,77 @@ describe("bounded Combo through real Workspace initialization and native control
     expect(renderData(ownerProbe(f.wrapper)).series.map((entry) => entry.id)).toEqual([
       source.series[1]!.id,
     ]);
+  });
+});
+
+describe("main chart picker captured selection", () => {
+  test("main picker restores the existing chart after both confirm and cancel without writing the draft", async () => {
+    const f = await fixture();
+    const before = serializeWorkbook(f.workbook);
+    const editor = await openComboEditor(f.wrapper);
+    await editor.get("[data-select-formula-reference]").trigger("click");
+    await flushPromises();
+    await pickCells(f.wrapper, { row: 0, column: 0 }, { row: 2, column: 2 });
+    expect(f.wrapper.getComponent(SheetDrawingLayer).props("selectedDrawingId")).toBeNull();
+    await footer("picker", "OK");
+    expect(f.wrapper.getComponent(SheetDrawingLayer).props("selectedDrawingId")).toBe("chart-one");
+    const source = editor.get<HTMLInputElement>(".chart-selector__source-controls input");
+    expect(source.element.value).toBe("='Source Data'!$A$1:$C$3");
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    await editor.get("[data-select-formula-reference]").trigger("click");
+    await flushPromises();
+    await pickCells(f.wrapper, { row: 0, column: 0 }, { row: 1, column: 1 });
+    expect(f.wrapper.getComponent(SheetDrawingLayer).props("selectedDrawingId")).toBeNull();
+    await footer("picker", "Cancel");
+    expect(f.wrapper.getComponent(SheetDrawingLayer).props("selectedDrawingId")).toBe("chart-one");
+    expect(source.element.value).toBe("='Source Data'!$A$1:$C$3");
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    await footer("editor", "OK");
+    expect(chart(f.sheet).chart.range).toEqual({
+      start: { row: 0, column: 0 },
+      end: { row: 2, column: 2 },
+    });
+    expect(f.wrapper.getComponent(SheetDrawingLayer).props("selectedDrawingId")).toBe("chart-one");
+    expect(f.controller.session.history.undoStack).toHaveLength(1);
+  });
+
+  test("main picker does not select an uninserted chart draft", async () => {
+    const f = await fixture();
+    const before = serializeWorkbook(f.workbook);
+    await f.wrapper.get('[data-ribbon-category="insert"]').trigger("click");
+    await f.wrapper
+      .get('.chart-insert-tools [role="button"][aria-label="Column"]')
+      .trigger("click");
+    await flushPromises();
+    const editor = f.wrapper.getComponent(ChartEditorDialog);
+    expect(editor.props("mode")).toBe("insert");
+    await editor.get("[data-select-formula-reference]").trigger("click");
+    await flushPromises();
+    await pickCells(f.wrapper, { row: 0, column: 0 }, { row: 2, column: 2 });
+    await footer("picker", "OK");
+    expect(f.wrapper.getComponent(SheetDrawingLayer).props("selectedDrawingId")).toBeNull();
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    await footer("editor", "Cancel");
+    expect(f.controller.session.history.undoStack).toHaveLength(0);
+  });
+
+  test("main picker never restores a stale chart after switching sheets", async () => {
+    const f = await fixture();
+    const before = serializeWorkbook(f.workbook);
+    const editor = await openComboEditor(f.wrapper);
+    await editor.get("[data-select-formula-reference]").trigger("click");
+    await flushPromises();
+    const picker = f.wrapper.getComponent(RangeReferencePicker);
+    const oldConfirm = picker.vm.$.vnode.props?.onConfirm as () => void;
+    await pickCells(f.wrapper, { row: 0, column: 0 }, { row: 2, column: 2 });
+    await tab(f.wrapper, "Other Sheet");
+    oldConfirm();
+    await flushPromises();
+    expect(f.controller.activeSheet.value.id).toBe("other");
+    expect(f.wrapper.findComponent(ChartEditorDialog).exists()).toBe(false);
+    expect(f.wrapper.findComponent(RangeReferencePicker).exists()).toBe(false);
+    expect(f.wrapper.getComponent(SheetDrawingLayer).props("selectedDrawingId")).toBeNull();
+    expect(serializeWorkbook(f.workbook)).toEqual({ ...before, activeSheetId: "other" });
+    expect(f.controller.session.history.undoStack).toHaveLength(0);
   });
 });

@@ -39,6 +39,7 @@ const props = defineProps<{
   ariaLabel: string;
   update: (snapshot: ShapeRichTextSnapshot) => boolean;
   composition: (active: boolean) => boolean;
+  historyStep?: (direction: "undo" | "redo") => boolean;
 }>();
 const emit = defineEmits<{
   selection: [snapshot: { selection: TextDomSelection; pendingFormat?: ShapeTextCharacterFormat }];
@@ -281,14 +282,16 @@ const events = computed(() => {
     source = props.source,
     revision = sourceRevision.value;
   const update = props.update,
-    composition = props.composition;
+    composition = props.composition,
+    sharedHistoryStep = props.historyStep;
   const current = () =>
     !disposed &&
     sessionId === props.sessionId &&
     source === props.source &&
     revision === sourceRevision.value &&
     update === props.update &&
-    composition === props.composition;
+    composition === props.composition &&
+    sharedHistoryStep === props.historyStep;
   const owns = (event: Event) =>
     current() && !!root.value && event.target instanceof Node && root.value.contains(event.target);
   const stop = (event: Event) => event.stopPropagation();
@@ -315,6 +318,10 @@ const events = computed(() => {
   const historyStep = (direction: "undo" | "redo") => {
     if (!current() || props.readOnly || composing.value) return;
     captureSelection();
+    if (sharedHistoryStep) {
+      sharedHistoryStep(direction);
+      return;
+    }
     const next = history.step(direction);
     if (!next) return;
     state = next;

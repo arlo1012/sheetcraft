@@ -41,6 +41,33 @@ function reflectedGroup() {
 }
 
 describe("internal picture document support preflight", () => {
+  test("preflights proposed row baselines in sparse and dimension restore shadows", () => {
+    const { workbook, sheet } = fixture();
+    const state = createSheetSparseState(sheet);
+    state.defaultRowHeight = 20;
+    state.rowHeights = [{ index: 1, size: 24 }];
+    state.floatingImages = [framedPicture()];
+    const sparse: WorkbookCommand = { type: "restoreSheetState", sheetId: sheet.id, state };
+    const dimensions: WorkbookCommand = {
+      type: "restoreSheetDimensionState",
+      sheetId: sheet.id,
+      axis: "row",
+      defaultRowHeight: 20,
+      dimensions: state.rowHeights,
+      hiddenIndexes: [2],
+      floatingImageState: state.floatingImages,
+    };
+    const before = serializeWorkbook(workbook);
+    expect(() => assertPictureCommandSupport(sparse, workbook)).not.toThrow();
+    expect(() => assertPictureCommandSupport(dimensions, workbook)).not.toThrow();
+    state.defaultRowHeight = Number.NaN;
+    expect(() => assertPictureCommandSupport(sparse, workbook)).toThrow(/default axis size/);
+    expect(() =>
+      assertPictureCommandSupport({ ...dimensions, defaultRowHeight: Number.NaN }, workbook),
+    ).toThrow(/default axis size/);
+    expect(serializeWorkbook(workbook)).toEqual(before);
+  });
+
   test.each([
     { image: framedPicture(), version: 47 },
     { image: pictureGroup(), version: 48 },

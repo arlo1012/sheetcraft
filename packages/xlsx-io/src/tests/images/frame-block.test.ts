@@ -4,6 +4,7 @@ import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import type { FramedFloatingImage } from "@sheetcraft/core/picture-object";
 import { encodeXlsx } from "../../index.js";
 import { createXlsxImageExporter } from "../../image-export.js";
+import { XlsxCompatibilityError } from "../../types.js";
 function picture(): FramedFloatingImage {
   return {
     id: "frame",
@@ -43,14 +44,30 @@ describe("unsupported frame-aware native export safety", () => {
     const target = { addImage: vi.fn(() => 1) },
       output = { addImage: vi.fn() };
     const sheet = getActiveSheet(createWorkbook({ id: "w", sheetId: "s" }));
-    expect(() =>
+    let failure: unknown;
+    try {
       createXlsxImageExporter(target, undefined).addFloatingImage(
         output,
         sheet,
         picture(),
         "Synthetic!C4",
-      ),
-    ).toThrow(/not yet supported/);
+      );
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toBeInstanceOf(XlsxCompatibilityError);
+    expect(failure).toMatchObject({
+      report: {
+        issues: [
+          {
+            code: "feature-omitted",
+            severity: "block",
+            count: 1,
+            locations: ['Synthetic!C4.floatingImages["frame"].frame'],
+          },
+        ],
+      },
+    });
     expect(target.addImage).not.toHaveBeenCalled();
     expect(output.addImage).not.toHaveBeenCalled();
   });

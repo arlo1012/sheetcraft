@@ -1,0 +1,41 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <xdr:twoCellAnchor editAs="absolute">
+    <xdr:from>
+      <xdr:col>4</xdr:col>
+      <xdr:colOff>1322070</xdr:colOff>
+      <xdr:row>3</xdr:row>
+      <xdr:rowOff>95250</xdr:rowOff>
+    </xdr:from>
+    <xdr:to>
+      <xdr:col>5</xdr:col>
+      <xdr:colOff>1104900</xdr:colOff>
+      <xdr:row>7</xdr:row>
+      <xdr:rowOff>95250</xdr:rowOff>
+    </xdr:to>
+    <xdr:pic>
+      <xdr:nvPicPr>
+        <xdr:cNvPr id="4" name="Picture 3" descr="Synthetic green checkerboard: fixed"/>
+        <xdr:cNvPicPr>
+          <a:picLocks noChangeAspect="1"/>
+        </xdr:cNvPicPr>
+      </xdr:nvPicPr>
+      <xdr:blipFill>
+        <a:blip r:embed="rId1"/>
+        <a:stretch>
+          <a:fillRect/>
+        </a:stretch>
+      </xdr:blipFill>
+      <xdr:spPr>
+        <a:xfrm>
+          <a:off x="6762750" y="742950"/>
+          <a:ext cx="1143000" cy="762000"/>
+        </a:xfrm>
+        <a:prstGeom prst="rect">
+          <a:avLst/>
+        </a:prstGeom>
+      </xdr:spPr>
+    </xdr:pic>
+    <xdr:clientData/>
+  </xdr:twoCellAnchor>
+</xdr:wsDr>

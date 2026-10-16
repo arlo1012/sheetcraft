@@ -267,13 +267,10 @@ function confirm(): void {
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/tabs/tab-label";
+
 .cell-format-dialog__tab {
-  font: inherit;
-  color: inherit;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
+  @include tab-label.label;
 }
 .cell-format-dialog__tabs {
   display: flex;

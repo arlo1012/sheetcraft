@@ -1,4 +1,11 @@
 export const chartsEnUS = {
+  "chart.comboCategory": "Combo",
+  "chart.defaultTitle": "Chart Title",
+  "chart.previewNoData": "No numeric data to preview. Select data and check the header settings.",
+  "chart.insertDialog": "Insert Chart",
+  "chart.dataPreview": "Selected data preview",
+  "chart.backToPreview": "Back to chart preview",
+
   "chart.dataTableUnavailable":
     "The complete data table cannot be rendered. Enlarge the chart, reduce the source to at most 32 categories and 8 series, or shorten number formats; check that the chosen font is available.",
   "chart.tools": "Charts",

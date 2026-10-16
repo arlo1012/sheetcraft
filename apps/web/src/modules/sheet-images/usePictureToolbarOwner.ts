@@ -1,3 +1,4 @@
+import type { PictureEffectEdit } from "./picture-effect-edit";
 import { computed, getCurrentScope, onScopeDispose, watch } from "vue";
 import { arePictureObjectsEqual } from "@sheetcraft/core/picture-object";
 import { isPictureGroup } from "@sheetcraft/core";
@@ -28,6 +29,7 @@ export function usePictureToolbarOwner(options: {
   resize: (source: FloatingImage, edit: PictureSizeEdit) => boolean;
   aspectRatio: (source: FloatingImage, locked: boolean) => boolean;
   appearance?: (patch: Partial<ImageAppearance> | undefined) => boolean;
+  effect?: (edit: PictureEffectEdit) => boolean;
 }) {
   let leaseEpoch = 0;
   let disposed = false;
@@ -208,6 +210,7 @@ export function usePictureToolbarOwner(options: {
         }),
       appearance: (patch: Partial<ImageAppearance> | undefined): boolean =>
         current() && (options.appearance?.(patch) ?? false),
+      effect: (edit: PictureEffectEdit): boolean => current() && (options.effect?.(edit) ?? false),
     };
   });
 }

@@ -91,6 +91,9 @@ describe("XLSX export geometry", () => {
     const result = await encodeXlsx(workbook);
     const xml = strFromU8(unzipSync(result.bytes)["xl/worksheets/sheet1.xml"]!);
     const rows = [...xml.matchAll(/<row\b([^>]*)>/g)].map((match) => match[1]!);
+    expect(xml).toMatch(
+      /<sheetFormatPr\b(?=[^>]*\bdefaultRowHeight="18")(?=[^>]*\bcustomHeight="1")/,
+    );
     expect(rows).toHaveLength(6);
     for (const row of rows) {
       expect(row).toContain('customHeight="1"');

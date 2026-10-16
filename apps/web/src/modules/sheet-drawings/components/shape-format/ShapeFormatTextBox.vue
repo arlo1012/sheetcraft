@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
-import PictureFormatSection from "../../../sheet-images/components/format-pane/PictureFormatSection.vue";
+import FormatSection from "../../../../shared/format-pane/FormatSection.vue";
 import PictureFormatField from "../../../sheet-images/components/format-pane/PictureFormatField.vue";
 import type { PictureFormatLengthUnit } from "../../../sheet-images/picture-format-pane-model";
 import ShapeFormatNumberField from "./ShapeFormatNumberField.vue";
@@ -63,7 +63,7 @@ const action = computed(() => {
 </script>
 <template>
   <div class="shape-format-text-box">
-    <PictureFormatSection :title="controller.s.value('textBox')" initially-open>
+    <FormatSection :title="controller.s.value('textBox')" initially-open>
       <ShapeFormatChoiceField :controller="controller" field="textVerticalAlignment" />
       <ShapeFormatChoiceField :controller="controller" field="textDirection" />
       <ShapeFormatChoiceField
@@ -98,7 +98,7 @@ const action = computed(() => {
       <ShapeFormatCheckbox :controller="controller" field="textResizeToFit" />
       <ShapeFormatCheckbox :controller="controller" field="textOverflow" />
       <ShapeFormatCheckbox :controller="controller" field="textWrap" />
-    </PictureFormatSection>
+    </FormatSection>
     <ShapeFormatFontFields v-if="includeFont" :controller="controller" />
   </div>
 </template>

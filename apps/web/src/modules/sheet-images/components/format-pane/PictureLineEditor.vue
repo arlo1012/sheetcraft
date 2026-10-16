@@ -113,6 +113,7 @@ function select<K extends "compound" | "dash" | "cap" | "join">(
     <template v-if="line">
       <PicturePaintNumber
         v-bind="numberProps('lineWidthPt', line.widthPt, (widthPt) => update({ widthPt }), 0, 4096)"
+        :step="0.25"
         unit="pt"
       />
       <PictureFormatField :label="t('lineCompound')"

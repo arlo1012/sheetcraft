@@ -18,6 +18,7 @@ import PicturePaintNumber from "./PicturePaintNumber.vue";
 import PicturePaintColor from "./PicturePaintColor.vue";
 const props = defineProps<{
   ownerKey: string;
+  hidePreset?: boolean;
   value?: Choice<PictureGlow>;
   disabled?: boolean;
   t: PictureFormatTranslate;
@@ -73,6 +74,7 @@ function selectPreset(id: string) {
 <template>
   <div class="picture-glow-editor">
     <PicturePresetGallery
+      v-if="!hidePreset"
       :owner-key="ownerKey"
       :groups="presetGroups"
       :selected-id="presetId"
@@ -113,6 +115,7 @@ function selectPreset(id: string) {
             100,
           )
         "
+        :display-precision="12"
         unit="%"
       />
     </template>

@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, useId } from "vue";
+import PictureFormatFeedback from "./PictureFormatFeedback.vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { RotateCcw } from "lucide-vue-next";
 import type { PictureFormatLabelKey, PictureFormatReset } from "../../picture-format-pane-model";
 import type { PictureFormatPaneController } from "./usePictureFormatPane";
 const props = defineProps<{ controller: PictureFormatPaneController; type: PictureFormatReset }>();
+const feedbackId = `picture-format-description-${useId()}`;
 const binding = computed(() => props.controller.reset(props.type));
 const labelKeys: Record<PictureFormatReset, PictureFormatLabelKey> = {
   "reset-size": "resetSize",
@@ -21,13 +23,13 @@ const labelKeys: Record<PictureFormatReset, PictureFormatLabelKey> = {
       variant="base"
       size="small"
       :disabled="binding.disabled"
+      :aria-describedby="binding.error || binding.reason ? feedbackId : undefined"
       :data-picture-format-reset="type"
       @click="binding.activate"
       ><template #icon><RotateCcw :size="14" /></template
       >{{ controller.t(labelKeys[type]) }}</TButton
     >
-    <p v-if="binding.error" role="alert">{{ binding.error }}</p>
-    <p v-else-if="binding.reason">{{ binding.reason }}</p>
+    <PictureFormatFeedback :id="feedbackId" :reason="binding.reason" :error="binding.error" />
   </div>
 </template>
 <style scoped lang="scss">

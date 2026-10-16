@@ -62,6 +62,19 @@ function fixture() {
 }
 
 describe("camera actions", () => {
+  test.each([
+    { baseline: undefined, expected: 72 },
+    { baseline: 20, expected: 60 },
+    { baseline: 24, expected: 72 },
+  ])("estimates initial source height from baseline $baseline", ({ baseline, expected }) => {
+    const f = fixture();
+    f.sheet.defaultRowHeight = baseline;
+    f.actions.open();
+    expect(f.actions.editing.value?.height).toBe(expected);
+    expect(f.sheet.rowHeights.size).toBe(0);
+    expect(f.execute).not.toHaveBeenCalled();
+  });
+
   test("inserts and edits a camera through Core without adding a duplicate", () => {
     const f = fixture();
     f.actions.open();

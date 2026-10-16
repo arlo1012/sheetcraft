@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
-import PictureFormatSection from "../../../sheet-images/components/format-pane/PictureFormatSection.vue";
+import FormatSection from "../../../../shared/format-pane/FormatSection.vue";
 import PicturePaintEditor from "../../../sheet-images/components/format-pane/PicturePaintEditor.vue";
 import PictureLineEditor from "../../../sheet-images/components/format-pane/PictureLineEditor.vue";
 import ShapeLineEndsControls from "../ShapeLineEndsControls.vue";
@@ -56,8 +56,8 @@ const leaf = computed(() => {
   return drawing?.kind === "shape" || drawing?.kind === "textBox" ? drawing : undefined;
 });
 const isConnector = computed(() => leaf.value?.kind === "shape" && !!leaf.value.shapeConnector);
-const fillRef = ref<InstanceType<typeof PictureFormatSection>>(),
-  lineRef = ref<InstanceType<typeof PictureFormatSection>>();
+const fillRef = ref<InstanceType<typeof FormatSection>>(),
+  lineRef = ref<InstanceType<typeof FormatSection>>();
 defineExpose({
   showCategory: (category: "fill" | "line") =>
     (category === "fill" ? fillRef.value : lineRef.value)?.expand(),
@@ -65,7 +65,7 @@ defineExpose({
 </script>
 <template>
   <div class="shape-format-fill-line">
-    <PictureFormatSection
+    <FormatSection
       v-if="target === 'text' && controller.hasWordArtStyleScope.value"
       :title="wordArtLabels.title"
       initially-open
@@ -121,8 +121,8 @@ defineExpose({
       >
         {{ clearWordArtCapability.reason }}
       </p>
-    </PictureFormatSection>
-    <PictureFormatSection
+    </FormatSection>
+    <FormatSection
       v-if="!isConnector"
       ref="fillRef"
       :title="
@@ -130,7 +130,7 @@ defineExpose({
       "
       initially-open
     >
-      <PicturePaintEditor v-bind="fill" :load-asset="fillAssetLoader" />
+      <PicturePaintEditor v-bind="fill" :load-asset="fillAssetLoader" :show-context-help="false" />
       <p
         v-if="controller.isMixedStyle(target, 'fill')"
         class="shape-format-fill-line__reason"
@@ -144,8 +144,8 @@ defineExpose({
       >
         {{ fillCapability.reason }}
       </p>
-    </PictureFormatSection>
-    <PictureFormatSection
+    </FormatSection>
+    <FormatSection
       ref="lineRef"
       :title="
         target === 'shape' ? controller.props.t('lineSection') : controller.s.value('textOutline')
@@ -184,7 +184,7 @@ defineExpose({
           {{ endsCapability.reason }}
         </p>
       </template>
-    </PictureFormatSection>
+    </FormatSection>
   </div>
 </template>
 <style scoped lang="scss">

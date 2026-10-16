@@ -21,11 +21,12 @@ import {
 import type { CellNumberFormat, CellNumberFormatNegativeStyle } from "@sheetcraft/core/style";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import OptionList from "../../../shared/option-list/OptionList.vue";
-import FontFormatField from "../../home-tools/components/FontFormatField.vue";
+import FontFormatField from "../../../shared/cell-text/FontFormatField.vue";
 import FontSettingsAction from "../../../shared/cell-text/FontSettingsAction.vue";
 import { useFontCatalog } from "../../../shared/cell-text/useFontCatalog";
 import { useAppI18n } from "../../../shared/i18n";
 import type { MessageKey } from "../../../shared/i18n";
+import { chartMinorGridlinesForAxis } from "../chart-axis-state";
 import type { ChartElementPatch } from "../chart-element-controls";
 import {
   chartFormatTargetKey,
@@ -134,6 +135,21 @@ const valueAxis = computed<ChartValueAxisFormat>(() =>
     ? (chart.value.format?.secondaryValueAxis ?? {})
     : (chart.value.format?.valueAxis ?? {}),
 );
+const minorGridlinesState = computed(() => {
+  if (!isValueAxis.value) return { checked: false, invalid: false };
+  try {
+    return {
+      checked: chartMinorGridlinesForAxis(
+        chart.value,
+        props.visibleData ?? props.data,
+        kind.value === "secondaryValueAxis",
+      ),
+      invalid: false,
+    };
+  } catch {
+    return { checked: false, invalid: true };
+  }
+});
 const categoryAxis = computed(() => chart.value.format?.categoryAxis ?? {});
 const axis = computed<ChartCategoryAxisFormat | ChartValueAxisFormat>(() =>
   kind.value === "categoryAxis" ? categoryAxis.value : valueAxis.value,
@@ -804,7 +820,13 @@ const localError = computed(
   () => Object.values(drafts).find((draft) => draft.error)?.error ?? fieldError.value,
 );
 const errorMessage = computed(
-  () => props.error || (localError.value ? t(errorKeys[localError.value]) : undefined),
+  () =>
+    props.error ||
+    (localError.value
+      ? t(errorKeys[localError.value])
+      : minorGridlinesState.value.invalid
+        ? t("chart.formatInvalidBounds")
+        : undefined),
 );
 function resetElement(): void {
   if (kind.value === "chart") {
@@ -953,8 +975,9 @@ function escapeDraft(event: KeyboardEvent): void {
               >{{ t("chart.formatMajorGridlines") }}</TCheckbox
             >
             <TCheckbox
-              :checked="valueAxis.minorGridlines ?? false"
-              :disabled="disabled"
+              :checked="minorGridlinesState.checked"
+              :indeterminate="minorGridlinesState.invalid"
+              :disabled="disabled || minorGridlinesState.invalid"
               data-chart-format-field="minorGridlines"
               :onChange="captureAction((value: unknown) => setAxisBoolean('minorGridlines', value))"
               >{{ t("chart.formatMinorGridlines") }}</TCheckbox

@@ -1,5 +1,5 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
-import FontFormatField from "../../../../../modules/home-tools/components/FontFormatField.vue";
+import FontFormatField from "../../../../../shared/cell-text/FontFormatField.vue";
 import { afterEach, describe, expect, test } from "vitest";
 import HomeFormatToolbar from "../../../../../modules/home-tools/components/HomeFormatToolbar.vue";
 import { createClearCellStylePatch } from "@sheetcraft/core/style";

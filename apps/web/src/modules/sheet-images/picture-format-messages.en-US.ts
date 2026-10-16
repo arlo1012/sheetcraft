@@ -7,6 +7,7 @@ export const pictureFormatEnUS = {
     paneTitle: "Format picture",
     close: "Close picture formatting",
     noSelection: "Select a picture to format.",
+    singlePictureEffects: "Select one picture to edit detailed effects.",
     fillLineTab: "Fill & Line",
     effectsTab: "Effects",
     sizePropertiesTab: "Size & Properties",

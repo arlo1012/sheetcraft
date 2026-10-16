@@ -38,9 +38,16 @@ export interface ShapeFormatPaneInput {
   options?: ShapeFormatOptions;
   loadPaintAsset?: (blob: Blob, texture?: PictureTextureId) => Promise<string | undefined>;
 }
+/** Read-only edit identity. It never grants capabilities or replaces session validation. */
+export interface ShapeNumericIdentity {
+  ownerKey: string;
+  lease: number;
+  cancellation: number;
+}
 export function useShapeFormatPane(props: ShapeFormatPaneInput) {
   const failure = ref<ShapeFormatFailure>();
   const epoch = ref(0);
+  const numericCancellation = ref(0);
   const numericDrafts = ref(new Set<string>());
   const hasActiveNumericDraft = computed(() => numericDrafts.value.size > 0);
   function setNumericDraft(key: string, active: boolean) {
@@ -97,6 +104,7 @@ export function useShapeFormatPane(props: ShapeFormatPaneInput) {
     { flush: "sync" },
   );
   function cancel() {
+    numericCancellation.value++;
     session.cancel();
     epoch.value++;
     accepted.clear();
@@ -242,6 +250,18 @@ export function useShapeFormatPane(props: ShapeFormatPaneInput) {
     props,
     s,
     ownerKey,
+    numericIdentity: computed(
+      (previous: ShapeNumericIdentity | undefined): ShapeNumericIdentity => {
+        const ownerKey = props.snapshot ? shapeFormatOwnerKey(props.snapshot.owner) : "none";
+        const lease = epoch.value,
+          cancellation = numericCancellation.value;
+        return previous?.ownerKey === ownerKey &&
+          previous.lease === lease &&
+          previous.cancellation === cancellation
+          ? previous
+          : { ownerKey, lease, cancellation };
+      },
+    ),
     isGroup,
     isMixedField,
     isMixedStyle,

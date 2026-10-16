@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import FontFormatField from "./FontFormatField.vue";
+import FontFormatField from "../../../shared/cell-text/FontFormatField.vue";
 import { resolveThemeFontFamily } from "@sheetcraft/core/workbook-theme";
 import { useWorkbookTheme } from "../../../shared/color/workbook-theme-context";
 import {

@@ -16,6 +16,37 @@ function worker(postMessage: XlsxWorkerPort["postMessage"]): XlsxWorkerPort {
 }
 
 describe("runXlsxWorker", () => {
+  test.each([
+    undefined,
+    { issues: null },
+    { issues: [{ code: "image-omitted", severity: "unknown", count: 1, locations: [] }] },
+    { issues: [{ code: "image-omitted", severity: "warning", count: -1, locations: [] }] },
+    { issues: [{ code: "image-omitted", severity: "warning", count: 1, locations: [null] }] },
+  ])(
+    "fails closed on a malformed compatibility report instead of silently downloading",
+    async (report) => {
+      const port = worker((request) =>
+        port.onmessage?.({
+          data: {
+            id: request.id,
+            ok: true,
+            type: "encode",
+            bytes: new ArrayBuffer(0),
+            report,
+          },
+        } as MessageEvent),
+      );
+      await expect(
+        runXlsxWorker(
+          () => port,
+          { id: "malformed-report", type: "encode", snapshot: {} as never },
+          { timeoutMs: 100 },
+        ),
+      ).rejects.toBeInstanceOf(XlsxWorkerFailure);
+      expect(port.terminate).toHaveBeenCalledOnce();
+    },
+  );
+
   test("transfers each prepared image buffer once without detaching the snapshot", async () => {
     const bytes = new ArrayBuffer(4);
     const otherBytes = new ArrayBuffer(8);

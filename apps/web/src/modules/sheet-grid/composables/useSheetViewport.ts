@@ -59,6 +59,7 @@ export function useSheetViewport(options: {
   getGridExtentPolicy: () => GridExtentPolicy;
   getColumnWidths: () => ReadonlyMap<number, number>;
   getDefaultColumnWidth?: () => number;
+  getDefaultRowHeight?: () => number;
   getHiddenRows?: () => ReadonlySet<number> | undefined;
   getHiddenColumns?: () => ReadonlySet<number> | undefined;
   getContentExtent: () => GridExtent;
@@ -112,6 +113,7 @@ export function useSheetViewport(options: {
   const extentGeometry = computed(() =>
     createSheetGeometry({
       rowHeights: options.getRowHeights(),
+      rowHeight: options.getDefaultRowHeight?.() ?? DEFAULT_ROW_HEIGHT,
       columnWidths: options.getColumnWidths(),
       columnWidth: options.getDefaultColumnWidth?.() ?? DEFAULT_COLUMN_WIDTH,
       hiddenRows: options.getHiddenRows?.(),
@@ -121,7 +123,7 @@ export function useSheetViewport(options: {
   const extentRows = computed(() =>
     createRowVisibilityIndex({
       rowCount: MAX_SHEET_ROWS,
-      defaultRowHeight: DEFAULT_ROW_HEIGHT,
+      defaultRowHeight: options.getDefaultRowHeight?.() ?? DEFAULT_ROW_HEIGHT,
       rowHeights: options.getRowHeights(),
       hiddenIntervals: options.getHiddenRowIntervals(),
       hiddenRows: options.getHiddenRows?.(),
@@ -199,6 +201,7 @@ export function useSheetViewport(options: {
       rowCount: baseExtent.value.rowCount,
       columnCount: baseExtent.value.columnCount,
       rowHeights: options.getRowHeights(),
+      rowHeight: options.getDefaultRowHeight?.() ?? DEFAULT_ROW_HEIGHT,
       columnWidths: options.getColumnWidths(),
       columnWidth: options.getDefaultColumnWidth?.() ?? DEFAULT_COLUMN_WIDTH,
       hiddenRows: options.getHiddenRows?.(),
@@ -208,7 +211,7 @@ export function useSheetViewport(options: {
   const baseRows = computed(() =>
     createRowVisibilityIndex({
       rowCount: baseExtent.value.rowCount,
-      defaultRowHeight: DEFAULT_ROW_HEIGHT,
+      defaultRowHeight: options.getDefaultRowHeight?.() ?? DEFAULT_ROW_HEIGHT,
       rowHeights: options.getRowHeights(),
       hiddenIntervals: options.getHiddenRowIntervals(),
       hiddenRows: options.getHiddenRows?.(),

@@ -88,6 +88,7 @@ function fixture() {
     resize: tools.resizeOne,
     aspectRatio: tools.setAspectRatio,
     appearance: tools.applyAppearance,
+    effect: tools.applyEffect,
   });
   return {
     session,
@@ -306,3 +307,24 @@ describe("picture ribbon geometry and owned intents", () => {
     expect(serializeWorkbook(f.session.workbook)).toEqual(before);
   });
 });
+
+test.each(["selection", "generation", "busy", "source"])(
+  "captured effect owner rejects a later %s before UI flush",
+  (change) => {
+    const f = fixture();
+    const old = f.owner.value!.effect;
+    if (change === "selection") f.selectedIds.value = ["legacy"];
+    else if (change === "generation") f.generation.value++;
+    else if (change === "busy") f.setBusy();
+    else {
+      frame(f).assetId = "replacement";
+      f.revision.value++;
+    }
+    const before = serializeWorkbook(f.session.workbook);
+    expect(old({ category: "softEdges", value: { kind: "value", value: { sizePt: 5 } } })).toBe(
+      false,
+    );
+    expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+    expect(f.execute).not.toHaveBeenCalled();
+  },
+);

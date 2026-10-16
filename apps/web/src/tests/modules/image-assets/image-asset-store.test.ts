@@ -23,14 +23,17 @@ function fixture() {
     createObjectStore: vi.fn(),
     transaction: vi.fn(() => {
       const read = requestFor(asset);
+      const put = vi.fn();
+      const abort = vi.fn();
       const transaction = {
         oncomplete: null,
         onerror: null,
         onabort: null,
         error: null,
-        objectStore: () => ({ get: () => read, put: vi.fn() }),
+        objectStore: () => ({ get: () => read, put }),
+        abort,
       } as unknown as IDBTransaction;
-      Object.assign(transaction, { read });
+      Object.assign(transaction, { read, put });
       transactions.push(transaction);
       return transaction;
     }),
@@ -62,6 +65,34 @@ function fixture() {
 }
 afterEach(() => vi.unstubAllGlobals());
 describe("recoverable picture asset storage", () => {
+  test("puts a complete image batch in one transaction and waits for its commit", async () => {
+    const f = fixture();
+    let finished = false;
+    const second = { ...asset, id: "image-second" };
+    const saved = f.store.putAll!([asset, second]).then(() => {
+      finished = true;
+    });
+    await f.opened();
+    expect(f.transactions).toHaveLength(1);
+    const transaction = f.transactions[0]!;
+    const put = (transaction as unknown as { put: ReturnType<typeof vi.fn> }).put;
+    expect(put).toHaveBeenNthCalledWith(1, asset, asset.id);
+    expect(put).toHaveBeenNthCalledWith(2, second, second.id);
+    expect(finished).toBe(false);
+    transaction.oncomplete?.(new Event("complete"));
+    await saved;
+    expect(finished).toBe(true);
+  });
+  test("a batch transaction abort rejects the whole import", async () => {
+    const f = fixture();
+    const saved = f.store.putAll!([asset, { ...asset, id: "image-second" }]);
+    const rejected = expect(saved).rejects.toThrow();
+    await f.opened();
+    expect(f.transactions).toHaveLength(1);
+    f.transactions[0]!.onabort?.(new Event("abort"));
+    await rejected;
+  });
+
   test.each(["error", "blocked"] as const)(
     "retries a temporary %s opening without losing assets",
     async (failure) => {

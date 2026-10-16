@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { SlidersHorizontal } from "lucide-vue-next";
-import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
-import type { ChangeContext } from "tdesign-vue-next/es/input-number/type";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { isPictureGroup, type PictureGroup } from "@sheetcraft/core";
 import { MIN_FLOATING_IMAGE_SIZE, MAX_FLOATING_IMAGE_SIZE } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
+import NumericField from "../../../shared/numeric-field/NumericField.vue";
+import type {
+  NumericCandidate,
+  NumericCommitResult,
+  NumericFieldSpec,
+  NumericValue,
+} from "../../../shared/numeric-field/types";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import PictureRotationMenu from "./PictureRotationMenu.vue";
@@ -59,38 +64,49 @@ const sizeDisabled = computed(
 const aspectRatioDisabled = computed(
   () => props.disabled || props.selectionCount > 1 || !props.aspectRatioHandler,
 );
-function points(axis: "width" | "height"): number | undefined {
-  return sizeAvailable.value ? Math.round(props.geometry![axis] * 75) / 100 : undefined;
+const sizeSpec: NumericFieldSpec = {
+  displayUnit: "pt",
+  toDisplay: (value) => value * 0.75,
+  fromDisplay: (value) => value / 0.75,
+  displayPrecision: 2,
+  displayStep: 1,
+  canonicalBounds: { min: MIN_FLOATING_IMAGE_SIZE, max: MAX_FLOATING_IMAGE_SIZE },
+};
+function sizeValue(axis: "width" | "height"): NumericValue {
+  return sizeAvailable.value ? { kind: "value", value: props.geometry![axis] } : { kind: "empty" };
+}
+function sizeOwnerKey(axis: "width" | "height"): string {
+  return `${props.draftOwnerKey}:${props.image.id}:${axis}`;
 }
 const numericCallbacks = computed(() => {
-  const imageId = props.image.id;
-  const draftOwnerKey = props.draftOwnerKey;
-  const handler = props.resizeHandler;
-  function commit(axis: "width" | "height", points: unknown): void {
+  const imageId = props.image.id,
+    owner = props.draftOwnerKey,
+    handler = props.resizeHandler;
+  function commit(axis: "width" | "height", candidate: NumericCandidate): NumericCommitResult {
     if (
       !isPictureGroup(props.image) ||
-      imageId !== props.image.id ||
-      draftOwnerKey !== props.draftOwnerKey ||
-      handler !== props.resizeHandler ||
-      !handler ||
+      candidate.kind !== "value" ||
       sizeDisabled.value ||
-      typeof points !== "number" ||
-      !Number.isFinite(points)
+      !handler ||
+      imageId !== props.image.id ||
+      owner !== props.draftOwnerKey ||
+      handler !== props.resizeHandler
     )
-      return;
-    const pixels = (points * 4) / 3;
-    if (pixels < MIN_FLOATING_IMAGE_SIZE || pixels > MAX_FLOATING_IMAGE_SIZE) return;
-    handler({ axis, value: pixels });
-  }
-  function change(axis: "width" | "height", points: unknown, context?: ChangeContext): void {
-    if (context?.type === "input" || context?.type === "enter" || context?.type === "props") return;
-    commit(axis, points);
+      return { accepted: false, error: t("picture.operationFailed") };
+    const value = candidate.value;
+    if (
+      !Number.isFinite(value) ||
+      value < MIN_FLOATING_IMAGE_SIZE ||
+      value > MAX_FLOATING_IMAGE_SIZE
+    )
+      return { accepted: false, error: t("pictureFormat.outOfRange") };
+    return handler({ axis, value }) === true
+      ? { accepted: true }
+      : { accepted: false, error: t("picture.operationFailed") };
   }
   return {
-    width: (points: unknown, context?: ChangeContext) => change("width", points, context),
-    height: (points: unknown, context?: ChangeContext) => change("height", points, context),
-    widthEnter: (points: unknown) => commit("width", points),
-    heightEnter: (points: unknown) => commit("height", points),
+    width: (value: NumericCandidate) => commit("width", value),
+    height: (value: NumericCandidate) => commit("height", value),
   };
 });
 const aspectRatioCallback = computed(() => {
@@ -158,20 +174,23 @@ const actionCallbacks = computed(() => {
           role="group"
           :aria-label="t('image.widthPoints')"
         >
-          <span>{{ t("image.widthPoints") }}</span>
-          <TInputNumber
-            :key="`${image.id}:${draftOwnerKey}:width`"
-            :model-value="points('width')"
-            :min="0.75"
-            :max="7500"
-            :decimal-places="2"
-            size="small"
-            theme="column"
-            class="sheetcraft-input-number--persistent-controls"
+          <span>{{ t("pictureFormat.sizeWidthPt") }}</span>
+          <NumericField
+            :key="sizeOwnerKey('width')"
+            :owner-key="sizeOwnerKey('width')"
+            :value="sizeValue('width')"
+            :spec="sizeSpec"
+            :label="t('image.widthPoints')"
             :disabled="sizeDisabled"
-            data-picture-size="width"
-            @change="numericCallbacks.width"
-            @enter="numericCallbacks.widthEnter"
+            :read-only="!resizeHandler"
+            :reason="!resizeHandler ? t('picture.numericViewerReadOnly') : undefined"
+            :hide-reason="!resizeHandler"
+            :invalid-message="t('pictureFormat.outOfRange')"
+            :rejected-message="t('picture.operationFailed')"
+            :stale-message="t('pictureFormat.staleOwner')"
+            :context-attributes="{ 'data-picture-size': 'width' }"
+            presentation="column"
+            :on-commit="numericCallbacks.width"
           />
         </div>
         <div
@@ -179,20 +198,23 @@ const actionCallbacks = computed(() => {
           role="group"
           :aria-label="t('image.heightPoints')"
         >
-          <span>{{ t("image.heightPoints") }}</span>
-          <TInputNumber
-            :key="`${image.id}:${draftOwnerKey}:height`"
-            :model-value="points('height')"
-            :min="0.75"
-            :max="7500"
-            :decimal-places="2"
-            size="small"
-            theme="column"
-            class="sheetcraft-input-number--persistent-controls"
+          <span>{{ t("pictureFormat.sizeHeightPt") }}</span>
+          <NumericField
+            :key="sizeOwnerKey('height')"
+            :owner-key="sizeOwnerKey('height')"
+            :value="sizeValue('height')"
+            :spec="sizeSpec"
+            :label="t('image.heightPoints')"
             :disabled="sizeDisabled"
-            data-picture-size="height"
-            @change="numericCallbacks.height"
-            @enter="numericCallbacks.heightEnter"
+            :read-only="!resizeHandler"
+            :reason="!resizeHandler ? t('picture.numericViewerReadOnly') : undefined"
+            :hide-reason="!resizeHandler"
+            :invalid-message="t('pictureFormat.outOfRange')"
+            :rejected-message="t('picture.operationFailed')"
+            :stale-message="t('pictureFormat.staleOwner')"
+            :context-attributes="{ 'data-picture-size': 'height' }"
+            presentation="column"
+            :on-commit="numericCallbacks.height"
           />
         </div>
       </div>
@@ -203,6 +225,9 @@ const actionCallbacks = computed(() => {
         >{{ t("image.lockAspectRatio") }}</TCheckbox
       >
       <span v-if="error" class="picture-group-ribbon__error" role="alert">{{ error }}</span>
+      <span v-if="!resizeHandler" class="picture-group-ribbon__status" role="status">{{
+        t("picture.numericViewerReadOnly")
+      }}</span>
     </section>
     <PictureRotationMenu
       :key="`${image.id}:${draftOwnerKey}:rotation`"
@@ -219,6 +244,7 @@ const actionCallbacks = computed(() => {
       @batch-size="actionCallbacks.batchSize"
     />
     <PictureArrangeTools
+      compact
       :alignment-reference="alignmentReference"
       :group-create-disabled="groupCreateDisabled"
       :grid-disabled="false"
@@ -256,10 +282,26 @@ const actionCallbacks = computed(() => {
   }
   &__dimension {
     @include ribbon.row;
-    gap: 6px;
-    span {
-      min-width: 64px;
+    gap: 4px;
+    width: 150px;
+    > :last-child {
+      flex: 1;
+      min-width: 0;
     }
+    span {
+      width: 42px;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+  &__status {
+    max-width: 180px;
+    color: var(--sheetcraft-text-secondary);
+    font-size: 12px;
+    line-height: 18px;
+    white-space: normal;
   }
   &__error {
     max-width: 240px;

@@ -29,13 +29,34 @@ function randomId(): string {
   return bytesToHex(bytes);
 }
 
-async function dimensions(blob: Blob): Promise<{ width: number; height: number }> {
+async function dimensions(
+  blob: Blob,
+  signal?: AbortSignal,
+): Promise<{ width: number; height: number }> {
+  signal?.throwIfAborted();
   const url = URL.createObjectURL(blob);
   try {
     const image = new Image();
     await new Promise<void>((resolve, reject) => {
-      image.onload = () => resolve();
-      image.onerror = () => reject(new ImageAssetError("decode-failed"));
+      const cleanup = () => {
+        signal?.removeEventListener("abort", onAbort);
+        image.onload = null;
+        image.onerror = null;
+      };
+      const onAbort = () => {
+        cleanup();
+        image.src = "";
+        reject(signal?.reason ?? new DOMException("Image decoding was cancelled.", "AbortError"));
+      };
+      image.onload = () => {
+        cleanup();
+        resolve();
+      };
+      image.onerror = () => {
+        cleanup();
+        reject(new ImageAssetError("decode-failed"));
+      };
+      signal?.addEventListener("abort", onAbort, { once: true });
       image.src = url;
     });
     return assertImagePixelBudget(image.naturalWidth, image.naturalHeight);
@@ -45,9 +66,11 @@ async function dimensions(blob: Blob): Promise<{ width: number; height: number }
 }
 
 /** Preflights encoded declarations, retains original bytes and derives decoded display dimensions. */
-export async function prepareImageAsset(file: Blob): Promise<ImageAsset> {
+export async function prepareImageAsset(file: Blob, signal?: AbortSignal): Promise<ImageAsset> {
+  signal?.throwIfAborted();
   const { bytes, blob, header } = await readEncodedImageSource(file);
-  const size = await dimensions(blob);
+  const size = await dimensions(blob, signal);
   const id = await contentHash(bytes);
+  signal?.throwIfAborted();
   return { id: `image-${id}`, mimeType: header.mimeType, ...size, blob };
 }

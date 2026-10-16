@@ -1,3 +1,4 @@
+import { readNativeChartStyles } from "./native-chart-styles.js";
 import { normalizeSheetChart, type SheetChart } from "@sheetcraft/core/sheet-charts";
 import { normalizeSheetDrawing, type SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
@@ -13,6 +14,7 @@ import {
   readChartTitle,
 } from "./chart-cache-reader.js";
 import { only, single, type NativeChartPart } from "./chart-package-parts.js";
+import { readNativeChartElements } from "./native-chart-elements.js";
 import { readNativeChartGeometry } from "./drawing-geometry.js";
 import { ordinaryColumnChartSource } from "./column-charts.js";
 import { attr, child, nodes, type XmlNode } from "./pivot-xml.js";
@@ -144,18 +146,29 @@ function recoverSource(
             only(single(item, "tx"), ["strRef"]);
             const title = single(single(item, "tx"), "strRef");
             const nameRange = source.nameRanges[index]!;
+            const currentName = source.names[index]!;
+            // Only a proven headerless rectangular source has no name range.
+            // Accept its current default, or the previously supported ordinal
+            // default, without treating arbitrary literal names as generated.
+            const legacyName = String(index + 1);
+            const cachedName = nameRange
+              ? currentName
+              : title.f === JSON.stringify(currentName)
+                ? currentName
+                : title.f === JSON.stringify(legacyName)
+                  ? legacyName
+                  : undefined;
             if (
-              nameRange
-                ? !sameRange(chartReferenceRange(title, sheet.name), nameRange)
-                : title.f !== JSON.stringify(String(index + 1))
+              (nameRange && !sameRange(chartReferenceRange(title, sheet.name), nameRange)) ||
+              cachedName === undefined ||
+              !textCacheMatches(title, [cachedName])
             ) {
               matches = false;
               break;
             }
-            if (!textCacheMatches(title, [source.names[index]!])) {
-              matches = false;
-              break;
-            }
+            // Legacy generated labels migrate to the current Core default;
+            // this is reported rather than described as label-lossless.
+            if (!nameRange && cachedName !== currentName) normalized = true;
             if (source.categoryRange) {
               only(single(item, "cat"), ["strRef"]);
               const category = single(single(item, "cat"), "strRef");
@@ -242,12 +255,8 @@ export function readXlsxColumnCharts(
         stacked: false,
         showHidden: !chartBoolean(native, "plotVisOnly", true),
       };
-      if (
-        ["showLegendKey", "showCatName", "showSerName", "showPercent", "showBubbleSize"].some(
-          (name) => chartBoolean(child(bar, "dLbls"), name, false),
-        )
-      )
-        throw new Error("Unsupported chart label content.");
+      const elements = readNativeChartElements(native, bar, base.type, base.title);
+      const chartBase = elements ? { ...base, elements } : base;
       if (nodes(bar.dLbls).length > 1 || nodes(native.legend).length > 1)
         throw new Error("Ambiguous chart presentation.");
       for (const item of series) {
@@ -264,15 +273,9 @@ export function readXlsxColumnCharts(
           )
             throw new Error("Unsupported straight marker line.");
         }
-        // Observed WPS default per-series labels are explicitly disabled.
-        if (item.dLbls !== undefined) {
-          const labels = single(item, "dLbls");
-          only(labels, ["delete"]);
-          if (!chartBoolean(labels, "delete", false) || base.labels)
-            throw new Error("Unsupported series labels.");
-        }
       }
-      const { chart, normalized } = recoverSource(workbook, sheet, series, base);
+      const { chart, normalized } = recoverSource(workbook, sheet, series, chartBase);
+      readNativeChartStyles(part.chartSpace, native, plot, bar, chart, part.chartPart, report);
       const geometry = readNativeChartGeometry(
         sheet,
         part.anchorKind,
@@ -300,7 +303,8 @@ export function readXlsxColumnCharts(
         rotation: 0,
       }) as SheetChartDrawing;
       (sheet.drawings ??= []).push(drawing);
-      report.add("style-omitted", "warning", `${part.chartPart}.nativePresentation`);
+      // Element positions are retained; native fonts, colors and strokes remain approximate.
+      report.add("style-omitted", "warning", part.chartPart);
       if (normalized) report.add("chart-cache-normalized", "warning", part.chartPart);
       if (geometry.approximated) report.add("dimension-approximated", "warning", part.drawingPart);
     } catch {

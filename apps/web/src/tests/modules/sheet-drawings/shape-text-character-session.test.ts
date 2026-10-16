@@ -172,9 +172,38 @@ describe("one leased attributed shape draft", () => {
         }),
       )!;
       const callbacks = f.editor.callbacks(f.editor.snapshot.value!.sessionId);
-      expect(pane.capabilities.value.fields.paragraphAlignment?.enabled).toBe(false);
-      expect(pane.capabilities.value.fields.textWrap?.enabled).toBe(false);
+      expect(pane.capabilities.value.fields.paragraphAlignment?.enabled).toBe(true);
+      expect(pane.capabilities.value.fields.textWrap?.enabled).toBe(true);
       expect(pane.capabilities.value.fields.textColor?.enabled).toBe(true);
+      for (const field of ["paragraphAlignment", "textWrap"] as const) {
+        const layout = pane.snapshot.value!;
+        expect(
+          pane.onIntent(
+            field === "paragraphAlignment"
+              ? {
+                  type: "set-field",
+                  field,
+                  value: "right",
+                  owner: layout.owner,
+                  baseRevision: layout.revision,
+                  intentId: "live-alignment",
+                }
+              : {
+                  type: "set-field",
+                  field,
+                  value: false,
+                  owner: layout.owner,
+                  baseRevision: layout.revision,
+                  intentId: "live-wrap",
+                },
+          ),
+        ).toBe(true);
+      }
+      expect(f.editor.snapshot.value!.draftView.shapeText).toMatchObject({
+        paragraph: { alignment: "right" },
+        layout: { wrap: false },
+      });
+      expect(f.execute).not.toHaveBeenCalled();
       callbacks.setSelection({ start: 0, end: 5, direction: "forward" });
       const captured = pane.snapshot.value!;
       expect(
@@ -200,6 +229,23 @@ describe("one leased attributed shape draft", () => {
         }),
       ).toBe(false);
       expect(source(f).characterRuns).toEqual([{ start: 0, end: 5, bold: true }]);
+      pane.close();
+      expect(pane.snapshot.value).toBeNull();
+      const ribbon = pane.ribbonSnapshot.value!;
+      expect(ribbon.values).toMatchObject({ paragraphAlignment: "right", textWrap: false });
+      expect(
+        pane.onIntent({
+          type: "set-field",
+          field: "paragraphAlignment",
+          value: "center",
+          owner: ribbon.owner,
+          baseRevision: ribbon.revision,
+          intentId: "ribbon-after-close",
+        }),
+      ).toBe(true);
+      expect(pane.snapshot.value).toBeNull();
+      expect(f.editor.snapshot.value!.draftView.shapeText!.paragraph.alignment).toBe("center");
+      expect(f.execute).not.toHaveBeenCalled();
     } finally {
       f.scope.stop();
     }

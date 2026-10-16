@@ -1,4 +1,7 @@
 import { computed, getCurrentScope, onScopeDispose, shallowRef } from "vue";
+import { ShapeTextDraftHistory } from "./shape-text-draft-history";
+import { normalizeShapeTextWarp, type ShapeTextWarp } from "@sheetcraft/core/text-warps";
+import { normalizeShapeStyle, type ShapeDetailedStyle } from "@sheetcraft/core/shape-style";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import {
   findShapeGroupNode,
@@ -38,6 +41,7 @@ import {
   editDrawingShapeTextField,
   materializeDrawingShapeText,
   withDrawingShapeText,
+  withDrawingShapeBodyStyle,
 } from "./shape-text-options";
 import type { Sheet, Workbook } from "@sheetcraft/core/workbook";
 import {
@@ -70,11 +74,14 @@ export type ShapeTextEditSnapshot = Readonly<{
   text: string;
   draftText: string;
   draftView: SheetGraphicDrawing;
+  /** Detached canonical appearance proposal; never used as a command owner. */
+  draftRoot: SheetDrawing;
   selection: TextDomSelection;
   pendingFormat?: ShapeTextCharacterFormat;
   rich: boolean;
   formatRevision: number;
   composing: boolean;
+  canFormat: boolean;
   stale: boolean;
   error?: ShapeTextEditError;
 }>;
@@ -92,6 +99,13 @@ export type ShapeTextEditCallbacks = Readonly<{
   editField: <K extends ShapeFormatField>(field: K, value: ShapeFormatValues[K]) => boolean;
   setMargins: (value: ShapeFormatTextMargins) => boolean;
   setComposing: (composing: boolean) => boolean;
+  setBodyStyle: (
+    category: "fill" | "line",
+    value: ShapeDetailedStyle["fill"] | ShapeDetailedStyle["line"],
+  ) => boolean;
+  setWarp: (value: ShapeTextWarp | undefined) => boolean;
+  historyStep: (direction: "undo" | "redo") => boolean;
+  focusFieldDraft: () => boolean;
   commit: () => boolean;
   cancel: () => boolean;
 }>;
@@ -103,6 +117,9 @@ export interface ShapeTextEditSessionOptions {
   getMetrics: () => PictureSheetMetrics | undefined;
   isBusy: () => boolean;
   flush: () => boolean;
+  /** Flush owned toolbar/pane fields before closing or stepping this same draft. */
+  flushFieldDrafts?: (sessionId: number) => boolean;
+  focusFieldDraft?: (sessionId: number) => boolean;
   /** The host prepares text/AutoFit and final connector paint before one Core command. */
   replaceCollection: (
     next: readonly SheetDrawing[],
@@ -190,12 +207,13 @@ function replaceOwnedText(
   root: ShapeGroupDrawing,
   path: ShapeGroupPath,
   draft: SheetGraphicDrawing,
+  baseline: SheetGraphicDrawing,
 ) {
   function replace(child: ShapeGroupChild, depth: number): ShapeGroupChild {
     if (child.id !== path[depth]) return child;
     if (depth === path.length - 1) {
       if (!textSource(child)) throw new TypeError("Shape text editing requires an ordinary leaf.");
-      return replaceTextAppearance(child, draft);
+      return replaceTextAppearance(child, draft, baseline);
     }
     if (child.kind !== "shapeGroup") throw new TypeError("The shape text owner path changed.");
     return { ...child, members: child.members.map((member) => replace(member, depth + 1)) };
@@ -215,8 +233,26 @@ function restoreLegacyDraftModel(state: Draft, next: SheetGraphicDrawing): Sheet
 }
 
 /** Only content/typography crosses the genuine carrier boundary. */
-function replaceTextAppearance<T extends TextSource>(source: T, draft: SheetGraphicDrawing): T {
-  const { textDirection: _oldDirection, shapeText: _oldText, ...base } = source;
+function replaceTextAppearance<T extends TextSource>(
+  source: T,
+  draft: SheetGraphicDrawing,
+  baseline: SheetGraphicDrawing,
+): T {
+  const {
+    textDirection: _oldDirection,
+    shapeText: _oldText,
+    shapeStyle: _oldStyle,
+    ...base
+  } = source;
+  // Only the two admitted body categories cross the projected carrier boundary.
+  const body: ShapeDetailedStyle = { ...source.shapeStyle };
+  for (const category of ["fill", "line"] as const) {
+    const value = draft.shapeStyle?.[category];
+    if (JSON.stringify(value) === JSON.stringify(baseline.shapeStyle?.[category])) continue;
+    if (value === undefined) delete body[category];
+    else Object.assign(body, { [category]: value });
+  }
+  const shapeStyle = normalizeShapeStyle(body);
   return {
     ...base,
     text: draft.text,
@@ -224,6 +260,7 @@ function replaceTextAppearance<T extends TextSource>(source: T, draft: SheetGrap
     bold: draft.bold,
     italic: draft.italic,
     color: draft.color,
+    ...(shapeStyle ? { shapeStyle } : {}),
     ...(draft.shapeText
       ? { shapeText: draft.shapeText }
       : draft.textDirection
@@ -239,6 +276,17 @@ export function useShapeTextEditSession(options: ShapeTextEditSessionOptions) {
   let opening = false;
   let committing = false;
   let boundCallbacks: ShapeTextEditCallbacks | undefined;
+  let history: ShapeTextDraftHistory<Draft> | undefined;
+  const historyKey = (state: Draft) =>
+    JSON.stringify({
+      drawing: state.draftView,
+      pendingFormat: state.pendingFormat,
+      uniformDirty: state.uniformDirty,
+    });
+  function acceptDraft(next: Draft): void {
+    active.value = next;
+    history?.record(next);
+  }
 
   function issue(lease: Lease): ShapeTextEditError | undefined {
     try {
@@ -291,11 +339,19 @@ export function useShapeTextEditSession(options: ShapeTextEditSessionOptions) {
     options.onFailure?.(reason);
     return false;
   }
+  function rootDraft(lease: Lease, draft: SheetGraphicDrawing): SheetDrawing {
+    const root = lease.root;
+    if (root.kind === "shapeGroup") return replaceOwnedText(root, lease.path, draft, lease.view);
+    if ((root.kind !== "shape" && root.kind !== "textBox") || !textSource(root))
+      throw new TypeError("The shape text root is no longer a graphic carrier.");
+    return replaceTextAppearance(root, draft, lease.view);
+  }
   const snapshot = computed<ShapeTextEditSnapshot | undefined>(() => {
     const state = active.value;
     if (!state) return;
     const lease = state.lease;
-    const reason = (committing ? undefined : issue(lease)) ?? state.error;
+    const guardIssue = committing ? undefined : issue(lease);
+    const reason = guardIssue ?? state.error;
     return Object.freeze({
       sessionId: lease.sessionId,
       root: lease.root,
@@ -307,11 +363,13 @@ export function useShapeTextEditSession(options: ShapeTextEditSessionOptions) {
       text: lease.text,
       draftText: state.draftText,
       draftView: state.draftView,
+      draftRoot: guardIssue ? lease.root : rootDraft(lease, state.draftView),
       selection: state.selection,
       ...(state.pendingFormat ? { pendingFormat: state.pendingFormat } : {}),
       rich: state.rich,
       formatRevision: state.formatRevision,
       composing: state.composing,
+      canFormat: !guardIssue && !state.composing,
       stale: !!reason && ["owner", "source", "metrics", "disposed"].includes(reason.code),
       ...(reason ? { error: reason } : {}),
     });
@@ -394,6 +452,7 @@ export function useShapeTextEditSession(options: ShapeTextEditSessionOptions) {
         uniformDirty: false,
         composing: false,
       };
+      history = new ShapeTextDraftHistory(active.value!, historyKey);
       return true;
     } catch (cause) {
       options.onFailure?.(
@@ -415,7 +474,7 @@ export function useShapeTextEditSession(options: ShapeTextEditSessionOptions) {
       const source = state.draftView.shapeText?.characterRuns?.length
         ? replaceShapeTextDraftByDiff(shapeTextDraftSource(state.draftView), draftText)
         : { text: draftText };
-      active.value = {
+      acceptDraft({
         ...state,
         draftText,
         draftView: restoreLegacyDraftModel(
@@ -426,7 +485,7 @@ export function useShapeTextEditSession(options: ShapeTextEditSessionOptions) {
         pendingFormat: undefined,
         formatRevision: state.formatRevision + 1,
         error: issue(state.lease),
-      };
+      });
     } catch (cause) {
       return fail(
         state,
@@ -448,7 +507,7 @@ export function useShapeTextEditSession(options: ShapeTextEditSessionOptions) {
         value.pendingFormat === undefined
           ? undefined
           : normalizeShapeTextCharacterFormat(value.pendingFormat);
-      active.value = {
+      acceptDraft({
         ...state,
         draftText: draftView.text,
         draftView,
@@ -457,7 +516,7 @@ export function useShapeTextEditSession(options: ShapeTextEditSessionOptions) {
         rich: true,
         formatRevision: state.formatRevision + 1,
         error: issue(state.lease),
-      };
+      });
       return true;
     } catch (cause) {
       return fail(
@@ -492,6 +551,7 @@ export function useShapeTextEditSession(options: ShapeTextEditSessionOptions) {
         pendingFormat: pending,
         formatRevision: state.formatRevision + 1,
       };
+      history?.capture(active.value);
       return true;
     } catch {
       return false;
@@ -517,7 +577,7 @@ export function useShapeTextEditSession(options: ShapeTextEditSessionOptions) {
         for (const property of inherit) delete pendingFormat[property];
         pendingFormat = normalizeShapeTextCharacterFormat({ ...pendingFormat, ...patch });
       }
-      active.value = {
+      acceptDraft({
         ...state,
         draftText: next.text,
         draftView: restoreLegacyDraftModel(state, withShapeTextDraftSource(state.draftView, next)),
@@ -525,7 +585,7 @@ export function useShapeTextEditSession(options: ShapeTextEditSessionOptions) {
         rich: true,
         formatRevision: state.formatRevision + 1,
         error: undefined,
-      };
+      });
       return true;
     } catch (cause) {
       return fail(
@@ -567,13 +627,13 @@ export function useShapeTextEditSession(options: ShapeTextEditSessionOptions) {
     try {
       const edited = editDrawingShapeTextField(state.draftView, field, value);
       if (!edited) return false;
-      active.value = {
+      acceptDraft({
         ...state,
         draftView: edited,
         uniformDirty: true,
         formatRevision: state.formatRevision + 1,
         error: undefined,
-      };
+      });
       return true;
     } catch (cause) {
       return fail(
@@ -592,13 +652,13 @@ export function useShapeTextEditSession(options: ShapeTextEditSessionOptions) {
       const model = materializeDrawingShapeText(state.draftView);
       model.layout.marginsPt = { ...value };
       const draftView = withDrawingShapeText(state.draftView, model);
-      active.value = {
+      acceptDraft({
         ...state,
         draftView,
         uniformDirty: true,
         formatRevision: state.formatRevision + 1,
         error: undefined,
-      };
+      });
       return true;
     } catch (cause) {
       return fail(
@@ -606,6 +666,88 @@ export function useShapeTextEditSession(options: ShapeTextEditSessionOptions) {
         error("prepare", cause instanceof Error ? cause.message : "Invalid text margins."),
       );
     }
+  }
+  function setBodyStyle(
+    sessionId: number,
+    category: "fill" | "line",
+    value: ShapeDetailedStyle["fill"] | ShapeDetailedStyle["line"],
+  ): boolean {
+    const state = active.value;
+    if (
+      !state ||
+      state.lease.sessionId !== sessionId ||
+      committing ||
+      state.composing ||
+      (category !== "fill" && category !== "line")
+    )
+      return false;
+    const reason = issue(state.lease);
+    if (reason) return fail(state, reason);
+    try {
+      const style = { ...state.draftView.shapeStyle };
+      if (value === undefined) delete style[category];
+      else Object.assign(style, { [category]: value });
+      const draftView = withDrawingShapeBodyStyle(state.draftView, style);
+      acceptDraft({
+        ...state,
+        draftView,
+        uniformDirty: true,
+        formatRevision: state.formatRevision + 1,
+        error: undefined,
+      });
+      return true;
+    } catch (cause) {
+      return fail(
+        state,
+        error("prepare", cause instanceof Error ? cause.message : "Invalid shape appearance."),
+      );
+    }
+  }
+  function setWarp(sessionId: number, value: ShapeTextWarp | undefined): boolean {
+    const state = active.value;
+    if (!state || state.lease.sessionId !== sessionId || committing || state.composing)
+      return false;
+    const reason = issue(state.lease);
+    if (reason) return fail(state, reason);
+    try {
+      const model = materializeDrawingShapeText(state.draftView),
+        warp = normalizeShapeTextWarp(value);
+      if (warp) model.warp = warp;
+      else delete model.warp;
+      acceptDraft({
+        ...state,
+        draftView: withDrawingShapeText(state.draftView, model),
+        uniformDirty: true,
+        formatRevision: state.formatRevision + 1,
+        error: undefined,
+      });
+      return true;
+    } catch (cause) {
+      return fail(
+        state,
+        error("prepare", cause instanceof Error ? cause.message : "Invalid text transform."),
+      );
+    }
+  }
+  function historyStep(sessionId: number, direction: "undo" | "redo"): boolean {
+    let state = active.value;
+    if (!state || state.lease.sessionId !== sessionId || committing || state.composing)
+      return false;
+    const reason = issue(state.lease);
+    if (reason) return fail(state, reason);
+    const lease = state.lease;
+    if (options.flushFieldDrafts?.(sessionId) === false) return false;
+    state = active.value;
+    if (!state || state.lease !== lease || issue(lease)) return false;
+    const checkpoint = history?.step(direction);
+    if (!checkpoint) return false;
+    active.value = {
+      ...checkpoint,
+      composing: false,
+      error: undefined,
+      formatRevision: state.formatRevision + 1,
+    };
+    return true;
   }
   function setComposing(sessionId: number, composing: boolean): boolean {
     const state = active.value;
@@ -616,15 +758,22 @@ export function useShapeTextEditSession(options: ShapeTextEditSessionOptions) {
   function cancel(sessionId = active.value?.lease.sessionId): boolean {
     if (!active.value || active.value.lease.sessionId !== sessionId) return false;
     active.value = undefined;
+    history = undefined;
     return true;
   }
   function commit(sessionId: number): boolean {
-    const state = active.value;
+    let state = active.value;
     if (committing || !state || state.lease.sessionId !== sessionId) return false;
     const reason = issue(state.lease);
     if (reason) return fail(state, reason);
     if (state.composing)
       return fail(state, error("composition", "Finish composing text before saving your draft."));
+    const fieldLease = state.lease;
+    if (options.flushFieldDrafts?.(sessionId) === false) return false;
+    state = active.value;
+    if (!state || state.lease !== fieldLease) return false;
+    const fieldIssue = issue(fieldLease);
+    if (fieldIssue) return fail(state, fieldIssue);
     if (
       state.draftText === state.lease.text &&
       areShapeTextCharacterRunsEqual(
@@ -641,10 +790,11 @@ export function useShapeTextEditSession(options: ShapeTextEditSessionOptions) {
       const lease = state.lease;
       const replacement =
         lease.root.kind === "shapeGroup"
-          ? replaceOwnedText(lease.root, lease.path, state.draftView)
+          ? replaceOwnedText(lease.root, lease.path, state.draftView, lease.view)
           : replaceTextAppearance(
               lease.root as SheetGraphicDrawing | SheetFramedGraphicDrawing,
               state.draftView,
+              lease.view,
             );
       const next = lease.pass.sourceForest.map((root) =>
         root === lease.root ? replacement : root,
@@ -692,6 +842,15 @@ export function useShapeTextEditSession(options: ShapeTextEditSessionOptions) {
         editField(sessionId, field, value),
       setMargins: (value: ShapeFormatTextMargins) => setMargins(sessionId, value),
       setComposing: (value: boolean) => setComposing(sessionId, value),
+      setBodyStyle: (
+        category: "fill" | "line",
+        value: ShapeDetailedStyle["fill"] | ShapeDetailedStyle["line"],
+      ) => setBodyStyle(sessionId, category, value),
+      setWarp: (value: ShapeTextWarp | undefined) => setWarp(sessionId, value),
+      historyStep: (direction: "undo" | "redo") => historyStep(sessionId, direction),
+      focusFieldDraft: () =>
+        active.value?.lease.sessionId === sessionId &&
+        (options.focusFieldDraft?.(sessionId) ?? false),
       commit: () => commit(sessionId),
       cancel: () => cancel(sessionId),
     });
@@ -719,6 +878,9 @@ export function useShapeTextEditSession(options: ShapeTextEditSessionOptions) {
     editField,
     setMargins,
     setComposing,
+    setBodyStyle,
+    setWarp,
+    historyStep,
     commit,
     cancel,
     callbacks,

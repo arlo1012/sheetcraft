@@ -180,6 +180,7 @@ export const PICTURE_FORMAT_LABEL_KEYS = [
   "paneTitle",
   "close",
   "noSelection",
+  "singlePictureEffects",
   "fillLineTab",
   "effectsTab",
   "sizePropertiesTab",

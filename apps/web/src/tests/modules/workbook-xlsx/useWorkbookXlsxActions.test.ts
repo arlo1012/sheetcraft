@@ -52,7 +52,7 @@ function mountActions(factory: XlsxWorkerFactory, options: { timeoutMs?: number 
     workbook = next;
     revision += 1;
   });
-  const persistence = { loading: ref(false), replaceDocument };
+  const persistence = { loading: ref(false), error: ref<string>(), replaceDocument };
   const download = vi.fn();
   const actions = scope.run(() =>
     useWorkbookXlsxActions({
@@ -73,6 +73,7 @@ function mountActions(factory: XlsxWorkerFactory, options: { timeoutMs?: number 
     getRevision: () => revision,
     getWorkbook: () => workbook,
     replaceDocument,
+    persistence,
     scope,
     setRevision: (next: number) => (revision = next),
   };
@@ -187,7 +188,7 @@ describe("useWorkbookXlsxActions", () => {
     expect(oversized.arrayBuffer).not.toHaveBeenCalled();
     expect(factory).not.toHaveBeenCalled();
     expect(fixture.actions.feedback.value).toEqual({
-      key: "xlsx.feedback.blocked",
+      key: "xlsx.feedback.tooLarge",
       error: true,
     });
     expect(fixture.replaceDocument).not.toHaveBeenCalled();
@@ -225,35 +226,103 @@ describe("useWorkbookXlsxActions", () => {
     cancelled.scope.stop();
   });
 
-  test("downloads an export directly even when internal compatibility diagnostics exist", async () => {
+  test.each(["image-omitted", "style-omitted"] as const)(
+    "requires confirmation of export %s before downloading",
+    async (code) => {
+      const fixture = mountActions(
+        createWorkerFactory((request, worker) =>
+          response(worker, {
+            id: request.id,
+            ok: true,
+            type: "encode",
+            bytes: new Uint8Array([1, 2]).buffer,
+            report: {
+              issues: [
+                {
+                  code,
+                  severity: "warning",
+                  count: 1,
+                  locations: ['Sheet1.floatingImages["plain"].inheritedThemeEffects'],
+                },
+              ],
+            },
+          }),
+        ),
+      );
+
+      await fixture.actions.exportXlsx();
+      expect(fixture.actions.confirmation.value).toBe("export");
+      expect(fixture.actions.report.value?.issues[0]).toEqual({
+        code,
+        severity: "warning",
+        count: 1,
+        locations: ['Sheet1.floatingImages["plain"].inheritedThemeEffects'],
+      });
+      expect(fixture.download).not.toHaveBeenCalled();
+      await fixture.actions.exportXlsx();
+      expect(fixture.download).not.toHaveBeenCalled();
+      await fixture.actions.confirm();
+      expect(fixture.actions.confirmation.value).toBeUndefined();
+      expect(fixture.download).toHaveBeenCalledWith(new Uint8Array([1, 2]), "workbook.xlsx");
+      expect(fixture.download).toHaveBeenCalledOnce();
+      expect(fixture.replaceDocument).not.toHaveBeenCalled();
+      expect(fixture.getRevision()).toBe(1);
+      await fixture.actions.confirm();
+      expect(fixture.download).toHaveBeenCalledOnce();
+      fixture.scope.stop();
+    },
+  );
+
+  test.each(["image-omitted", "style-omitted"] as const)(
+    "cancels a lossy %s export and clears its report without downloading",
+    async (code) => {
+      const fixture = mountActions(
+        createWorkerFactory((request, worker) =>
+          response(worker, {
+            id: request.id,
+            ok: true,
+            type: "encode",
+            bytes: new ArrayBuffer(1),
+            report: {
+              issues: [{ code, severity: "warning", count: 3, locations: ["Sheet1!A1"] }],
+            },
+          }),
+        ),
+      );
+      await fixture.actions.exportXlsx();
+      fixture.actions.dismissFeedback();
+      expect(fixture.actions.confirmation.value).toBe("export");
+      fixture.actions.cancel();
+      await fixture.actions.confirm();
+      expect(fixture.actions.confirmation.value).toBeUndefined();
+      expect(fixture.actions.report.value).toBeUndefined();
+      expect(fixture.download).not.toHaveBeenCalled();
+      fixture.scope.stop();
+    },
+  );
+
+  test("reports a confirmed import that is open but could not be saved", async () => {
     const fixture = mountActions(
       createWorkerFactory((request, worker) =>
         response(worker, {
           id: request.id,
           ok: true,
-          type: "encode",
-          bytes: new Uint8Array([1, 2]).buffer,
-          report: {
-            issues: [
-              {
-                code: "image-omitted",
-                severity: "warning",
-                count: 1,
-                locations: ["A1"],
-              },
-            ],
-          },
+          type: "decode",
+          snapshot: serializeWorkbook(createTestWorkbook()),
+          report: emptyReport(),
         }),
       ),
     );
-
-    await fixture.actions.exportXlsx();
+    fixture.replaceDocument.mockImplementationOnce(async () => {
+      fixture.persistence.error.value = "quota";
+    });
+    await fixture.actions.importXlsx(file());
+    await fixture.actions.confirm();
+    expect(fixture.actions.feedback.value).toEqual({
+      key: "xlsx.feedback.importedUnsaved",
+      error: true,
+    });
     expect(fixture.actions.confirmation.value).toBeUndefined();
-    expect(fixture.download).toHaveBeenCalledWith(new Uint8Array([1, 2]), "workbook.xlsx");
-    expect(fixture.download).toHaveBeenCalledOnce();
-    expect(fixture.replaceDocument).not.toHaveBeenCalled();
-    expect(fixture.getRevision()).toBe(1);
-    expect("report" in fixture.actions).toBe(false);
     fixture.scope.stop();
   });
 
@@ -275,6 +344,7 @@ describe("useWorkbookXlsxActions", () => {
 
     await fixture.actions.importXlsx(file());
     expect(fixture.actions.confirmation.value).toBe("import");
+    expect(fixture.actions.report.value?.issues[0]?.locations).toEqual(["A1"]);
     expect(fixture.replaceDocument).not.toHaveBeenCalled();
     fixture.actions.dismissFeedback();
     expect(fixture.actions.confirmation.value).toBe("import");
@@ -315,6 +385,7 @@ describe("useWorkbookXlsxActions", () => {
     if (type === "encode") await fixture.actions.exportXlsx();
     else await fixture.actions.importXlsx(file());
     expect(fixture.actions.feedback.value).toEqual({ key: "xlsx.feedback.blocked", error: true });
+    expect(fixture.actions.report.value?.issues[0]?.code).toBe("archive-limit");
     expect(fixture.actions.confirmation.value).toBeUndefined();
     expect(fixture.download).not.toHaveBeenCalled();
     expect(fixture.replaceDocument).not.toHaveBeenCalled();

@@ -144,6 +144,36 @@ describe("explicit local Symbol font source", () => {
     expect(storage.read).not.toHaveBeenCalled();
   });
 
+  test("one shared Settings scan supplies Symbol handles and only the explicitly selected Blob", async () => {
+    Object.defineProperty(window, "isSecureContext", { configurable: true, value: true });
+    const selected = systemChoice();
+    const other = systemChoice("OtherMetadataFace");
+    const query = vi.fn(async () => [selected, other]);
+    Object.assign(window, { queryLocalFonts: query });
+    const symbolState = module.useLocalSymbolFonts();
+    const { localFontAccess } = await import("../../../shared/cell-text/local-fonts");
+    expect(query).not.toHaveBeenCalled();
+    expect(symbolState.choices.value).toEqual([]);
+    await localFontAccess.load({ refresh: true });
+    expect(query).toHaveBeenCalledOnce();
+    expect(symbolState.choices.value).toHaveLength(2);
+    expect(selected.blob).not.toHaveBeenCalled();
+    expect(other.blob).not.toHaveBeenCalled();
+    const verified = await module.loadSystemFont(symbolState.choices.value[0]!.id, {
+      persist: false,
+    });
+    expect(query).toHaveBeenCalledOnce();
+    expect(selected.blob).toHaveBeenCalledOnce();
+    expect(other.blob).not.toHaveBeenCalled();
+    expect(verified).toMatchObject({
+      displayFamily: "Noto Sans Math",
+      count: 3033,
+      source: "system",
+      persisted: false,
+    });
+    expect(storage.save).not.toHaveBeenCalled();
+  });
+
   test("coalesces concurrent metadata requests and caches a successful empty result", async () => {
     let finish!: (result: ReturnType<typeof systemChoice>[]) => void;
     const query = vi.fn(

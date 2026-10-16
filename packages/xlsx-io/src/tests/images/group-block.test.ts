@@ -4,6 +4,7 @@ import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import type { PictureGroup } from "@sheetcraft/core/picture-group";
 import { encodeXlsx } from "../../index.js";
 import { createXlsxImageExporter } from "../../image-export.js";
+import { XlsxCompatibilityError } from "../../types.js";
 function group(): PictureGroup {
   return {
     kind: "picture-group-v1",
@@ -55,14 +56,30 @@ describe("owned group native writer safety boundary", () => {
     const target = { addImage: vi.fn(() => 1) },
       output = { addImage: vi.fn() };
     const sheet = getActiveSheet(createWorkbook({ id: "w", sheetId: "s" }));
-    expect(() =>
+    let failure: unknown;
+    try {
       createXlsxImageExporter(target, undefined).addFloatingImage(
         output,
         sheet,
         group(),
         "Synthetic!C4",
-      ),
-    ).toThrow(/not yet supported/);
+      );
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toBeInstanceOf(XlsxCompatibilityError);
+    expect(failure).toMatchObject({
+      report: {
+        issues: [
+          {
+            code: "feature-omitted",
+            severity: "block",
+            count: 1,
+            locations: ['Synthetic!C4.floatingImages["group"].frame'],
+          },
+        ],
+      },
+    });
     expect(target.addImage).not.toHaveBeenCalled();
     expect(output.addImage).not.toHaveBeenCalled();
   });

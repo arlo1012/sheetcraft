@@ -42,6 +42,23 @@ function paintScene(display: ReturnType<typeof createSheetDisplaySnapshot>, scro
 }
 
 describe("Sheet display snapshot", () => {
+  test("invalidates an isolated display when only the row baseline changes", () => {
+    const sheet = reactive(createSheet("Snapshot", "snapshot"));
+    const evaluator = createSheetEvaluator(sheet);
+    const display = useSheetDisplaySnapshot({
+      getSheet: () => sheet,
+      getEvaluator: () => evaluator,
+    });
+    const before = display.value;
+    sheet.defaultRowHeight = 20;
+    const imported = display.value;
+    expect(imported).not.toBe(before);
+    expect(imported.sheet.defaultRowHeight).toBe(20);
+    sheet.defaultRowHeight = 24;
+    expect(display.value).not.toBe(imported);
+    expect(sheet.rowHeights.size).toBe(0);
+  });
+
   test("resolves live theme colors and multilingual fonts without rewriting direct formatting", () => {
     const sheet = createSheet("Theme", "theme");
     const theme = {

@@ -4,10 +4,11 @@ import { encodeXlsx, XlsxCompatibilityError } from "../../index.js";
 import { nativeColumnFixture } from "./native-column-fixture.js";
 
 describe("chart presentation export safety gate", () => {
-  test.each([{}, { palette: ["#123456"] }, { background: "#202020" }])(
+  test.each([{ background: "#202020" }, { lineMarkers: true }])(
     "blocks presentation presence %j before resource reads",
     async (presentation) => {
       const f = nativeColumnFixture();
+      if ("lineMarkers" in presentation) f.drawing.chart.type = "line";
       f.drawing.chart.presentation = presentation;
       const before = serializeWorkbook(f.workbook),
         images = vi.fn(() => []);
@@ -25,7 +26,9 @@ describe("chart presentation export safety gate", () => {
               code: "feature-omitted",
               severity: "block",
               count: 1,
-              locations: ['Data.drawings["column-chart"].chart.presentation'],
+              locations: [
+                `Data.drawings["column-chart"].chart.presentation.${"background" in presentation ? "background" : "lineMarkers"}`,
+              ],
             },
           ],
         },

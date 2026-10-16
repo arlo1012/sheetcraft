@@ -147,6 +147,7 @@ describe("picture cell overwrite leases", () => {
     "source",
     "target",
     "merge",
+    "default-row-height",
     "permission",
     "dispose",
   ] as const)("changed %s rejects without mutation/history", (kind) => {
@@ -163,6 +164,7 @@ describe("picture cell overwrite leases", () => {
       f.sheet.mergedCells = [
         { start: f.address, end: { ...f.address, column: f.address.column + 1 } },
       ];
+    if (kind === "default-row-height") f.sheet.defaultRowHeight = 20;
     if (kind === "permission") f.sheet.properties.protected = true;
     if (kind === "dispose") f.scope.stop();
     const before = serializeWorkbook(f.session.workbook);

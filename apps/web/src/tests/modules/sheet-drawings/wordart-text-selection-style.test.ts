@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import { undoWorkbookCommand, redoWorkbookCommand } from "@sheetcraft/core/history";
 import { findShapeGroupNode } from "@sheetcraft/core/shape-group";
@@ -23,15 +23,20 @@ const blue: ShapeChoice<ShapeLine> = {
     miterLimit: 4,
   },
 };
-function setup(owned = false) {
-  const root = owned ? deepRoot() : textRoot();
+function setup(
+  owned = false,
+  kind: "shape" | "textBox" | "wordArt" = "shape",
+  paintBoundary?: Parameters<typeof fixture>[1],
+) {
+  const root = owned ? deepRoot() : textRoot(kind === "textBox" ? "textBox" : "shape");
+  if (kind === "wordArt" && root.kind !== "shapeGroup") root.wordArt = true;
   const leaf =
     root.kind === "shapeGroup"
       ? findShapeGroupNode(root, ["outer", "nested", "target"])!.node
       : root;
   if (leaf.kind === "shapeGroup") throw Error("leaf");
   leaf.text = "alpha beta";
-  const f = fixture([root]);
+  const f = fixture([root], paintBoundary);
   const callbacks = f.begin(
     f.sheet.drawings![0]!,
     owned ? ["outer", "nested", "target"] : undefined,
@@ -158,33 +163,93 @@ describe("WordArt range glyph appearance shares the leased text draft", () => {
   });
 });
 
-test("text transform remains object-level during a leased draft and composing never partially commits", () => {
-  const f = setup();
+test.each(["textBox", "wordArt"] as const)(
+  "%s injected paint-proof transaction boundary receives merged glyph fill/warp; IME never partially commits",
+  (kind) => {
+    // This session/command test injects the native paint-proof boundary. It does
+    // not claim browser glyph fidelity; the real Node-without-Canvas failure below
+    // must still preserve the exact complete draft.
+    const proof = vi.fn<NonNullable<NonNullable<Parameters<typeof fixture>[1]>["preflight"]>>(
+      () => ({
+        kind: "ready",
+        proof: "native-alpha-warp",
+        actualDensity: 1,
+        estimatedPeakBytes: 0,
+        contourCount: 0,
+        edgeCount: 0,
+        pointCount: 0,
+        glyphCommandCount: 0,
+      }),
+    );
+    const f = setup(false, kind, { preflight: proof });
+    try {
+      const before = serializeWorkbook(f.workbook);
+      const selection = { start: 0, end: 5, direction: "backward" as const };
+      f.callbacks.setSelection(selection);
+      expect(f.style("fill", red)).toBe(true);
+      expect(f.pane.capabilities.value.textWarp?.enabled).toBe(true);
+      expect(f.pane.capabilities.value.fields.paragraphAlignment?.enabled).toBe(true);
+      expect(f.pane.capabilities.value.fields.textMarginLeftPt?.enabled).toBe(true);
+      expect(f.pane.capabilities.value.styles?.shape?.fill?.enabled).toBe(true);
+      expect(f.pane.capabilities.value.styles?.shape?.line?.enabled).toBe(true);
+      const transform = (preset: "textWave1" | "textArchUp") => {
+        // Every accepted intent advances the same session's pane revision.
+        const snapshot = f.pane.snapshot.value!;
+        return f.pane.onIntent({
+          type: "set-text-warp",
+          value: { preset },
+          owner: snapshot.owner,
+          baseRevision: snapshot.revision,
+          intentId: `object-transform-${snapshot.revision}`,
+        });
+      };
+      expect(transform("textWave1")).toBe(true);
+      const draft = f.editor.snapshot.value!.draftView;
+      expect(draft.shapeText!.warp).toEqual({ preset: "textWave1" });
+      expect(draft.shapeText!.characterRuns).toEqual([{ start: 0, end: 5, fill: red }]);
+      expect(f.editor.snapshot.value!.selection).toEqual(selection);
+      expect(f.pane.snapshot.value!.textWarp).toEqual({ preset: "textWave1" });
+      expect(serializeWorkbook(f.workbook)).toEqual(before);
+      expect(f.execute).not.toHaveBeenCalled();
+      f.callbacks.setComposing(true);
+      expect(transform("textArchUp")).toBe(false);
+      expect(f.callbacks.commit()).toBe(false);
+      expect(f.editor.snapshot.value!.draftView).toBe(draft);
+      expect(f.execute).not.toHaveBeenCalled();
+      expect(f.core.history.undoStack).toHaveLength(0);
+      f.callbacks.setComposing(false);
+      expect(f.callbacks.commit()).toBe(true);
+      expect(proof).toHaveBeenCalledOnce();
+      expect(proof.mock.calls[0]![0].drawing.shapeText?.warp).toEqual({ preset: "textWave1" });
+      expect(proof.mock.calls[0]![0].drawing.shapeText?.characterRuns).toEqual([
+        { start: 0, end: 5, fill: red },
+      ]);
+      expect(f.execute).toHaveBeenCalledOnce();
+      expect(f.core.history.undoStack).toHaveLength(1);
+      const after = serializeWorkbook(f.workbook);
+      expect(undoWorkbookCommand(f.core)).toBe(true);
+      expect(serializeWorkbook(f.workbook)).toEqual(before);
+      expect(redoWorkbookCommand(f.core)).toBe(true);
+      expect(serializeWorkbook(f.workbook)).toEqual(after);
+    } finally {
+      f.scope.stop();
+    }
+  },
+);
+
+test("missing native warp proof preserves the complete same-lease draft without a command", () => {
+  const f = setup(false, "textBox");
   try {
+    const before = serializeWorkbook(f.workbook);
     f.callbacks.setSelection({ start: 0, end: 5, direction: "forward" });
     expect(f.style("fill", red)).toBe(true);
+    expect(f.callbacks.setWarp({ preset: "textWave1" })).toBe(true);
     const draft = f.editor.snapshot.value!.draftView;
-    const snapshot = f.pane.snapshot.value!;
-    expect(f.pane.capabilities.value.textWarp?.enabled).toBe(false);
-    expect(f.pane.capabilities.value.textWarp?.reason).toContain("Apply the text");
-    expect(snapshot.scopeDescription).toContain("text-transform");
-    const transform = () =>
-      f.pane.onIntent({
-        type: "set-text-warp",
-        value: { preset: "textWave1" },
-        owner: snapshot.owner,
-        baseRevision: snapshot.revision,
-        intentId: "object-transform",
-      });
-    expect(transform()).toBe(false);
-    f.callbacks.setComposing(true);
-    expect(transform()).toBe(false);
-    expect(f.editor.snapshot.value!.draftView).toBe(draft);
-    expect(f.editor.snapshot.value!.draftView.shapeText!.characterRuns).toEqual([
-      { start: 0, end: 5, fill: red },
-    ]);
+    expect(f.callbacks.commit()).toBe(false);
+    expect(f.editor.snapshot.value?.error?.code).toBe("prepare");
+    expect(f.editor.snapshot.value?.draftView).toBe(draft);
     expect(f.execute).not.toHaveBeenCalled();
-    expect(f.core.history.undoStack).toHaveLength(0);
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
   } finally {
     f.scope.stop();
   }

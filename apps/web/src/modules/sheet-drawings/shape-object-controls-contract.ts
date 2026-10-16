@@ -108,3 +108,18 @@ const zh: typeof en = {
 export function shapeObjectControlsLabels(locale: ShapeObjectControlsLocale = "en-US") {
   return locale === "zh-CN" ? zh : en;
 }
+
+/** Shared standalone/embedded object commands retain the same exact-owner handlers. */
+export interface ShapeObjectToolsInput {
+  ownerKey: string;
+  disabled: boolean;
+  canFormat?: boolean;
+  canFlip: boolean;
+  canRotate: boolean;
+  canOrder: boolean;
+  unavailableReason?: string;
+  locale?: ShapeObjectControlsLocale;
+  actionHandler: (action: ShapeObjectControlAction) => boolean;
+  formatHandler: () => boolean;
+  selectionPaneHandler: () => boolean;
+}

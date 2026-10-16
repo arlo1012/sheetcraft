@@ -107,6 +107,7 @@ import {
   getCellContent,
   getCellHyperlink,
   getDefaultColumnWidth,
+  getDefaultRowHeight,
   type FloatingImage,
   type CellAddress,
   type CellNoteBox,
@@ -342,6 +343,7 @@ const props = withDefaults(
     equationEditSnapshot?: EquationEditSnapshot;
     chartLayoutPreview?: ChartLayoutPreview;
     equationEditCallbacks?: EquationEditCallbacks;
+    ownsSelectedShapeFieldTarget?: (target: EventTarget | null) => boolean;
     shapeTextEditSnapshot?: ShapeTextEditSnapshot | null;
     shapeTextEditCallbacks?: ShapeTextEditCallbacks;
     shapeTextEditStart?: (request: ShapeCanvasTextEditRequest) => boolean;
@@ -928,6 +930,7 @@ const {
   }),
   getColumnWidths: () => effectiveColumnWidths.value,
   getDefaultColumnWidth: () => getDefaultColumnWidth(props.sheet),
+  getDefaultRowHeight: () => getDefaultRowHeight(props.sheet),
   getHiddenRows: () => props.sheet.hiddenRows,
   getHiddenColumns: () => outlineHiddenColumnSet.value,
   getContentExtent: () => ({
@@ -1038,6 +1041,7 @@ const automaticRowHeights = computed(() => {
     getCellStyle: (address) => display.value.getCellStyle(address),
     columnWidths: effectiveColumnWidths.value,
     defaultColumnWidth: props.sheet.defaultColumnWidth,
+    defaultRowHeight: getDefaultRowHeight(props.sheet),
     rowCount: gridExtent.rowCount,
     columnCount: gridExtent.columnCount,
     defaultFontFamily: defaultFontFamily.value,
@@ -4311,6 +4315,7 @@ defineExpose({
       ? ownedImageLayerRef.value?.arrangeSelection(ids, action, reference)
       : imageLayerRef.value?.arrangeImages(ids, action, reference);
   },
+  hasActivePictureCrop: () => pictureCrop.active.value,
   applyPendingPictureCrop: () => !pictureCrop.active.value || finishPictureCrop(false, false),
   cropImage: startPictureCrop,
   canCropPicture: () => pictureCrop.canStart.value,
@@ -4668,6 +4673,7 @@ defineExpose({
         :equation-edit-snapshot="equationEditSnapshot"
         :chart-layout-preview="chartLayoutPreview"
         :equation-edit-callbacks="equationEditCallbacks"
+        :owns-selected-shape-field-target="ownsSelectedShapeFieldTarget"
         :text-edit-snapshot="shapeTextEditSnapshot"
         :text-edit-callbacks="shapeTextEditCallbacks"
         :start-text-edit="shapeTextEditStart"

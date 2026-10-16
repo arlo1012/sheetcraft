@@ -288,7 +288,10 @@ test("mixed member fill is an explicit non-applying placeholder, not the inherit
   const onCommit = vi.fn(() => true);
   const wrapper = mount(PicturePaintEditor, {
     props: { ownerKey: "group", mixed: true, t: (key) => key, onCommit },
-    global: { stubs: { ColorPaletteSelect: paletteStub } },
+    global: {
+      plugins: [createAppI18n("en-US")],
+      stubs: { ColorPaletteSelect: paletteStub },
+    },
   });
   wrappers.push(wrapper);
   const mode = wrapper.getComponent(Select);

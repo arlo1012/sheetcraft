@@ -109,7 +109,10 @@ export function deepRoot(withOwnedConnector = false): ShapeGroupDrawing {
     members: withOwnedConnector ? [nested, owned(connectorRoot())] : [nested],
   };
 }
-export function fixture(drawings: SheetDrawing[] = [textRoot()]) {
+export function fixture(
+  drawings: SheetDrawing[] = [textRoot()],
+  paintBoundary?: Parameters<typeof prepareShapeTextUpdate>[4],
+) {
   const workbook = reactive(createWorkbook({ id: "text-session", sheetId: "sheet" }));
   const sheet = getActiveSheet(workbook);
   sheet.drawings = normalizeSheetDrawings(drawings);
@@ -136,7 +139,7 @@ export function fixture(drawings: SheetDrawing[] = [textRoot()]) {
         owner,
         viewport,
         measurement,
-        undefined,
+        paintBoundary,
         metrics.value,
         {
           candidateForest: forest!,

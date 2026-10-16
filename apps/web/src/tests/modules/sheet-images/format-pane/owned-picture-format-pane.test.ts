@@ -506,6 +506,13 @@ describe("real picture format pane document owner", () => {
     const f = fixture("owned-group", leafPath),
       old = intent(f, "sizeWidthPt", 45);
     f.busy.value = true;
+    expect(f.pane.capabilities.value.cropShape?.enabled).toBe(false);
+    for (const capabilities of [
+      f.pane.capabilities.value.fields,
+      f.pane.capabilities.value.detailed,
+      f.pane.capabilities.value.resets,
+    ])
+      expect(Object.values(capabilities ?? {}).every((field) => !field.enabled)).toBe(true);
     expect(f.pane.onIntent(old)).toBe(false);
     f.busy.value = false;
     f.sheet.properties.protected = true;

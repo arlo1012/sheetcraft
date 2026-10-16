@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { PictureTextureId } from "../../picture-texture";
-import { computed, nextTick, ref, useId } from "vue";
+import { computed, nextTick, provide, ref, useId } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
-import { Image, PaintBucket, Ruler, Sparkles, X } from "lucide-vue-next";
+import { Tabs as TTabs, TabPanel as TTabPanel } from "tdesign-vue-next/es/tabs";
+import { X } from "lucide-vue-next";
 import {
   type PictureFormatCapabilities,
   type PictureFormatIntentHandler,
@@ -15,6 +16,7 @@ import {
 } from "../../picture-format-pane-model";
 import type { PictureIntrinsicSizeStatus } from "../../usePictureIntrinsicSize";
 import { usePictureFormatPane } from "./usePictureFormatPane";
+import { pictureFormatCommonReasons } from "./picture-format-feedback";
 import PictureFormatFillLine from "./PictureFormatFillLine.vue";
 import PictureFormatEffects from "./PictureFormatEffects.vue";
 import PictureFormatSizeProperties from "./PictureFormatSizeProperties.vue";
@@ -37,6 +39,21 @@ const props = withDefaults(
   }>(),
   { initialTab: "size-properties", initialUnit: "pt" },
 );
+const commonReasons = computed<ReadonlySet<string>>(() => {
+  const counts = new Map<string, number>();
+  const capabilities = [
+    ...Object.values(props.capabilities.fields),
+    ...Object.values(props.capabilities.detailed ?? {}),
+    ...Object.values(props.capabilities.resets ?? {}),
+    props.capabilities.cropShape,
+  ];
+  for (const capability of capabilities) {
+    const reason = capability?.enabled === false ? capability.reason : undefined;
+    if (reason) counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  }
+  return new Set([...counts].filter(([, count]) => count > 1).map(([reason]) => reason));
+});
+provide(pictureFormatCommonReasons, commonReasons);
 const emit = defineEmits<{ close: []; cancel: [] }>();
 const controller = usePictureFormatPane(props);
 const tab = ref<PictureFormatTab>(props.initialPaint ? "fill-line" : props.initialTab);
@@ -44,7 +61,7 @@ const fillLineRef = ref<InstanceType<typeof PictureFormatFillLine> | null>(null)
 const unit = ref<PictureFormatLengthUnit>(props.initialUnit);
 const paneId = `picture-format-pane-${useId()}`;
 const tabs = ["fill-line", "effects", "size-properties", "picture"] as const;
-const tabButtons = ref<HTMLButtonElement[]>([]);
+
 const unitOptions = computed(() => [
   { value: "in", label: props.t("unitIn") },
   { value: "cm", label: props.t("unitCm") },
@@ -106,6 +123,14 @@ function keydown(event: KeyboardEvent) {
   }
 }
 async function tabKeydown(event: KeyboardEvent) {
+  if (event.isComposing || event.keyCode === 229) return;
+  const tablist = event.currentTarget;
+  if (
+    !(tablist instanceof HTMLElement) ||
+    !(event.target instanceof Element) ||
+    !event.target.closest("[role=tab]")
+  )
+    return;
   const index = tabs.indexOf(tab.value);
   let next: number;
   if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
@@ -116,10 +141,22 @@ async function tabKeydown(event: KeyboardEvent) {
   event.preventDefault();
   tab.value = tabs[next]!;
   await nextTick();
-  tabButtons.value[next]?.focus();
+  tablist.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
+}
+function changeTab(value: string | number): void {
+  if (
+    value === "fill-line" ||
+    value === "effects" ||
+    value === "size-properties" ||
+    value === "picture"
+  )
+    tab.value = value;
 }
 defineExpose({
   cancel: controller.cancel,
+  showEffects: () => {
+    tab.value = "effects";
+  },
   showPaint: (category: "fill" | "line") => {
     tab.value = "fill-line";
     fillLineRef.value?.showCategory(category);
@@ -150,74 +187,72 @@ defineExpose({
       :aria-label="t('paneTitle')"
       @keydown="tabKeydown"
     >
-      <button
-        :id="`${paneId}-fill-line-tab`"
-        :ref="
-          (element) => {
-            tabButtons[0] = element as HTMLButtonElement;
-          }
-        "
-        type="button"
-        role="tab"
-        :aria-controls="`${paneId}-fill-line-panel`"
-        :aria-selected="tab === 'fill-line'"
-        :tabindex="tab === 'fill-line' ? 0 : -1"
-        :title="t('fillLineTab')"
-        @click="tab = 'fill-line'"
-      >
-        <PaintBucket :size="16" aria-hidden="true" /><span>{{ t("fillLineTab") }}</span>
-      </button>
-      <button
-        :id="`${paneId}-effects-tab`"
-        :ref="
-          (element) => {
-            tabButtons[1] = element as HTMLButtonElement;
-          }
-        "
-        type="button"
-        role="tab"
-        :aria-controls="`${paneId}-effects-panel`"
-        :aria-selected="tab === 'effects'"
-        :tabindex="tab === 'effects' ? 0 : -1"
-        :title="t('effectsTab')"
-        @click="tab = 'effects'"
-      >
-        <Sparkles :size="16" aria-hidden="true" /><span>{{ t("effectsTab") }}</span>
-      </button>
-      <button
-        :id="`${paneId}-size-properties-tab`"
-        :ref="
-          (element) => {
-            tabButtons[2] = element as HTMLButtonElement;
-          }
-        "
-        type="button"
-        role="tab"
-        :aria-controls="`${paneId}-size-properties-panel`"
-        :aria-selected="tab === 'size-properties'"
-        :tabindex="tab === 'size-properties' ? 0 : -1"
-        :title="t('sizePropertiesTab')"
-        @click="tab = 'size-properties'"
-      >
-        <Ruler :size="16" aria-hidden="true" /><span>{{ t("sizePropertiesTab") }}</span>
-      </button>
-      <button
-        :id="`${paneId}-picture-tab`"
-        :ref="
-          (element) => {
-            tabButtons[3] = element as HTMLButtonElement;
-          }
-        "
-        type="button"
-        role="tab"
-        :aria-controls="`${paneId}-picture-panel`"
-        :aria-selected="tab === 'picture'"
-        :tabindex="tab === 'picture' ? 0 : -1"
-        :title="t('pictureTab')"
-        @click="tab = 'picture'"
-      >
-        <Image :size="16" aria-hidden="true" /><span>{{ t("pictureTab") }}</span>
-      </button>
+      <TTabs :value="tab" class="sheetcraft-tabs--compact" @change="changeTab">
+        <TTabPanel value="fill-line" :destroy-on-hide="false">
+          <template #label>
+            <button
+              :id="`${paneId}-fill-line-tab`"
+              type="button"
+              role="tab"
+              class="picture-format-pane__tab-label"
+              :aria-controls="`${paneId}-fill-line-panel`"
+              :aria-selected="tab === 'fill-line'"
+              :tabindex="tab === 'fill-line' ? 0 : -1"
+              :title="t('fillLineTab')"
+            >
+              {{ t("fillLineTab") }}
+            </button>
+          </template>
+        </TTabPanel>
+        <TTabPanel value="effects" :destroy-on-hide="false">
+          <template #label>
+            <button
+              :id="`${paneId}-effects-tab`"
+              type="button"
+              role="tab"
+              class="picture-format-pane__tab-label"
+              :aria-controls="`${paneId}-effects-panel`"
+              :aria-selected="tab === 'effects'"
+              :tabindex="tab === 'effects' ? 0 : -1"
+              :title="t('effectsTab')"
+            >
+              {{ t("effectsTab") }}
+            </button>
+          </template>
+        </TTabPanel>
+        <TTabPanel value="size-properties" :destroy-on-hide="false">
+          <template #label>
+            <button
+              :id="`${paneId}-size-properties-tab`"
+              type="button"
+              role="tab"
+              class="picture-format-pane__tab-label"
+              :aria-controls="`${paneId}-size-properties-panel`"
+              :aria-selected="tab === 'size-properties'"
+              :tabindex="tab === 'size-properties' ? 0 : -1"
+              :title="t('sizePropertiesTab')"
+            >
+              {{ t("sizePropertiesTab") }}
+            </button>
+          </template>
+        </TTabPanel>
+        <TTabPanel value="picture" :destroy-on-hide="false">
+          <template #label>
+            <button
+              :id="`${paneId}-picture-tab`"
+              type="button"
+              role="tab"
+              class="picture-format-pane__tab-label"
+              :aria-controls="`${paneId}-picture-panel`"
+              :aria-selected="tab === 'picture'"
+              :tabindex="tab === 'picture' ? 0 : -1"
+              :title="t('pictureTab')"
+            >
+              {{ t("pictureTab") }}
+            </button>
+          </template>
+        </TTabPanel>
+      </TTabs>
     </div>
     <div v-if="snapshot" class="picture-format-pane__units">
       <span>{{ t("units") }}</span
@@ -232,6 +267,9 @@ defineExpose({
       />
     </div>
     <div class="picture-format-pane__body">
+      <div v-if="snapshot && commonReasons.size" class="picture-format-pane__status" role="status">
+        <p v-for="reason in commonReasons" :key="reason">{{ reason }}</p>
+      </div>
       <p v-if="!snapshot" class="picture-format-pane__empty">{{ t("noSelection") }}</p>
       <template v-else>
         <div
@@ -281,6 +319,7 @@ defineExpose({
   </aside>
 </template>
 <style scoped lang="scss">
+@use "../../../../shared/tabs/tab-label" as tabLabel;
 .picture-format-pane {
   box-sizing: border-box;
   display: flex;
@@ -302,11 +341,13 @@ defineExpose({
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding: 12px 12px 8px;
+    padding: 8px 10px 6px;
   }
   &__heading {
     min-width: 0;
-    display: grid;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
     strong {
       font-size: 14px;
       line-height: 22px;
@@ -320,47 +361,17 @@ defineExpose({
     }
   }
   &__tabs {
-    display: grid;
-    grid-template-columns: 1fr 0.8fr 1.4fr 0.9fr;
-    gap: 2px;
-    margin: 0 8px;
-    border-bottom: 1px solid var(--sheetcraft-border-subtle);
-  }
-  &__tabs button {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
     min-width: 0;
-    gap: 2px;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    background: transparent;
-    padding: 8px 2px 6px;
-    color: inherit;
-    font: inherit;
-    cursor: pointer;
-    border-radius: var(--sheetcraft-radius-small) var(--sheetcraft-radius-small) 0 0;
   }
-  &__tabs button span {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  &__tabs button:hover {
-    background: var(--sheetcraft-surface-hover);
-  }
-  &__tabs button[aria-selected="true"] {
-    border-bottom-color: var(--sheetcraft-text-primary);
-    font-weight: 500;
+  &__tab-label {
+    @include tabLabel.label;
   }
   &__units {
     display: flex;
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
-    padding: 10px 12px 4px;
+    padding: 5px 10px 2px;
     > span {
       color: var(--sheetcraft-text-secondary);
     }
@@ -373,7 +384,15 @@ defineExpose({
     min-height: 0;
     overflow: auto;
     overscroll-behavior: contain;
-    padding: 0 12px 12px;
+    padding: 0 10px 10px;
+  }
+  &__status {
+    color: var(--sheetcraft-text-secondary);
+    padding: 4px 0 6px;
+    p {
+      margin: 0;
+      line-height: 18px;
+    }
   }
   &__empty {
     color: var(--sheetcraft-text-secondary);

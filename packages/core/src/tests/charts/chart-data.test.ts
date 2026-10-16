@@ -43,8 +43,8 @@ describe("chart data", () => {
   test("independently controls row and column headers", () => {
     const f = fixture();
     expect(f.read({ headerRow: false }).series).toEqual([
-      { rangeBand: { seriesBy: "columns", index: 1 }, name: "1", values: [null, 10, 30] },
-      { rangeBand: { seriesBy: "columns", index: 2 }, name: "2", values: [null, 20, 40] },
+      { rangeBand: { seriesBy: "columns", index: 1 }, name: "Series 1", values: [null, 10, 30] },
+      { rangeBand: { seriesBy: "columns", index: 2 }, name: "Series 2", values: [null, 20, 40] },
     ]);
     expect(f.read({ headerColumn: false })).toMatchObject({
       categories: ["1", "2"],
@@ -78,9 +78,13 @@ describe("chart data", () => {
     const data = fixture().read({ headerRow: false, headerColumn: false });
     expect(data.categories).toEqual(["1", "2", "3"]);
     expect(data.series).toEqual([
-      { rangeBand: { seriesBy: "columns", index: 0 }, name: "1", values: [null, null, null] },
-      { rangeBand: { seriesBy: "columns", index: 1 }, name: "2", values: [null, 10, 30] },
-      { rangeBand: { seriesBy: "columns", index: 2 }, name: "3", values: [null, 20, 40] },
+      {
+        rangeBand: { seriesBy: "columns", index: 0 },
+        name: "Series 1",
+        values: [null, null, null],
+      },
+      { rangeBand: { seriesBy: "columns", index: 1 }, name: "Series 2", values: [null, 10, 30] },
+      { rangeBand: { seriesBy: "columns", index: 2 }, name: "Series 3", values: [null, 20, 40] },
     ]);
   });
   test.each([
@@ -89,8 +93,8 @@ describe("chart data", () => {
       headerColumn: false,
       categories: ["Region", "Q1", "Q2"],
       series: [
-        { name: "1", values: [null, 10, 20] },
-        { name: "2", values: [null, 30, 40] },
+        { name: "Series 1", values: [null, 10, 20] },
+        { name: "Series 2", values: [null, 30, 40] },
       ],
     },
     {
@@ -108,9 +112,9 @@ describe("chart data", () => {
       headerColumn: false,
       categories: ["1", "2", "3"],
       series: [
-        { name: "1", values: [null, null, null] },
-        { name: "2", values: [null, 10, 20] },
-        { name: "3", values: [null, 30, 40] },
+        { name: "Series 1", values: [null, null, null] },
+        { name: "Series 2", values: [null, 10, 20] },
+        { name: "Series 3", values: [null, 30, 40] },
       ],
     },
   ])(
@@ -138,7 +142,7 @@ describe("chart data", () => {
     expect(f.read(rows).series[0]!.rangeBand).toEqual({ seriesBy: "rows", index: 1 });
     expect(f.read(rows)).toMatchObject({
       categories: ["1"],
-      series: [{ name: "1", values: [10] }],
+      series: [{ name: "Series 1", values: [10] }],
     });
   });
   test("omits hidden row and column data unless explicitly enabled", () => {

@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
-import PictureFormatSection from "../../../sheet-images/components/format-pane/PictureFormatSection.vue";
+import FormatSection from "../../../../shared/format-pane/FormatSection.vue";
 import type { PictureFormatLengthUnit } from "../../../sheet-images/picture-format-pane-model";
 import ShapeFormatNumberField from "./ShapeFormatNumberField.vue";
 import ShapeFormatCheckbox from "./ShapeFormatCheckbox.vue";
@@ -21,7 +21,7 @@ const disconnect = computed(() => props.controller.session.disconnectConnectorAc
 </script>
 <template>
   <div class="shape-format-size-properties">
-    <PictureFormatSection :title="controller.props.t('sizeSection')" initially-open>
+    <FormatSection :title="controller.props.t('sizeSection')" initially-open>
       <div v-if="isConnector" class="shape-format-size-properties__connector">
         <p class="shape-format-size-properties__reason" data-shape-connector-size-limit>
           {{ controller.s.value("connectorSizeReason") }}
@@ -64,22 +64,22 @@ const disconnect = computed(() => props.controller.session.disconnectConnectorAc
           {{ controller.s.value("relativeOriginalReason") }}
         </p>
       </div>
-    </PictureFormatSection>
-    <PictureFormatSection :title="controller.props.t('propertiesSection')" initially-open>
+    </FormatSection>
+    <FormatSection :title="controller.props.t('propertiesSection')" initially-open>
       <ShapeFormatChoiceField v-if="!isConnector" :controller="controller" field="anchor" />
       <ShapeFormatCheckbox :controller="controller" field="printObject" />
       <ShapeFormatCheckbox :controller="controller" field="locked" />
-    </PictureFormatSection>
+    </FormatSection>
     <ShapeFormatTextBox
       v-if="!isConnector"
       :controller="controller"
       :unit="unit"
       :include-font="false"
     />
-    <PictureFormatSection :title="controller.props.t('altTextSection')">
+    <FormatSection :title="controller.props.t('altTextSection')">
       <ShapeFormatTextField :controller="controller" field="altTitle" />
       <ShapeFormatTextField :controller="controller" field="altDescription" multiline />
-    </PictureFormatSection>
+    </FormatSection>
   </div>
 </template>
 <style scoped lang="scss">

@@ -26,7 +26,7 @@ describe("combo native export safety gate", () => {
               code: "feature-omitted",
               severity: "block",
               locations: [
-                `Data.drawings["column-chart"].chart.${mode === "combo" ? "type" : "format"}`,
+                `Data.drawings["column-chart"].chart.${mode === "combo" ? "type" : "format.series"}`,
               ],
             },
           ],

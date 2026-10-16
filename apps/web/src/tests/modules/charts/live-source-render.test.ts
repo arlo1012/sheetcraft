@@ -1,3 +1,5 @@
+import { displayedSeriesName, withDisplayedSeriesNames } from "./chart-render-labels";
+import type { EChartsOption } from "echarts";
 // @vitest-environment node
 import { describe, expect, test } from "vitest";
 import { createChartSourceFromRange, type ChartSeriesSource } from "@sheetcraft/core/chart-source";
@@ -108,7 +110,7 @@ function renderedColors(instance: EChartsType, radar: boolean) {
     }));
   }
   return series.map((entry) => ({
-    name: entry.name,
+    name: displayedSeriesName(instance.getOption() as EChartsOption, entry.name),
     color: entry.getData().getItemVisual(0, "style").fill,
   }));
 }
@@ -151,8 +153,9 @@ describe("live ordered series SVG rendering", () => {
           expected[1],
         ]);
         const svg = instance.renderToSVGString();
-        expect(svg.indexOf(">apple<")).toBeLessThan(svg.indexOf(">extra<"));
-        expect(svg.indexOf(">extra<")).toBeLessThan(svg.indexOf(">pear<"));
+        const order = type === "bar" ? ["pear", "extra", "apple"] : ["apple", "extra", "pear"];
+        expect(svg.indexOf(`>${order[0]}<`)).toBeLessThan(svg.indexOf(`>${order[1]}<`));
+        expect(svg.indexOf(`>${order[1]}<`)).toBeLessThan(svg.indexOf(`>${order[2]}<`));
         for (const text of ["red", "green", "blue", "apple", "extra", "pear"])
           expect(svg).toContain(`>${text}<`);
       });
@@ -321,9 +324,11 @@ describe("live ordered series SVG rendering", () => {
         { type: "bar", name: "pear", data: [70, 80, 90], label: { show: false } },
       ],
     };
-    expect(createChartOption(legacy, data)).toEqual(expected);
+    expect(withDisplayedSeriesNames(createChartOption(legacy, data))).toMatchObject(expected);
     const detached = { ...legacy, range: null, dataCache: data };
-    expect(createChartOption(detached, f.read(detached))).toEqual(expected);
+    expect(withDisplayedSeriesNames(createChartOption(detached, f.read(detached)))).toMatchObject(
+      expected,
+    );
     for (const next of [legacy, detached])
       render(next, f.read(next), (instance) => {
         expect(renderedColors(instance, false)).toEqual([

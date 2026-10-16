@@ -9,6 +9,8 @@ export type ImageAsset = {
 export type ImageAssetStore = {
   get(id: string): Promise<ImageAsset | undefined>;
   put(asset: ImageAsset): Promise<void>;
+  /** Atomically persist a complete import batch, or leave the store unchanged. */
+  putAll?(assets: readonly ImageAsset[]): Promise<void>;
 };
 
 const DATABASE_NAME = "sheetcraft-image-assets";
@@ -22,6 +24,9 @@ export function createMemoryImageAssetStore(): ImageAssetStore {
     },
     async put(asset) {
       assets.set(asset.id, asset);
+    },
+    async putAll(batch) {
+      for (const asset of batch) assets.set(asset.id, asset);
     },
   };
 }
@@ -73,6 +78,24 @@ export function createIndexedDbImageAssetStore(): ImageAssetStore {
     database = opening;
     return opening;
   };
+  const putAll = async (assets: readonly ImageAsset[]): Promise<void> => {
+    const db = await getDatabase();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, "readwrite");
+      transaction.onerror = () =>
+        reject(transaction.error ?? new Error("Could not save image asset."));
+      transaction.onabort = () =>
+        reject(transaction.error ?? new Error("Could not save image asset."));
+      transaction.oncomplete = () => resolve();
+      try {
+        const store = transaction.objectStore(STORE_NAME);
+        for (const asset of assets) store.put(asset, asset.id);
+      } catch (error) {
+        transaction.abort();
+        reject(error);
+      }
+    });
+  };
   return {
     async get(id) {
       const db = await getDatabase();
@@ -92,16 +115,8 @@ export function createIndexedDbImageAssetStore(): ImageAssetStore {
       });
     },
     async put(asset) {
-      const db = await getDatabase();
-      await new Promise<void>((resolve, reject) => {
-        const transaction = db.transaction(STORE_NAME, "readwrite");
-        transaction.onerror = () =>
-          reject(transaction.error ?? new Error("Could not save image asset."));
-        transaction.onabort = () =>
-          reject(transaction.error ?? new Error("Could not save image asset."));
-        transaction.oncomplete = () => resolve();
-        transaction.objectStore(STORE_NAME).put(asset, asset.id);
-      });
+      await putAll([asset]);
     },
+    putAll,
   };
 }

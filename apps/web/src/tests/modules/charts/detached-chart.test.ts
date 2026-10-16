@@ -2,7 +2,6 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { Button } from "tdesign-vue-next/es/button";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
-import { Dialog } from "tdesign-vue-next/es/dialog";
 import {
   createWorkbook,
   getActiveSheet,
@@ -89,6 +88,7 @@ describe("detached pivot charts", () => {
       attachTo: document.body,
       props: {
         drawing: f.drawing,
+        mode: "change-type",
         workbook: f.workbook,
         sheet: f.sheet,
         evaluator: createSheetEvaluator(f.sheet),
@@ -104,6 +104,11 @@ describe("detached pivot charts", () => {
       },
     });
     mounted.push(wrapper);
+    await wrapper
+      .findAllComponents(Button)
+      .find((button) => button.text() === "Select data")!
+      .trigger("click");
+    await flushPromises();
     expect(wrapper.findComponent(RangeReferenceInput).props("disabled")).toBe(true);
     const locked = () =>
       wrapper
@@ -127,7 +132,13 @@ describe("detached pivot charts", () => {
     expect(wrapper.findComponent(RangeReferenceInput).props("disabled")).toBe(false);
     expect(locked()).toEqual([false, false, false, false]);
     expect(f.drawing.chart.dataCache).toBeDefined();
-    wrapper.findComponent(Dialog).vm.$emit("confirm");
+    await wrapper
+      .findAllComponents(Button)
+      .find((button) => button.text() === "Back to chart preview")!
+      .trigger("click");
+    await flushPromises();
+    document.querySelector<HTMLButtonElement>("[data-chart-confirm]")!.click();
+    await flushPromises();
     const result = wrapper.emitted("confirm")![0]![0] as SheetChartDrawing;
     expect(result.chart.dataCache).toBeUndefined();
     expect(f.drawing.chart.dataCache).toBeDefined();

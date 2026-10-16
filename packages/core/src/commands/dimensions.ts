@@ -2,7 +2,7 @@ import { assertPictureObjectsForSheet } from "../picture-object-sheet.js";
 import { assertShapeObjectsForSheet } from "../shape-object-sheet.js";
 import {
   DEFAULT_COLUMN_WIDTH,
-  DEFAULT_ROW_HEIGHT,
+  getDefaultRowHeight,
   MAX_COLUMN_WIDTH,
   MAX_ROW_HEIGHT,
   MAX_SHEET_COLUMNS,
@@ -129,7 +129,9 @@ function createRestoreSheetDimensionStateCommand(
     dimensions: [...dimensions].map(([index, size]) => ({ index, size })),
     hiddenIndexes,
     floatingImageState: sheet.floatingImages.map(cloneFloatingImage),
-    ...(axis === "column" ? { defaultColumnWidth: getDefaultColumnWidth(sheet) } : {}),
+    ...(axis === "row"
+      ? { defaultRowHeight: getDefaultRowHeight(sheet) }
+      : { defaultColumnWidth: getDefaultColumnWidth(sheet) }),
   };
 }
 
@@ -179,7 +181,7 @@ export function applyResizeSheetDimensionsCommand(
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const changedIndexes = indexes.filter((index) =>
     command.axis === "row"
-      ? (sheet.rowHeights.get(index) ?? DEFAULT_ROW_HEIGHT) !== command.size
+      ? (sheet.rowHeights.get(index) ?? getDefaultRowHeight(sheet)) !== command.size
       : (sheet.columnWidths.get(index) ?? getDefaultColumnWidth(sheet)) !== command.size,
   );
   if (changedIndexes.length === 0) return null;
@@ -209,7 +211,7 @@ export function applySetSheetDimensionSizesCommand(
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const changes = command.changes.filter((change) =>
     command.axis === "row"
-      ? (sheet.rowHeights.get(change.index) ?? DEFAULT_ROW_HEIGHT) !== change.size
+      ? (sheet.rowHeights.get(change.index) ?? getDefaultRowHeight(sheet)) !== change.size
       : (sheet.columnWidths.get(change.index) ?? getDefaultColumnWidth(sheet)) !== change.size,
   );
   if (changes.length === 0) return null;
@@ -283,7 +285,11 @@ export function applyRestoreSheetDimensionStateCommand(
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const dimensions = command.axis === "row" ? sheet.rowHeights : sheet.columnWidths;
   const maximum = command.axis === "row" ? MAX_SHEET_ROWS : MAX_SHEET_COLUMNS;
+  // Older row inverses did not own a baseline; retain the target default.
+  const defaultRowHeight =
+    command.defaultRowHeight === undefined ? getDefaultRowHeight(sheet) : command.defaultRowHeight;
   const defaultColumnWidth = command.defaultColumnWidth ?? DEFAULT_COLUMN_WIDTH;
+  if (command.axis === "row") assertSize("row", defaultRowHeight, "defaultRowHeight");
   if (command.axis === "column") assertSize("column", defaultColumnWidth, "defaultColumnWidth");
   const seen = new Set<number>();
   for (const dimension of command.dimensions) {
@@ -292,7 +298,7 @@ export function applyRestoreSheetDimensionStateCommand(
     assertIndex(command.axis, dimension.index);
     assertSize(command.axis, dimension.size, "dimensions.size");
     if (
-      (command.axis === "row" && dimension.size === DEFAULT_ROW_HEIGHT) ||
+      (command.axis === "row" && dimension.size === defaultRowHeight) ||
       (command.axis === "column" && dimension.size === defaultColumnWidth)
     )
       throw invalidCommandPayload("dimensions", command.dimensions);
@@ -316,12 +322,15 @@ export function applyRestoreSheetDimensionStateCommand(
     command.dimensions.every(({ index, size }) => dimensions.get(index) === size) &&
     (currentHidden?.size ?? 0) === hidden.size &&
     [...hidden].every((index) => currentHidden?.has(index)) &&
-    (command.axis === "row" || getDefaultColumnWidth(sheet) === defaultColumnWidth) &&
+    (command.axis === "row"
+      ? getDefaultRowHeight(sheet) === defaultRowHeight
+      : getDefaultColumnWidth(sheet) === defaultColumnWidth) &&
     (pictures === undefined || areFloatingImageCollectionsEqual(sheet.floatingImages, pictures));
   if (unchanged) return null;
   preflightDimensionMutation(sheet, (shadow) => {
     const nextDimensions = new Map(command.dimensions.map((entry) => [entry.index, entry.size]));
     if (command.axis === "row") {
+      shadow.defaultRowHeight = defaultRowHeight;
       shadow.rowHeights = nextDimensions;
       shadow.hiddenRows = hidden;
     } else {
@@ -334,8 +343,10 @@ export function applyRestoreSheetDimensionStateCommand(
   const inverse = createRestoreSheetDimensionStateCommand(command.sheetId, command.axis, sheet);
   dimensions.clear();
   for (const dimension of command.dimensions) dimensions.set(dimension.index, dimension.size);
-  if (command.axis === "row") sheet.hiddenRows = hidden;
-  else {
+  if (command.axis === "row") {
+    sheet.defaultRowHeight = defaultRowHeight;
+    sheet.hiddenRows = hidden;
+  } else {
     sheet.hiddenColumns = hidden;
     sheet.defaultColumnWidth = defaultColumnWidth;
   }

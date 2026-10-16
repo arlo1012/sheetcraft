@@ -476,6 +476,25 @@
   line-height: var(--td-line-height-body-medium);
 }
 
+// Property panes need compact navigation; Tabs exposes no small/compact public size.
+// Opt-in only: ordinary dialog Tabs retain the library's default header spacing.
+.sheetcraft-tabs--compact > .t-tabs__header .t-tabs__nav-item-wrapper {
+  margin-inline: 0;
+  padding-inline: var(--sheetcraft-space-2);
+}
+
+// Formatting panes already own their content inset. Collapse has no public padding API.
+// Keep this opt-in adapter bounded to the direct section, not nested/ordinary Collapse.
+.sheetcraft-collapse--format-section > .t-collapse-panel > .t-collapse-panel__wrapper {
+  > .t-collapse-panel__header {
+    padding: var(--sheetcraft-space-3) 0;
+  }
+
+  > .t-collapse-panel__body > .t-collapse-panel__content {
+    padding: var(--sheetcraft-space-2) 0 var(--sheetcraft-space-4);
+  }
+}
+
 // Dialog action/status icons retain their geometry independently of body text.
 .t-dialog__close {
   width: 20px;

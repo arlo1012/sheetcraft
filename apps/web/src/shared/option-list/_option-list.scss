@@ -56,7 +56,7 @@
   white-space: nowrap;
   cursor: pointer;
 
-  &:hover:not([aria-selected="true"]) {
+  &:hover:not(:disabled):not([aria-selected="true"]) {
     background: var(--sheetcraft-surface-secondary);
   }
   &[aria-selected="true"] {
@@ -67,7 +67,11 @@
     outline: 1px solid var(--sheetcraft-border-control);
     outline-offset: -1px;
   }
-  &:focus-visible {
+  &:disabled {
+    color: var(--sheetcraft-text-disabled);
+    cursor: default;
+  }
+  &:focus-visible:not(:disabled) {
     outline: none;
     background: var(--sheetcraft-keyboard-focus-bg);
   }

@@ -24,6 +24,9 @@ export type XlsxWorkerImage = {
   height: number;
 };
 
+/** Original, untrusted image bytes decoded and content-addressed by the Web adapter. */
+export type XlsxWorkerImportedImage = Pick<XlsxWorkerImage, "assetId" | "bytes" | "extension">;
+
 export type XlsxWorkerRequest =
   | { id: string; type: "decode"; bytes: ArrayBuffer; password?: string }
   | {
@@ -41,6 +44,7 @@ export type XlsxWorkerResponse =
       ok: true;
       type: "decode";
       snapshot: WorkbookSnapshot;
+      images?: readonly XlsxWorkerImportedImage[];
       report: XlsxCompatibilityReport;
     }
   | {

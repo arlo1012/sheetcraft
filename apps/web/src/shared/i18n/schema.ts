@@ -740,6 +740,11 @@ export type MessageSchema = ToolMessageSchema & {
   xlsx: {
     actions: { import: string; export: string; selectFile: string };
     feedback: {
+      importedUnsavedTitle: string;
+      importedUnsaved: string;
+      tooLarge: string;
+      invalidImages: string;
+      imageStorageFailed: string;
       errorTitle: string;
       imported: string;
       exported: string;
@@ -752,7 +757,47 @@ export type MessageSchema = ToolMessageSchema & {
       blocked: string;
       numericTableTotals: string;
     };
+    report: {
+      title: string;
+      importWarning: string;
+      blockedDescription: string;
+      warning: string;
+      block: string;
+      count: string;
+      locationUnknown: string;
+      moreLocations: string;
+      unknownIssue: string;
+      issues: {
+        archiveInvalid: string;
+        archiveLimit: string;
+        archiveEncrypted: string;
+        archiveCompression: string;
+        archivePath: string;
+        macroContent: string;
+        drawingOrMedia: string;
+        externalContent: string;
+        chartCacheNormalized: string;
+        formulaCacheDiscarded: string;
+        formulaNotCalculated: string;
+        filterOmitted: string;
+        filterTableNormalized: string;
+        numericTableTotals: string;
+        advancedFilterCriteriaOmitted: string;
+        imageOmitted: string;
+        styleOmitted: string;
+        numberFormatOmitted: string;
+        numberFormatDegraded: string;
+        dimensionApproximated: string;
+        pictureGeometryApproximated: string;
+        dateNormalized: string;
+        cellValueOmitted: string;
+        featureOmitted: string;
+      };
+    };
     confirm: {
+      exportTitle: string;
+      exportDescription: string;
+      exportConfirm: string;
       importTitle: string;
       importDescription: string;
       importConfirm: string;
@@ -1617,6 +1662,8 @@ export type MessageSchema = ToolMessageSchema & {
     colorValue: string;
   };
   picture: {
+    numericViewerReadOnly: string;
+    layers: string;
     pageLayoutUnsupported: string;
     groupReflectionUnsupported: string;
     memberCutUnsupported: string;

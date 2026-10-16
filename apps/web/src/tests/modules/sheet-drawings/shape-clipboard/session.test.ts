@@ -114,6 +114,7 @@ function fixture(drawings: SheetDrawing[] = [group(), wordArt()]) {
       if (kind === "revision") revision++;
       else if (kind === "generation") generation++;
       else if (kind === "metrics") metrics = createPictureSheetMetrics(sheet);
+      else if (kind === "default-row-height") sheet.defaultRowHeight = 20;
       else if (kind === "workbook")
         currentWorkbook = createWorkbook({ id: "other", sheetId: "source" });
       else if (kind === "replace-sheet") workbook.sheets.set(sheet.id, { ...sheet });
@@ -269,6 +270,7 @@ describe("guarded document-local shape clipboard", () => {
     "revision",
     "generation",
     "metrics",
+    "default-row-height",
     "workbook",
     "replace-sheet",
     "forest-identity",

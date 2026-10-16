@@ -4,7 +4,7 @@ import type { CellStyle } from "@sheetcraft/core/style";
 import type { CellTextDocument } from "@sheetcraft/core/text-font-runs";
 import {
   DEFAULT_COLUMN_WIDTH,
-  DEFAULT_ROW_HEIGHT,
+  getDefaultRowHeight,
   MAX_COLUMN_WIDTH,
   MAX_ROW_HEIGHT,
   MIN_COLUMN_WIDTH,
@@ -424,6 +424,7 @@ function getMergedAxisIndexes(
  */
 export function getAutoFitRowHeights(input: AxisAutoFitInput): Map<number, number> {
   const sheet = input.sheet;
+  const defaultHeight = getDefaultRowHeight(sheet);
   const merged = new MergedCellRangeResolver(sheet.mergedCells);
   const mergedRows = getMergedAxisIndexes(input.range, sheet.mergedCells, "row");
   const manualRows = new Set<number>();
@@ -467,8 +468,8 @@ export function getAutoFitRowHeights(input: AxisAutoFitInput): Map<number, numbe
 
   return new Map(
     [...new Set([...manualRows, ...measured.keys()])]
-      .map((row) => [row, measured.get(row) ?? DEFAULT_ROW_HEIGHT] as const)
-      .filter(([row, height]) => differs(sheet.rowHeights.get(row), height, DEFAULT_ROW_HEIGHT)),
+      .map((row) => [row, measured.get(row) ?? defaultHeight] as const)
+      .filter(([row, height]) => differs(sheet.rowHeights.get(row), height, defaultHeight)),
   );
 }
 

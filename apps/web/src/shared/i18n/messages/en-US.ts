@@ -769,6 +769,14 @@ export const enUS = {
       selectFile: "Select an XLSX workbook",
     },
     feedback: {
+      importedUnsavedTitle: "Imported, not yet saved",
+      importedUnsaved:
+        "The imported workbook is open, but its local copy could not be saved. Keep this tab open and save a backup or retry saving. The original file is unchanged.",
+      tooLarge: "This XLSX file exceeds the 25 MB import limit. Your document was not replaced.",
+      invalidImages:
+        "A picture is missing, damaged, unsupported, or exceeds the image size limit. Import was stopped; your current document was not replaced.",
+      imageStorageFailed:
+        "Pictures could not be saved safely in this browser. Check available storage and retry. Your current document was not replaced.",
       errorTitle: "XLSX operation could not be completed",
       imported: "XLSX imported. Undo history starts from this file.",
       exported: "XLSX download started. The current document and original file are unchanged.",
@@ -784,7 +792,50 @@ export const enUS = {
       numericTableTotals:
         "XLSX export was stopped because a table total row contains a numeric constant: {locations}. Excel may repair these cells and change table formulas. Your workbook is unchanged; you can still save a JSON workbook backup.",
     },
+    report: {
+      title: "Compatibility details",
+      importWarning:
+        "The imported workbook will omit or change the content listed below. Cancel to keep your current document.",
+      blockedDescription:
+        "Compatibility checks found content that cannot be processed safely. The operation was stopped; review the affected locations below.",
+      warning: "Will change or be omitted",
+      block: "Blocked",
+      count: "Occurrences: {count}",
+      locationUnknown: "No specific location was provided.",
+      moreLocations: "{count} additional affected locations are not listed.",
+      unknownIssue: "Unsupported content ({code})",
+      issues: {
+        archiveInvalid: "Invalid XLSX archive",
+        archiveLimit: "Archive exceeds the supported size or complexity",
+        archiveEncrypted: "Encrypted archive is not supported",
+        archiveCompression: "Archive compression is not supported",
+        archivePath: "Archive contains an unsafe file path",
+        macroContent: "Macros cannot be retained",
+        drawingOrMedia: "Drawing or media content cannot be retained",
+        externalContent: "External links or content cannot be retained",
+        chartCacheNormalized: "Chart cached values will be normalized",
+        formulaCacheDiscarded: "Cached formula values will be discarded",
+        formulaNotCalculated: "Some formulas have no calculated result",
+        filterOmitted: "Filter settings cannot be retained",
+        filterTableNormalized: "Filter or table settings will be adjusted",
+        numericTableTotals: "Numeric constants in table total rows cannot be exported safely",
+        advancedFilterCriteriaOmitted: "Advanced filter criteria cannot be retained",
+        imageOmitted: "Pictures cannot be retained",
+        styleOmitted: "Formatting cannot be retained",
+        numberFormatOmitted: "Number formats cannot be retained",
+        numberFormatDegraded: "Number formats will be simplified",
+        dimensionApproximated: "Row or column dimensions will be approximated",
+        pictureGeometryApproximated: "Picture positions or sizes may be approximated or changed",
+        dateNormalized: "Date values will be normalized",
+        cellValueOmitted: "Cell values cannot be retained",
+        featureOmitted: "Workbook features cannot be retained",
+      },
+    },
     confirm: {
+      exportTitle: "Export with compatibility changes?",
+      exportDescription:
+        "The downloaded XLSX will contain the changes listed below. Review them before continuing. Your current workbook and original file will remain unchanged.",
+      exportConfirm: "Continue and download",
       importTitle: "Import XLSX workbook?",
       importDescription:
         "Import will replace the current document and its saved local copy, and clear undo history. Continue?",
@@ -1673,6 +1724,8 @@ export const enUS = {
     colorValue: "Color {value}",
   },
   picture: {
+    numericViewerReadOnly: "Numeric editing is unavailable in this viewer.",
+    layers: "Layer",
     pageLayoutUnsupported:
       "New picture frames and groups are not available in Page Layout. Use Normal view.",
     groupReflectionUnsupported:

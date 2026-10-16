@@ -1,6 +1,6 @@
 import { strToU8 } from "fflate/browser";
 import { MAIN_NS, REL_NS, addRelationship, xml } from "../pivot-xml.js";
-import type { NativeCell, NativeImage, NativeSheetData } from "./model.js";
+import type { NativeCell, NativeImage, NativeImageAnchor, NativeSheetData } from "./model.js";
 import { xlsxText } from "./writer-text.js";
 
 const DRAWING_NS = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
@@ -32,6 +32,8 @@ function drawingDescription(altText: string, issueLocation: string): string {
 }
 
 function drawingXml(sheet: NativeSheetData, relationshipIds: string[]): string {
+  const marker = (tag: "from" | "to", point: NativeImageAnchor["tl"]) =>
+    `<xdr:${tag}><xdr:col>${point.nativeCol}</xdr:col><xdr:colOff>${point.nativeColOff}</xdr:colOff><xdr:row>${point.nativeRow}</xdr:row><xdr:rowOff>${point.nativeRowOff}</xdr:rowOff></xdr:${tag}>`;
   const anchors = sheet.images
     .map(({ range }, index) => {
       const { tl, ext } = range;
@@ -41,7 +43,30 @@ function drawingXml(sheet: NativeSheetData, relationshipIds: string[]): string {
         range.altText ?? "",
         range.issueLocation ?? `${sheet.name}.images[${index + 1}].altText`,
       );
-      return `<xdr:oneCellAnchor><xdr:from><xdr:col>${tl.nativeCol}</xdr:col><xdr:colOff>${tl.nativeColOff}</xdr:colOff><xdr:row>${tl.nativeRow}</xdr:row><xdr:rowOff>${tl.nativeRowOff}</xdr:rowOff></xdr:from><xdr:ext cx="${width}" cy="${height}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${index + 1}" name="Picture ${index + 1}" descr="${description}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="${relationshipIds[index]}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${width}" cy="${height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`;
+      const geometry = range.geometry;
+      const crop = geometry
+        ? `<a:srcRect l="${geometry.crop.left}" t="${geometry.crop.top}" r="${geometry.crop.right}" b="${geometry.crop.bottom}"/>`
+        : "";
+      const transform = geometry
+        ? ` rot="${geometry.rotation}" flipH="${Number(geometry.flipHorizontal)}" flipV="${Number(geometry.flipVertical)}"`
+        : "";
+      const origin = range.transformOrigin ?? { x: 0, y: 0 };
+      const placement = range.placement;
+      const tag =
+        placement?.kind === "absolute"
+          ? "absoluteAnchor"
+          : placement?.kind === "twoCell"
+            ? "twoCellAnchor"
+            : "oneCellAnchor";
+      const position =
+        placement?.kind === "absolute"
+          ? `<xdr:pos x="${placement.x}" y="${placement.y}"/><xdr:ext cx="${width}" cy="${height}"/>`
+          : `${marker("from", tl)}${
+              placement?.kind === "twoCell"
+                ? marker("to", placement.end)
+                : `<xdr:ext cx="${width}" cy="${height}"/>`
+            }`;
+      return `<xdr:${tag}>${position}<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${index + 1}" name="Picture ${index + 1}" descr="${description}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="${range.lockAspectRatio === false ? 0 : 1}"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="${relationshipIds[index]}"/>${crop}<a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm${transform}><a:off x="${origin.x}" y="${origin.y}"/><a:ext cx="${width}" cy="${height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:${tag}>`;
     })
     .join("");
   return `${HEADER}<xdr:wsDr xmlns:xdr="${DRAWING_NS}" xmlns:a="${ART_NS}" xmlns:r="${REL_NS}">${anchors}</xdr:wsDr>`;

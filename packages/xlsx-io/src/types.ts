@@ -26,6 +26,7 @@ export type XlsxCompatibilityCode =
   | "number-format-omitted"
   | "number-format-degraded"
   | "dimension-approximated"
+  | "picture-geometry-approximated"
   | "date-normalized"
   | "cell-value-omitted"
   | "feature-omitted";
@@ -48,6 +49,8 @@ export type XlsxDecodeOptions = Readonly<{
 export type XlsxDecodeResult = Readonly<{
   workbook: Workbook;
   report: XlsxCompatibilityReport;
+  /** Referenced, bounded raster resources. Runtime adapters validate pixels and remap asset IDs. */
+  images?: readonly XlsxImportedImage[];
 }>;
 
 export type XlsxEncodeResult = Readonly<{
@@ -65,6 +68,8 @@ export type XlsxImageAsset = Readonly<{
   width: number;
   height: number;
 }>;
+
+export type XlsxImportedImage = Readonly<Pick<XlsxImageAsset, "assetId" | "bytes" | "extension">>;
 
 export type XlsxEncodeOptions = Readonly<{
   images?: readonly XlsxImageAsset[];

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import PictureFormatSection from "../../../sheet-images/components/format-pane/PictureFormatSection.vue";
+import FormatSection from "../../../../shared/format-pane/FormatSection.vue";
 import PictureShadowEditor from "../../../sheet-images/components/format-pane/PictureShadowEditor.vue";
 import PictureReflectionEditor from "../../../sheet-images/components/format-pane/PictureReflectionEditor.vue";
 import PictureGlowEditor from "../../../sheet-images/components/format-pane/PictureGlowEditor.vue";
@@ -14,7 +14,11 @@ import ShapeFormatMixedEffect from "./ShapeFormatMixedEffect.vue";
 import type { ShapeFormatMode, ShapeFormatStyleCategory } from "../../shape-format-pane-model";
 import type { ShapeFormatController } from "./useShapeFormatPane";
 const props = withDefaults(
-  defineProps<{ controller: ShapeFormatController; target?: ShapeFormatMode }>(),
+  defineProps<{
+    controller: ShapeFormatController;
+    target?: ShapeFormatMode;
+    availableOnly?: boolean;
+  }>(),
   { target: "shape" },
 );
 const shadow = computed(() => props.controller.styleBinding(props.target, "shadow"));
@@ -46,7 +50,11 @@ function reason(category: ShapeFormatStyleCategory): string | undefined {
 </script>
 <template>
   <div class="shape-format-effects">
-    <PictureFormatSection :title="controller.props.t('shadowSection')" initially-open>
+    <FormatSection
+      v-if="!availableOnly || controller.styleCapability(target, 'shadow').enabled"
+      :title="controller.props.t('shadowSection')"
+      initially-open
+    >
       <ShapeFormatMixedEffect
         v-if="controller.isMixedStyle(target, 'shadow')"
         :controller="controller"
@@ -55,8 +63,11 @@ function reason(category: ShapeFormatStyleCategory): string | undefined {
       />
       <PictureShadowEditor v-else v-bind="shadow" />
       <p v-if="reason('shadow')" class="shape-format-effects__reason">{{ reason("shadow") }}</p>
-    </PictureFormatSection>
-    <PictureFormatSection :title="controller.props.t('reflectionSection')">
+    </FormatSection>
+    <FormatSection
+      v-if="!availableOnly || controller.styleCapability(target, 'reflection').enabled"
+      :title="controller.props.t('reflectionSection')"
+    >
       <ShapeFormatMixedEffect
         v-if="controller.isMixedStyle(target, 'reflection')"
         :controller="controller"
@@ -67,8 +78,11 @@ function reason(category: ShapeFormatStyleCategory): string | undefined {
       <p v-if="reason('reflection')" class="shape-format-effects__reason">
         {{ reason("reflection") }}
       </p>
-    </PictureFormatSection>
-    <PictureFormatSection :title="controller.props.t('glowSection')">
+    </FormatSection>
+    <FormatSection
+      v-if="!availableOnly || controller.styleCapability(target, 'glow').enabled"
+      :title="controller.props.t('glowSection')"
+    >
       <ShapeFormatMixedEffect
         v-if="controller.isMixedStyle(target, 'glow')"
         :controller="controller"
@@ -77,8 +91,11 @@ function reason(category: ShapeFormatStyleCategory): string | undefined {
       />
       <PictureGlowEditor v-else v-bind="glow" />
       <p v-if="reason('glow')" class="shape-format-effects__reason">{{ reason("glow") }}</p>
-    </PictureFormatSection>
-    <PictureFormatSection :title="controller.props.t('softEdgesSection')">
+    </FormatSection>
+    <FormatSection
+      v-if="!availableOnly || controller.styleCapability(target, 'softEdges').enabled"
+      :title="controller.props.t('softEdgesSection')"
+    >
       <ShapeFormatMixedEffect
         v-if="controller.isMixedStyle(target, 'softEdges')"
         :controller="controller"
@@ -92,8 +109,13 @@ function reason(category: ShapeFormatStyleCategory): string | undefined {
       <p v-if="reason('softEdges')" class="shape-format-effects__reason">
         {{ reason("softEdges") }}
       </p>
-    </PictureFormatSection>
-    <PictureFormatSection v-if="!isConnector" :title="controller.props.t('format3dSection')">
+    </FormatSection>
+    <FormatSection
+      v-if="
+        !isConnector && (!availableOnly || controller.styleCapability(target, 'format3d').enabled)
+      "
+      :title="controller.props.t('format3dSection')"
+    >
       <ShapeFormatMixedEffect
         v-if="controller.isMixedStyle(target, 'format3d')"
         :controller="controller"
@@ -102,8 +124,13 @@ function reason(category: ShapeFormatStyleCategory): string | undefined {
       />
       <PictureFormat3dEditor v-else v-bind="format3d" />
       <p v-if="reason('format3d')" class="shape-format-effects__reason">{{ reason("format3d") }}</p>
-    </PictureFormatSection>
-    <PictureFormatSection v-if="!isConnector" :title="controller.props.t('rotation3dSection')">
+    </FormatSection>
+    <FormatSection
+      v-if="
+        !isConnector && (!availableOnly || controller.styleCapability(target, 'rotation3d').enabled)
+      "
+      :title="controller.props.t('rotation3dSection')"
+    >
       <ShapeFormatMixedEffect
         v-if="controller.isMixedStyle(target, 'rotation3d')"
         :controller="controller"
@@ -127,9 +154,9 @@ function reason(category: ShapeFormatStyleCategory): string | undefined {
         {{ reason("rotation3d") }}
       </p>
       <ShapeFormatCheckbox :controller="controller" field="shapeKeepTextFlat" />
-    </PictureFormatSection>
-    <PictureFormatSection
-      v-if="target === 'text'"
+    </FormatSection>
+    <FormatSection
+      v-if="target === 'text' && (!availableOnly || controller.textWarpCapability().enabled)"
       :title="transformTitle"
       data-text-transform-section
     >
@@ -137,7 +164,7 @@ function reason(category: ShapeFormatStyleCategory): string | undefined {
         {{ transformScope }}
       </p>
       <WordArtTransformGallery v-bind="textWarp" />
-    </PictureFormatSection>
+    </FormatSection>
   </div>
 </template>
 <style scoped lang="scss">

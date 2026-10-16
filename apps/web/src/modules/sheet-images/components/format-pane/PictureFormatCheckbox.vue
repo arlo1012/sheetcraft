@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, useId } from "vue";
+import { vNativeControl } from "../../../../shared/tdesign/native-control";
+import PictureFormatFeedback from "./PictureFormatFeedback.vue";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import type { PictureFormatBooleanField } from "../../picture-format-pane-model";
 import type { PictureFormatPaneController } from "./usePictureFormatPane";
@@ -7,11 +9,17 @@ const props = defineProps<{
   controller: PictureFormatPaneController;
   field: PictureFormatBooleanField;
 }>();
+const feedbackId = `picture-format-description-${useId()}`;
 const binding = computed(() => props.controller.boolean(props.field));
 </script>
 <template>
   <div class="picture-format-checkbox">
     <TCheckbox
+      v-native-control="{
+        attributes: {
+          'aria-describedby': binding.error || binding.reason ? feedbackId : undefined,
+        },
+      }"
       :model-value="binding.value === true"
       :indeterminate="binding.value === undefined"
       :disabled="binding.disabled"
@@ -20,8 +28,7 @@ const binding = computed(() => props.controller.boolean(props.field));
       @change="binding.select"
       >{{ controller.t(field) }}</TCheckbox
     >
-    <p v-if="binding.error" role="alert">{{ binding.error }}</p>
-    <p v-else-if="binding.reason">{{ binding.reason }}</p>
+    <PictureFormatFeedback :id="feedbackId" :reason="binding.reason" :error="binding.error" />
   </div>
 </template>
 <style scoped lang="scss">

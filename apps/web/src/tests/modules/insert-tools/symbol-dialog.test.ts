@@ -7,6 +7,11 @@ import { shallowRef } from "vue";
 import { Tabs } from "tdesign-vue-next/es/tabs";
 import SymbolDialog from "../../../modules/insert-tools/components/SymbolDialog.vue";
 import SymbolCharacterGrid from "../../../modules/insert-tools/components/SymbolCharacterGrid.vue";
+import OptionList from "../../../shared/option-list/OptionList.vue";
+import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
+import FontSettingsAction from "../../../shared/cell-text/FontSettingsAction.vue";
+import { fontSettingsVisible } from "../../../shared/cell-text/font-settings";
+import { PrimaryTable } from "tdesign-vue-next/es/table";
 import { createAppI18n } from "../../../shared/i18n";
 import {
   defaultSymbolPreferences,
@@ -23,6 +28,7 @@ vi.mock("../../../shared/cell-text/managed-fonts", async (original) => ({
 vi.mock("../../../shared/cell-text/font-resources", () => ({ retryCellFontResource: ensureFont }));
 const mounted: Array<{ unmount(): void }> = [];
 beforeEach(() => {
+  fontSettingsVisible.value = false;
   useSymbolPreferences().update(defaultSymbolPreferences());
   ensureFont.mockReset();
   ensureFont.mockResolvedValue(undefined);
@@ -103,7 +109,11 @@ describe("complete Symbol dialog", () => {
     ]);
     expect(wrapper.emitted("close")).toBeUndefined();
     await wrapper.vm.$nextTick();
-    expect(mainDialog(wrapper).props("cancelBtn")).toBe("Close");
+    expect(mainDialog(wrapper).props("cancelBtn")).toMatchObject({
+      content: "Close",
+      theme: "default",
+      variant: "base",
+    });
   });
   test("keeps glyph DOM bounded and supports double click, arrows and document End", async () => {
     const wrapper = await fixture();
@@ -213,14 +223,22 @@ describe("complete Symbol dialog", () => {
     mainDialog(wrapper).vm.$emit("confirm");
     expect(insertText).toHaveBeenCalledWith({ text: "A", fontFamily: "Noto Sans" });
     expect(wrapper.emitted("insert")).toBeUndefined();
-    expect(mainDialog(wrapper).props("cancelBtn")).toBe("Cancel");
+    expect(mainDialog(wrapper).props("cancelBtn")).toMatchObject({
+      content: "Cancel",
+      theme: "default",
+      variant: "base",
+    });
     expect(wrapper.get(".symbol-dialog").attributes("data-cell-edit-session")).toBe(
       "captured-owner",
     );
     insertText.mockReturnValue(true);
     mainDialog(wrapper).vm.$emit("confirm");
     await wrapper.vm.$nextTick();
-    expect(mainDialog(wrapper).props("cancelBtn")).toBe("Close");
+    expect(mainDialog(wrapper).props("cancelBtn")).toMatchObject({
+      content: "Close",
+      theme: "default",
+      variant: "base",
+    });
     expect(wrapper.emitted("insert")).toBeUndefined();
   });
   test("custom configuration assigns and clears shortcuts, reorders, removes and confirms reset", async () => {
@@ -342,19 +360,16 @@ describe("complete Symbol dialog", () => {
     mainDialog(wrapper).vm.$emit("confirm");
     expect(wrapper.emitted("insert")?.[0]).toEqual([{ text: "Ω" }]);
   });
-  test("local font denial is explicit and bundled browsing stays usable", async () => {
+  test("local access opens the shared Settings without requesting OS access from Symbol", async () => {
     const query = vi
       .spyOn(localSource, "requestSystemFontChoices")
       .mockRejectedValue(new localSource.LocalSymbolFontError("denied"));
     const wrapper = await fixture();
     expect(query).not.toHaveBeenCalled();
-    await wrapper
-      .findAll("button")
-      .find((entry) => entry.text() === "Access local fonts…")!
-      .trigger("click");
+    await wrapper.getComponent(FontSettingsAction).trigger("click");
     await flushPromises();
-    expect(query).toHaveBeenCalledTimes(1);
-    expect(wrapper.text()).toContain("Local font access was not granted");
+    expect(query).not.toHaveBeenCalled();
+    expect(fontSettingsVisible.value).toBe(true);
     expect(wrapper.findComponent(SymbolCharacterGrid).exists()).toBe(true);
     await wrapper.get('[data-code-point="65"]').trigger("click");
     mainDialog(wrapper).vm.$emit("confirm");
@@ -386,12 +401,9 @@ describe("complete Symbol dialog", () => {
       .mockResolvedValue(choices.value);
     const load = vi.spyOn(localSource, "loadSystemFont").mockResolvedValue(local);
     const wrapper = await fixture();
-    await wrapper
-      .findAll("button")
-      .find((entry) => entry.text() === "Access local fonts…")!
-      .trigger("click");
+    await wrapper.getComponent(FontSettingsAction).trigger("click");
     await flushPromises();
-    expect(query).toHaveBeenCalledTimes(1);
+    expect(query).not.toHaveBeenCalled();
     expect(load).not.toHaveBeenCalled();
     const choice = wrapper
       .findAllComponents(Select)
@@ -426,10 +438,7 @@ describe("complete Symbol dialog", () => {
       .mockResolvedValue(choices.value);
     const load = vi.spyOn(localSource, "loadSystemFont");
     const wrapper = await fixture();
-    await wrapper
-      .findAll("button")
-      .find((entry) => entry.text() === "Access local fonts…")!
-      .trigger("click");
+    await wrapper.getComponent(FontSettingsAction).trigger("click");
     await flushPromises();
     const choice = wrapper
       .findAllComponents(Select)
@@ -454,11 +463,11 @@ describe("complete Symbol dialog", () => {
         .find((entry) => entry.text() === "Load selected font")!
         .attributes("disabled"),
     ).toBeDefined();
-    expect(query).toHaveBeenCalledOnce();
+    expect(query).not.toHaveBeenCalled();
     expect(load).not.toHaveBeenCalled();
   });
   test.each([false, true])(
-    "a settings refresh keeps Symbol empty-list feedback current (initially empty: %s)",
+    "shared Settings metadata controls Symbol source choices without a second scan (initially empty: %s)",
     async (initiallyEmpty) => {
       const font = {
         id: "system:Example",
@@ -479,21 +488,21 @@ describe("complete Symbol dialog", () => {
         .spyOn(localSource, "requestSystemFontChoices")
         .mockResolvedValue(choices.value);
       const wrapper = await fixture();
-      await wrapper
-        .findAll("button")
-        .find((entry) => entry.text() === "Access local fonts…")!
-        .trigger("click");
+      await wrapper.getComponent(FontSettingsAction).trigger("click");
       await flushPromises();
-      const emptyText = "No local font metadata was returned";
-      expect(wrapper.text().includes(emptyText)).toBe(initiallyEmpty);
+      const hasSourceChoices = () =>
+        wrapper
+          .findAllComponents(Select)
+          .some((entry) => entry.props("placeholder") === "Choose one local font to read");
+      expect(hasSourceChoices()).toBe(!initiallyEmpty);
       choices.value = initiallyEmpty ? [font] : [];
       queryStatus.value = { state: "ready" };
       await wrapper.vm.$nextTick();
-      expect(wrapper.text().includes(emptyText)).toBe(!initiallyEmpty);
-      expect(query).toHaveBeenCalledOnce();
+      expect(hasSourceChoices()).toBe(initiallyEmpty);
+      expect(query).not.toHaveBeenCalled();
     },
   );
-  test("a successful settings scan clears a previous Symbol query error", async () => {
+  test("Symbol leaves shared Settings query errors in their owner instead of duplicating an alert", async () => {
     const original = localSource.useLocalSymbolFonts();
     const queryStatus = shallowRef<localSource.SystemFontQueryStatus>({
       state: "error",
@@ -504,12 +513,10 @@ describe("complete Symbol dialog", () => {
       new localSource.LocalSymbolFontError("query-failed"),
     );
     const wrapper = await fixture();
-    await wrapper
-      .findAll("button")
-      .find((entry) => entry.text() === "Access local fonts…")!
-      .trigger("click");
+    await wrapper.getComponent(FontSettingsAction).trigger("click");
     await flushPromises();
-    expect(wrapper.find('[role="alert"]').exists()).toBe(true);
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    expect(fontSettingsVisible.value).toBe(true);
     queryStatus.value = { state: "ready" };
     await wrapper.vm.$nextTick();
     expect(wrapper.find('[role="alert"]').exists()).toBe(false);
@@ -557,5 +564,162 @@ describe("complete Symbol dialog", () => {
     await flushPromises();
     mainDialog(wrapper).vm.$emit("confirm");
     expect(wrapper.emitted("insert")?.[0]).toEqual([{ text: " " }]);
+  });
+  test("keeps all three pages and insertion actions outside the scrolling primary body", async () => {
+    const wrapper = await fixture();
+    const footer = mainDialog(wrapper).get(".t-dialog__footer");
+    expect(footer.element.closest(".symbol-dialog__body")).toBeNull();
+    expect(mainDialog(wrapper).props("width")).toBe("min(652px, calc(100vw - 24px))");
+    const options = wrapper.get(".symbol-dialog__extensions");
+    expect(options.attributes("open")).toBeUndefined();
+    expect(options.findComponent(FontSettingsAction).exists()).toBe(true);
+    expect(options.text()).toContain("Restore saved fonts");
+    expect(options.find(".symbol-dialog__literal").exists()).toBe(true);
+    expect(wrapper.get(".symbol-dialog__search").element.closest("details")).toBeNull();
+    await wrapper.get('[data-code-point="65"]').trigger("click");
+    const insert = footer.findAll("button").find((entry) => entry.text() === "Insert")!;
+    await insert.trigger("click");
+    await insert.trigger("click");
+    expect(wrapper.emitted("insert")).toHaveLength(2);
+    expect(wrapper.emitted("close")).toBeUndefined();
+    await footer
+      .findAll("button")
+      .find((entry) => entry.text() === "Close")!
+      .trigger("click");
+    expect(wrapper.emitted("close")).toHaveLength(1);
+  });
+
+  test("custom shortcuts and management use the project mini table in the primary page", async () => {
+    const wrapper = await fixture();
+    wrapper.getComponent(Tabs).vm.$emit("update:modelValue", "custom");
+    await wrapper.vm.$nextTick();
+    const custom = wrapper.get('[aria-label="Custom symbols"].symbol-dialog__page');
+    for (const label of [
+      "Assign shortcut",
+      "Clear shortcut",
+      "Move up",
+      "Move down",
+      "Remove",
+      "Reset symbol toolbar",
+    ]) {
+      const button = custom.findAll("button").find((entry) => entry.text() === label);
+      expect(button, label).toBeDefined();
+      expect(button!.element.closest("details")).toBeNull();
+    }
+    expect(wrapper.find("[data-symbol-add-custom]").exists()).toBe(false);
+    const table = custom.getComponent(PrimaryTable);
+    expect(table.props("size")).toBe("small");
+    expect(table.classes()).toContain("sheetcraft-table--mini");
+    expect(custom.findComponent(TableHeightWrapper).exists()).toBe(true);
+    expect(custom.find("button input[type=checkbox]").exists()).toBe(false);
+    const rows = custom.findAll('[role="option"]');
+    expect(rows).toHaveLength(39);
+    expect(rows[0]!.find("kbd").exists()).toBe(true);
+    expect(rows[0]!.get(".symbol-dialog__list-glyph").attributes("title")).toBeTruthy();
+  });
+
+  test("unknown font coverage remains in the primary view without requesting access or switching mode", async () => {
+    const query = vi.spyOn(localSource, "requestSystemFontChoices");
+    const wrapper = await fixture(false, "Example Cell Sans");
+    expect(wrapper.get(".symbol-dialog__coverage-warning").element.closest("details")).toBeNull();
+    expect(wrapper.findComponent(SymbolCharacterGrid).exists()).toBe(false);
+    const allUnicode = wrapper.get('.symbol-dialog__search input[type="checkbox"]');
+    expect((allUnicode.element as HTMLInputElement).checked).toBe(false);
+    expect(query).not.toHaveBeenCalled();
+    expect(ensureFont).not.toHaveBeenCalled();
+    await allUnicode.setValue(true);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.findComponent(SymbolCharacterGrid).exists()).toBe(true);
+    expect(query).not.toHaveBeenCalled();
+    expect(ensureFont).not.toHaveBeenCalled();
+  });
+  test("virtual grid paging uses the observed viewport and the same compact row geometry", async () => {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(private readonly callback: ResizeObserverCallback) {}
+        observe(element: Element) {
+          if (element.classList.contains("symbol-dialog__grid")) {
+            this.callback(
+              [
+                {
+                  target: element,
+                  contentRect: { width: 320, height: 120 },
+                } as ResizeObserverEntry,
+              ],
+              this as unknown as ResizeObserver,
+            );
+          }
+        }
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    const wrapper = await fixture();
+    const grid = wrapper.getComponent(SymbolCharacterGrid);
+    const viewport = grid.get('[role="grid"]');
+    expect(viewport.attributes("aria-colcount")).toBe("10");
+    await viewport.trigger("keydown", { key: "Home", ctrlKey: true });
+    const points = grid.props("points");
+    expect(grid.props("selected")).toBe(points[0]);
+    await viewport.trigger("keydown", { key: "PageDown" });
+    expect(grid.props("selected")).toBe(points[40]);
+    await viewport.trigger("keydown", { key: "PageUp" });
+    expect(grid.props("selected")).toBe(points[0]);
+    expect(grid.findAll('[role="gridcell"]').length).toBeLessThanOrEqual(70);
+  });
+  test("uses shared OptionList activation and built-in base dialog actions without feature frame overrides", async () => {
+    const wrapper = await fixture();
+    expect(mainDialog(wrapper).props("dialogStyle")).toBeUndefined();
+    expect(mainDialog(wrapper).props("confirmBtn")).toMatchObject({
+      content: "Insert",
+      theme: "primary",
+      variant: "base",
+    });
+    expect(mainDialog(wrapper).props("cancelBtn")).toMatchObject({
+      content: "Cancel",
+      theme: "default",
+      variant: "base",
+    });
+    expect(wrapper.find(".symbol-dialog__footer").exists()).toBe(false);
+    expect(
+      wrapper.get("[data-symbol-add-custom]").element.closest(".symbol-dialog__body"),
+    ).not.toBeNull();
+    wrapper.getComponent(Tabs).vm.$emit("update:modelValue", "special");
+    await wrapper.vm.$nextTick();
+    const list = wrapper.getComponent(OptionList);
+    expect(list.props("options")).toHaveLength(17);
+    const option = list.get('[data-symbol-special="0"]');
+    expect(option.get(".option-list__icon .symbol-dialog__list-glyph").text()).toBe("—");
+    expect(list.vm.$slots.option).toBeUndefined();
+    expect(
+      Array.from(option.element.childNodes)
+        .filter((node) => node.nodeType === Node.TEXT_NODE)
+        .map((node) => node.textContent)
+        .join("")
+        .trim(),
+    ).toBe("Em dash");
+    await option.trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(wrapper.emitted("insert")?.[0]?.[0]).toMatchObject({ text: "—" });
+    expect(wrapper.emitted("close")).toBeUndefined();
+  });
+  test("table row selection works while checkbox clicks do not change the active row or insert", async () => {
+    const wrapper = await fixture();
+    wrapper.getComponent(Tabs).vm.$emit("update:modelValue", "custom");
+    await wrapper.vm.$nextTick();
+    const table = wrapper.getComponent(PrimaryTable);
+    const list = wrapper.get(".symbol-dialog__custom-list");
+    expect(table.props("activeRowKeys")).toEqual([0]);
+    const otherCheckbox = list.findAll('input[type="checkbox"]')[1]!;
+    await otherCheckbox.trigger("click");
+    await otherCheckbox.trigger("dblclick");
+    expect(table.props("activeRowKeys")).toEqual([0]);
+    expect(wrapper.emitted("insert")).toBeUndefined();
+    await list.get('[data-row-index="1"]').trigger("click");
+    expect(table.props("activeRowKeys")).toEqual([1]);
+    mainDialog(wrapper).vm.$emit("confirm");
+    await flushPromises();
+    expect(wrapper.emitted("insert")?.[0]).toEqual([{ text: "－" }]);
   });
 });

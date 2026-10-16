@@ -1,6 +1,8 @@
+import { captureDisplayCommit } from "./numeric-test-actions";
+import MenuItem from "../../../../shared/menu/MenuItem.vue";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { InputNumber } from "tdesign-vue-next/es/input-number";
+import NumericField from "../../../../shared/numeric-field/NumericField.vue";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import type { FloatingImage } from "@sheetcraft/core/workbook";
 import type { GroupedGroup } from "@sheetcraft/core/picture-group";
@@ -130,7 +132,7 @@ describe("standalone ribbon owned-group refusal", () => {
       },
     });
     mounted.push(wrapper);
-    const resize = listener(wrapper.findAllComponents(InputNumber)[0]?.vm.$.vnode.props?.onChange);
+    const resize = captureDisplayCommit(wrapper.findAllComponents(NumericField)[0]!);
     const aspect = listener(
       wrapper.getComponent(Checkbox).vm.$.vnode.props?.["onUpdate:modelValue"],
     );
@@ -176,9 +178,14 @@ describe("standalone ribbon owned-group refusal", () => {
         },
       });
       mounted.push(wrapper);
-      await wrapper.get('[aria-label="Transparency"]').trigger("click");
+      await wrapper.get('[role="button"][aria-label="Picture style"]').trigger("click");
       await flushPromises();
-      const edit = listener(wrapper.getComponent(InputNumber).vm.$.vnode.props?.onChange);
+      wrapper
+        .findAllComponents(MenuItem)
+        .find((item) => item.text() === "Transparency")!
+        .vm.$emit("select");
+      await flushPromises();
+      const edit = captureDisplayCommit(wrapper.getComponent(NumericField));
       const color = wrapper
         .findAllComponents(RibbonMenuButton)
         .find((button) => button.props("label") === "Color")!;

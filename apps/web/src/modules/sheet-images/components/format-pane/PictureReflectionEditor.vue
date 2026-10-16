@@ -17,6 +17,7 @@ import PictureFormatField from "./PictureFormatField.vue";
 import PicturePaintNumber from "./PicturePaintNumber.vue";
 const props = defineProps<{
   ownerKey: string;
+  hidePreset?: boolean;
   value?: Choice<PictureReflection>;
   disabled?: boolean;
   t: PictureFormatTranslate;
@@ -72,6 +73,7 @@ function selectPreset(id: string) {
 <template>
   <div class="picture-reflection-editor">
     <PicturePresetGallery
+      v-if="!hidePreset"
       :owner-key="ownerKey"
       :groups="presetGroups"
       :selected-id="presetId"
@@ -113,6 +115,7 @@ function selectPreset(id: string) {
             100,
           )
         "
+        :display-precision="12"
         unit="%"
       />
       <PicturePaintNumber

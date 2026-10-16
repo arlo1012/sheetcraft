@@ -2,7 +2,7 @@ import { ref } from "vue";
 import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
 import { normalizeSheetDrawing, type SheetCameraDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
-  DEFAULT_ROW_HEIGHT,
+  getDefaultRowHeight,
   getDefaultColumnWidth,
   type Workbook,
   type Sheet,
@@ -49,7 +49,7 @@ export function useCameraActions(options: {
       ),
       height: Math.min(
         600,
-        Math.max(40, (range.end.row - range.start.row + 1) * DEFAULT_ROW_HEIGHT),
+        Math.max(40, (range.end.row - range.start.row + 1) * getDefaultRowHeight(sheet)),
       ),
       text: "",
       shape: "rectangle",

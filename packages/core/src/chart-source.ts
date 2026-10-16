@@ -288,7 +288,7 @@ export function createChartSourceFromRange(
               sheetId: id,
               cell: rows ? { row: fixed, column: start.column } : { row: start.row, column: fixed },
             }
-          : { kind: "literal", text: String(palette.get(index)! + 1) },
+          : { kind: "literal", text: `Series ${palette.get(index)! + 1}` },
         values:
           valuesStart <= valuesEnd
             ? { kind: "range", sheetId: id, range: vector(fixed) }

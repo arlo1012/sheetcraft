@@ -32,7 +32,7 @@ import type { TextBoxReferenceResolver } from "../sheet-drawings/textbox-referen
 import { getPictureProperties } from "@sheetcraft/core/picture-properties";
 import { isFormulaError, type FormulaValue } from "@sheetcraft/core/formula";
 import {
-  DEFAULT_ROW_HEIGHT,
+  getDefaultRowHeight,
   getDefaultColumnWidth,
   type Sheet,
   type SheetEvaluator,
@@ -340,7 +340,7 @@ export function createPrintPreviewDocument(options: {
     columnCount,
     rowHeights: options.sheet.rowHeights,
     columnWidths: options.sheet.columnWidths,
-    rowHeight: DEFAULT_ROW_HEIGHT,
+    rowHeight: getDefaultRowHeight(options.sheet),
     columnWidth: getDefaultColumnWidth(options.sheet),
     hiddenRows: options.sheet.hiddenRows,
     hiddenColumns: [
@@ -352,7 +352,7 @@ export function createPrintPreviewDocument(options: {
   });
   const rows = createRowVisibilityIndex({
     rowCount,
-    defaultRowHeight: DEFAULT_ROW_HEIGHT,
+    defaultRowHeight: getDefaultRowHeight(options.sheet),
     rowHeights: options.sheet.rowHeights,
     hiddenRows: options.sheet.hiddenRows,
     hiddenIntervals: createSheetHiddenRowIntervals(options.sheet, options.evaluator),

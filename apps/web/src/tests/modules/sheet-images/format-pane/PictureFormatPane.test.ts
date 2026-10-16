@@ -690,3 +690,16 @@ test("pane blocks pointer focus and the following click when pending crop applic
     onIntent.mock.invocationCallOrder[0]!,
   );
 });
+
+test("effects entry opens the Effects tab without editing the document", async () => {
+  const { wrapper, onIntent } = fixture({ initialTab: "effects" });
+  expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe("effectsTab");
+  await wrapper
+    .findAll('[role="tab"]')
+    .find((tab) => tab.text() === "sizePropertiesTab")!
+    .trigger("click");
+  wrapper.vm.showEffects();
+  await wrapper.vm.$nextTick();
+  expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe("effectsTab");
+  expect(onIntent).not.toHaveBeenCalled();
+});

@@ -1,0 +1,15 @@
+// Tab headers own surface/spacing feedback; their accessible label must not add a button shell.
+@mixin label($with-icon: false) {
+  font: inherit;
+  color: inherit;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+
+  @if $with-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sheetcraft-space-2);
+  }
+}

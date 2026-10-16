@@ -43,6 +43,8 @@ const props = defineProps<{
   t: PictureFormatTranslate;
   sourceAssetId?: string;
   paintRole?: "fill" | "line";
+  /** Obvious context help may be omitted by a formatting host; capability reasons stay separate. */
+  showContextHelp?: boolean;
   loadAsset?: (blob: Blob, texture?: PictureTextureId) => Promise<string | undefined>;
   onCommit: (value: Choice<PicturePaint> | undefined) => boolean;
 }>();
@@ -306,7 +308,10 @@ function patternPreview(preset: PicturePatternPreset) {
         @change="changeMode"
     /></PictureFormatField>
     <template v-if="paint">
-      <p v-if="paintRole !== 'line'" class="picture-paint-editor__source">
+      <p
+        v-if="paintRole !== 'line' && showContextHelp !== false"
+        class="picture-paint-editor__source"
+      >
         {{ t("paintBehindSourceHelp") }}
       </p>
       <PicturePaintColor
@@ -533,6 +538,7 @@ function patternPreview(preset: PicturePatternPreset) {
             100,
           )
         "
+        :display-precision="12"
         unit="%"
       />
       <TCheckbox

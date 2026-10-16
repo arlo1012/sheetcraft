@@ -1,7 +1,6 @@
 import { DOMWrapper, flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
-import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input } from "tdesign-vue-next/es/input";
 import { Select } from "tdesign-vue-next/es/select";
 import type { SheetChart } from "@sheetcraft/core/sheet-charts";
@@ -485,6 +484,7 @@ function editor() {
     attachTo: document.body,
     props: {
       drawing,
+      mode: "change-type",
       workbook,
       sheet,
       evaluator: createSheetEvaluator(sheet),
@@ -499,63 +499,53 @@ function editor() {
   mounted.push(wrapper);
   return { wrapper, drawing };
 }
-describe("chart editor element draft", () => {
-  test("nested elements are independently cloned, and Cancel never changes the original", async () => {
+describe("chart type draft and context element ownership", () => {
+  test("type confirmation preserves independently cloned dormant element settings", async () => {
     const f = editor();
-    const controls = f.wrapper.getComponent(ChartElementsControls);
-    expect(controls.props("chart").elements).not.toBe(f.drawing.chart.elements);
-    select(controls, "Legend position").vm.$emit("change", "topRight");
-    select(controls, "Data label position").vm.$emit("change", "outsideEnd");
+    expect(f.wrapper.findComponent(ChartElementsControls).exists()).toBe(false);
+    document.querySelector<HTMLButtonElement>("[data-chart-confirm]")!.click();
     await flushPromises();
-    f.wrapper.getComponent(Dialog).vm.$emit("close");
-    expect(f.wrapper.emitted("confirm")).toBeUndefined();
-    expect(f.wrapper.emitted("close")).toEqual([[]]);
-    expect(f.drawing.chart.elements).toEqual({
-      titlePosition: "overlay",
-      legendPosition: "right",
-      labelPosition: "insideBase",
-    });
+    const result = f.wrapper.emitted("confirm")![0]![0] as SheetChartDrawing;
+    expect(result.chart.elements).toEqual(f.drawing.chart.elements);
+    expect(result.chart.elements).not.toBe(f.drawing.chart.elements);
+    expect(result.chart.title).toBe("Sales");
     expect(f.drawing.chart.labels).toBe(false);
   });
-  test("Confirm atomically includes the complete pending title and element settings", async () => {
-    const f = editor();
+  test("context element callback atomically includes the complete pending title", async () => {
+    const f = await toolbar();
     const controls = f.wrapper.getComponent(ChartElementsControls);
     await controls.getComponent(Input).get("input").setValue("2026 Sales");
     select(controls, "Legend position").vm.$emit("change", "topRight");
     await flushPromises();
-    f.wrapper.getComponent(Dialog).vm.$emit("confirm");
-    const result = f.wrapper.emitted("confirm")?.[0]?.[0] as SheetChartDrawing;
-    expect(result.chart.title).toBe("2026 Sales");
-    expect(result.chart.elements).toEqual({
-      titlePosition: "overlay",
-      legendPosition: "topRight",
-      labelPosition: "insideBase",
+    expect(f.apply).toHaveBeenCalledExactlyOnceWith({
+      title: "2026 Sales",
+      legend: true,
+      elements: { legendPosition: "topRight" },
     });
-    expect(f.drawing.chart.title).toBe("Sales");
-    expect(f.drawing.chart.elements?.legendPosition).toBe("right");
   });
-  test("Confirm waits for an active real title composition to end", async () => {
-    const f = editor();
-    const input = f.wrapper.getComponent(ChartElementsControls).getComponent(Input).get("input");
+  test("context element commit waits for a real title composition to end", async () => {
+    const f = await toolbar();
+    const controls = f.wrapper.getComponent(ChartElementsControls);
+    const input = controls.getComponent(Input).get("input");
     await input.trigger("compositionstart");
     await input.setValue("营");
-    f.wrapper.getComponent(Dialog).vm.$emit("confirm");
-    expect(f.wrapper.emitted("confirm")).toBeUndefined();
-    expect(f.drawing.chart.title).toBe("Sales");
+    select(controls, "Legend position").vm.$emit("change", "topRight");
+    expect(f.apply).not.toHaveBeenCalled();
     input.element.value = "营收统计";
     await input.trigger("compositionend");
-    f.wrapper.getComponent(Dialog).vm.$emit("confirm");
-    const result = f.wrapper.emitted("confirm")![0]![0] as SheetChartDrawing;
-    expect(result.chart.title).toBe("营收统计");
+    select(controls, "Legend position").vm.$emit("change", "topRight");
+    expect(f.apply).toHaveBeenCalledExactlyOnceWith({
+      title: "营收统计",
+      legend: true,
+      elements: { legendPosition: "topRight" },
+    });
   });
-  test("disabled confirmation cannot emit or apply a pending element patch", async () => {
+  test("disabled type confirmation cannot emit or alter saved elements", async () => {
     const f = editor();
     await f.wrapper.setProps({ disabled: true });
-    f.wrapper
-      .getComponent(ChartElementsControls)
-      .vm.$emit("patch", { title: "Rejected", elements: { titlePosition: "none" } });
-    f.wrapper.getComponent(Dialog).vm.$emit("confirm");
+    document.querySelector<HTMLButtonElement>("[data-chart-confirm]")!.click();
+    await flushPromises();
     expect(f.wrapper.emitted("confirm")).toBeUndefined();
-    expect(f.wrapper.getComponent(ChartElementsControls).props("chart").title).toBe("Sales");
+    expect(f.drawing.chart.title).toBe("Sales");
   });
 });

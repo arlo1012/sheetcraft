@@ -56,7 +56,12 @@ export function writeNativeColumnChart(
     "application/vnd.openxmlformats-officedocument.drawingml.chart+xml",
   );
   appendNativeChartDrawing(entries, sheetPart, drawing, part, anchor);
-  report?.add("style-omitted", "warning", `${issuePath}.style`);
+  // Ordinary element placement is retained; target typography/palette/strokes still differ.
+  report?.add(
+    "style-omitted",
+    "warning",
+    pivotIdentity === undefined ? `${issuePath}.chart` : `${issuePath}.style`,
+  );
 }
 
 export function ordinaryColumnChartSource(

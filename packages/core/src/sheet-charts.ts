@@ -478,7 +478,9 @@ export function getSheetChartSourceData(
       series: rows.map((row, index) => ({
         ...identity(row),
         ...seriesFormat(columns.map((column) => ({ row, column }))),
-        name: chart.headerColumn ? String(read(row, range.start.column) ?? "") : String(index + 1),
+        name: chart.headerColumn
+          ? String(read(row, range.start.column) ?? "")
+          : `Series ${index + 1}`,
         values: columns.map((column) => numeric(row, column)),
       })),
       records,
@@ -490,7 +492,7 @@ export function getSheetChartSourceData(
     series: columns.map((column, index) => ({
       ...identity(column),
       ...seriesFormat(rows.map((row) => ({ row, column }))),
-      name: chart.headerRow ? String(read(range.start.row, column) ?? "") : String(index + 1),
+      name: chart.headerRow ? String(read(range.start.row, column) ?? "") : `Series ${index + 1}`,
       values: rows.map((row) => numeric(row, column)),
     })),
     records,

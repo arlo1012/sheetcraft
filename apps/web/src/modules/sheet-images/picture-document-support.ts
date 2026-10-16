@@ -9,6 +9,7 @@ import {
 } from "@sheetcraft/core/picture-object";
 import {
   DEFAULT_COLUMN_WIDTH,
+  getDefaultRowHeight,
   type FloatingImage,
   type LegacyFloatingImage,
   type Sheet,
@@ -110,6 +111,7 @@ export function assertPictureCommandSupport(command: WorkbookCommand, workbook: 
         ? {
             ...sheet,
             rowHeights: new Map(state.rowHeights.map(({ index, size }) => [index, size])),
+            defaultRowHeight: state.defaultRowHeight,
             columnWidths: new Map(state.columnWidths.map(({ index, size }) => [index, size])),
             hiddenRows: new Set(state.hiddenRows),
             hiddenColumns: new Set(state.hiddenColumns),
@@ -168,6 +170,7 @@ export function assertPictureCommandSupport(command: WorkbookCommand, workbook: 
           ...(command.axis === "row"
             ? {
                 rowHeights: dimensions,
+                defaultRowHeight: command.defaultRowHeight ?? getDefaultRowHeight(sheet),
                 hiddenRows: new Set(command.hiddenIndexes),
               }
             : {

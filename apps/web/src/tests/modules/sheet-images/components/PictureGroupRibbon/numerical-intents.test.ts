@@ -1,3 +1,4 @@
+import { displayNumber, commitDisplay } from "../numeric-test-actions";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { defineComponent, h, shallowRef } from "vue";
@@ -22,11 +23,11 @@ describe("owned group ribbon numerical intents", () => {
     const { image, wrapper, resizeHandler, aspectRatioHandler } = fixture();
     mounted.push(wrapper);
     const before = structuredClone(image);
-    expect(dimension(wrapper, "width").props("modelValue")).toBe(90);
-    expect(dimension(wrapper, "height").props("modelValue")).toBe(60);
+    expect(displayNumber(dimension(wrapper, "width"))).toBe(90);
+    expect(displayNumber(dimension(wrapper, "height"))).toBe(60);
     expect(wrapper.getComponent(Checkbox).props("modelValue")).toBe(false);
-    dimension(wrapper, "width").vm.$emit("change", 150);
-    dimension(wrapper, "height").vm.$emit("change", 75);
+    commitDisplay(dimension(wrapper, "width"), 150);
+    commitDisplay(dimension(wrapper, "height"), 75);
     wrapper.getComponent(Checkbox).vm.$emit("update:modelValue", true);
     expect(resizeHandler).toHaveBeenNthCalledWith(1, { axis: "width", value: 200 });
     expect(resizeHandler).toHaveBeenNthCalledWith(2, { axis: "height", value: 100 });
@@ -49,13 +50,13 @@ describe("owned group ribbon numerical intents", () => {
       aspectRatioHandler,
       error: "Size could not be applied",
     });
-    dimension(wrapper, "width").vm.$emit("change", 150);
+    commitDisplay(dimension(wrapper, "width"), 150);
     wrapper.getComponent(Checkbox).vm.$emit("update:modelValue", true);
     await wrapper.vm.$nextTick();
     expect(resizeHandler).toHaveBeenCalledExactlyOnceWith({ axis: "width", value: 200 });
     expect(aspectRatioHandler).toHaveBeenCalledExactlyOnceWith(true);
-    expect(dimension(wrapper, "width").props("modelValue")).toBe(90);
-    expect(dimension(wrapper, "height").props("modelValue")).toBe(60);
+    expect(displayNumber(dimension(wrapper, "width"))).toBe(90);
+    expect(displayNumber(dimension(wrapper, "height"))).toBe(60);
     expect(wrapper.getComponent(Checkbox).props("modelValue")).toBe(false);
     expect(wrapper.get('[role="alert"]').text()).toBe("Size could not be applied");
     expect(image).not.toHaveProperty("lockAspectRatio");
@@ -74,10 +75,10 @@ describe("owned group ribbon numerical intents", () => {
       await wrapper.setProps({ geometry });
       for (const axis of ["width", "height"] as const) {
         const input = dimension(wrapper, axis);
-        expect(input.props("modelValue")).toBeUndefined();
+        expect(displayNumber(input)).toBeUndefined();
         expect(input.props("disabled")).toBe(true);
         expect((input.get("input").element as HTMLInputElement).value).toBe("");
-        input.vm.$emit("change", 100);
+        commitDisplay(input, 100);
       }
     }
     expect(wrapper.text()).not.toContain("NaN");
@@ -88,13 +89,13 @@ describe("owned group ribbon numerical intents", () => {
     const { wrapper, resizeHandler, aspectRatioHandler } = fixture();
     mounted.push(wrapper);
     for (const invalid of [undefined, "100", Number.NaN, Infinity, -1, 0, 0.74, 7500.01])
-      dimension(wrapper, "width").vm.$emit("change", invalid);
+      commitDisplay(dimension(wrapper, "width"), invalid);
     for (const invalid of [undefined, "false", 0, 1])
       wrapper.getComponent(Checkbox).vm.$emit("update:modelValue", invalid);
     expect(resizeHandler).not.toHaveBeenCalled();
     expect(aspectRatioHandler).not.toHaveBeenCalled();
-    dimension(wrapper, "width").vm.$emit("change", 0.75);
-    dimension(wrapper, "height").vm.$emit("change", 7500);
+    commitDisplay(dimension(wrapper, "width"), 0.75);
+    commitDisplay(dimension(wrapper, "height"), 7500);
     expect(resizeHandler).toHaveBeenNthCalledWith(1, { axis: "width", value: 1 });
     expect(resizeHandler).toHaveBeenNthCalledWith(2, { axis: "height", value: 10000 });
   });
@@ -115,7 +116,7 @@ describe("owned group ribbon numerical intents", () => {
       await wrapper.setProps(props);
       expect(dimension(wrapper, "width").props("disabled")).toBe(true);
       expect(wrapper.getComponent(Checkbox).props("disabled")).toBe(true);
-      dimension(wrapper, "width").vm.$emit("change", 150);
+      commitDisplay(dimension(wrapper, "width"), 150);
       wrapper.getComponent(Checkbox).vm.$emit("update:modelValue", true);
     }
     expect(resizeHandler).not.toHaveBeenCalled();
@@ -175,7 +176,7 @@ describe("owned group ribbon stable numeric drafts", () => {
       else await input.trigger("keydown", { key: "Enter" });
       await flushPromises();
       expect(resizeHandler).toHaveBeenCalledExactlyOnceWith({ axis: "width", value: 80 / 3 });
-      expect(dimension(ribbon, "width").props("modelValue")).toBe(20);
+      expect(displayNumber(dimension(ribbon, "width"))).toBe(20);
       expect(dimension(ribbon, "width").vm.$.uid).toBe(width.vm.$.uid);
       if (completion === "enter") expect(document.activeElement).toBe(input.element);
     },
@@ -187,12 +188,13 @@ describe("owned group ribbon stable numeric drafts", () => {
     const width = dimension(ribbon, "width");
     const input = width.get<HTMLInputElement>("input");
     input.element.focus();
-    await input.trigger("keydown", { key: "ArrowUp" });
+    await input.trigger("keydown", { key: "ArrowUp", code: "ArrowUp" });
+    await input.trigger("keyup", { key: "ArrowUp", code: "ArrowUp" });
     await flushPromises();
     expect(resizeHandler).toHaveBeenCalledExactlyOnceWith({ axis: "width", value: 364 / 3 });
     expect(dimension(ribbon, "width").vm.$.uid).toBe(width.vm.$.uid);
     expect(document.activeElement).toBe(input.element);
-    const increase = width.get<HTMLButtonElement>(".t-input-number__increase");
+    const increase = width.get<HTMLButtonElement>('button[aria-label="Width (pt) +"]');
     increase.element.focus();
     await increase.trigger("click");
     await flushPromises();

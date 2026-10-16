@@ -1,5 +1,5 @@
 import {
-  DEFAULT_ROW_HEIGHT,
+  getDefaultRowHeight,
   MAX_FLOATING_IMAGE_SIZE,
   getDefaultColumnWidth,
   type Sheet,
@@ -40,7 +40,7 @@ export function createPictureViewMetrics(
   if (geometry.rowCount !== rows.rowCount)
     throw new RangeError("Picture row metrics must share the viewport's logical count.");
   if (
-    geometry.rowHeight !== DEFAULT_ROW_HEIGHT ||
+    geometry.rowHeight !== getDefaultRowHeight(sheet) ||
     geometry.columnWidth !== getDefaultColumnWidth(sheet)
   )
     throw new RangeError(
@@ -52,7 +52,7 @@ export function createPictureViewMetrics(
     (sheet.rowHeights.has(defaultRow) || options.effectiveRowHeights?.has(defaultRow))
   )
     defaultRow = rows.getNextVisibleRow(defaultRow);
-  if (defaultRow !== null && rows.getVisibleRow(defaultRow)!.height !== DEFAULT_ROW_HEIGHT)
+  if (defaultRow !== null && rows.getVisibleRow(defaultRow)!.height !== getDefaultRowHeight(sheet))
     throw new RangeError("Picture row visibility must use the worksheet's default height.");
   const base = createPictureSheetMetrics(sheet);
   const rowEnd = rows.getTotalHeight();

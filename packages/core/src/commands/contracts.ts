@@ -343,6 +343,7 @@ export type RestoreSheetDimensionStateCommand = {
   axis: SheetDimensionAxis;
   dimensions: SheetSparseDimension[];
   hiddenIndexes: number[];
+  defaultRowHeight?: number;
   defaultColumnWidth?: number;
   /** Exact ordered pictures; undefined reads legacy inverses without this field. */
   floatingImageState?: FloatingImage[];

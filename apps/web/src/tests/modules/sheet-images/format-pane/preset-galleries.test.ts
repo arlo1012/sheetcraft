@@ -10,7 +10,7 @@ vi.mock("../../../../modules/sheet-images/picture-preset-preview", () => ({
   picturePresetPreview: () => "data:image/png;base64,c2FtcGxl",
 }));
 const panelStub = defineComponent({
-  props: ["disabled"],
+  props: ["disabled", "valueLabel"],
   emits: ["open-change"],
   setup(props, { slots, emit }) {
     const open = ref(false);
@@ -164,4 +164,18 @@ test("material and lighting galleries change only their actual field, retaining 
   onCommit.mockClear();
   expect(galleries[0]!.props("onSelect")("unknown")).toBe(false);
   expect(onCommit).not.toHaveBeenCalled();
+});
+
+test("a narrow selected preset keeps its complete label available without wrapping markup", async () => {
+  const { wrapper } = gallery();
+  await wrapper.setProps({
+    groups: getPictureEffectPresetGroups("reflection"),
+    selectedId: "reflection-1-1",
+    t: (key) => (key === "reflectionSection" ? "Reflection" : key),
+  });
+  const value = wrapper.get(".picture-preset-gallery__value");
+  expect(value.text()).toBe("Reflection 5");
+  expect(value.attributes("title")).toBe("Reflection 5");
+  expect(wrapper.getComponent(panelStub).props("valueLabel")).toBe("Reflection 5");
+  expect(wrapper.get(".picture-preset-gallery__selected").attributes("alt")).toBe("");
 });

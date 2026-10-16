@@ -18,6 +18,7 @@ export type UseMenuOptions = FloatingPanelOptions & {
   menuSurfaceRef: Readonly<Ref<MenuSurface | null>>;
   disabled?: Readonly<Ref<boolean>>;
   additionalInside?: () => Iterable<HTMLElement | null | undefined>;
+  restoreFocusTarget?: () => HTMLElement | null | undefined;
   defaultFocus?: MenuFocus;
   pointerFocus?: MenuFocus;
   onDismiss?: (payload: { reason: FloatingDismissReason; restoreFocus: boolean }) => void;
@@ -44,6 +45,7 @@ export function useMenu(options: UseMenuOptions) {
       placement: options.placement,
       padding: options.padding,
       additionalInside: options.additionalInside,
+      restoreFocusTarget: options.restoreFocusTarget,
       onDismiss(payload) {
         open.value = false;
         options.onDismiss?.(payload);

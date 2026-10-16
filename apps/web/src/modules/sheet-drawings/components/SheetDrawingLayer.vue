@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import EquationCanvasEditor from "../equation/EquationCanvasEditor.vue";
+import { SlidersHorizontal } from "lucide-vue-next";
+import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import type { ChartFormatTarget } from "../../charts/chart-format-pane";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { ChartLayoutPreview } from "../../charts/chart-layout-preview";
@@ -82,6 +84,7 @@ import { createBrowserIdFactory } from "../../../shared/runtime/browser-id-facto
 import { useAppI18n } from "../../../shared/i18n";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import type { ShapeTextEditSnapshot, ShapeTextEditCallbacks } from "../useShapeTextEditSession";
+import { ownsShapeTextEditTarget } from "../shape-text-edit-ownership";
 import type { ShapeCanvasTextEditRequest } from "../shape-canvas-text-edit-contract";
 import { shapeTextEditorPlacement } from "../shape-text-editor-placement";
 import { getDrawingShapeTextRect } from "../shape-text-runtime";
@@ -204,6 +207,7 @@ const props = defineProps<{
   equationPlaceholdersHidden?: boolean;
   equationEditSnapshot?: EquationEditSnapshot;
   equationEditCallbacks?: EquationEditCallbacks;
+  ownsSelectedShapeFieldTarget?: (target: EventTarget | null) => boolean;
   textEditSnapshot?: ShapeTextEditSnapshot | null;
   textEditCallbacks?: ShapeTextEditCallbacks;
   startTextEdit?: (request: ShapeCanvasTextEditRequest) => boolean;
@@ -421,6 +425,9 @@ const displayedRenderPass = computed(() => {
       forest = props.drawings.map((root) => (root === owner.source ? next : root));
     }
   }
+  const text = props.textEditSnapshot;
+  if (text && !text.stale && props.drawings.includes(text.root))
+    forest = forest.map((root) => (root === text.root ? text.draftRoot : root));
   return forest === props.drawings
     ? base
     : resolveShapeForestForRender({
@@ -1025,6 +1032,18 @@ const equationEditorFragmentKey = computed(() => {
     )[0];
   return candidate && `${candidate.drawing.id}-${candidate.pageKey ?? candidate.paneId}`;
 });
+function textDraftPaintView(
+  drawing: SheetGraphicDrawing | undefined,
+): SheetGraphicDrawing | undefined {
+  const state = props.textEditSnapshot;
+  return state &&
+    !state.stale &&
+    drawing &&
+    state.sourceId === drawing.id &&
+    sourceOwner(drawing) === state.root
+    ? state.draftView
+    : drawing;
+}
 function equationPaintView(drawing: SheetDrawing): SheetDrawing {
   const state = props.equationEditSnapshot;
   return state && drawing.id === state.ownerId && sourceOwner(drawing) === state.root
@@ -1048,7 +1067,7 @@ const canvasTextPlacement = computed(() => {
   const clip =
     fragment?.pageClip ?? (fragment ? props.layout.panes[fragment.paneId].clip : pane?.clip);
   if (!clip) return;
-  const placement = fragment && shapeTextEditorPlacement(state.view, fragment);
+  const placement = fragment && shapeTextEditorPlacement(state.draftView, fragment);
   return {
     clip: {
       left: `${clip.x}px`,
@@ -3219,6 +3238,24 @@ function standardSelectionHandlers(fragment: DrawingFragment) {
   };
 }
 function clearOutside(event: PointerEvent) {
+  if (selectedRoots.value.length > 0 && props.ownsSelectedShapeFieldTarget?.(event.target)) return;
+  const target = event.target instanceof Element ? event.target : undefined;
+  const contextTab = target?.closest(
+    '.spreadsheet-ribbon [role="tab"][data-ribbon-category="shape"], .spreadsheet-ribbon [role="tab"][data-ribbon-category="shape-text"]',
+  );
+  const workspace = layerElement.value?.closest(".spreadsheet-workspace");
+  // Context tabs belong to the selected object even before a text-edit lease exists.
+  // Keep the boundary local to the current connected Ribbon, not stale/other Workspaces.
+  if (
+    selectedRoots.value.length > 0 &&
+    contextTab?.isConnected &&
+    workspace?.isConnected &&
+    workspace.contains(contextTab) &&
+    contextTab.closest(".spreadsheet-ribbon") === workspace.querySelector(".spreadsheet-ribbon")
+  )
+    return;
+  const edit = props.textEditSnapshot;
+  if (edit && ownsShapeTextEditTarget(event.target, edit.sessionId)) return;
   if (
     event.target instanceof Element &&
     !event.target.closest("[data-sheet-drawing-id]") &&
@@ -3394,19 +3431,22 @@ watch(
     >
       {{ t("drawing.collectionRejected") }}
     </div>
-    <button
+    <div
       v-if="formatTarget && canChange(formatTarget.drawing)"
-      type="button"
-      class="sheet-drawing-layer__format"
+      class="sheet-drawing-layer__format-position"
       :style="formatTriggerStyle"
-      data-shape-format-trigger
-      :aria-label="locale === 'zh-CN' ? '设置形状格式' : 'Format Shape'"
-      :title="locale === 'zh-CN' ? '设置形状格式' : 'Format Shape'"
       @pointerdown.stop
-      @click.stop="formatSelected"
+      @click.stop
     >
-      ⋯
-    </button>
+      <RibbonButton
+        :label="locale === 'zh-CN' ? '设置形状格式' : 'Format Shape'"
+        :disabled="!canChange(formatTarget.drawing)"
+        data-shape-format-trigger
+        @activate="formatSelected"
+      >
+        <SlidersHorizontal />
+      </RibbonButton>
+    </div>
     <div
       v-if="pointEditingId && pointRejected"
       role="status"
@@ -3480,7 +3520,9 @@ watch(
                 ? chartLayoutPreview?.chart
                 : undefined
             "
-            :paint-drawing="displayedRenderPass?.getLeaf(fragment.drawing.id)?.paintView"
+            :paint-drawing="
+              textDraftPaintView(displayedRenderPass?.getLeaf(fragment.drawing.id)?.paintView)
+            "
             :text-reference-unavailable="
               displayedRenderPass?.getLeaf(fragment.drawing.id)?.textReference?.status ===
               'unavailable'
@@ -3724,6 +3766,8 @@ watch(
         :update="textEditCallbacks.update"
         :composition="textEditCallbacks.setComposing"
         :commit="canvasTextOwnerActions.commit"
+        :history-step="textEditCallbacks.historyStep"
+        :focus-field-draft="textEditCallbacks.focusFieldDraft"
         :escape="canvasTextOwnerActions.escape"
         :cancel="canvasTextOwnerActions.cancel"
         v-on="{
@@ -3764,18 +3808,10 @@ watch(
     background: var(--sheetcraft-surface-panel);
     font-size: 12px;
   }
-  &__format {
+  &__format-position {
     position: absolute;
     z-index: var(--sheetcraft-layer-toolbar);
     pointer-events: auto;
-    width: 28px;
-    height: 28px;
-    border: 1px solid var(--sheetcraft-border-control);
-    border-radius: 4px;
-    background: var(--sheetcraft-surface-panel);
-    color: var(--sheetcraft-text-primary);
-    font-size: 20px;
-    cursor: pointer;
   }
   &__object {
     position: absolute;

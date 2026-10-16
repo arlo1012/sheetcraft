@@ -88,7 +88,15 @@ function placeRoots(
       rect,
       placement.destinationMetrics,
     );
-    return { ...root, frame: { ...root.frame, anchor } } as PictureObject;
+    // Paste actively rebuilds cell bindings in destination metrics. Carry only
+    // the relative offset policy, never source points as preferred locations.
+    const placedAnchor =
+      anchor.mode !== "fixed" &&
+      root.frame.anchor.mode !== "fixed" &&
+      root.frame.anchor.offsetMode === "free-pixels"
+        ? { ...anchor, offsetMode: "free-pixels" as const }
+        : anchor;
+    return { ...root, frame: { ...root.frame, anchor: placedAnchor } } as PictureObject;
   });
 }
 

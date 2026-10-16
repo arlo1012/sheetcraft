@@ -1,5 +1,8 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, expect, test, vi } from "vitest";
+import { InputNumber } from "tdesign-vue-next/es/input-number";
+import { Input } from "tdesign-vue-next/es/input";
+import { RadioGroup } from "tdesign-vue-next/es/radio";
 import { isPictureGroup } from "@sheetcraft/core/picture-group";
 import type { PictureObject, StandalonePictureObject } from "@sheetcraft/core/picture-object";
 import type { FloatingImage } from "@sheetcraft/core/workbook";
@@ -119,3 +122,28 @@ test("command failure shows an alert while preserving the loaded annotation draf
     requireStandalone(f.wrapper.emitted("confirm")![0]![0] as FloatingImage).transform?.annotations,
   ).toHaveLength(2);
 });
+
+test.each(["busy", "confirming"])(
+  "annotation options consistently disable while %s",
+  async (state) => {
+    const { wrapper } = await fixture();
+    wrapper.getComponent(RadioGroup).vm.$emit("update:modelValue", "text");
+    await wrapper.vm.$nextTick();
+    const numbers = wrapper.findAllComponents(InputNumber);
+    expect(numbers).toHaveLength(2);
+    for (const number of numbers) {
+      expect(number.props("theme")).toBe("column");
+      expect(number.classes()).toContain("sheetcraft-input-number--persistent-controls");
+      expect(number.element.closest("label")).toBeNull();
+      expect(number.element.closest('[role="group"]')?.getAttribute("aria-label")).toBeTruthy();
+      expect(number.props("disabled")).toBe(false);
+    }
+    if (state === "busy") await wrapper.setProps({ busy: true });
+    else await confirm();
+    await wrapper.vm.$nextTick();
+    for (const number of numbers) expect(number.props("disabled")).toBe(true);
+    expect(wrapper.getComponent(Input).props("disabled")).toBe(true);
+    expect((document.querySelector('input[type="color"]') as HTMLInputElement).disabled).toBe(true);
+    expect(wrapper.getComponent(RadioGroup).props("disabled")).toBe(true);
+  },
+);

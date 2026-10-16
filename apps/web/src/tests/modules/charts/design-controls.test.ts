@@ -1,9 +1,7 @@
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { Input } from "tdesign-vue-next/es/input";
-import { Select } from "tdesign-vue-next/es/select";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import type { SheetChart } from "@sheetcraft/core/sheet-charts";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import { createSheetEvaluator, createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
@@ -12,6 +10,7 @@ import ChartElementsControls from "../../../modules/charts/components/ChartEleme
 import ChartSubtypeControls from "../../../modules/charts/components/ChartSubtypeControls.vue";
 import ChartStyleGallery from "../../../modules/charts/components/ChartStyleGallery.vue";
 import ChartInsertTools from "../../../modules/charts/components/ChartInsertTools.vue";
+import ChartTypeNavigation from "../../../modules/charts/components/ChartTypeNavigation.vue";
 import ChartEditorDialog from "../../../modules/charts/components/ChartEditorDialog.vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import RibbonSplitButton from "../../../shared/ribbon/RibbonSplitButton.vue";
@@ -85,6 +84,7 @@ function editor(overrides: Partial<SheetChart> = {}) {
     attachTo: document.body,
     props: {
       drawing,
+      mode: "change-type",
       workbook,
       sheet,
       evaluator: createSheetEvaluator(sheet),
@@ -313,26 +313,27 @@ describe("insert subtype intents", () => {
   });
 });
 
-describe("chart editor design draft", () => {
-  test("style and subtype mutate only the local draft until Confirm; Cancel has no mutation", async () => {
-    const f = editor(),
+describe("chart type dialog design draft", () => {
+  async function confirmType(wrapper: VueWrapper): Promise<SheetChartDrawing> {
+    document.querySelector<HTMLButtonElement>("[data-chart-confirm]")!.click();
+    await flushPromises();
+    return wrapper.emitted("confirm")![0]![0] as SheetChartDrawing;
+  }
+  test("subtype mutates only the local draft while saved appearance survives; Cancel has no mutation", async () => {
+    const styled = applyChartDesignIntent(chart(), { kind: "style", style: "dark" });
+    const f = editor(styled),
       before = structuredClone(f.drawing);
-    await f.wrapper
-      .getComponent(ChartStyleGallery)
-      .get('[data-chart-style="dark"]')
-      .trigger("click");
+    expect(f.wrapper.findComponent(ChartStyleGallery).exists()).toBe(false);
     await f.wrapper
       .getComponent(ChartSubtypeControls)
       .get('[data-chart-variant="percentStackedMarkers"]')
       .trigger("click");
-    await flushPromises();
     expect(f.wrapper.emitted("confirm")).toBeUndefined();
     expect(f.drawing).toEqual(before);
     f.wrapper.getComponent(Dialog).vm.$emit("close");
     expect(f.wrapper.emitted("close")).toEqual([[]]);
     expect(f.drawing).toEqual(before);
-    f.wrapper.getComponent(Dialog).vm.$emit("confirm");
-    const result = f.wrapper.emitted("confirm")![0]![0] as SheetChartDrawing;
+    const result = await confirmType(f.wrapper);
     expect(result.chart.presentation).toMatchObject({
       background: "#202936",
       percentStacked: true,
@@ -340,39 +341,27 @@ describe("chart editor design draft", () => {
     });
     expect(f.drawing).toEqual(before);
   });
-  test("changing type and unchecking stacked remove only inapplicable presentation flags", async () => {
-    const f = editor();
-    await f.wrapper
-      .getComponent(ChartStyleGallery)
-      .get('[data-chart-style="office"]')
-      .trigger("click");
+  test("changing type and choosing standard remove only inapplicable flags while preserving appearance", async () => {
+    const styled = applyChartDesignIntent(chart(), { kind: "style", style: "office" });
+    const f = editor(styled);
     await f.wrapper
       .getComponent(ChartSubtypeControls)
       .get('[data-chart-variant="percentStackedMarkers"]')
       .trigger("click");
-    const type = f.wrapper
-      .findAllComponents(Select)
-      .find((select) => select.attributes("aria-label") === "Chart type")!;
-    type.vm.$emit("change", "column");
+    f.wrapper.getComponent(ChartTypeNavigation).vm.$emit("select", "column");
     await flushPromises();
-    let current = f.wrapper.getComponent(ChartElementsControls).props("chart");
-    expect(current.presentation).toMatchObject({ percentStacked: true, background: "#ffffff" });
-    expect(current.presentation?.lineMarkers).toBeUndefined();
-    const stacked = f.wrapper
-      .getComponent(ChartElementsControls)
-      .findAllComponents(Checkbox)
-      .find((box) => box.text() === "Stacked")!;
-    await stacked.get('input[type="checkbox"]').setValue(false);
-    current = f.wrapper.getComponent(ChartElementsControls).props("chart");
-    expect(current.stacked).toBe(false);
-    expect(current.presentation?.percentStacked).toBeUndefined();
-    expect(current.presentation?.palette).toHaveLength(6);
-    type.vm.$emit("change", "pie");
+    await f.wrapper
+      .getComponent(ChartSubtypeControls)
+      .get('[data-chart-variant="standard"]')
+      .trigger("click");
+    f.wrapper.getComponent(ChartTypeNavigation).vm.$emit("select", "pie");
     await flushPromises();
     expect(f.wrapper.findComponent(ChartSubtypeControls).exists()).toBe(false);
-    expect(
-      f.wrapper.getComponent(ChartElementsControls).props("chart").presentation?.palette,
-    ).toHaveLength(6);
+    const result = await confirmType(f.wrapper);
+    expect(result.chart.stacked).toBe(false);
+    expect(result.chart.presentation?.percentStacked).toBeUndefined();
+    expect(result.chart.presentation?.lineMarkers).toBeUndefined();
+    expect(result.chart.presentation?.palette).toHaveLength(6);
   });
   test("disabled editor and live-source applicability remain authoritative", async () => {
     const f = editor({
@@ -390,16 +379,21 @@ describe("chart editor design draft", () => {
         ],
       },
     });
-    const type = f.wrapper
-      .findAllComponents(Select)
-      .find((select) => select.attributes("aria-label") === "Chart type")!;
-    type.vm.$emit("change", "pie");
+    f.wrapper.getComponent(ChartTypeNavigation).vm.$emit("select", "pie");
     await flushPromises();
-    expect(f.wrapper.getComponent(ChartElementsControls).props("chart").type).toBe("line");
+    expect(f.wrapper.getComponent(ChartTypeNavigation).props("value")).toBe("line");
     await f.wrapper.setProps({ disabled: true });
-    const gallery = f.wrapper.getComponent(ChartStyleGallery);
-    expect(gallery.props("apply")({ kind: "style", style: "dark" })).toBe(false);
-    f.wrapper.getComponent(Dialog).vm.$emit("confirm");
+    expect(
+      f.wrapper.getComponent(ChartSubtypeControls).props("apply")({
+        kind: "variant",
+        variant: "standardMarkers",
+      }),
+    ).toBe(false);
+    await confirmTypeNoResult(f.wrapper);
     expect(f.wrapper.emitted("confirm")).toBeUndefined();
   });
+  async function confirmTypeNoResult(_wrapper: VueWrapper): Promise<void> {
+    document.querySelector<HTMLButtonElement>("[data-chart-confirm]")!.click();
+    await flushPromises();
+  }
 });

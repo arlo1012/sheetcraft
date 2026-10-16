@@ -430,6 +430,8 @@ export type Sheet = {
   hiddenRows?: Set<number>;
   hiddenColumns?: Set<number>;
   /** Sparse column widths fall back to this value. */
+  /** Default nominal row height in CSS pixels; absent preserves the 24px baseline. */
+  defaultRowHeight?: number;
   defaultColumnWidth?: number;
   freezePanes: FreezePanes;
   filter: SheetFilter | null;
@@ -471,6 +473,8 @@ export type SheetSparseState = {
   columnWidths: SheetSparseDimension[];
   hiddenRows?: number[];
   hiddenColumns?: number[];
+  /** Default nominal row height in CSS pixels; absent preserves the 24px baseline. */
+  defaultRowHeight?: number;
   defaultColumnWidth?: number;
   freezePanes: FreezePanes;
   filter: SheetFilter | null;
@@ -2186,13 +2190,17 @@ function setDimension(
 export function getRowHeight(sheet: Sheet, row: number): number {
   assertDimensionIndex(row, MAX_SHEET_ROWS, "Row");
   if (sheet.hiddenRows?.has(row)) return 0;
-  return sheet.rowHeights.get(row) ?? DEFAULT_ROW_HEIGHT;
+  return sheet.rowHeights.get(row) ?? getDefaultRowHeight(sheet);
 }
 
 export function getColumnWidth(sheet: Sheet, column: number): number {
   assertDimensionIndex(column, MAX_SHEET_COLUMNS, "Column");
   if (sheet.hiddenColumns?.has(column)) return 0;
   return sheet.columnWidths.get(column) ?? getDefaultColumnWidth(sheet);
+}
+
+export function getDefaultRowHeight(sheet: Sheet): number {
+  return sheet.defaultRowHeight ?? DEFAULT_ROW_HEIGHT;
 }
 
 export function getDefaultColumnWidth(sheet: Sheet): number {
@@ -2202,7 +2210,7 @@ export function getDefaultColumnWidth(sheet: Sheet): number {
 export function setRowHeight(sheet: Sheet, row: number, height: number): boolean {
   assertDimensionIndex(row, MAX_SHEET_ROWS, "Row");
   assertDimensionSize(height, MIN_ROW_HEIGHT, MAX_ROW_HEIGHT, "Row height");
-  return setDimension(sheet.rowHeights, row, height, DEFAULT_ROW_HEIGHT);
+  return setDimension(sheet.rowHeights, row, height, getDefaultRowHeight(sheet));
 }
 
 export function setColumnWidth(sheet: Sheet, column: number, width: number): boolean {
@@ -3047,10 +3055,13 @@ export function normalizeSheetSparseState(state: SheetSparseState): SheetSparseS
     ];
   });
 
+  const defaultRowHeight =
+    state.defaultRowHeight === undefined ? DEFAULT_ROW_HEIGHT : state.defaultRowHeight;
+  assertDimensionSize(defaultRowHeight, MIN_ROW_HEIGHT, MAX_ROW_HEIGHT, "Default row height");
   const rowHeights = state.rowHeights.map((dimension) => {
     assertDimensionIndex(dimension.index, MAX_SHEET_ROWS, "Row");
     assertDimensionSize(dimension.size, MIN_ROW_HEIGHT, MAX_ROW_HEIGHT, "Row height");
-    if (dimension.size === DEFAULT_ROW_HEIGHT) {
+    if (dimension.size === defaultRowHeight) {
       throw new Error("Sparse state cannot store a default row height.");
     }
     if (rowIndexes.has(dimension.index)) {
@@ -3109,6 +3120,7 @@ export function normalizeSheetSparseState(state: SheetSparseState): SheetSparseS
       columnWidths: new Map(columnWidths.map((entry) => [entry.index, entry.size])),
       hiddenRows: new Set(hiddenRows),
       hiddenColumns: new Set(hiddenColumns),
+      defaultRowHeight,
       defaultColumnWidth,
     });
   assertShapeObjectsForSheet(metadata.drawings, {
@@ -3117,6 +3129,7 @@ export function normalizeSheetSparseState(state: SheetSparseState): SheetSparseS
     columnWidths: new Map(columnWidths.map((entry) => [entry.index, entry.size])),
     hiddenRows: new Set(hiddenRows),
     hiddenColumns: new Set(hiddenColumns),
+    defaultRowHeight,
     defaultColumnWidth,
   });
   return {
@@ -3125,6 +3138,7 @@ export function normalizeSheetSparseState(state: SheetSparseState): SheetSparseS
     columnWidths,
     hiddenRows,
     hiddenColumns,
+    ...(defaultRowHeight === DEFAULT_ROW_HEIGHT ? {} : { defaultRowHeight }),
     defaultColumnWidth,
     freezePanes: cloneFreezePanes(metadata.freezePanes),
     filter: metadata.filter ? cloneSheetFilter(metadata.filter) : null,
@@ -3154,6 +3168,7 @@ function areSheetSparseStatesEqual(left: SheetSparseState, right: SheetSparseSta
     left.columnWidths.length !== right.columnWidths.length ||
     left.hiddenRows?.length !== right.hiddenRows?.length ||
     left.hiddenColumns?.length !== right.hiddenColumns?.length ||
+    left.defaultRowHeight !== right.defaultRowHeight ||
     left.defaultColumnWidth !== right.defaultColumnWidth ||
     !areSheetMetadataEqual(left, right) ||
     JSON.stringify(left.subtotalMetadata ?? []) !== JSON.stringify(right.subtotalMetadata ?? []) ||
@@ -3219,6 +3234,7 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
     })),
     hiddenRows: [...(sheet.hiddenRows ?? [])],
     hiddenColumns: [...(sheet.hiddenColumns ?? [])],
+    defaultRowHeight: getDefaultRowHeight(sheet),
     defaultColumnWidth: getDefaultColumnWidth(sheet),
     freezePanes: cloneFreezePanes(sheet.freezePanes),
     filter: sheet.filter ? cloneSheetFilter(sheet.filter) : null,
@@ -3285,6 +3301,7 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
   }
   sheet.hiddenRows = new Set(nextState.hiddenRows);
   sheet.hiddenColumns = new Set(nextState.hiddenColumns);
+  sheet.defaultRowHeight = nextState.defaultRowHeight;
   sheet.defaultColumnWidth = nextState.defaultColumnWidth;
   sheet.freezePanes = cloneFreezePanes(nextState.freezePanes);
   sheet.filter = nextState.filter ? cloneSheetFilter(nextState.filter) : null;

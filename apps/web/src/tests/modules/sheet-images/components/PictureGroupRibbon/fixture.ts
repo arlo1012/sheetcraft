@@ -1,5 +1,5 @@
 import { mount, type VueWrapper } from "@vue/test-utils";
-import { InputNumber } from "tdesign-vue-next/es/input-number";
+import NumericField from "../../../../../shared/numeric-field/NumericField.vue";
 import { vi } from "vitest";
 import PictureGroupRibbon from "../../../../../modules/sheet-images/components/PictureGroupRibbon.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
@@ -30,8 +30,8 @@ export function dimension(
   axis: "width" | "height",
 ) {
   return wrapper
-    .findAllComponents(InputNumber)
-    .find((input) => input.attributes("data-picture-size") === axis)!;
+    .findAllComponents(NumericField)
+    .find((input) => input.props("contextAttributes")?.["data-picture-size"] === axis)!;
 }
 
 export function listener(value: unknown): (...args: unknown[]) => unknown {

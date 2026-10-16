@@ -1,7 +1,8 @@
+import { displayNumber, commitDisplay } from "./numeric-test-actions";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
-import { Checkbox } from "tdesign-vue-next/es/checkbox";
-import { InputNumber } from "tdesign-vue-next/es/input-number";
+import PictureEffectsMenu from "../../../../modules/sheet-images/components/PictureEffectsMenu.vue";
+import NumericField from "../../../../shared/numeric-field/NumericField.vue";
 import RibbonMenuButton from "../../../../shared/ribbon/RibbonMenuButton.vue";
 import type { FloatingImage, LegacyFloatingImage } from "@sheetcraft/core/workbook";
 import type { GroupedPicture } from "@sheetcraft/core/picture-group";
@@ -36,16 +37,31 @@ function ownedPicture(): GroupedPicture {
   return { ...leaf, transform: { appearance: { opacity: 0.5 } } };
 }
 function fixture(image: FloatingImage | GroupedPicture) {
-  const wrapper = mount(PictureAppearanceTools, {
+  let wrapper: VueWrapper;
+  wrapper = mount(PictureAppearanceTools, {
     attachTo: document.body,
-    props: { image, disabled: false },
+    props: {
+      image,
+      disabled: false,
+      appearanceCommitHandler: (patch) => {
+        wrapper.vm.$emit("change", patch);
+        return true;
+      },
+    },
     global: { plugins: [createAppI18n("en-US")] },
   });
   mounted.push(wrapper);
   return wrapper;
 }
 async function openMenu(wrapper: VueWrapper, label: string): Promise<void> {
-  await wrapper.get(`[aria-label="${label}"]`).trigger("click");
+  if (["Transparency", "Picture design", "Filters"].includes(label)) {
+    await wrapper.get('[role="button"][aria-label="Picture style"]').trigger("click");
+    await flushPromises();
+    const item = wrapper.findAllComponents(MenuItem).find((entry) => entry.text() === label)!;
+    item.vm.$emit("select");
+  } else {
+    await wrapper.get(`[aria-label="${label}"]`).trigger("click");
+  }
   await flushPromises();
 }
 
@@ -62,9 +78,9 @@ describe("picture appearance union-safe intents", () => {
       const before = structuredClone(image);
       const wrapper = fixture(image);
       await openMenu(wrapper, "Transparency");
-      const input = wrapper.getComponent(InputNumber);
-      expect(input.props("modelValue")).toBe(50);
-      input.vm.$emit("change", 25);
+      const input = wrapper.getComponent(NumericField);
+      expect(displayNumber(input)).toBe(50);
+      commitDisplay(input, 25);
       expect(wrapper.emitted("change")).toEqual([[{ opacity: 0.75 }]]);
       expect(wrapper.emitted("update")).toBeUndefined();
       await wrapper.get('[aria-label="Reset style"]').trigger("click");
@@ -73,46 +89,61 @@ describe("picture appearance union-safe intents", () => {
     },
   );
 
-  test.each(["frame", "owned"])(
-    "disables %s reflection and leaves shadow presets usable",
+  test.each(["legacy", "frame", "owned"])(
+    "%s effects route through the typed menu and detailed effects target",
     async (kind) => {
-      const wrapper = fixture(kind === "frame" ? framedPicture() : ownedPicture());
-      await openMenu(wrapper, "Effects");
-      const reflection = wrapper.getComponent(Checkbox);
-      expect(reflection.props("disabled")).toBe(true);
-      reflection.vm.$emit("update:modelValue", true);
+      const wrapper = fixture(
+        kind === "legacy" ? legacyPicture() : kind === "frame" ? framedPicture() : ownedPicture(),
+      );
+      const effects = wrapper.getComponent(PictureEffectsMenu);
+      effects.vm.$emit("format");
+      expect(wrapper.emitted("format")).toEqual([["effects"]]);
       expect(wrapper.emitted("change")).toBeUndefined();
-      const shadow = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
-        (item) => item.textContent?.trim() === "Soft shadow",
-      )!;
-      shadow.click();
-      await wrapper.vm.$nextTick();
-      expect(wrapper.emitted("change")).toEqual([[{ shadow: "soft" }]]);
-      expect(wrapper.emitted("update")).toBeUndefined();
     },
   );
 
-  test("keeps reflection available to legacy pictures", async () => {
-    const wrapper = fixture(legacyPicture());
-    await openMenu(wrapper, "Effects");
-    const reflection = wrapper.getComponent(Checkbox);
-    expect(reflection.props("disabled")).toBe(false);
-    reflection.vm.$emit("update:modelValue", true);
-    expect(wrapper.emitted("change")).toEqual([[{ reflection: true }]]);
-  });
+  test.each(["frame", "owned"])(
+    "%s reflection design opens formatting without a legacy patch",
+    async (kind) => {
+      const wrapper = fixture(kind === "frame" ? framedPicture() : ownedPicture());
+      await openMenu(wrapper, "Picture design");
+      const reflection = wrapper
+        .findAllComponents(MenuItem)
+        .find((item) => item.text().startsWith("Reflection ·"))!;
+      reflection.vm.$emit("select");
+      await flushPromises();
+      expect(wrapper.emitted("format")).toEqual([[]]);
+      expect(wrapper.emitted("change")).toBeUndefined();
+      expect(document.querySelector('[role="menu"]')).toBeNull();
+    },
+  );
 
-  test("a disabled frame reflection design leaves the menu open and emits nothing", async () => {
-    const wrapper = fixture(framedPicture());
-    await openMenu(wrapper, "Picture design");
-    const reflection = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
-      (item) => item.textContent?.trim() === "Reflection",
-    )!;
-    expect(reflection.getAttribute("aria-disabled")).toBe("true");
-    reflection.click();
-    await wrapper.vm.$nextTick();
-    expect(document.querySelector('[role="menu"]')).not.toBeNull();
-    expect(wrapper.emitted("change")).toBeUndefined();
-  });
+  test.each(["disabled", "source"])(
+    "a stale reflection entry cannot open formatting after %s changes",
+    async (change) => {
+      const image = framedPicture();
+      const wrapper = fixture(image);
+      await openMenu(wrapper, "Picture design");
+      const reflection = wrapper
+        .findAllComponents(MenuItem)
+        .find((item) => item.text().startsWith("Reflection ·"))!;
+      const old = reflection.vm.$.vnode.props!.onSelect as () => void;
+      if (change === "disabled") await wrapper.setProps({ disabled: true });
+      else await wrapper.setProps({ image: { ...image, assetId: "replacement" } });
+      old();
+      expect(wrapper.emitted("format")).toBeUndefined();
+      expect(wrapper.emitted("change")).toBeUndefined();
+      await wrapper.setProps({ disabled: false });
+      await openMenu(wrapper, "Picture design");
+      old();
+      expect(wrapper.emitted("format")).toBeUndefined();
+      const current = wrapper
+        .findAllComponents(MenuItem)
+        .find((item) => item.text().startsWith("Reflection ·"))!;
+      current.vm.$emit("select");
+      expect(wrapper.emitted("format")).toEqual([[]]);
+    },
+  );
 
   test.each(["legacy", "frame", "owned"])(
     "rejects invalid border widths for %s pictures",
@@ -121,11 +152,11 @@ describe("picture appearance union-safe intents", () => {
         kind === "legacy" ? legacyPicture() : kind === "frame" ? framedPicture() : ownedPicture(),
       );
       await openMenu(wrapper, "Border");
-      const input = wrapper.getComponent(InputNumber);
+      const input = wrapper.getComponent(NumericField);
       for (const invalid of [undefined, "2", Number.NaN, Infinity, -1, 20.01])
-        input.vm.$emit("change", invalid);
+        commitDisplay(input, invalid);
       expect(wrapper.emitted("change")).toBeUndefined();
-      input.vm.$emit("change", 2);
+      commitDisplay(input, 2);
       expect(wrapper.emitted("change")).toEqual([[{ border: { color: "#000000", width: 2 } }]]);
     },
   );
@@ -136,20 +167,22 @@ describe("picture appearance union-safe intents", () => {
       const image = kind === "legacy" ? legacyPicture() : ownedPicture();
       const wrapper = fixture(image);
       await openMenu(wrapper, "Transparency");
-      const oldInput = wrapper.getComponent(InputNumber);
+      const oldInput = wrapper.getComponent(NumericField);
       await oldInput.get("input").setValue("50.");
       expect((oldInput.get("input").element as HTMLInputElement).value).toBe("50.");
       await wrapper.setProps({ image: { ...image, transform: { appearance: { opacity: 0.25 } } } });
-      expect(wrapper.get('[aria-label="Transparency"]').attributes("aria-expanded")).toBe("true");
-      expect(wrapper.getComponent(InputNumber).vm.$.uid).toBe(oldInput.vm.$.uid);
+      expect(
+        wrapper.get('[role="button"][aria-label="Picture style"]').attributes("aria-expanded"),
+      ).toBe("true");
+      expect(wrapper.getComponent(NumericField).vm.$.uid).toBe(oldInput.vm.$.uid);
       await wrapper.setProps({ image: { ...image, assetId: "replacement-asset" } });
       expect(document.querySelector('[role="menu"]')).toBeNull();
-      oldInput.vm.$emit("change", 20);
+      commitDisplay(oldInput, 20);
       expect(wrapper.emitted("change")).toBeUndefined();
       await openMenu(wrapper, "Transparency");
-      expect(wrapper.getComponent(InputNumber).vm.$.uid).not.toBe(oldInput.vm.$.uid);
+      expect(wrapper.getComponent(NumericField).vm.$.uid).not.toBe(oldInput.vm.$.uid);
       expect(
-        (wrapper.getComponent(InputNumber).get("input").element as HTMLInputElement).value,
+        (wrapper.getComponent(NumericField).get("input").element as HTMLInputElement).value,
       ).toBe("50");
     },
   );
@@ -172,12 +205,11 @@ describe("picture appearance union-safe intents", () => {
 
   test("disabled tools and invalid numeric changes do not emit patches", async () => {
     const wrapper = fixture(framedPicture());
-    await openMenu(wrapper, "Color");
-    const input = wrapper.findAllComponents(InputNumber)[0]!;
-    for (const invalid of [undefined, "100", Number.NaN, Infinity])
-      input.vm.$emit("change", invalid);
+    await openMenu(wrapper, "Color adjustments");
+    const input = wrapper.findAllComponents(NumericField)[0]!;
+    for (const invalid of [undefined, "100", Number.NaN, Infinity]) commitDisplay(input, invalid);
     await wrapper.setProps({ disabled: true });
-    input.vm.$emit("change", 50);
+    commitDisplay(input, 50);
     await wrapper.get('[aria-label="Reset style"]').trigger("click");
     expect(wrapper.emitted("change")).toBeUndefined();
     expect(wrapper.emitted("update")).toBeUndefined();
@@ -187,11 +219,12 @@ describe("picture appearance union-safe intents", () => {
     const image = ownedPicture();
     const before = structuredClone(image);
     const wrapper = fixture(image);
+    await openMenu(wrapper, "Color adjustments");
+    const inputs = wrapper.findAllComponents(NumericField);
+    commitDisplay(inputs[0]!, 125);
+    commitDisplay(inputs[1]!, 75);
+    commitDisplay(inputs[2]!, 150);
     await openMenu(wrapper, "Color");
-    const inputs = wrapper.findAllComponents(InputNumber);
-    inputs[0]!.vm.$emit("change", 125);
-    inputs[1]!.vm.$emit("change", 75);
-    inputs[2]!.vm.$emit("change", 150);
     wrapper
       .findAllComponents(MenuItem)
       .find((item) => item.text() === "Grayscale")!

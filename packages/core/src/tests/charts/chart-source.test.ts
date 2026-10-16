@@ -103,8 +103,8 @@ describe("strict ordered chart source and authoritative derived data", () => {
     const legacy = getSheetChartData(f.sheet, rectangular, createSheetEvaluator(f.sheet));
     const source = createChartSourceFromRange(f.sheet.id, rectangular, f.sheet);
     expect(source.series.map(({ id, colorIndex, name }) => ({ id, colorIndex, name }))).toEqual([
-      { id: "series-1", colorIndex: 1, name: { kind: "literal", text: "2" } },
-      { id: "series-2", colorIndex: 0, name: { kind: "literal", text: "1" } },
+      { id: "series-1", colorIndex: 1, name: { kind: "literal", text: "Series 2" } },
+      { id: "series-2", colorIndex: 0, name: { kind: "literal", text: "Series 1" } },
     ]);
     const explicit = { ...rectangular, range: null, source };
     const read = () => getSheetChartData(f.sheet, explicit, createSheetEvaluator(f.sheet));

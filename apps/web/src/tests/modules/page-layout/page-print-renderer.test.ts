@@ -20,6 +20,53 @@ function documentFor(setup = DEFAULT_SHEET_PAGE_SETUP) {
 afterEach(() => vi.restoreAllMocks());
 
 describe("print preview pagination", () => {
+  test("shares default20, explicit24 and hidden-row metrics across print consumers", () => {
+    const { sheet } = documentFor();
+    sheet.defaultRowHeight = 20;
+    sheet.rowHeights.set(1, 24);
+    sheet.rowHeights.set(3, 24);
+    sheet.hiddenRows = new Set([2, 3]);
+    const preview = createPrintPreviewDocument({
+      sheet,
+      evaluator: createSheetEvaluator(sheet),
+      setup: {
+        ...DEFAULT_SHEET_PAGE_SETUP,
+        printArea: { start: { row: 0, column: 0 }, end: { row: 4, column: 0 } },
+      },
+    });
+    expect(preview.geometry.rowHeight).toBe(20);
+    expect(preview.geometry.getCellRect({ row: 4, column: 0 })).toMatchObject({
+      y: 44,
+      height: 20,
+    });
+    expect(preview.rows.getBoundaryOffset(5)).toBe(64);
+    expect(preview.rows.getVisibleRow(2)).toBeNull();
+    expect(preview.rows.getVisibleRow(3)).toBeNull();
+    expect(preview.shapeMetrics.rows.nominalSize(1)).toBe(24);
+    expect(preview.shapeMetrics.rows.nominalSize(2)).toBe(20);
+    expect(preview.shapeMetrics.rows.nominalSize(3)).toBe(24);
+    expect(preview.shapeMetrics.rows.nominalPrefix(5)).toBe(108);
+    expect(preview.shapeMetrics.rows.visiblePrefix(5)).toBe(64);
+    expect(preview.pages).toHaveLength(1);
+    expect([...sheet.rowHeights]).toEqual([
+      [1, 24],
+      [3, 24],
+    ]);
+    expect(sheet.cells.size).toBe(0);
+  });
+
+  test("leaves absent and explicit24 sheet defaults at the legacy print baseline", () => {
+    const { sheet } = documentFor();
+    for (const baseline of [undefined, 24]) {
+      sheet.defaultRowHeight = baseline;
+      const preview = createPrintPreviewDocument({ sheet, evaluator: createSheetEvaluator(sheet) });
+      expect(preview.geometry.rowHeight).toBe(24);
+      expect(preview.rows.getBoundaryOffset(1)).toBe(24);
+      expect(preview.shapeMetrics.rows.nominalSize(0)).toBe(24);
+      expect(sheet.rowHeights.size).toBe(0);
+    }
+  });
+
   test.each([framedPicture(), pictureGroup()])(
     "legacy print guards reject hidden $id before canvas sizing or drawing",
     (image) => {

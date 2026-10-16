@@ -239,6 +239,7 @@ export function preflightTextReferenceSparseState(sheet: Sheet, state: SheetSpar
     columnWidths: new Map(normalized.columnWidths.map((entry) => [entry.index, entry.size])),
     hiddenRows: new Set(normalized.hiddenRows ?? []),
     hiddenColumns: new Set(normalized.hiddenColumns ?? []),
+    defaultRowHeight: normalized.defaultRowHeight,
     defaultColumnWidth: normalized.defaultColumnWidth,
   };
   assertShapeObjectsForSheet(normalized.drawings, shadow);

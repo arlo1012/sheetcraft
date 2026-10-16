@@ -1,3 +1,5 @@
+import { normalizePictureEffectEdit, type PictureEffectEdit } from "./picture-effect-edit";
+import { editPictureDetailedCategory } from "./picture-detailed-style-edit";
 import { planPictureBatchSize } from "./picture-batch-size";
 import { planPictureOriginalReset } from "./picture-original-reset";
 import {
@@ -417,6 +419,73 @@ export function usePictureTools(options: {
     }
     return true;
   }
+  /** Apply exactly one typed category per real target, in one atomic history command. */
+  function applyEffect(edit: PictureEffectEdit): boolean {
+    operationFeedback.value = undefined;
+    sizeFeedback.value = undefined;
+    try {
+      // Capture before reading the intent; reentrant selection changes cannot retarget it.
+      const lease = capture();
+      const choice = normalizePictureEffectEdit(edit);
+      const ids = lease.selectedIds;
+      if (
+        !ids.length ||
+        new Set(ids).size !== ids.length ||
+        !canEditPictureSelection(lease.sheet, ids)
+      )
+        throw new Error("Invalid or protected picture effect selection.");
+      const path = lease.selectedPath;
+      if (path && (ids.length !== 1 || path[0] !== ids[0]))
+        throw new Error("The picture effect owner changed.");
+      let next: FloatingImage[];
+      if (path && path.length > 1) {
+        const root = lease.forest.find((image) => image.id === path[0]);
+        if (!root || !isPictureGroup(root)) throw new Error("Missing effect owner.");
+        const copy = normalizePictureGroup(root);
+        const target = findPictureGroupNode(copy, path)?.node;
+        if (!target || !isGroupedPicture(target))
+          throw new Error("A picture effect requires a real source-bearing leaf.");
+        const normalized = normalizeImageTransform({
+          annotations: target.transform?.annotations,
+          appearance: editPictureDetailedCategory(target.transform?.appearance, choice),
+        });
+        target.transform = normalized
+          ? { annotations: normalized.annotations, appearance: normalized.appearance }
+          : undefined;
+        next = lease.forest.map((image) => (image.id === root.id ? copy : image));
+      } else {
+        const targets = lease.forest.filter((image) => ids.includes(image.id));
+        if (targets.length !== ids.length || targets.some(isPictureGroup))
+          throw new Error("A picture effect requires standalone pictures.");
+        const changes = new Map<string, FloatingImage>(
+          requireStandalonePictures(targets).map((image): [string, FloatingImage] => {
+            const normalized = normalizeImageTransform({
+              ...image.transform,
+              appearance: editPictureDetailedCategory(image.transform?.appearance, choice),
+            });
+            if (isFramedPictureObject(image))
+              return [
+                image.id,
+                {
+                  ...image,
+                  transform: normalized
+                    ? { annotations: normalized.annotations, appearance: normalized.appearance }
+                    : undefined,
+                },
+              ];
+            return [image.id, { ...image, transform: normalized }];
+          }),
+        );
+        next = lease.forest.map((image) => changes.get(image.id) ?? image);
+      }
+      const accepted = replace(next, lease);
+      if (!accepted) operationFeedback.value = "picture.operationFailed";
+      return accepted;
+    } catch {
+      operationFeedback.value = "picture.operationFailed";
+      return false;
+    }
+  }
   function applyAppearance(patch: Partial<ImageAppearance> | undefined): boolean {
     operationFeedback.value = undefined;
     sizeFeedback.value = undefined;
@@ -549,6 +618,7 @@ export function usePictureTools(options: {
   return {
     clearFeedback,
     applyAppearance,
+    applyEffect,
     paneVisible,
     updateMany,
     replaceAll,

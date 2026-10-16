@@ -1,5 +1,5 @@
 import {
-  DEFAULT_ROW_HEIGHT,
+  getDefaultRowHeight,
   getDefaultColumnWidth,
   type Sheet,
   type SheetDimensionAxis,
@@ -39,7 +39,7 @@ export function createPictureAxisMetrics(
 ): PictureAxisMetrics {
   if (axis !== "row" && axis !== "column") throw new TypeError("Invalid picture axis.");
   const count = axis === "row" ? MAX_SHEET_ROWS : MAX_SHEET_COLUMNS;
-  const defaultSize = axis === "row" ? DEFAULT_ROW_HEIGHT : getDefaultColumnWidth(sheet);
+  const defaultSize = axis === "row" ? getDefaultRowHeight(sheet) : getDefaultColumnWidth(sheet);
   if (!Number.isFinite(defaultSize) || defaultSize <= 0)
     throw new RangeError("Invalid picture default axis size.");
   const dimensions = new Map(axis === "row" ? sheet.rowHeights : sheet.columnWidths);
@@ -120,6 +120,28 @@ export function projectPictureAxisPoint(
   const origin = metrics.visiblePrefix(p.index);
   if (p.offset < 0 || p.index === metrics.count) return origin + p.offset;
   return origin + Math.min(p.offset, metrics.visibleSize(p.index));
+}
+/** Native worksheet markers retain a free pixel offset from their original cell. */
+export function projectFreePictureAxisPoint(
+  point: PictureAxisPoint,
+  metrics: PictureAxisMetrics,
+): number {
+  const p = normalizePictureAxisPoint(point, metrics.count);
+  const coordinate = metrics.visiblePrefix(p.index) + p.offset;
+  if (!Number.isFinite(coordinate))
+    throw new RangeError("Free picture coordinates exceed finite bounds.");
+  return coordinate;
+}
+/** Reuse an unchanged native marker without applying the UI's bounded-inset policy. */
+export function locateFreePictureAxisPoint(
+  position: number,
+  metrics: PictureAxisMetrics,
+  preferred?: PictureAxisPoint,
+): PictureAxisPoint {
+  if (!Number.isFinite(position)) throw new RangeError("Picture coordinate must be finite.");
+  if (preferred && projectFreePictureAxisPoint(preferred, metrics) === position)
+    return normalizePictureAxisPoint(preferred, metrics.count);
+  return locatePictureAxisPoint(position, metrics);
 }
 /** Legacy offsets are free pixel offsets, not bounded endpoint insets. */
 export function projectLegacyPictureAxisOrigin(

@@ -1,4 +1,11 @@
 export const chartsZhCN = {
+  "chart.comboCategory": "组合图",
+  "chart.defaultTitle": "图表标题",
+  "chart.previewNoData": "当前范围没有可绘制的数值。请选择数据并检查表头设置。",
+  "chart.insertDialog": "插入图表",
+  "chart.dataPreview": "所选数据预览",
+  "chart.backToPreview": "返回图表预览",
+
   "chart.dataTableUnavailable":
     "完整数据表暂时无法绘制。请放大图表、将来源缩小到最多32个分类和8个系列，或缩短数字格式，并检查所选字体是否可用。",
   "chart.tools": "图表",

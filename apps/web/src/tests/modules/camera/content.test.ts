@@ -1,5 +1,5 @@
 import { mount } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { nextTick, reactive } from "vue";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   createWorkbook,
@@ -21,9 +21,11 @@ afterEach(() => {
 function canvasHost() {
   const fillText = vi.fn();
   const fillRect = vi.fn();
+  const scale = vi.fn();
   const methods: Record<string, unknown> = {
     fillText,
     fillRect,
+    scale,
     getTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
     measureText: (text: string) => ({
       width: text.length * 7,
@@ -39,7 +41,7 @@ function canvasHost() {
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
     context as unknown as CanvasRenderingContext2D,
   );
-  return { fillText, fillRect };
+  return { fillText, fillRect, scale };
 }
 
 function drawing(row: number, column: number): SheetCameraDrawing {
@@ -67,6 +69,44 @@ function drawing(row: number, column: number): SheetCameraDrawing {
 }
 
 describe("camera content using the sheet renderer", () => {
+  test("uses sparse sheet row metrics and refreshes a changed baseline", async () => {
+    const host = canvasHost();
+    const sheet = reactive(getActiveSheet(createWorkbook({ id: "camera", sheetId: "sheet" })));
+    sheet.defaultRowHeight = 20;
+    sheet.rowHeights.set(1, 24);
+    sheet.rowHeights.set(3, 24);
+    sheet.hiddenRows = new Set([2, 3]);
+    const source = drawing(0, 0);
+    source.camera.range = { start: { row: 0, column: 0 }, end: { row: 4, column: 0 } };
+    const wrapper = mount(CameraContent, {
+      props: { drawing: source, sheet, evaluator: createSheetEvaluator(sheet), revision: 0 },
+    });
+    wrappers.push(wrapper);
+    await nextTick();
+    expect(host.scale.mock.lastCall?.[1]).toBe(200 / 64);
+    expect([...sheet.rowHeights]).toEqual([
+      [1, 24],
+      [3, 24],
+    ]);
+
+    host.scale.mockClear();
+    sheet.defaultRowHeight = 24;
+    await nextTick();
+    expect(host.scale.mock.lastCall?.[1]).toBe(200 / 72);
+  });
+
+  test("retains the legacy 24-pixel baseline when no sheet default is stored", async () => {
+    const host = canvasHost();
+    const sheet = getActiveSheet(createWorkbook({ id: "camera", sheetId: "sheet" }));
+    const wrapper = mount(CameraContent, {
+      props: { drawing: drawing(0, 0), sheet, evaluator: createSheetEvaluator(sheet), revision: 0 },
+    });
+    wrappers.push(wrapper);
+    await nextTick();
+    expect(host.scale.mock.lastCall?.[1]).toBe(200 / 24);
+    expect(sheet.rowHeights.size).toBe(0);
+  });
+
   test.each([
     { row: 2, column: 3 },
     { row: MAX_SHEET_ROWS - 1, column: MAX_SHEET_COLUMNS - 1 },

@@ -9,11 +9,13 @@ import {
   getPictureEffectPreset,
   findPictureEffectPresetId,
 } from "../../picture-effect-presets";
+import GallerySection from "../../../../shared/gallery/GallerySection.vue";
 import PicturePresetGallery from "./PicturePresetGallery.vue";
 import PictureFormatField from "./PictureFormatField.vue";
 import PicturePaintNumber from "./PicturePaintNumber.vue";
 const props = defineProps<{
   ownerKey: string;
+  hidePreset?: boolean;
   value?: Choice<PictureSoftEdges>;
   disabled?: boolean;
   t: PictureFormatTranslate;
@@ -43,6 +45,7 @@ function selectPreset(id: string) {
 <template>
   <div class="picture-soft-edges-editor">
     <PicturePresetGallery
+      v-if="!hidePreset"
       :owner-key="ownerKey"
       :groups="presetGroups"
       :selected-id="presetId"
@@ -74,21 +77,24 @@ function selectPreset(id: string) {
       :rejected-message="t('applyRejected')"
       :on-commit="(sizePt) => !disabled && onCommit({ kind: 'value', value: { sizePt } })"
     />
-    <div v-if="soft" class="picture-soft-edges-editor__presets">
-      <button
-        v-for="sizePt in [1, 2.5, 5, 10, 25, 50]"
-        :key="sizePt"
-        type="button"
-        :disabled="disabled"
-        :aria-pressed="soft.sizePt === sizePt"
-        @click="onCommit({ kind: 'value', value: { sizePt } })"
-      >
-        {{ sizePt }} {{ t("unitPt") }}
-      </button>
-    </div>
+    <GallerySection v-if="soft" :title="t('preset')">
+      <div class="picture-soft-edges-editor__presets">
+        <button
+          v-for="sizePt in [1, 2.5, 5, 10, 25, 50]"
+          :key="sizePt"
+          type="button"
+          :disabled="disabled"
+          :aria-pressed="soft.sizePt === sizePt"
+          @click="onCommit({ kind: 'value', value: { sizePt } })"
+        >
+          {{ sizePt }} {{ t("unitPt") }}
+        </button>
+      </div>
+    </GallerySection>
   </div>
 </template>
 <style scoped lang="scss">
+@use "../../../../shared/gallery/gallery-choice" as gallery;
 .picture-soft-edges-editor {
   display: grid;
   gap: 10px;
@@ -99,16 +105,8 @@ function selectPreset(id: string) {
     gap: 6px;
   }
   &__presets button {
+    @include gallery.choice;
     font: inherit;
-    color: inherit;
-    border: 1px solid var(--sheetcraft-border-subtle);
-    border-radius: var(--sheetcraft-radius-small);
-    background: var(--sheetcraft-surface-panel);
-    padding: 4px 7px;
-    cursor: pointer;
-  }
-  &__presets button[aria-pressed="true"] {
-    outline: 2px solid var(--sheetcraft-text-primary);
   }
 }
 </style>
