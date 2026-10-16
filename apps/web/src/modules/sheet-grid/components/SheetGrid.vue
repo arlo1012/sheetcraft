@@ -96,6 +96,7 @@ import {
 import { completeFormulaForCommit } from "../../../shared/formula-editing/formula-commit";
 import type { FormulaReferenceToken } from "../../../shared/formula-editing/formula-reference-tokens";
 import { getWorkbookHistoryShortcut } from "../../../shared/keyboard/workbook-history-shortcuts";
+import { restoreFocusAfterRemount } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { insertTextAtSelection } from "../../../shared/forms/text-selection";
 import {
   MAX_COLUMN_WIDTH,
@@ -3863,6 +3864,35 @@ function onCellDoubleClick(address: CellAddress, event: MouseEvent): void {
   beginEdit("append", "", event.clientX);
 }
 
+function getPictureSelectionFocusTarget(ids: readonly string[], owner: Sheet): HTMLElement | null {
+  if (
+    props.sheet !== owner ||
+    isEditing.value ||
+    isComposing.value ||
+    pictureCrop.active.value ||
+    pictureSelectionReadOnly.value ||
+    selectedOwnedPicturePath.value ||
+    !ids.length ||
+    ids.length !== selectedImageIds.value.length ||
+    !ids.every((id, index) => selectedImageIds.value[index] === id)
+  )
+    return null;
+  // Resolve inside this Grid only. Both kinds already route Delete, arrows and
+  // clipboard commands to the full picture selection, unlike the cell editor.
+  const candidates = rootRef.value?.querySelectorAll<HTMLElement>(
+    "[data-owned-picture-selected]:not([data-passive-outline]), [data-floating-image-selected]",
+  );
+  return (
+    Array.from(candidates ?? []).find((target) =>
+      ids.some(
+        (id) =>
+          target.dataset.floatingImageId === id ||
+          target.dataset.ownedPicturePath === JSON.stringify([id]),
+      ),
+    ) ?? null
+  );
+}
+
 function handleHistoryShortcut(event: KeyboardEvent): boolean {
   if (isEditing.value) {
     return false;
@@ -3873,7 +3903,9 @@ function handleHistoryShortcut(event: KeyboardEvent): boolean {
   if (!action) return false;
   const pictureTarget =
     event.target instanceof Element
-      ? event.target.closest<HTMLElement>("[data-owned-picture-selected]")
+      ? event.target.closest<HTMLElement>(
+          "[data-owned-picture-selected], [data-floating-image-selected]",
+        )
       : null;
   const focusedPicture = pictureTarget?.contains(document.activeElement) ? pictureTarget : null;
   const owner = props.sheet,
@@ -3882,21 +3914,26 @@ function handleHistoryShortcut(event: KeyboardEvent): boolean {
   clearPendingClipboard();
   if (action === "undo") emit("undo");
   else emit("redo");
-  if (focusedPicture)
-    void nextTick(() => {
-      // Undoing Group removes its selected overlay. Keep the next shortcut in
+  if (focusedPicture) {
+    const roots = owner.floatingImages;
+    restoreFocusAfterRemount(
+      focusedPicture,
+      () =>
+        selectedImageIds.value.length
+          ? getPictureSelectionFocusTarget(selectedImageIds.value, owner)
+          : rootRef.value?.querySelector<HTMLElement>("textarea.cell-editor"),
+      // Undoing Group/Ungroup removes selected overlays. Keep the next shortcut in
       // Grid without stealing focus from a newer control or text editor.
-      if (
+      () =>
         props.sheet === owner &&
         props.pictureOwnerGeneration === generation &&
-        !focusedPicture.isConnected &&
-        document.activeElement === document.body &&
+        owner.floatingImages === roots &&
         !isEditing.value &&
         !isComposing.value &&
-        rootRef.value?.isConnected
-      )
-        focusEditor();
-    });
+        !pictureCrop.active.value &&
+        !!rootRef.value?.isConnected,
+    );
+  }
   return true;
 }
 
@@ -4374,6 +4411,7 @@ defineExpose({
     )
       ownedImageLayerRef.value?.focusSelected();
   },
+  getPictureSelectionFocusTarget,
   arrangePictures: (
     ids: string[],
     action: Parameters<NonNullable<typeof imageLayerRef.value>["arrangeImages"]>[1],

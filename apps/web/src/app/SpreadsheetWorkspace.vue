@@ -3284,6 +3284,33 @@ function performPictureGroup(
       revision = workbookRevision.value,
       grid = sheetGridRef.value;
     grid?.selectFloatingImages(selectedIds);
+    // Ungroup removes its menu/toolbar trigger. Keep the replacement roots'
+    // keyboard ownership without changing their multi-selection or taking focus
+    // back from a control the user reached while the view was updating.
+    if (
+      ungroup &&
+      (focusBeforeGrouping instanceof HTMLElement || focusBeforeGrouping instanceof SVGElement)
+    )
+      restoreFocusAfterRemount(
+        focusBeforeGrouping,
+        () => grid?.getPictureSelectionFocusTarget(selectedIds, owner),
+        () =>
+          session.workbook === workbook &&
+          activeSheet.value === owner &&
+          pictureOwnerGeneration.value === generation &&
+          workbookRevision.value === revision &&
+          sheetGridRef.value === grid &&
+          activeViewMode.value !== "page-layout" &&
+          !gridInert.value &&
+          !imageBusy.value &&
+          !cellEditSession.state.active &&
+          !cellEditSession.state.composing &&
+          !shapeTextEdit.snapshot.value &&
+          !equationEdit.snapshot.value &&
+          selectedIds.length === selectedPictureIds.value.length &&
+          selectedIds.every((id, index) => selectedPictureIds.value[index] === id),
+        focusBeforeGrouping,
+      );
     // The floating Group button disappears with the old multi-selection. Return
     // keyboard ownership to its new group, after Grid has received the new roots.
     if (!ungroup)
