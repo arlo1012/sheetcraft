@@ -1,6 +1,5 @@
 import { createGraphicDrawing } from "../../../../modules/sheet-drawings/drawing-defaults";
 import { pictureGroup } from "../../sheet-images/picture-group-fixture";
-import { framedPicture } from "../../sheet-images/framed-picture-fixture";
 import {
   createWorkbook,
   getActiveSheet,
@@ -34,7 +33,7 @@ afterEach(() => {
 });
 
 describe("workbook JSON transfer", () => {
-  test.each([framedPicture(), pictureGroup()])(
+  test.each([pictureGroup()])(
     "external owned-picture documents reject before portable resource validation or storage writes: $id",
     async (image) => {
       const workbook = createTestWorkbook();
@@ -255,6 +254,65 @@ describe("workbook JSON transfer", () => {
         createMemoryImageAssetStore(),
       ),
     ).rejects.toMatchObject({ code: "missing-image" });
+  });
+
+  test("classifies image storage, missing assets and unreadable bytes before download", async () => {
+    const workbook = createTestWorkbook();
+    setCellContent(
+      getActiveSheet(workbook),
+      { row: 1, column: 1 },
+      {
+        kind: "image",
+        image: { assetId: "image-test", altText: "test" },
+      },
+    );
+    const createObjectURL = vi.fn();
+    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL: vi.fn() });
+    const cause = new Error("private storage detail");
+    const store = createMemoryImageAssetStore();
+    await expect(downloadWorkbookBundle(workbook, store)).rejects.toMatchObject({
+      code: "missing-image",
+    });
+    await expect(
+      downloadWorkbookBundle(workbook, {
+        ...store,
+        get: async () => {
+          throw cause;
+        },
+      }),
+    ).rejects.toMatchObject({ code: "image-storage-unavailable", cause });
+    const blob = new Blob(["image"]);
+    vi.spyOn(blob, "arrayBuffer").mockRejectedValue(cause);
+    await store.put({ id: "image-test", mimeType: "image/png", width: 1, height: 1, blob });
+    await expect(downloadWorkbookBundle(workbook, store)).rejects.toMatchObject({
+      code: "image-read-failed",
+      cause,
+    });
+    expect(createObjectURL).not.toHaveBeenCalled();
+  });
+
+  test.each(["url", "click"])("classifies %s download failures and cleans up", (stage) => {
+    vi.useFakeTimers();
+    const cause = new Error("private download detail");
+    const createObjectURL = vi.fn(() => {
+      if (stage === "url") throw cause;
+      return "blob:failed-download";
+    });
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {
+      throw cause;
+    });
+    expect(() => downloadWorkbookJson(createTestWorkbook())).toThrow(WorkbookFileError);
+    try {
+      downloadWorkbookJson(createTestWorkbook());
+    } catch (error) {
+      expect(error).toMatchObject({ code: "download-failed", cause });
+    }
+    expect(document.querySelector('a[download="sheetcraft-workbook.json"]')).toBeNull();
+    vi.runAllTimers();
+    if (stage === "click") expect(revokeObjectURL).toHaveBeenCalledWith("blob:failed-download");
+    else expect(revokeObjectURL).not.toHaveBeenCalled();
   });
 
   test("downloads a fixed JSON filename and revokes its object URL", () => {

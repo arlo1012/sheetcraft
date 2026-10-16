@@ -86,7 +86,17 @@ describe("owned group prepared-consumer safety", () => {
         store,
       ),
     ).rejects.toMatchObject({ code: "unsupported-picture-frame" });
-    await expect(prepareXlsxImages(before, store)).rejects.toThrow(/not yet supported/);
+    await expect(prepareXlsxImages(before, store)).rejects.toMatchObject({
+      report: {
+        issues: [
+          expect.objectContaining({
+            code: "feature-omitted",
+            severity: "block",
+            locations: ['Sheet1.floatingImages["owned-group"].frame'],
+          }),
+        ],
+      },
+    });
     expect(get).not.toHaveBeenCalled();
     expect(put).not.toHaveBeenCalled();
     expect(() =>

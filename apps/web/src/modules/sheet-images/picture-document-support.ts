@@ -223,16 +223,100 @@ export function assertPictureCommandSupport(command: WorkbookCommand, workbook: 
   }
 }
 
-/** Internal snapshots do not implicitly enable paused external group packaging. */
+/** Canonical portable pictures are bounded plain data, never executable object graphs. */
+function assertPortableFramedPictureData(value: object): void {
+  const active = new WeakSet<object>();
+  const pending: { value: unknown; depth: number; leave?: boolean }[] = [{ value, depth: 0 }];
+  let fields = 0;
+  while (pending.length) {
+    const entry = pending.pop()!;
+    const node = entry.value;
+    if (entry.leave) {
+      active.delete(node as object);
+      continue;
+    }
+    if (
+      node === null ||
+      node === undefined ||
+      typeof node === "string" ||
+      typeof node === "boolean"
+    )
+      continue;
+    if (typeof node === "number" && Number.isFinite(node)) continue;
+    if (typeof node !== "object")
+      throw new TypeError("Portable pictures require JSON data values.");
+    if (entry.depth > 32 || active.has(node))
+      throw new TypeError("Invalid portable picture data depth or cycle.");
+    const array = Array.isArray(node),
+      prototype: unknown = Object.getPrototypeOf(node);
+    if (
+      array ? prototype !== Array.prototype : prototype !== Object.prototype && prototype !== null
+    )
+      throw new TypeError("Portable pictures require ordinary own data records.");
+    active.add(node);
+    pending.push({ value: node, depth: entry.depth, leave: true });
+    const keys = Reflect.ownKeys(node);
+    fields += keys.length;
+    // Includes Core's 100 annotations × 1024 two-coordinate points.
+    if (fields > 500000) throw new RangeError("Portable picture data budget exceeded.");
+    let indexed = 0;
+    for (const key of keys) {
+      if (array && key === "length") continue;
+      if (
+        typeof key !== "string" ||
+        (array && (!/^(0|[1-9]\d*)$/.test(key) || Number(key) >= node.length))
+      )
+        throw new TypeError("Portable picture arrays require indexed data entries.");
+      const field = Object.getOwnPropertyDescriptor(node, key)!;
+      if (!("value" in field)) throw new TypeError("Portable pictures must be own data fields.");
+      if (array) indexed++;
+      pending.push({ value: field.value as unknown, depth: entry.depth + 1 });
+    }
+    if (array && indexed !== node.length)
+      throw new TypeError("Portable picture arrays must be dense.");
+  }
+}
+
+/** Portable JSON supports validated standalone frames, but not owned groups or cell frames. */
 export function assertExternalPictureGroupSupport(workbook: Workbook): void {
   for (const sheet of workbook.sheets.values()) {
-    const ids = sheet.floatingImages
-      .filter((image) => isPictureGroup(image) || isFramedPictureObject(image))
-      .map((image) => image.id);
+    const images = sheet.floatingImages;
+    if (!Array.isArray(images) || Object.getPrototypeOf(images) !== Array.prototype)
+      throw new TypeError("Portable pictures require an ordinary data array.");
+    // Inspect descriptors before using any caller-owned array methods or object fields.
+    for (const key of Reflect.ownKeys(images)) {
+      if (key === "length") continue;
+      if (typeof key !== "string" || !/^(0|[1-9]\d*)$/.test(key) || Number(key) >= images.length)
+        throw new TypeError("Portable pictures require only indexed data entries.");
+      const entry = Object.getOwnPropertyDescriptor(images, key)!;
+      if (!("value" in entry))
+        throw new TypeError("Portable pictures cannot contain entry accessors.");
+      const image: unknown = entry.value;
+      if (!image || typeof image !== "object" || Array.isArray(image))
+        throw new TypeError("Invalid portable picture.");
+      const prototype: unknown = Object.getPrototypeOf(image);
+      if (prototype !== Object.prototype && prototype !== null)
+        throw new TypeError("Portable pictures require ordinary own data records.");
+      for (const field of Reflect.ownKeys(image))
+        if (!("value" in Object.getOwnPropertyDescriptor(image, field)!))
+          throw new TypeError("Portable pictures must be own data fields.");
+    }
+    const ids: string[] = [];
+    const safeImages: FloatingImage[] = [];
+    for (let index = 0; index < images.length; index++) {
+      const entry = Object.getOwnPropertyDescriptor(images, String(index));
+      if (!entry) throw new TypeError("Portable pictures require dense own data entries.");
+      const image = entry.value as FloatingImage;
+      if (isFramedPictureObject(image)) assertPortableFramedPictureData(image);
+      safeImages.push(image);
+      if (isPictureGroup(image)) ids.push(image.id);
+    }
     for (const [key, cell] of sheet.cells)
       if (cell.content?.kind === "image" && Object.hasOwn(cell.content.image, "frame"))
         ids.push(`cell:${key}`);
     if (ids.length) throw new UnsupportedPictureDocumentError(sheet.id, ids);
+    const roots = normalizePictureObjectCollection(safeImages);
+    assertPictureObjectsForSheet(roots, sheet);
   }
 }
 

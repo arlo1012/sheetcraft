@@ -860,6 +860,18 @@ export const zhCN = {
     invalidJson: "文件不是有效的 Sheetcraft 工作簿，或使用了不支持的版本，当前工作簿未被替换。",
     readFailed: "无法读取文件，当前工作簿未被替换。",
     exportFailed: "无法导出文件，当前工作簿仍保留在页面中。",
+    exportMissingImage: "无法导出：工作簿引用的图片资源缺失。当前工作簿仍保留在页面中。",
+    exportImageStorageFailed:
+      "无法导出：无法读取浏览器中的图片存储。请稍后重试，当前工作簿仍保留在页面中。",
+    exportImageReadFailed: "无法导出：无法读取图片数据。当前工作簿仍保留在页面中。",
+    exportDownloadFailed:
+      "无法开始下载文件。请检查浏览器下载设置后重试，当前工作簿仍保留在页面中。",
+    exportInvalidSnapshot:
+      "无法导出：工作簿数据未通过格式验证，或使用了不支持的版本。当前工作簿仍保留在页面中。",
+    exportUnsupportedPictures:
+      "无法导出：工作簿包含暂不支持 JSON 导出的图片框架或组合。当前工作簿仍保留在页面中。",
+    exportUnsupportedShapes:
+      "无法导出：工作簿包含暂不支持 JSON 导出的形状功能。当前工作簿仍保留在页面中。",
     exportStarted: "已开始下载 JSON 文件。",
     imported: "已导入工作簿，撤销历史从此文件重新开始。",
     restored: "已恢复本地副本。",

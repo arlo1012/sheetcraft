@@ -1,3 +1,7 @@
+import { WorkbookDomainError } from "@sheetcraft/core/errors";
+import { WorkbookFileError } from "../../../../modules/workbook-persistence/workbookJsonTransfer";
+import { UnsupportedShapeFrameDocumentError } from "../../../../modules/sheet-drawings/shape-document-support";
+import { UnsupportedPictureDocumentError } from "../../../../modules/sheet-images/picture-document-support";
 import { createWorkbook } from "@sheetcraft/core/workbook";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -82,6 +86,42 @@ describe("useWorkbookFileActions save and leave", () => {
       key: "persistence.exportStarted",
       error: false,
     });
+  });
+
+  test.each([
+    [new WorkbookFileError("missing-image"), "persistence.exportMissingImage"],
+    [new WorkbookFileError("image-storage-unavailable"), "persistence.exportImageStorageFailed"],
+    [new WorkbookFileError("image-read-failed"), "persistence.exportImageReadFailed"],
+    [new WorkbookFileError("download-failed"), "persistence.exportDownloadFailed"],
+    [new WorkbookFileError("invalid-snapshot"), "persistence.exportInvalidSnapshot"],
+    [
+      new WorkbookDomainError({ code: "invalid_snapshot" }, "private content"),
+      "persistence.exportInvalidSnapshot",
+    ],
+    [
+      new WorkbookDomainError({ code: "unsupported_snapshot_version" }),
+      "persistence.exportInvalidSnapshot",
+    ],
+    [
+      new UnsupportedShapeFrameDocumentError("private-sheet", ["private-object"]),
+      "persistence.exportUnsupportedShapes",
+    ],
+    [
+      new UnsupportedPictureDocumentError("private-sheet", ["private-object"]),
+      "persistence.exportUnsupportedPictures",
+    ],
+    [new Error("private content and stack"), "persistence.exportFailed"],
+    [{ code: "missing-image", message: "untrusted object" }, "persistence.exportFailed"],
+    [new WorkbookDomainError({ code: "workbook_operation_failed" }), "persistence.exportFailed"],
+  ])("reports a safe export reason for %s", async (error, key) => {
+    const fixture = mountActions();
+    mocks.downloadWorkbookJson.mockImplementation(() => {
+      throw error;
+    });
+    await fixture.actions.exportJson();
+    expect(fixture.actions.feedback.value).toEqual({ key, error: true });
+    expect(fixture.persistence.replaceDocument).not.toHaveBeenCalled();
+    expect(fixture.persistence.resetDocument).not.toHaveBeenCalled();
   });
 
   test("does not overlap another file operation or its confirmation", async () => {

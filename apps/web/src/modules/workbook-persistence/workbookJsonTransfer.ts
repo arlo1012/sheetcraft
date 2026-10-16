@@ -1,3 +1,4 @@
+import type { PictureDetailedStyle } from "@sheetcraft/core/picture-detailed-style";
 import {
   assertWorkbookShapeSupport,
   UnsupportedShapeFrameDocumentError,
@@ -21,7 +22,10 @@ export type WorkbookFileErrorCode =
   | "unsupported-shape-frame"
   | "read-failed"
   | "invalid-images"
-  | "missing-image";
+  | "missing-image"
+  | "image-storage-unavailable"
+  | "image-read-failed"
+  | "download-failed";
 
 export class WorkbookFileError extends Error {
   readonly code: WorkbookFileErrorCode;
@@ -110,6 +114,14 @@ function isEnvelope(value: unknown): value is PortableEnvelope {
 }
 
 function rewriteImageReferences(workbook: Workbook, ids: ReadonlyMap<string, string>): void {
+  function rewriteStyle(style: Pick<PictureDetailedStyle, "fill" | "line"> | undefined): void {
+    const fill = style?.fill;
+    if (fill?.kind === "value" && fill.value.kind === "picture")
+      fill.value.assetId = ids.get(fill.value.assetId) ?? fill.value.assetId;
+    const line = style?.line;
+    if (line?.kind === "value" && line.value.paint.kind === "picture")
+      line.value.paint.assetId = ids.get(line.value.paint.assetId) ?? line.value.paint.assetId;
+  }
   for (const preset of workbook.watermarkPresets ?? []) {
     const image = preset.watermark.image;
     if (image) image.assetId = ids.get(image.assetId) ?? image.assetId;
@@ -128,25 +140,22 @@ function rewriteImageReferences(workbook: Workbook, ids: ReadonlyMap<string, str
         : [root];
       for (const drawing of leaves) {
         if (drawing.kind !== "shape" && drawing.kind !== "textBox") continue;
-        for (const style of [drawing.shapeStyle, drawing.shapeText?.style]) {
-          const fill = style?.fill;
-          if (fill?.kind === "value" && fill.value.kind === "picture")
-            fill.value.assetId = ids.get(fill.value.assetId) ?? fill.value.assetId;
-          const line = style?.line;
-          if (line?.kind === "value" && line.value.paint.kind === "picture")
-            line.value.paint.assetId =
-              ids.get(line.value.paint.assetId) ?? line.value.paint.assetId;
-        }
+        rewriteStyle(drawing.shapeStyle);
+        rewriteStyle(drawing.shapeText?.style);
+        for (const run of drawing.shapeText?.characterRuns ?? []) rewriteStyle(run);
       }
     }
     for (const cell of sheet.cells.values()) {
-      if (cell.content?.kind === "image")
+      if (cell.content?.kind === "image") {
         cell.content.image.assetId =
           ids.get(cell.content.image.assetId) ?? cell.content.image.assetId;
+        rewriteStyle(cell.content.image.transform?.appearance?.detailedStyle);
+      }
     }
     for (const root of sheet.floatingImages) {
       const image = requireStandalonePicture(root);
       image.assetId = ids.get(image.assetId) ?? image.assetId;
+      rewriteStyle(image.transform?.appearance?.detailedStyle);
     }
   }
 }
@@ -195,7 +204,9 @@ export async function readWorkbookBundleFile(
     throw new WorkbookFileError(
       error instanceof UnsupportedShapeFrameDocumentError
         ? "unsupported-shape-frame"
-        : "unsupported-picture-frame",
+        : error instanceof UnsupportedPictureDocumentError
+          ? "unsupported-picture-frame"
+          : "invalid-snapshot",
       { cause: error },
     );
   }
@@ -239,9 +250,36 @@ export async function readWorkbookBundleFile(
     if (existing && !(await sameBytes(existing.blob, asset.blob)))
       throw new WorkbookFileError("invalid-images");
   }
-  await Promise.all(assets.map(({ asset }) => assetStore.put(asset)));
   rewriteImageReferences(workbook, replacements);
+  assertWorkbookShapeSupport(workbook);
+  assertExternalPictureGroupSupport(workbook);
+  const importedIds = new Set(assets.map(({ asset }) => asset.id));
+  if ([...collectWorkbookImageAssetIds(workbook)].some((id) => !importedIds.has(id)))
+    throw new WorkbookFileError("missing-image");
+  await Promise.all(assets.map(({ asset }) => assetStore.put(asset)));
   return workbook;
+}
+
+function downloadJsonBlob(blob: Blob): void {
+  let url: string | undefined;
+  let anchor: HTMLAnchorElement | undefined;
+  try {
+    url = URL.createObjectURL(blob);
+    anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "sheetcraft-workbook.json";
+    anchor.style.display = "none";
+    document.body.append(anchor);
+    anchor.click();
+  } catch (error) {
+    throw new WorkbookFileError("download-failed", { cause: error });
+  } finally {
+    anchor?.remove();
+    if (url !== undefined) {
+      const downloadUrl = url;
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+    }
+  }
 }
 
 export function downloadWorkbookJson(workbook: Workbook): void {
@@ -250,15 +288,7 @@ export function downloadWorkbookJson(workbook: Workbook): void {
   const blob = new Blob([JSON.stringify(serializeWorkbook(workbook), null, 2)], {
     type: "application/json",
   });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = "sheetcraft-workbook.json";
-  anchor.style.display = "none";
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  downloadJsonBlob(blob);
 }
 
 export async function downloadWorkbookBundle(
@@ -273,27 +303,30 @@ export async function downloadWorkbookBundle(
   if (ids.size === 0) return downloadWorkbookJson(workbook);
   const images: PortableImage[] = [];
   for (const id of ids) {
-    const asset = await assetStore.get(id);
+    let asset: ImageAsset | undefined;
+    try {
+      asset = await assetStore.get(id);
+    } catch (error) {
+      throw new WorkbookFileError("image-storage-unavailable", { cause: error });
+    }
     if (!asset) throw new WorkbookFileError("missing-image");
+    let data: string;
+    try {
+      data = toBase64(new Uint8Array(await asset.blob.arrayBuffer()));
+    } catch (error) {
+      throw new WorkbookFileError("image-read-failed", { cause: error });
+    }
     images.push({
       id,
       mimeType: asset.mimeType,
       width: asset.width,
       height: asset.height,
-      data: toBase64(new Uint8Array(await asset.blob.arrayBuffer())),
+      data,
     });
   }
   const blob = new Blob(
     [JSON.stringify({ format: "sheetcraft-workbook", version: 1, snapshot, images }, null, 2)],
     { type: "application/json" },
   );
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = "sheetcraft-workbook.json";
-  anchor.style.display = "none";
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  downloadJsonBlob(blob);
 }

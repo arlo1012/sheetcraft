@@ -887,6 +887,20 @@ export const enUS = {
       "This file is not a valid Sheetcraft workbook or uses an unsupported version. The current workbook has not been replaced.",
     readFailed: "The file could not be read. The current workbook has not been replaced.",
     exportFailed: "The file could not be exported. Your workbook is still here.",
+    exportMissingImage:
+      "Export failed because a referenced image is missing. Your workbook is still here.",
+    exportImageStorageFailed:
+      "Export failed because browser image storage could not be read. Try again; your workbook is still here.",
+    exportImageReadFailed:
+      "Export failed because image data could not be read. Your workbook is still here.",
+    exportDownloadFailed:
+      "The file download could not be started. Check browser download settings and retry; your workbook is still here.",
+    exportInvalidSnapshot:
+      "Export failed because workbook data did not pass format validation or uses an unsupported version. Your workbook is still here.",
+    exportUnsupportedPictures:
+      "This workbook contains picture frames or groups that JSON export does not yet support. Your workbook is still here.",
+    exportUnsupportedShapes:
+      "This workbook contains shape features that JSON export does not yet support. Your workbook is still here.",
     exportStarted: "JSON download started.",
     imported: "Workbook imported. Undo history starts from this file.",
     restored: "Local copy restored.",

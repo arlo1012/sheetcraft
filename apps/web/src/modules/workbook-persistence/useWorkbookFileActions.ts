@@ -1,3 +1,6 @@
+import { WorkbookDomainError } from "@sheetcraft/core/errors";
+import { UnsupportedShapeFrameDocumentError } from "../sheet-drawings/shape-document-support";
+import { UnsupportedPictureDocumentError } from "../sheet-images/picture-document-support";
 import { computed, onBeforeUnmount, onMounted, readonly, ref, shallowRef } from "vue";
 import type { Workbook } from "@sheetcraft/core/workbook";
 import type { ImageAssetStore } from "../image-assets/imageAssetStore";
@@ -13,6 +16,37 @@ import {
 
 export type WorkbookFileConfirmation = "import" | "reload" | "reset";
 export type WorkbookFileFeedback = { key: MessageKey; error: boolean };
+
+function exportFailureKey(error: unknown): MessageKey {
+  if (error instanceof UnsupportedShapeFrameDocumentError)
+    return "persistence.exportUnsupportedShapes";
+  if (error instanceof UnsupportedPictureDocumentError)
+    return "persistence.exportUnsupportedPictures";
+  if (
+    error instanceof WorkbookDomainError &&
+    (error.data.code === "invalid_snapshot" || error.data.code === "unsupported_snapshot_version")
+  )
+    return "persistence.exportInvalidSnapshot";
+  if (error instanceof WorkbookFileError) {
+    switch (error.code) {
+      case "missing-image":
+        return "persistence.exportMissingImage";
+      case "image-storage-unavailable":
+        return "persistence.exportImageStorageFailed";
+      case "image-read-failed":
+        return "persistence.exportImageReadFailed";
+      case "download-failed":
+        return "persistence.exportDownloadFailed";
+      case "invalid-snapshot":
+        return "persistence.exportInvalidSnapshot";
+      case "unsupported-picture-frame":
+        return "persistence.exportUnsupportedPictures";
+      case "unsupported-shape-frame":
+        return "persistence.exportUnsupportedShapes";
+    }
+  }
+  return "persistence.exportFailed";
+}
 
 export function useWorkbookFileActions(options: {
   persistence: ReturnType<typeof useWorkbookPersistence>;
@@ -56,8 +90,8 @@ export function useWorkbookFileActions(options: {
         await downloadWorkbookBundle(options.getWorkbook(), options.assetStore);
       else downloadWorkbookJson(options.getWorkbook());
       feedback.value = { key: "persistence.exportStarted", error: false };
-    } catch {
-      feedback.value = { key: "persistence.exportFailed", error: true };
+    } catch (error) {
+      feedback.value = { key: exportFailureKey(error), error: true };
     }
   }
 

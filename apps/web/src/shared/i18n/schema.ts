@@ -840,6 +840,13 @@ export type MessageSchema = ToolMessageSchema & {
     invalidJson: string;
     readFailed: string;
     exportFailed: string;
+    exportMissingImage: string;
+    exportImageStorageFailed: string;
+    exportImageReadFailed: string;
+    exportDownloadFailed: string;
+    exportInvalidSnapshot: string;
+    exportUnsupportedPictures: string;
+    exportUnsupportedShapes: string;
     exportStarted: string;
     imported: string;
     restored: string;
@@ -1749,6 +1756,8 @@ export type MessageSchema = ToolMessageSchema & {
     selectAll: string;
     noPictures: string;
     name: string;
+    nameRequired: string;
+    renameRejected: string;
     show: string;
     hide: string;
     style: string;
