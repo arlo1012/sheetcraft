@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, useId, watch } from "vue";
+import { computed, onUnmounted, ref, useId, watch, type ComponentPublicInstance } from "vue";
 import { useNativePopupOwnership } from "../../../shared/floating/useNativePopupOwnership";
 import { vNativeControl } from "../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -127,8 +127,12 @@ const endPopup = useNativePopupOwnership({
   disabled: () => props.disabled,
   root: () => root.value,
 });
-const beginHost = beginPopup.host,
-  endHost = endPopup.host;
+function setBeginHost(element: Element | ComponentPublicInstance | null): void {
+  beginPopup.host.value = element instanceof HTMLElement ? element : undefined;
+}
+function setEndHost(element: Element | ComponentPublicInstance | null): void {
+  endPopup.host.value = element instanceof HTMLElement ? element : undefined;
+}
 const popups = { begin: beginPopup, end: endPopup };
 const nativeTypes = computed(() => ({
   begin: {
@@ -333,8 +337,8 @@ onUnmounted(() => {
 <template>
   <div ref="root" class="shape-line-ends" role="group" :aria-label="labels.group">
     <Teleport to="body">
-      <div ref="beginHost" data-shape-line-end-popup="begin" />
-      <div ref="endHost" data-shape-line-end-popup="end" />
+      <div :ref="setBeginHost" data-shape-line-end-popup="begin" />
+      <div :ref="setEndHost" data-shape-line-end-popup="end" />
     </Teleport>
     <section
       v-for="side in ENDPOINTS"

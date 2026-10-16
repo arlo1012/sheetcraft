@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, useId, watch } from "vue";
+import { computed, nextTick, ref, useId, watch, type ComponentPublicInstance } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { RadioGroup as TRadioGroup, RadioButton as TRadioButton } from "tdesign-vue-next/es/radio";
@@ -96,7 +96,9 @@ const unitsPopup = useNativePopupOwnership({
   root: () => paneRoot.value,
   scope: popups,
 });
-const unitsPopupHost = unitsPopup.host;
+function setUnitsPopupHost(element: Element | ComponentPublicInstance | null): void {
+  unitsPopup.host.value = element instanceof HTMLElement ? element : undefined;
+}
 const changeUnitAction = computed(() => {
   const owner = controller.ownerKey.value;
   return (value: unknown) => owner === controller.ownerKey.value && changeUnit(value);
@@ -315,7 +317,7 @@ defineExpose({
         </TTabPanel>
       </TTabs>
     </div>
-    <Teleport to="body"><div ref="unitsPopupHost" data-shape-format-units-popup /></Teleport>
+    <Teleport to="body"><div :ref="setUnitsPopupHost" data-shape-format-units-popup /></Teleport>
     <div v-if="snapshot" class="shape-format-pane__units">
       <span>{{ t("units") }}</span
       ><TSelect

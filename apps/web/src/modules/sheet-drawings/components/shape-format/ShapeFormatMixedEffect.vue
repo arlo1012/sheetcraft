@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, useId } from "vue";
+import { computed, ref, useId, type ComponentPublicInstance } from "vue";
 import { useNativePopupOwnership } from "../../../../shared/floating/useNativePopupOwnership";
 import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -30,7 +30,9 @@ const popup = useNativePopupOwnership({
   disabled: () => !capability.value.enabled,
   root: () => root.value,
 });
-const popupHost = popup.host;
+function setPopupHost(element: Element | ComponentPublicInstance | null): void {
+  popup.host.value = element instanceof HTMLElement ? element : undefined;
+}
 const inputId = `shape-mixed-effect-${useId()}`;
 const nativeControl = computed(() => ({
   attributes: {
@@ -78,7 +80,9 @@ const action = computed(() => {
 </script>
 <template>
   <div ref="root" :data-shape-format-mixed-style="category">
-    <Teleport to="body"><div ref="popupHost" :data-shape-mixed-effect-popup="category" /></Teleport>
+    <Teleport to="body"
+      ><div :ref="setPopupHost" :data-shape-mixed-effect-popup="category"
+    /></Teleport>
     <p class="shape-format-mixed-effect__notice">{{ controller.s.value("mixedStyleNotice") }}</p>
     <PictureFormatField :label="controller.s.value('mixedEffectSetting')">
       <TSelect

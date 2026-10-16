@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, useId } from "vue";
+import { computed, ref, useId, type ComponentPublicInstance } from "vue";
 import { useNativePopupOwnership } from "../../../../shared/floating/useNativePopupOwnership";
 import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -45,7 +45,9 @@ const marginsPopup = useNativePopupOwnership({
   disabled: () => !marginsCapability.value.enabled,
   root: () => root.value,
 });
-const marginsPopupHost = marginsPopup.host;
+function setMarginsPopupHost(element: Element | ComponentPublicInstance | null): void {
+  marginsPopup.host.value = element instanceof HTMLElement ? element : undefined;
+}
 const marginInputId = `shape-format-margins-${useId()}`;
 const marginNativeControl = computed(() => ({
   attributes: {
@@ -85,7 +87,9 @@ const action = computed(() => {
 </script>
 <template>
   <div ref="root" class="shape-format-text-box">
-    <Teleport to="body"><div ref="marginsPopupHost" data-shape-format-margins-popup /></Teleport>
+    <Teleport to="body"
+      ><div :ref="setMarginsPopupHost" data-shape-format-margins-popup
+    /></Teleport>
     <FormatSection
       :title="controller.s.value('textBox')"
       initially-open

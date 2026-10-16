@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, useId } from "vue";
+import { computed, ref, useId, type ComponentPublicInstance } from "vue";
 import { useNativePopupOwnership } from "../../../../shared/floating/useNativePopupOwnership";
 import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -21,7 +21,9 @@ const popup = useNativePopupOwnership({
   disabled: () => !capability.value.enabled,
   root: () => root.value?.$el,
 });
-const popupHost = popup.host;
+function setPopupHost(element: Element | ComponentPublicInstance | null): void {
+  popup.host.value = element instanceof HTMLElement ? element : undefined;
+}
 const inputId = `shape-format-choice-${useId()}`;
 const nativeControl = computed(() => ({
   attributes: {
@@ -109,7 +111,9 @@ const action = computed(() => {
     :reason="capability.enabled ? undefined : capability.reason"
     :data-shape-format-field="field"
   >
-    <Teleport to="body"><div ref="popupHost" :data-shape-format-choice-popup="field" /></Teleport>
+    <Teleport to="body"
+      ><div :ref="setPopupHost" :data-shape-format-choice-popup="field"
+    /></Teleport>
     <TSelect
       v-native-control="nativeControl"
       :popup-visible="popup.visible.value"
