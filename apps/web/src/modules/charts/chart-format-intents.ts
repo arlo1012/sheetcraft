@@ -8,6 +8,7 @@ import {
   type ChartFormatIntent,
   type ChartFormatTarget,
 } from "./chart-format-pane";
+import { getChartElementCapabilities } from "./chart-elements";
 import { applyElementPatch } from "./useChartObjectControls";
 
 function validateDataRecord(value: unknown, keys: readonly string[]): void {
@@ -32,12 +33,31 @@ export function applyChartFormatIntent(
   target: ChartFormatTarget,
   intent: ChartFormatIntent,
 ): SheetChart {
-  validateDataRecord(intent, ["kind", "format", "seriesId", "patch"]);
+  validateDataRecord(intent, ["kind", "format", "seriesId", "patch", "reset"]);
+  const legendAvailable =
+    target.kind === "legend" && chart.legend && getChartElementCapabilities(chart.type).legend;
+  if (intent.kind === "legend") {
+    validateDataRecord(intent, ["kind", "reset"]);
+    if (!legendAvailable || intent.reset !== true)
+      throw new TypeError("Legend reset belongs to an unavailable element.");
+    const next = normalizeSheetChart(chart);
+    if (next.elements) {
+      delete next.elements.legendPosition;
+      delete next.elements.legendOverlay;
+      if (!Object.keys(next.elements).length) delete next.elements;
+    }
+    return next;
+  }
   if (intent.kind === "elements") {
     validateDataRecord(intent, ["kind", "patch"]);
-    if (target.kind !== "title") throw new TypeError("Title edit belongs to another element.");
-    validateDataRecord(intent.patch, ["title", "elements"]);
-    if (intent.patch.elements) validateDataRecord(intent.patch.elements, ["titlePosition"]);
+    if (target.kind === "title") {
+      validateDataRecord(intent.patch, ["title", "elements"]);
+      if (intent.patch.elements) validateDataRecord(intent.patch.elements, ["titlePosition"]);
+    } else if (legendAvailable) {
+      validateDataRecord(intent.patch, ["elements"]);
+      if (intent.patch.elements)
+        validateDataRecord(intent.patch.elements, ["legendPosition", "legendOverlay"]);
+    } else throw new TypeError("Element edit belongs to an unavailable target.");
     return applyElementPatch(chart, intent.patch);
   }
   validateDataRecord(

@@ -58,7 +58,7 @@ function chart(): SheetChart {
   });
 }
 
-const branchIntents: Exclude<ChartFormatIntent, { kind: "series" | "elements" }>[] = [
+const branchIntents: Exclude<ChartFormatIntent, { kind: "series" | "elements" | "legend" }>[] = [
   { kind: "title", format: { fontSize: 24, color: "#abcdef" } },
   { kind: "plot", format: { fill: "#abcdef", strokeWidth: 0 } },
   { kind: "categoryAxis", format: { show: false, labelAngle: -45 } },
@@ -328,5 +328,73 @@ describe("pure chart format intents", () => {
     expect(result).not.toHaveProperty("format");
     expect(result.source).toEqual(original.source);
     expect(original.format).toEqual({ title: { bold: true } });
+  });
+});
+
+describe("legend layout intents", () => {
+  test("layout edits preserve unrelated fields and sparse reset removes only legend layout", () => {
+    const original = chart();
+    const changed = applyChartFormatIntent(
+      original,
+      { kind: "legend" },
+      {
+        kind: "elements",
+        patch: { elements: { legendPosition: "topRight", legendOverlay: true } },
+      },
+    );
+    expect(changed.elements).toEqual({
+      ...original.elements,
+      legendPosition: "topRight",
+      legendOverlay: true,
+    });
+    expect(changed.format).toEqual(original.format);
+    const reset = applyChartFormatIntent(
+      changed,
+      { kind: "legend" },
+      { kind: "legend", reset: true },
+    );
+    expect(reset.elements).toEqual({ titlePosition: "overlay", labelPosition: "outsideEnd" });
+    expect(reset.legend).toBe(true);
+    expect(reset.format).toEqual(original.format);
+    expect(
+      applyChartFormatIntent(
+        { ...original, elements: { legendPosition: "right" } },
+        { kind: "legend" },
+        { kind: "legend", reset: true },
+      ).elements,
+    ).toBeUndefined();
+  });
+  test("legend edits cannot cross target boundaries or mutate hidden or unsupported legends", () => {
+    for (const patch of [
+      { legend: false },
+      { title: "Wrong" },
+      { labels: true },
+      { elements: { titlePosition: "none" } },
+      { elements: { labelPosition: "center" } },
+    ]) {
+      expect(() =>
+        applyChartFormatIntent(chart(), { kind: "legend" }, {
+          kind: "elements",
+          patch,
+        } as ChartFormatIntent),
+      ).toThrow();
+    }
+    const layout: ChartFormatIntent = {
+      kind: "elements",
+      patch: { elements: { legendPosition: "left" } },
+    };
+    expect(() => applyChartFormatIntent(chart(), { kind: "title" }, layout)).toThrow();
+    for (const original of [
+      { ...chart(), legend: false },
+      { ...chart(), type: "wordCloud" as const },
+    ]) {
+      expect(() => applyChartFormatIntent(original, { kind: "legend" }, layout)).toThrow();
+      expect(() =>
+        applyChartFormatIntent(original, { kind: "legend" }, { kind: "legend", reset: true }),
+      ).toThrow();
+    }
+    expect(() =>
+      applyChartFormatIntent(chart(), { kind: "chart" }, { kind: "legend", reset: true }),
+    ).toThrow();
   });
 });

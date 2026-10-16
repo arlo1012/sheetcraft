@@ -2,6 +2,7 @@
 import EquationCanvasEditor from "../equation/EquationCanvasEditor.vue";
 import { SlidersHorizontal } from "lucide-vue-next";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
+import type { ChartElementSelection } from "../../charts/chart-format-selection";
 import type { ChartFormatTarget } from "../../charts/chart-format-pane";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { ChartLayoutPreview } from "../../charts/chart-layout-preview";
@@ -179,6 +180,7 @@ import type { TextBoxReferenceResolver } from "../textbox-reference-display";
 const props = defineProps<{
   drawings: readonly SourceSheetDrawing[];
   chartLayoutPreview?: ChartLayoutPreview;
+  chartElementSelection?: ChartElementSelection;
   applyUpdate?: (drawing: SourceSheetDrawing, expected: SourceSheetDrawing) => boolean;
   applyCollection?: (
     drawings: readonly SourceSheetDrawing[],
@@ -3512,11 +3514,20 @@ watch(
             @control-change="emit('controlChange', fragment.drawing.id, $event)"
             @chart-element-select="
               (target, openPane) => {
-                if (fragment.drawing.kind === 'chart')
+                if (fragment.drawing.kind === 'chart' && chooseDrawing(fragment.drawing, {})) {
+                  emit('select');
                   emit('chartElementSelect', fragment.drawing, target, openPane);
+                }
               }
             "
             :drawing="equationPaintView(fragment.drawing)"
+            :chart-editing="!readOnly"
+            :chart-selected-element="
+              chartElementSelection?.owner === sourceOwner(fragment.drawing) &&
+              selectedDrawingId === fragment.drawing.id
+                ? chartElementSelection.target
+                : undefined
+            "
             :paint-chart="
               chartLayoutPreview?.owner === sourceOwner(fragment.drawing)
                 ? chartLayoutPreview?.chart

@@ -332,6 +332,19 @@ describe("chart formatting real Workspace", () => {
     await major.trigger("keydown", { key: "Enter", code: "Enter", isComposing: true });
     expect(serializeWorkbook(f.controller.session.workbook)).toEqual(before);
   });
+  test("legend entry selects its owner before opening the pane from another drawing", async () => {
+    const f = await fixture();
+    await select(f.wrapper, "two");
+    const probe = f.wrapper
+      .findAllComponents(ChartContentProbe)
+      .find((item) => item.props("drawing").id === "one")!;
+    probe.vm.$emit("selectElement", { kind: "legend" }, true);
+    await flushPromises();
+    const pane = f.wrapper.getComponent(ChartFormatPane);
+    expect(pane.props("target")).toEqual({ kind: "legend" });
+    expect(pane.props("drawing").id).toBe("one");
+    expect(f.controller.session.history.undoStack).toHaveLength(0);
+  });
   test("stable series element event travels through real drawing layer/grid to pane", async () => {
     const f = await fixture();
     const probe = f.wrapper

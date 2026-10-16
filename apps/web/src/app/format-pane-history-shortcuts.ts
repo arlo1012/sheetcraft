@@ -49,10 +49,17 @@ export function routeFormatPaneHistoryShortcut(
     !(target instanceof Element) ||
     !target.isConnected ||
     !pane.contains(target) ||
-    target.closest("[data-shape-format-pane]") !== pane ||
+    target.closest("[data-shape-format-pane], [data-chart-format-pane]") !== pane ||
     target.closest(
       '[role="dialog"], [role="menu"], [role="listbox"], [contenteditable]:not([contenteditable="false"]), [role="textbox"]',
     )
+  )
+    return false;
+  // Chart resets are explicit commands, shared by every element and numeric field.
+  // Do not admit arbitrary chart buttons or native editors into workbook history.
+  if (
+    pane.hasAttribute("data-chart-format-pane") &&
+    !target.closest("button[data-chart-format-reset]")
   )
     return false;
   const readonlyMode = isFormatPaneReadonlyHistoryControl(target);

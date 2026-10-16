@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from "vitest";
 import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
 import {
   chartFormatTargetKey,
+  chartFormatTargetLabelKeys,
   commitChartFormatNumberDraft,
   createChartFormatDraft,
   editChartFormatDraft,
@@ -264,4 +265,34 @@ describe("sparse branch replacement", () => {
       ),
     ).toBeUndefined();
   });
+});
+
+test("legend is a visible supported data-bearing target with a stable key", () => {
+  expect(getChartFormatTargets(chart(), data).map(chartFormatTargetKey)).toContain("legend");
+  for (const type of ["treemap", "sankey", "wordCloud"] as const)
+    expect(getChartFormatTargets(chart({ type }), data).map(chartFormatTargetKey)).not.toContain(
+      "legend",
+    );
+  expect(
+    getChartFormatTargets(chart({ legend: false }), data).map(chartFormatTargetKey),
+  ).not.toContain("legend");
+});
+
+test("Ribbon and pane share exhaustive, distinct labels for every non-series target", () => {
+  expect(chartFormatTargetLabelKeys).toEqual({
+    chart: "chart.formatChartArea",
+    title: "chart.title",
+    legend: "chart.legend",
+    plot: "chart.formatPlotArea",
+    categoryAxis: "chart.formatCategoryAxis",
+    valueAxis: "chart.formatValueAxis",
+    secondaryValueAxis: "chart.formatSecondaryValueAxis",
+  });
+  const targets = getChartFormatTargets(chart(), data);
+  expect(targets[2]?.kind).toBe("legend");
+  expect(
+    targets
+      .filter((target) => target.kind !== "series")
+      .map((target) => chartFormatTargetLabelKeys[target.kind]),
+  ).toContain("chart.legend");
 });

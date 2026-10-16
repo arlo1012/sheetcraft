@@ -20,6 +20,7 @@ import {
 } from "../chart-data-table";
 import { createWordCloudLayout } from "../chart-wordcloud-layout";
 import { getChartPresentationBackground } from "../chart-presentation-render";
+import { getChartLegendLayout, chartLegendContainsPoint } from "../chart-element-layout";
 import { getChartFormatClickTarget } from "../chart-format-selection";
 import { getChartFormatTargets, type ChartFormatTarget } from "../chart-format-pane";
 import {
@@ -32,6 +33,8 @@ import { useAppI18n } from "../../../shared/i18n";
 const props = defineProps<{
   drawing: SheetChartDrawing;
   paintChart?: SheetChart;
+  editableLegend?: boolean;
+  selectedElement?: ChartFormatTarget;
   comboSeriesChanges?: readonly ChartComboSeriesChange[];
   sheet: Sheet;
   evaluator: SheetEvaluator;
@@ -77,10 +80,17 @@ const result = computed(() => {
   }
 });
 const data = computed(() => result.value.data);
+const legendLayout = computed(() =>
+  props.editableLegend && !result.value.invalid
+    ? getChartLegendLayout(paintChart.value, data.value, props.drawing)
+    : undefined,
+);
 const error = ref(false);
 const tableError = ref(false);
 const fontError = ref(false);
 let eventCleanup: (() => void) | undefined;
+let paginationPoint: { x: number; y: number } | undefined;
+let legendDoubleClickHandled = false;
 let fontRequest = 0;
 const fontFamilies = computed(() => {
   const format = paintChart.value.format;
@@ -136,6 +146,21 @@ function loadFonts(retry = false) {
     },
   );
 }
+/** Browser click detail already applies the platform's double-click timing.
+ * A selection repaint can replace SVG nodes before dblclick is dispatched, so
+ * consume the second native click without adding a separate timing heuristic.
+ */
+function legendClickOpensPane(event: unknown): boolean {
+  const native = event && typeof event === "object" && "event" in event ? event.event : undefined;
+  const detail =
+    native && typeof native === "object" && "detail" in native && typeof native.detail === "number"
+      ? native.detail
+      : 1;
+  if (detail < 2) legendDoubleClickHandled = false;
+  if (detail < 2 || legendDoubleClickHandled) return false;
+  legendDoubleClickHandled = true;
+  return true;
+}
 function bindEvents(instance: EChartsType) {
   eventCleanup?.();
   const owner = props.drawing,
@@ -150,10 +175,34 @@ function bindEvents(instance: EChartsType) {
     sheet === props.sheet &&
     paint === paintChart.value;
   const handled = new WeakSet<object>();
+  let scrollingLegend = false;
+  paginationPoint = undefined;
+  const legendScroll = () => {
+    scrollingLegend = true;
+    queueMicrotask(() => {
+      scrollingLegend = false;
+    });
+  };
   const component = (openPane: boolean) => (event: unknown) => {
     if (!current()) return;
-    const target = getChartFormatClickTarget(event, owner.chart, source);
+    const pointer =
+      event && typeof event === "object" && "event" in event ? event.event : undefined;
+    const legendHit =
+      pointer &&
+      typeof pointer === "object" &&
+      "offsetX" in pointer &&
+      "offsetY" in pointer &&
+      typeof pointer.offsetX === "number" &&
+      typeof pointer.offsetY === "number" &&
+      chartLegendContainsPoint(legendLayout.value?.bounds, pointer.offsetX, pointer.offsetY);
+    // With selectedMode:false, native legend items are silent; an overlaid
+    // legend can otherwise expose a series underneath to component events.
+    const target: ChartFormatTarget | undefined =
+      legendHit && !scrollingLegend
+        ? { kind: "legend" }
+        : getChartFormatClickTarget(event, owner.chart, source);
     if (
+      target &&
       event &&
       typeof event === "object" &&
       "event" in event &&
@@ -161,7 +210,12 @@ function bindEvents(instance: EChartsType) {
       typeof event.event === "object"
     )
       handled.add(event.event);
-    if (target) emit("selectElement", target, openPane);
+    if (target && !(openPane && target.kind === "legend"))
+      emit(
+        "selectElement",
+        target,
+        target.kind === "legend" ? legendClickOpensPane(pointer) : openPane,
+      );
   };
   const plot = (openPane: boolean) => (event: unknown) => {
     if (!current() || !event || typeof event !== "object" || handled.has(event)) return;
@@ -172,6 +226,19 @@ function bindEvents(instance: EChartsType) {
       typeof event.offsetY !== "number"
     )
       return;
+    // Native pagination runs first. Observe it without cancelling its action;
+    // the same pointer event must not also select the legend or the plot.
+    if (scrollingLegend) {
+      paginationPoint = { x: event.offsetX, y: event.offsetY };
+      return;
+    }
+    if (openPane && paginationPoint?.x === event.offsetX && paginationPoint.y === event.offsetY)
+      return;
+    if (!openPane) paginationPoint = undefined;
+    if (chartLegendContainsPoint(legendLayout.value?.bounds, event.offsetX, event.offsetY)) {
+      if (!openPane) emit("selectElement", { kind: "legend" }, legendClickOpensPane(event));
+      return;
+    }
     if (
       getChartFormatTargets(owner.chart, source).some((target) => target.kind === "plot") &&
       instance.containPixel({ gridIndex: 0 }, [event.offsetX, event.offsetY])
@@ -182,16 +249,67 @@ function bindEvents(instance: EChartsType) {
     doubleClick = component(true),
     plotClick = plot(false),
     plotDoubleClick = plot(true);
+  instance.on("legendscroll", legendScroll);
   instance.on("click", click);
   instance.on("dblclick", doubleClick);
   instance.getZr().on("click", plotClick);
   instance.getZr().on("dblclick", plotDoubleClick);
   eventCleanup = () => {
+    instance.off("legendscroll", legendScroll);
     instance.off("click", click);
     instance.off("dblclick", doubleClick);
     instance.getZr().off("click", plotClick);
     instance.getZr().off("dblclick", plotDoubleClick);
   };
+}
+/** Keep legend input out of the drawing move gesture. Its preventDefault would
+ * suppress the mouse sequence ZRender needs, including native page buttons.
+ * SVG's public screen transform handles drawing zoom and rotation.
+ */
+function legendPointer(event: MouseEvent) {
+  const bounds = legendLayout.value?.bounds;
+  const canvas = root.value;
+  if (!bounds || !canvas) return;
+  const svg = canvas.querySelector("svg");
+  const matrix = svg?.getScreenCTM?.();
+  let x: number, y: number;
+  if (svg && matrix && typeof svg.createSVGPoint === "function") {
+    const point = svg.createSVGPoint();
+    point.x = event.clientX;
+    point.y = event.clientY;
+    const local = point.matrixTransform(matrix.inverse());
+    x = local.x;
+    y = local.y;
+  } else {
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    x = ((event.clientX - rect.left) * props.drawing.width) / rect.width;
+    y = ((event.clientY - rect.top) * props.drawing.height) / rect.height;
+  }
+  return chartLegendContainsPoint(bounds, x, y) ? { x, y } : undefined;
+}
+function legendPointerDown(event: PointerEvent) {
+  if (legendPointer(event)) event.stopPropagation();
+}
+function legendDoubleClick(event: MouseEvent) {
+  const point = legendPointer(event);
+  if (!point || error.value || legendDoubleClickHandled) return;
+  if (
+    paginationPoint &&
+    Math.abs(paginationPoint.x - point.x) < 2 &&
+    Math.abs(paginationPoint.y - point.y) < 2
+  )
+    return;
+  // Selection paint can replace the SVG target between the two clicks. Handle
+  // the native event on the stable container, not on the replaced SVG subtree.
+  legendDoubleClickHandled = true;
+  emit("selectElement", { kind: "legend" }, true);
+}
+function legendBorderColor() {
+  return props.selectedElement?.kind === "legend" && root.value
+    ? getComputedStyle(root.value).getPropertyValue("--sheetcraft-action-primary").trim() ||
+        "#2563eb"
+    : "transparent";
 }
 function render() {
   if (!root.value || paintChart.value.type === "wordCloud") {
@@ -225,6 +343,16 @@ function render() {
       },
       props.comboSeriesChanges,
     );
+    if (legendLayout.value && option.legend && !Array.isArray(option.legend))
+      option.legend = {
+        ...option.legend,
+        ...legendLayout.value.option,
+        formatter: option.legend.formatter,
+        selectedMode: false,
+        // Keep layout stable while changing only the editor's transient paint.
+        borderWidth: 1,
+        borderColor: legendBorderColor(),
+      };
     // Enable native title/axis hit events without changing legacy serialized options.
     if (option.title && !Array.isArray(option.title))
       option.title = { ...option.title, triggerEvent: true };
@@ -265,10 +393,29 @@ onMounted(() => {
   observer = new ResizeObserver(render);
   if (root.value) observer.observe(root.value);
 });
-watch([() => props.drawing, result, paintChart, () => props.comboSeriesChanges], render, {
-  deep: true,
-  flush: "post",
-});
+watch(
+  [
+    () => props.drawing,
+    result,
+    paintChart,
+    () => props.comboSeriesChanges,
+    () => props.editableLegend,
+  ],
+  render,
+  {
+    deep: true,
+    flush: "post",
+  },
+);
+// Paint-only target changes preserve native legend pagination and plot state.
+watch(
+  () => props.selectedElement?.kind === "legend",
+  () => {
+    if (chart && legendLayout.value && !error.value)
+      chart.setOption({ legend: { borderColor: legendBorderColor() } });
+  },
+  { flush: "post" },
+);
 watch([fontFamilies, () => props.drawing, () => props.revision, paintChart], () => loadFonts(), {
   immediate: true,
   flush: "post",
@@ -281,7 +428,12 @@ onBeforeUnmount(() => {
 });
 </script>
 <template>
-  <div class="chart-content" style="pointer-events: auto" @dblclick.stop>
+  <div
+    class="chart-content"
+    style="pointer-events: auto"
+    @pointerdown="legendPointerDown"
+    @dblclick.stop="legendDoubleClick"
+  >
     <svg
       v-if="drawing.chart.type === 'wordCloud'"
       :viewBox="`0 0 ${drawing.width} ${drawing.height}`"

@@ -8,6 +8,7 @@ import {
   undoWorkbookCommand,
 } from "@sheetcraft/core/history";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
+import { serializeWorkbook, deserializeWorkbook } from "@sheetcraft/core/serialization";
 import { normalizeSheetChart } from "@sheetcraft/core/sheet-charts";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
@@ -463,4 +464,34 @@ describe("captured chart format owner controls", () => {
       expect(f.session.history.redoStack).toHaveLength(0);
     },
   );
+});
+
+test("legend layout is one undoable command and survives workbook save/reopen without new style fields", () => {
+  const f = fixture({ kind: "legend" });
+  const before = structuredClone(f.current());
+  expect(
+    f.controls.snapshot.value!.apply({
+      kind: "elements",
+      patch: { elements: { legendPosition: "topRight", legendOverlay: true } },
+    }),
+  ).toBe(true);
+  expect(f.session.history.undoStack).toHaveLength(1);
+  const changed = structuredClone(f.current());
+  const reopened = deserializeWorkbook(serializeWorkbook(f.workbook.value));
+  expect(reopened.sheets.get(f.ownerSheet.id)?.drawings?.[0]).toEqual(changed);
+  expect(undoWorkbookCommand(f.session)).toBe(true);
+  f.revision.value++;
+  expect(f.current()).toEqual(before);
+  expect(redoWorkbookCommand(f.session)).toBe(true);
+  f.revision.value++;
+  expect(f.current()).toEqual(changed);
+  expect(f.controls.snapshot.value!.apply({ kind: "legend", reset: true })).toBe(true);
+  expect(f.current().chart.elements).toEqual({
+    titlePosition: "overlay",
+    labelPosition: "outsideEnd",
+  });
+  expect(f.current().chart.format).toEqual(before.chart.format);
+  const history = f.session.history.undoStack.length;
+  expect(f.controls.snapshot.value!.apply({ kind: "legend", reset: true })).toBe(true);
+  expect(f.session.history.undoStack).toHaveLength(history);
 });

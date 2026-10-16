@@ -29,6 +29,8 @@ const EquationContent = defineAsyncComponent(() => import("./EquationContent.vue
 const props = defineProps<{
   drawing: SheetDrawing;
   paintChart?: SheetChart;
+  chartEditing?: boolean;
+  chartSelectedElement?: ChartFormatTarget;
   /** Disposable glyph projection; drawing remains the actual editable carrier. */
   paintDrawing?: SheetGraphicDrawing;
   textReferenceUnavailable?: boolean;
@@ -200,6 +202,8 @@ const legacyBodyTransform = computed(() =>
       v-if="drawing.kind === 'chart' && sheet && evaluator"
       :drawing="drawing"
       :paint-chart="paintChart"
+      :editable-legend="chartEditing"
+      :selected-element="chartSelectedElement"
       :sheet="sheet"
       :evaluator="evaluator"
       :resolve-sheet="resolveSheet"

@@ -1,6 +1,7 @@
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { Input } from "tdesign-vue-next/es/input";
+import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
 import { Select } from "tdesign-vue-next/es/select";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import ChartFormatPane from "../../../modules/charts/components/ChartFormatPane.vue";
@@ -140,6 +141,7 @@ describe("chart format right pane", () => {
     expect(options.map((entry) => entry.value)).toEqual([
       "chart",
       "title",
+      "legend",
       "plot",
       "categoryAxis",
       "valueAxis",
@@ -922,5 +924,74 @@ describe("shared chart layout numbers", () => {
       kind: "valueAxis",
       format: { linkedToSource: false, numberFormat: { kind: "number", fractionDigits: 3 } },
     });
+  });
+});
+
+describe("legend layout pane", () => {
+  test("position, nonoverlap and sparse reset submit exact captured intents", async () => {
+    const { wrapper, apply } = fixture(
+      { kind: "legend" },
+      { drawing: drawing({ elements: { legendPosition: "right", legendOverlay: true } }) },
+    );
+    expect(select(wrapper, "Chart element").props("value")).toBe("legend");
+    expect(wrapper.getComponent(RadioGroup).props("modelValue")).toBe("right");
+    expect(wrapper.findAllComponents(Radio).map((control) => control.props("value"))).toEqual([
+      "top",
+      "bottom",
+      "left",
+      "right",
+      "topRight",
+    ]);
+    expect(checkbox(wrapper, "Show legend without overlapping the chart").props("checked")).toBe(
+      false,
+    );
+    await wrapper
+      .findAllComponents(Radio)
+      .find((control) => control.props("value") === "topRight")!
+      .trigger("click");
+    await flushPromises();
+    expect(apply).toHaveBeenLastCalledWith({
+      kind: "elements",
+      patch: { elements: { legendPosition: "topRight" } },
+    });
+    checkbox(wrapper, "Show legend without overlapping the chart").vm.$emit("change", true);
+    await flushPromises();
+    expect(apply).toHaveBeenLastCalledWith({
+      kind: "elements",
+      patch: { elements: { legendOverlay: false } },
+    });
+    await wrapper.get('[data-chart-format-reset="element"]').trigger("click");
+    expect(apply).toHaveBeenLastCalledWith({ kind: "legend", reset: true });
+    expect(apply).toHaveBeenCalledTimes(3);
+    expect(wrapper.findAllComponents(NumericField)).toHaveLength(0);
+  });
+  test("rejected position retains the target and an external hide returns to chart", async () => {
+    const apply = vi.fn(() => false);
+    const { wrapper } = fixture({ kind: "legend" }, { apply });
+    wrapper.getComponent(RadioGroup).vm.$emit("change", "left");
+    await flushPromises();
+    expect(apply).toHaveBeenCalledExactlyOnceWith({
+      kind: "elements",
+      patch: { elements: { legendPosition: "left" } },
+    });
+    expect(wrapper.emitted("update:target")).toBeUndefined();
+    expect(wrapper.text()).toContain("draft is retained");
+    await wrapper.setProps({ drawing: drawing({ legend: false }) });
+    expect(wrapper.emitted("update:target")?.at(-1)).toEqual([{ kind: "chart" }]);
+    expect(wrapper.findComponent(RadioGroup).exists()).toBe(false);
+  });
+  test("disabled and stale legend controls cannot send changes", async () => {
+    const { wrapper, apply } = fixture({ kind: "legend" });
+    const oldPosition = wrapper.getComponent(RadioGroup).vm.$props.onChange as (
+      value: string,
+    ) => void;
+    await wrapper.setProps({ disabled: true });
+    wrapper.getComponent(RadioGroup).vm.$emit("change", "left");
+    checkbox(wrapper, "Show legend without overlapping the chart").vm.$emit("change", false);
+    await flushPromises();
+    expect(apply).not.toHaveBeenCalled();
+    await wrapper.setProps({ disabled: false, target: { kind: "title" } });
+    oldPosition("left");
+    expect(apply).not.toHaveBeenCalled();
   });
 });

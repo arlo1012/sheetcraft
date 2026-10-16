@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, reactive, ref, useId, watch } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Input as TInput } from "tdesign-vue-next/es/input";
+import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { ChartNoAxesColumn, RotateCcw, X } from "lucide-vue-next";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
@@ -35,10 +36,12 @@ import FontSettingsAction from "../../../shared/cell-text/FontSettingsAction.vue
 import { useFontCatalog } from "../../../shared/cell-text/useFontCatalog";
 import { useAppI18n } from "../../../shared/i18n";
 import type { MessageKey } from "../../../shared/i18n";
+import { getChartElementSettings } from "../chart-elements";
 import { chartMinorGridlinesForAxis } from "../chart-axis-state";
 import type { ChartElementPatch } from "../chart-element-controls";
 import {
   chartFormatTargetKey,
+  chartFormatTargetLabelKeys,
   compactChartAxis,
   commitChartFormatNumberDraft,
   createChartFormatDraft,
@@ -174,6 +177,7 @@ const textFormat = computed<ChartTextFormat>(() =>
 const lineFormat = computed<ChartAxisLineFormat>(() =>
   kind.value === "plot" ? (chart.value.format?.plot ?? {}) : (axis.value.line ?? {}),
 );
+const elementSettings = computed(() => getChartElementSettings(chart.value));
 const barFormat = computed(() => chart.value.format?.bar ?? {});
 const fieldError = ref<ChartFormatDraftError>();
 let titleLayoutInteraction = false;
@@ -495,7 +499,10 @@ function composing(): boolean {
     ?.focus();
   return true;
 }
-defineExpose({ canChangeTarget: () => live && !composing() });
+defineExpose({
+  canChangeTarget: () => live && !composing(),
+  getHistoryElement: () => (live ? root.value : undefined),
+});
 function submit(intent: ChartFormatIntent, handler = activeHandler ?? props.apply): boolean {
   if (!live || handler !== props.apply) {
     fieldError.value = "rejected";
@@ -512,30 +519,16 @@ function submit(intent: ChartFormatIntent, handler = activeHandler ?? props.appl
   return accepted;
 }
 function targetLabel(target: ChartFormatTarget): string {
-  switch (target.kind) {
-    case "chart":
-      return t("chart.formatChartArea");
-    case "title":
-      return t("chart.title");
-    case "plot":
-      return t("chart.formatPlotArea");
-    case "categoryAxis":
-      return t("chart.formatCategoryAxis");
-    case "valueAxis":
-      return t("chart.formatValueAxis");
-    case "secondaryValueAxis":
-      return t("chart.formatSecondaryValueAxis");
-    case "series":
-      return t("chart.formatSeriesName", {
-        name:
-          getChartFormatSeries(chart.value, props.data).find((entry) =>
-            target.rangeBand
-              ? entry.rangeBand?.seriesBy === target.rangeBand.seriesBy &&
-                entry.rangeBand.index === target.rangeBand.index
-              : entry.id === target.seriesId,
-          )?.name ?? target.seriesId,
-      });
-  }
+  if (target.kind !== "series") return t(chartFormatTargetLabelKeys[target.kind]);
+  return t("chart.formatSeriesName", {
+    name:
+      getChartFormatSeries(chart.value, props.data).find((entry) =>
+        target.rangeBand
+          ? entry.rangeBand?.seriesBy === target.rangeBand.seriesBy &&
+            entry.rangeBand.index === target.rangeBand.index
+          : entry.id === target.seriesId,
+      )?.name ?? target.seriesId,
+  });
 }
 const targetOptions = computed(() =>
   targets.value.map((target) => ({
@@ -997,6 +990,22 @@ const titlePositionOptions = computed(() => [
   { value: "above", label: t("chart.titleAbove") },
   { value: "overlay", label: t("chart.titleOverlay") },
 ]);
+function setLegendPosition(value: unknown): void {
+  if (kind.value !== "legend") return;
+  if (
+    value === "right" ||
+    value === "top" ||
+    value === "left" ||
+    value === "bottom" ||
+    value === "topRight"
+  ) {
+    submit({ kind: "elements", patch: { elements: { legendPosition: value } } });
+  }
+}
+function setLegendNonOverlapping(value: unknown): void {
+  if (kind.value === "legend" && typeof value === "boolean")
+    submit({ kind: "elements", patch: { elements: { legendOverlay: !value } } });
+}
 const seriesAxisOptions = computed(() => [
   { value: "primary", label: t("chart.formatPrimaryAxis") },
   { value: "secondary", label: t("chart.formatSecondaryAxis") },
@@ -1021,7 +1030,9 @@ const errorMessage = computed(
         : undefined),
 );
 function resetElement(): void {
-  if (kind.value === "chart") {
+  if (kind.value === "legend") {
+    if (submit({ kind: "legend", reset: true })) resetDrafts();
+  } else if (kind.value === "chart") {
     if (submit({ kind: "chart", format: undefined })) resetDrafts();
   } else if (props.target.kind === "series") {
     if (submit({ kind: "series", seriesId: props.target.seriesId, format: undefined }))
@@ -1101,6 +1112,30 @@ function escapeDraft(event: KeyboardEvent): void {
         {{ t("chart.formatSeriesUnavailable") }}
       </p>
 
+      <FormatSection v-if="kind === 'legend'" :title="t('chart.legend')" initially-open>
+        <span>{{ t("chart.legendPosition") }}</span>
+        <TRadioGroup
+          :model-value="elementSettings.legendPosition"
+          :disabled="disabled"
+          :aria-label="t('chart.legendPosition')"
+          role="radiogroup"
+          class="chart-format-pane__legend-positions"
+          :onChange="captureAction(setLegendPosition)"
+        >
+          <TRadio value="top">{{ t("chart.positionTop") }}</TRadio>
+          <TRadio value="bottom">{{ t("chart.positionBottom") }}</TRadio>
+          <TRadio value="left">{{ t("chart.positionLeft") }}</TRadio>
+          <TRadio value="right">{{ t("chart.positionRight") }}</TRadio>
+          <TRadio value="topRight">{{ t("chart.positionTopRight") }}</TRadio>
+        </TRadioGroup>
+        <TCheckbox
+          :checked="!elementSettings.legendOverlay"
+          :disabled="disabled"
+          :onChange="captureAction(setLegendNonOverlapping)"
+        >
+          {{ t("chart.legendNonOverlapping") }}
+        </TCheckbox>
+      </FormatSection>
       <FormatSection v-if="kind === 'title'" :title="t('chart.title')" initially-open>
         <div class="chart-format-pane__field" data-chart-format-field="title">
           <label :for="`${paneId}-title`">{{ t("chart.titleText") }}</label>
@@ -1932,6 +1967,12 @@ function escapeDraft(event: KeyboardEvent): void {
     align-items: center;
     gap: 4px;
     min-width: 0;
+  }
+  &__legend-positions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
   }
   &__checks {
     display: flex;

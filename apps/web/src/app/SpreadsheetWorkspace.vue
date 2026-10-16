@@ -155,6 +155,7 @@ import {
   getChartFormatTargets,
   getChartFormatSeries,
   chartFormatTargetKey,
+  chartFormatTargetLabelKeys,
   type ChartFormatTarget,
 } from "../modules/charts/chart-format-pane";
 import ChartFormatPane from "../modules/charts/components/ChartFormatPane.vue";
@@ -1741,17 +1742,7 @@ const chartFormatChoices = computed(() => {
                 })(),
               },
             )
-          : target.kind === "chart"
-            ? t("chart.formatChartArea")
-            : target.kind === "title"
-              ? t("chart.title")
-              : target.kind === "plot"
-                ? t("chart.formatPlotArea")
-                : target.kind === "categoryAxis"
-                  ? t("chart.formatCategoryAxis")
-                  : target.kind === "secondaryValueAxis"
-                    ? t("chart.formatSecondaryValueAxis")
-                    : t("chart.formatValueAxis"),
+          : t(chartFormatTargetLabelKeys[target.kind]),
     }));
   } catch {
     return [{ target: { kind: "chart" } as ChartFormatTarget, label: t("chart.formatChartArea") }];
@@ -4536,6 +4527,25 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       restoreFocusAfterRemount(effectsTrigger, effectsFocusReturn, () => true, activeBeforeHistory);
     return;
   }
+  const chartHistory = chartFormatContext.value;
+  if (
+    routeFormatPaneHistoryShortcut(event, {
+      ...historyContext,
+      pane: chartFormatPaneRef.value?.getHistoryElement(),
+      current: () =>
+        !!chartHistory &&
+        chartHistory === chartFormatContext.value &&
+        chartHistory.isCurrent() &&
+        !chartHistory.disabled &&
+        !loading.value &&
+        !fileBusy.value &&
+        !xlsxBusy.value &&
+        !chartDialog.value &&
+        !chartSourceDialog.value &&
+        chartFormatPaneRef.value?.canChangeTarget() === true,
+    })
+  )
+    return;
   const paneHistory = selectedShapePaneFieldLease();
   const paneFocusOwner = paneHistory
     ? {
@@ -6427,6 +6437,11 @@ watch(
           :ref="setSheetGridRef"
           :sheet="activeSheet"
           :chart-layout-preview="chartLayoutPreview"
+          :chart-element-selection="
+            chartObjectContext
+              ? { owner: chartObjectContext.drawing, target: chartFormatTarget }
+              : undefined
+          "
           :workbook="session.workbook"
           :evaluator="activeSheetEvaluator"
           :context-menu-state="contextMenuState"

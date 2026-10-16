@@ -105,3 +105,40 @@ test("rejects retired owner, disconnected pane and a control outside the current
   expect(event.defaultPrevented).toBe(false);
   expect(f.undo).not.toHaveBeenCalled();
 });
+
+test.each([
+  "element",
+  "fontSize",
+  "labelAngle",
+  "gapWidth",
+  "overlap",
+  "strokeWidth",
+  "min",
+  "max",
+  "majorUnit",
+  "minorUnit",
+])("routes owned chart %s reset Undo and Redo", (field) => {
+  const f = fixture(`<button data-target data-chart-format-reset="${field}">Reset</button>`);
+  f.pane.removeAttribute("data-shape-format-pane");
+  f.pane.setAttribute("data-chart-format-pane", "");
+  expect(f.dispatch().handled).toBe(true);
+  expect(f.undo).toHaveBeenCalledTimes(1);
+  expect(f.dispatch({ shiftKey: true }).handled).toBe(true);
+  expect(f.redo).toHaveBeenCalledTimes(1);
+  f.current.mockReturnValue(false);
+  expect(f.dispatch().handled).toBe(false);
+  expect(f.undo).toHaveBeenCalledTimes(1);
+});
+
+test.each([
+  "<button data-target>Close</button>",
+  '<input data-target data-chart-format-reset="element">',
+  '<button data-target disabled data-chart-format-reset="element">Reset</button>',
+  '<div role="dialog"><button data-target data-chart-format-reset="element">Reset</button></div>',
+])("chart reset history does not capture other controls: %s", (markup) => {
+  const f = fixture(markup);
+  f.pane.removeAttribute("data-shape-format-pane");
+  f.pane.setAttribute("data-chart-format-pane", "");
+  expect(f.dispatch().handled).toBe(false);
+  expect(f.undo).not.toHaveBeenCalled();
+});

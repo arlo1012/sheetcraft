@@ -13,12 +13,33 @@ import {
   lookupChartRangeSeriesId,
   type ChartRangeSeriesBand,
 } from "@sheetcraft/core/chart-range-series";
+import { getChartElementCapabilities } from "./chart-elements";
 import type { ChartElementPatch } from "./chart-element-controls";
 import { resolveChartComboSeriesSettings } from "@sheetcraft/core/chart-combo";
 
 export type ChartFormatTarget =
-  | { kind: "chart" | "title" | "plot" | "categoryAxis" | "valueAxis" | "secondaryValueAxis" }
+  | {
+      kind:
+        | "chart"
+        | "title"
+        | "legend"
+        | "plot"
+        | "categoryAxis"
+        | "valueAxis"
+        | "secondaryValueAxis";
+    }
   | { kind: "series"; seriesId: string; rangeBand?: ChartRangeSeriesBand };
+// Shared by Ribbon and pane; every non-series target must have an explicit label.
+export const chartFormatTargetLabelKeys = {
+  chart: "chart.formatChartArea",
+  title: "chart.title",
+  legend: "chart.legend",
+  plot: "chart.formatPlotArea",
+  categoryAxis: "chart.formatCategoryAxis",
+  valueAxis: "chart.formatValueAxis",
+  secondaryValueAxis: "chart.formatSecondaryValueAxis",
+} as const satisfies Record<Exclude<ChartFormatTarget["kind"], "series">, string>;
+
 export type ChartFormatIntent =
   | { kind: "chart"; format: ChartBarFormat | undefined }
   | { kind: "title"; format: ChartTextFormat | undefined }
@@ -26,7 +47,8 @@ export type ChartFormatIntent =
   | { kind: "categoryAxis"; format: ChartCategoryAxisFormat | undefined }
   | { kind: "valueAxis" | "secondaryValueAxis"; format: ChartValueAxisFormat | undefined }
   | { kind: "series"; seriesId: string; format: Omit<ChartSeriesFormat, "id"> | undefined }
-  | { kind: "elements"; patch: ChartElementPatch };
+  | { kind: "elements"; patch: ChartElementPatch }
+  | { kind: "legend"; reset: true };
 export type ChartFormatIntentHandler = (intent: ChartFormatIntent) => boolean;
 export type ChartFormatNumericField =
   | "min"
@@ -137,6 +159,7 @@ export function getChartFormatCapabilities(
   const boundIds = new Set(chart.rectangleSeries?.[chart.seriesBy].map((entry) => entry.id) ?? []);
   return {
     hasData,
+    legend: hasData && chart.legend && getChartElementCapabilities(chart.type).legend,
     title: !!chart.title.trim() && chart.elements?.titlePosition !== "none",
     plot: hasData && cartesian,
     categoryAxis:
@@ -169,6 +192,7 @@ export function getChartFormatTargets(
   const capabilities = getChartFormatCapabilities(chart, visibleData);
   const targets: ChartFormatTarget[] = [{ kind: "chart" }];
   if (capabilities.title) targets.push({ kind: "title" });
+  if (capabilities.legend) targets.push({ kind: "legend" });
   if (capabilities.plot) targets.push({ kind: "plot" });
   if (capabilities.categoryAxis) targets.push({ kind: "categoryAxis" });
   if (capabilities.valueAxis) targets.push({ kind: "valueAxis" });
@@ -195,7 +219,7 @@ export function getChartSeriesFormat(chart: SheetChart, id: string): Omit<ChartS
 /** Produces detached branch data. Host validates/normalizes and owns the workbook command. */
 export function getChartFormatIntentSettings(
   current: ChartFormatSettings | undefined,
-  intent: Exclude<ChartFormatIntent, { kind: "elements" }>,
+  intent: Exclude<ChartFormatIntent, { kind: "elements" | "legend" }>,
 ): ChartFormatSettings | undefined {
   const result: ChartFormatSettings = { ...current };
   if (intent.kind === "series") {

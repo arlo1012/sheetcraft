@@ -30,6 +30,7 @@ import { isPivotValueCell, type SheetPivotTable } from "@sheetcraft/core/pivot-t
 import PivotEmptyReports from "../../pivot-tables/components/PivotEmptyReports.vue";
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { ChartElementSelection } from "../../charts/chart-format-selection";
 import type { ChartFormatTarget } from "../../charts/chart-format-pane";
 import type { ChartLayoutPreview } from "../../charts/chart-layout-preview";
 import type { TextBoxReferenceResolver } from "../../sheet-drawings/textbox-reference-display";
@@ -342,6 +343,7 @@ const props = withDefaults(
     equationPlaceholdersHidden?: boolean;
     equationEditSnapshot?: EquationEditSnapshot;
     chartLayoutPreview?: ChartLayoutPreview;
+    chartElementSelection?: ChartElementSelection;
     equationEditCallbacks?: EquationEditCallbacks;
     ownsSelectedShapeFieldTarget?: (target: EventTarget | null) => boolean;
     shapeTextEditSnapshot?: ShapeTextEditSnapshot | null;
@@ -4741,6 +4743,7 @@ defineExpose({
         :equation-placeholders-hidden="equationPlaceholdersHidden"
         :equation-edit-snapshot="equationEditSnapshot"
         :chart-layout-preview="chartLayoutPreview"
+        :chart-element-selection="chartElementSelection"
         :equation-edit-callbacks="equationEditCallbacks"
         :owns-selected-shape-field-target="ownsSelectedShapeFieldTarget"
         :text-edit-snapshot="shapeTextEditSnapshot"

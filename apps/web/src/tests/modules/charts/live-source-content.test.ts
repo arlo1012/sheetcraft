@@ -13,6 +13,7 @@ import {
 import type { ECElementEvent } from "echarts";
 import type { EChartsType } from "../../../modules/charts/chart-runtime";
 import ChartContent from "../../../modules/charts/components/ChartContent.vue";
+import { getChartLegendLayout } from "../../../modules/charts/chart-element-layout";
 import { createAppI18n } from "../../../shared/i18n";
 
 const rendered = vi.hoisted(() => ({ instances: [] as EChartsType[] }));
@@ -139,6 +140,207 @@ function nativeEvent(input: Partial<ECElementEvent>): ECElementEvent {
   };
 }
 describe("live chart content lifecycle", () => {
+  test("editable legend selects and opens its pane without toggling data; pagination stays native", async () => {
+    const f = fixture();
+    await f.wrapper.setProps({ editableLegend: true, selectedElement: { kind: "legend" } });
+    const instance = rendered.instances.at(-1)!;
+    const option = instance.getOption() as {
+      legend: {
+        selectedMode?: boolean;
+        formatter?: (key: string) => string;
+        borderWidth: number;
+        borderColor: string;
+      }[];
+      series: { name: string }[];
+    };
+    expect(option.legend[0]?.selectedMode).toBe(false);
+    expect(option.legend[0]?.formatter?.(option.series[0]!.name)).toBe("extra");
+    expect(option.legend[0]?.borderWidth).toBe(1);
+    expect(option.legend[0]?.borderColor).not.toBe("transparent");
+    const repaint = vi.spyOn(instance, "setOption");
+    await f.wrapper.setProps({ selectedElement: { kind: "legend" } });
+    expect(repaint).not.toHaveBeenCalled();
+    repaint.mockRestore();
+    const point = getChartLegendLayout(
+      f.drawing.chart,
+      {
+        categories: ["red", "green", "blue"],
+        records: [],
+        series: [{ name: "extra", values: [15, 25, 35] }],
+      },
+      f.drawing,
+    )!.bounds;
+    const x = point.x + point.width / 2,
+      y = point.y + point.height / 2;
+    instance.getZr().trigger("click", { offsetX: x, offsetY: y });
+    const canvas = f.wrapper.get(".chart-content__canvas").element;
+    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 480,
+      height: 300,
+    } as DOMRect);
+    canvas.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: x, clientY: y }));
+    expect(f.wrapper.emitted("selectElement")).toEqual([
+      [{ kind: "legend" }, false],
+      [{ kind: "legend" }, true],
+    ]);
+    instance.trigger("legendscroll", { type: "legendscroll", scrollDataIndex: 1 });
+    instance.getZr().trigger("click", { offsetX: 450, offsetY: 285 });
+    await Promise.resolve();
+    instance.getZr().trigger("dblclick", { offsetX: 450, offsetY: 285 });
+    canvas.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: 450, clientY: 285 }));
+    expect(f.wrapper.emitted("selectElement")).toHaveLength(2);
+    instance.setOption({ legend: { scrollDataIndex: 1 } });
+    const beforeSelection = instance.getOption() as {
+      legend: {
+        left: number;
+        top: number;
+        width: number;
+        height: number;
+        scrollDataIndex: number;
+      }[];
+    };
+    await f.wrapper.setProps({ selectedElement: { kind: "chart" } });
+    const afterSelection = instance.getOption() as typeof beforeSelection;
+    for (const key of ["left", "top", "width", "height", "scrollDataIndex"] as const)
+      expect(afterSelection.legend[0]?.[key]).toEqual(beforeSelection.legend[0]?.[key]);
+    expect(
+      (instance.getOption() as { legend: { borderColor: string }[] }).legend[0]?.borderColor,
+    ).toBe("transparent");
+    await f.wrapper.setProps({
+      drawing: { ...f.drawing, chart: { ...f.drawing.chart, legend: false } },
+    });
+    instance.getZr().trigger("click", { offsetX: x, offsetY: y });
+    expect(f.wrapper.emitted("selectElement")).toHaveLength(2);
+  });
+  test("real DOM legend pointer input bypasses the outer drawing drag handler without cancelling native input", async () => {
+    const f = fixture();
+    await f.wrapper.setProps({ editableLegend: true });
+    const canvas = f.wrapper.get(".chart-content__canvas").element;
+    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+      left: 214,
+      top: 193,
+      width: 480,
+      height: 300,
+    } as DOMRect);
+    const outer = document.createElement("div");
+    outer.append(f.wrapper.element);
+    const drag = vi.fn((event: Event) => event.preventDefault());
+    outer.addEventListener("pointerdown", drag);
+    const bounds = getChartLegendLayout(
+      f.drawing.chart,
+      {
+        categories: ["red", "green", "blue"],
+        records: [],
+        series: [{ name: "extra", values: [15, 25, 35] }],
+      },
+      f.drawing,
+    )!.bounds;
+    const inside = new MouseEvent("pointerdown", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 214 + bounds.x + bounds.width / 2,
+      clientY: 193 + bounds.y + bounds.height / 2,
+    });
+    canvas.dispatchEvent(inside);
+    expect(drag).not.toHaveBeenCalled();
+    expect(inside.defaultPrevented).toBe(false);
+    canvas.dispatchEvent(
+      new MouseEvent("pointerdown", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 220,
+        clientY: 200,
+      }),
+    );
+    expect(drag).toHaveBeenCalledOnce();
+  });
+  test("first legend selection may replace SVG children before native container double-click", async () => {
+    const f = fixture();
+    await f.wrapper.setProps({ editableLegend: true, selectedElement: { kind: "chart" } });
+    const canvas = f.wrapper.get(".chart-content__canvas").element;
+    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 480,
+      height: 300,
+    } as DOMRect);
+    const bounds = getChartLegendLayout(
+      f.drawing.chart,
+      {
+        categories: ["red", "green", "blue"],
+        records: [],
+        series: [{ name: "extra", values: [15, 25, 35] }],
+      },
+      f.drawing,
+    )!.bounds;
+    const x = bounds.x + bounds.width / 2,
+      y = bounds.y + bounds.height / 2;
+    const instance = rendered.instances.at(-1)!;
+    const firstTarget = document.createElement("span");
+    canvas.append(firstTarget);
+    instance.getZr().trigger("click", { offsetX: x, offsetY: y });
+    await f.wrapper.setProps({ selectedElement: { kind: "legend" } });
+    firstTarget.remove();
+    canvas.append(document.createElement("span"));
+    instance.getZr().trigger("click", { offsetX: x, offsetY: y });
+    canvas.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: x, clientY: y }));
+    expect(f.wrapper.emitted("selectElement")).toEqual([
+      [{ kind: "legend" }, false],
+      [{ kind: "legend" }, false],
+      [{ kind: "legend" }, true],
+    ]);
+  });
+  test("two native legend clicks open once when SVG repaint prevents dblclick", async () => {
+    const f = fixture();
+    await f.wrapper.setProps({ editableLegend: true, selectedElement: { kind: "chart" } });
+    const bounds = getChartLegendLayout(
+      f.drawing.chart,
+      {
+        categories: ["red", "green", "blue"],
+        records: [],
+        series: [{ name: "extra", values: [15, 25, 35] }],
+      },
+      f.drawing,
+    )!.bounds;
+    const x = bounds.x + bounds.width / 2,
+      y = bounds.y + bounds.height / 2;
+    const instance = rendered.instances.at(-1)!;
+    instance
+      .getZr()
+      .trigger("click", { offsetX: x, offsetY: y, event: new MouseEvent("click", { detail: 1 }) });
+    await f.wrapper.setProps({ selectedElement: { kind: "legend" } });
+    instance
+      .getZr()
+      .trigger("click", { offsetX: x, offsetY: y, event: new MouseEvent("click", { detail: 2 }) });
+    expect(f.wrapper.emitted("selectElement")).toEqual([
+      [{ kind: "legend" }, false],
+      [{ kind: "legend" }, true],
+    ]);
+    const canvas = f.wrapper.get(".chart-content__canvas").element;
+    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 480,
+      height: 300,
+    } as DOMRect);
+    canvas.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: x, clientY: y }));
+    expect(f.wrapper.emitted("selectElement")).toHaveLength(2);
+    instance.trigger("legendscroll", { type: "legendscroll", scrollDataIndex: 1 });
+    instance
+      .getZr()
+      .trigger("click", { offsetX: x, offsetY: y, event: new MouseEvent("click", { detail: 2 }) });
+    expect(f.wrapper.emitted("selectElement")).toHaveLength(2);
+  });
+  test("preview legend retains native selection behavior", () => {
+    const f = fixture();
+    const option = rendered.instances.at(-1)!.getOption() as {
+      legend: { selectedMode: boolean }[];
+    };
+    expect(option.legend[0]?.selectedMode).not.toBe(false);
+    expect(f.wrapper.find(".chart-content__legend-selection").exists()).toBe(false);
+  });
   test("native component events resolve stable elements and do not target a series index", async () => {
     const f = fixture(),
       instance = rendered.instances.at(-1)!;

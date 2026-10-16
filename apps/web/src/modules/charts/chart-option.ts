@@ -1,3 +1,4 @@
+import { createChartElementLayout } from "./chart-element-layout";
 import { applySeriesLegendIdentity } from "./chart-series-legend";
 import type { EChartsOption, SeriesOption } from "echarts";
 import { formatCellNumberValue } from "@sheetcraft/core/number-format";
@@ -12,7 +13,7 @@ import {
   type ChartPresentationSettings,
 } from "@sheetcraft/core/chart-presentation";
 import type { ChartComboSeriesChange } from "@sheetcraft/core/chart-combo";
-import { getChartElementCapabilities, getChartElementSettings } from "./chart-elements";
+import { getChartElementSettings } from "./chart-elements";
 import { applyChartCommonFormat, getChartComboDataSeriesSettings } from "./chart-format-render";
 import {
   chartPercentAxisDomain,
@@ -30,109 +31,6 @@ function seriesAppearance(series: ChartData["series"][number], palette: readonly
     ...(series.id !== undefined ? { id: series.id } : {}),
     ...(color ? { itemStyle: { color }, lineStyle: { color } } : {}),
   };
-}
-
-function createElementLayout(chart: SheetChart, data: ChartData, dimensions?: ChartDimensions) {
-  const capabilities = getChartElementCapabilities(chart.type);
-  const elements = chart.elements;
-  // An old chart, or a label-only edit, keeps the original renderer's geometry.
-  if (
-    !elements ||
-    (elements.titlePosition === undefined &&
-      (!capabilities.legend ||
-        (elements.legendPosition === undefined && elements.legendOverlay === undefined)))
-  )
-    return undefined;
-  const settings = getChartElementSettings(chart);
-  const width = Math.max(1, dimensions?.width ?? 480);
-  const height = Math.max(1, dimensions?.height ?? 300);
-  const margin = Math.min(8, width / 10, height / 10);
-  const titleHeight =
-    chart.title && settings.titlePosition === "above" ? Math.min(30, height * 0.24) : 0;
-  const plot = {
-    left: margin,
-    top: margin + titleHeight,
-    right: margin,
-    bottom: margin,
-    width: width - margin * 2,
-    height: height - margin * 2 - titleHeight,
-  };
-  const title: EChartsOption["title"] = {
-    text: chart.title,
-    show: settings.titlePosition !== "none",
-    top: margin,
-    left: "center",
-    textStyle: {
-      fontSize: 15,
-      fontWeight: "normal",
-      width: plot.width,
-      height: Math.max(1, Math.min(20, height * 0.2)),
-      overflow: "truncate",
-      lineOverflow: "truncate",
-    },
-  };
-  const legend: EChartsOption["legend"] = {
-    show: chart.legend && capabilities.legend,
-    type: "scroll",
-  };
-  if (chart.legend && capabilities.legend) {
-    const names =
-      chart.type === "pie" || chart.type === "doughnut"
-        ? data.categories
-        : data.series.slice(chart.type === "scatter" ? 1 : 0).map((entry) => entry.name);
-    const vertical = ["left", "right", "topRight"].includes(settings.legendPosition);
-    const gap = Math.min(8, plot.width * 0.04, plot.height * 0.04);
-    // A bounded scroll viewport and truncated one-line names keep even very long
-    // legends in their reserved strip. Moving legend coordinates alone cannot do this.
-    const legendWidth = vertical
-      ? Math.min(144, Math.max(64, ...names.map((name) => name.length * 7 + 22)), plot.width * 0.3)
-      : plot.width;
-    const legendHeight = vertical
-      ? Math.min(plot.height, Math.max(16, names.length * 20))
-      : Math.min(28, plot.height * 0.22);
-    const left = settings.legendPosition === "left" ? plot.left : width - plot.right - legendWidth;
-    const top =
-      settings.legendPosition === "bottom"
-        ? height - plot.bottom - legendHeight
-        : settings.legendPosition === "left" || settings.legendPosition === "right"
-          ? plot.top + (plot.height - legendHeight) / 2
-          : plot.top;
-    const itemWidth = Math.min(12, legendWidth * 0.2);
-    Object.assign(legend, {
-      orient: vertical ? "vertical" : "horizontal",
-      left: vertical ? left : "center",
-      top,
-      width: legendWidth,
-      height: legendHeight,
-      padding: 0,
-      itemWidth,
-      itemHeight: Math.min(10, legendHeight * 0.5),
-      itemGap: 8,
-      formatter: (name: string) => name.replace(/[\r\n]+/g, " "),
-      textStyle: {
-        fontSize: Math.max(1, Math.min(12, legendHeight - 4)),
-        width: Math.max(1, Math.min(140, legendWidth - itemWidth - 7)),
-        overflow: "truncate",
-      },
-      pageIconSize: Math.min(8, legendWidth / 8),
-      pageButtonItemGap: 2,
-      pageButtonGap: 4,
-      pageFormatter: "{current}",
-      pageTextStyle: { fontSize: Math.min(10, legendWidth / 7) },
-    });
-    if (!settings.legendOverlay) {
-      if (vertical) {
-        if (settings.legendPosition === "left") plot.left += legendWidth + gap;
-        else plot.right += legendWidth + gap;
-        plot.width -= legendWidth + gap;
-      } else {
-        if (settings.legendPosition === "top") plot.top += legendHeight + gap;
-        else plot.bottom += legendHeight + gap;
-        plot.height -= legendHeight + gap;
-      }
-    }
-  }
-  return { title, legend, plot };
 }
 
 function getBarLabelPosition(
@@ -186,7 +84,7 @@ function buildChartOption(
     (chart.type === "combo" && (!data.categories.length || !data.series.length))
   )
     return { animation: false, backgroundColor: background, series: [] };
-  const layout = createElementLayout(chart, data, dimensions);
+  const layout = createChartElementLayout(chart, data, dimensions);
   const plotBounds = layout
     ? {
         left: layout.plot.left,
