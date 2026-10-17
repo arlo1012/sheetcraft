@@ -673,9 +673,24 @@ test.each(["history", "external focus", "owner"] as const)(
       expect(document.activeElement).toBe(elsewhere);
       return;
     }
-    const input = editor.getComponent(TSelect).get<HTMLInputElement>("input").element;
-    expect(input).not.toBe(oldInput);
+    const currentPane = f.wrapper.getComponent(ShapeFormatPane);
+    expect(currentPane.props("snapshot")!.owner).toMatchObject({
+      workbookId: f.current.session.workbook.id,
+      sheetId: getActiveSheet(f.current.session.workbook).id,
+      drawingId: "box",
+    });
+    expect(currentPane.props("snapshot")!.drawing.id).toBe("box");
+    expect(f.current.sheetGridRef.getSelectedShapeObjects()).toEqual([["box"]]);
+    const currentEditor = currentPane
+      .findAllComponents(PicturePaintEditor)
+      .find((item) => item.props("ownerKey").endsWith(":shape:fill"))!;
+    const input = currentEditor.getComponent(TSelect).get<HTMLInputElement>("input").element;
+    // An accepted self-commit may reuse the input. The current owner, live
+    // readonly control and real history shortcut are the behavioral contract.
+    expect(input.isConnected).toBe(true);
+    expect(input.closest("[data-shape-format-pane]")).toBe(currentPane.element);
     expect(input.readOnly).toBe(true);
+    expect(input.disabled).toBe(false);
     expect(document.activeElement).toBe(input);
     const undo = new KeyboardEvent("keydown", {
       key: "z",
@@ -687,6 +702,8 @@ test.each(["history", "external focus", "owner"] as const)(
     await flushPromises();
     expect(undo.defaultPrevented).toBe(true);
     expect(serializeWorkbook(f.current.session.workbook)).toEqual(f.before);
+    expect(f.current.session.history.undoStack).toHaveLength(0);
+    expect(f.current.session.history.redoStack).toHaveLength(1);
   },
   15000,
 );

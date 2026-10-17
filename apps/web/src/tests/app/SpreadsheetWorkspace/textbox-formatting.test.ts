@@ -221,7 +221,12 @@ async function openFormat(
   return pane;
 }
 async function textMode(pane: FormatWrapper, tab: "text-fill-line" | "text-effects") {
-  await pane.get(".shape-format-pane__modes button:nth-child(2)").trigger("click");
+  const radio = pane.get<HTMLInputElement>('.shape-format-pane__modes input[value="text"]');
+  const label = radio.element.closest("label");
+  expect(label).not.toBeNull();
+  label!.click();
+  await flushPromises();
+  expect(radio.element.checked).toBe(true);
   await pane.get(`[role="tab"][id$="${tab}-tab"]`).trigger("click");
 }
 function fillLine(pane: FormatWrapper, mode: "shape" | "text") {
@@ -253,16 +258,21 @@ async function chooseEffect(editor: FormatWrapper, id: string) {
   (combobox.element as HTMLInputElement).focus();
   await flushPromises();
   await combobox.trigger("keydown", { key: "ArrowDown" });
+  const popup = () => {
+    const id = combobox.attributes("aria-controls");
+    return id ? document.getElementById(id) : null;
+  };
   // Wait for the real controlled open state and its native TDesign portal.
   await vi.waitFor(
     () => {
       expect(combobox.attributes("aria-expanded")).toBe("true");
-      expect(document.querySelector(".picture-preset-gallery button")).not.toBeNull();
+      expect(popup()?.getAttribute("role")).toBe("dialog");
+      expect(popup()?.querySelector(".picture-preset-choices button")).not.toBeNull();
     },
     { timeout: 1000, interval: 20 },
   );
   const button = [
-    ...document.querySelectorAll<HTMLButtonElement>(".picture-preset-gallery button"),
+    ...popup()!.querySelectorAll<HTMLButtonElement>(".picture-preset-choices button"),
   ].find((choice) => choice.getAttribute("aria-label") === label);
   expect(button).toBeDefined();
   expect(button!.disabled).toBe(false);
@@ -279,6 +289,70 @@ async function editAlpha(wrapper: VueWrapper) {
   writeTextDomSelection(input.element as HTMLElement, { start: 0, end: 5, direction: "forward" });
   await input.trigger("keyup", { key: "Shift" });
   await flushPromises();
+  const current = workspaceState(wrapper);
+  const edit = current.shapeTextEdit.snapshot.value!;
+  expect(edit.selection).toMatchObject({ start: 0, end: 5 });
+  const sessionId = edit.sessionId,
+    selection = clone(edit.selection),
+    draft = clone(edit.draftView),
+    draftText = edit.draftText,
+    before = serializeWorkbook(current.session.workbook),
+    undoStack = [...current.session.history.undoStack],
+    redoStack = [...current.session.history.redoStack];
+  const assertEditUnchanged = () => {
+    expect(current.shapeTextEdit.snapshot.value?.sessionId).toBe(sessionId);
+    expect(current.shapeTextEdit.snapshot.value?.selection).toEqual(selection);
+    expect(current.shapeTextEdit.snapshot.value?.draftView).toEqual(draft);
+    expect(current.shapeTextEdit.snapshot.value?.draftText).toBe(draftText);
+    expect(serializeWorkbook(current.session.workbook)).toEqual(before);
+    expect(current.session.history.undoStack).toEqual(undoStack);
+    expect(current.session.history.redoStack).toEqual(redoStack);
+    expect(input.element.isConnected).toBe(true);
+  };
+  // Match the real pointer/focus/click path exercised by text-context-transitions.
+  const activate = async (element: HTMLElement) => {
+    const pointer = (type: "pointerdown" | "pointerup") => {
+      const event = new PointerEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 73,
+        pointerType: "mouse",
+        isPrimary: true,
+        button: 0,
+        buttons: type === "pointerdown" ? 1 : 0,
+      });
+      element.dispatchEvent(event);
+      return event;
+    };
+    if (!pointer("pointerdown").defaultPrevented) element.focus();
+    pointer("pointerup");
+    element.click();
+    await flushPromises();
+  };
+  // F2 keeps closed properties closed. Open the real Ribbon format entry while
+  // retaining the private text session and its selected character range.
+  expect(wrapper.findComponent(ShapeFormatPane).exists()).toBe(false);
+  const drawingTools = wrapper.get<HTMLElement>('[data-ribbon-category="shape"]');
+  expect(drawingTools.isVisible()).toBe(true);
+  expect(drawingTools.attributes("data-shape-text-edit-session")).toBe(String(sessionId));
+  await activate(drawingTools.element);
+  expect(drawingTools.attributes("aria-selected")).toBe("true");
+  expect(drawingTools.attributes("data-shape-text-edit-session")).toBe(String(sessionId));
+  assertEditUnchanged();
+  expect(wrapper.findComponent(ShapeFormatPane).exists()).toBe(false);
+  const format = wrapper.get<HTMLElement>('[data-shape-control="format"]');
+  expect(format.isVisible()).toBe(true);
+  expect(format.attributes("aria-disabled")).not.toBe("true");
+  expect(
+    format.element
+      .closest("[data-shape-text-edit-session]")
+      ?.getAttribute("data-shape-text-edit-session"),
+  ).toBe(String(sessionId));
+  await activate(format.element);
+  const pane = wrapper.getComponent(ShapeFormatPane);
+  expect(pane.isVisible()).toBe(true);
+  expect(pane.attributes("data-shape-text-edit-session")).toBe(String(sessionId));
+  assertEditUnchanged();
   return input;
 }
 
@@ -366,7 +440,7 @@ test("plain TextBox pane exposes 25 recipes and 41 transforms and applies the fi
   expect(target(current).text).toBe(original.text);
   const styled = serializeWorkbook(current.session.workbook);
   await textMode(pane, "text-effects");
-  await pane.get("[data-text-transform-section] > button").trigger("click");
+  await pane.get("[data-text-transform-section] .format-section__heading").trigger("click");
   const transform = pane.getComponent(WordArtTransformGallery);
   expect(transform.findAll("[data-wordart-transform-choice]")).toHaveLength(41);
   expect(transform.props("disabled")).toBe(false);
@@ -424,8 +498,8 @@ test("owned TextBox F2 recipe and local effect galleries change only selected al
     [local.getComponent(PictureReflectionEditor), "reflection-0-0"],
     [local.getComponent(PictureGlowEditor), "glow-accent1-2"],
   ] as const) {
-    const section = (editor.element as Element).closest(".picture-format-section")!;
-    section.querySelector<HTMLButtonElement>(".picture-format-section__heading")!.click();
+    const section = (editor.element as Element).closest(".format-section")!;
+    section.querySelector<HTMLButtonElement>(".format-section__heading")!.click();
     await flushPromises();
     await chooseEffect(editor, id);
   }
