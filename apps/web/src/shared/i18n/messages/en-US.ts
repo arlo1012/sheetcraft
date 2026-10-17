@@ -825,6 +825,7 @@ export const enUS = {
         numberFormatOmitted: "Number formats cannot be retained",
         numberFormatDegraded: "Number formats will be simplified",
         dimensionApproximated: "Row or column dimensions will be approximated",
+        textboxLayoutNormalized: "Horizontal text box column order was normalized to left-to-right for Excel online editing",
         pictureGeometryApproximated: "Picture positions or sizes may be approximated or changed",
         dateNormalized: "Date values will be normalized",
         cellValueOmitted: "Cell values cannot be retained",

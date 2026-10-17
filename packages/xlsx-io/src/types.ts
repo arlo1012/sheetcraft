@@ -26,6 +26,7 @@ export type XlsxCompatibilityCode =
   | "number-format-omitted"
   | "number-format-degraded"
   | "dimension-approximated"
+  | "textbox-layout-normalized"
   | "picture-geometry-approximated"
   | "date-normalized"
   | "cell-value-omitted"

@@ -788,6 +788,7 @@ export type MessageSchema = ToolMessageSchema & {
         numberFormatOmitted: string;
         numberFormatDegraded: string;
         dimensionApproximated: string;
+        textboxLayoutNormalized: string;
         pictureGeometryApproximated: string;
         dateNormalized: string;
         cellValueOmitted: string;

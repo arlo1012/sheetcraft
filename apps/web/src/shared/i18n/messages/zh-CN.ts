@@ -803,6 +803,7 @@ export const zhCN = {
         numberFormatOmitted: "数字格式无法保留",
         numberFormatDegraded: "数字格式将被简化",
         dimensionApproximated: "行高或列宽将使用近似值",
+        textboxLayoutNormalized: "横排文本框的栏排列方向已规范为从左到右，以支持 Excel 在线编辑",
         pictureGeometryApproximated: "图片位置或尺寸可能使用近似值或发生变化",
         dateNormalized: "日期值将被规范化",
         cellValueOmitted: "单元格值无法保留",

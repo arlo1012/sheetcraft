@@ -43,11 +43,13 @@ function line(d: SheetFramedGraphicDrawing): string {
 function typography(format: ShapeTextCharacterFormat): string {
   return `sz="${Math.round(format.fontSize! * 75)}" b="${Number(format.bold)}" i="${Number(format.italic)}"`;
 }
-function fontBody(format: ShapeTextCharacterFormat): string {
+export type TextBoxExportProfile = "excel-horizontal-editable";
+
+function fontBody(format: ShapeTextCharacterFormat, profile?: TextBoxExportProfile): string {
   const face = xml(format.fontFamily!);
-  return `<a:ln><a:noFill/></a:ln>${solid(format.color!)}<a:effectLst/><a:latin typeface="${face}"/><a:ea typeface="${face}"/><a:cs typeface="${face}"/>`;
+  return `${profile ? "" : "<a:ln><a:noFill/></a:ln>"}${solid(format.color!)}<a:effectLst/><a:latin typeface="${face}"/><a:ea typeface="${face}"/><a:cs typeface="${face}"/>`;
 }
-function textBody(d: SheetFramedGraphicDrawing): string {
+function textBody(d: SheetFramedGraphicDrawing, profile?: TextBoxExportProfile): string {
   const text = d.shapeText!,
     layout = text.layout,
     m = layout.marginsPt;
@@ -82,7 +84,7 @@ function textBody(d: SheetFramedGraphicDrawing): string {
       ) {
         const s = segments[index]!;
         chunks.push(
-          `<a:r><a:rPr ${typography(s)}>${fontBody(s)}</a:rPr><a:t xml:space="preserve">${xml(d.text.slice(Math.max(start, s.start), Math.min(end, s.end)))}</a:t></a:r>`,
+          `<a:r><a:rPr ${typography(s)}>${fontBody(s, profile)}</a:rPr><a:t xml:space="preserve">${xml(d.text.slice(Math.max(start, s.start), Math.min(end, s.end)))}</a:t></a:r>`,
         );
       }
       const runs = chunks.join("");
@@ -93,10 +95,10 @@ function textBody(d: SheetFramedGraphicDrawing): string {
       const alignment = { left: "l", center: "ctr", right: "r", justify: "just" }[
         text.paragraph.alignment
       ];
-      return `<a:p><a:pPr algn="${alignment}"><a:lnSpc><a:spcPct val="100000"/></a:lnSpc><a:spcBef><a:spcPts val="0"/></a:spcBef><a:spcAft><a:spcPts val="0"/></a:spcAft><a:defRPr ${typography(base)}>${fontBody(base)}</a:defRPr></a:pPr>${runs}<a:endParaRPr ${typography(endFormat)}>${fontBody(endFormat)}</a:endParaRPr></a:p>`;
+      return `<a:p><a:pPr algn="${alignment}"><a:lnSpc><a:spcPct val="100000"/></a:lnSpc><a:spcBef><a:spcPts val="0"/></a:spcBef><a:spcAft><a:spcPts val="0"/></a:spcAft><a:defRPr ${typography(base)}>${fontBody(base, profile)}</a:defRPr></a:pPr>${runs}<a:endParaRPr ${typography(endFormat)}>${fontBody(endFormat, profile)}</a:endParaRPr></a:p>`;
     })
     .join("");
-  return `<xdr:txBody><a:bodyPr rot="0" vert="horz" wrap="${layout.wrap ? "square" : "none"}" lIns="${pt(m.leftPt)}" tIns="${pt(m.topPt)}" rIns="${pt(m.rightPt)}" bIns="${pt(m.bottomPt)}" anchor="${{ start: "t", center: "ctr", end: "b" }[layout.blockAlignment]}" anchorCtr="0" rtlCol="${Number(layout.lineOrder === "rtl")}" horzOverflow="${layout.overflow ? "overflow" : "clip"}" vertOverflow="${layout.overflow ? "overflow" : "clip"}"><a:noAutofit/></a:bodyPr><a:lstStyle/>${paragraphs}</xdr:txBody>`;
+  return `<xdr:txBody><a:bodyPr rot="0" vert="horz" wrap="${layout.wrap ? "square" : "none"}" lIns="${pt(m.leftPt)}" tIns="${pt(m.topPt)}" rIns="${pt(m.rightPt)}" bIns="${pt(m.bottomPt)}" anchor="${{ start: "t", center: "ctr", end: "b" }[layout.blockAlignment]}" anchorCtr="0" rtlCol="${Number(!profile && layout.lineOrder === "rtl")}" horzOverflow="${layout.overflow ? "overflow" : "clip"}" vertOverflow="${layout.overflow ? "overflow" : "clip"}"><a:noAutofit/></a:bodyPr><a:lstStyle/>${paragraphs}</xdr:txBody>`;
 }
 function marker(tag: "from" | "to", p: PictureCellPoint): string {
   return `<xdr:${tag}><xdr:col>${p.column.index}</xdr:col><xdr:colOff>${px(p.column.offset)}</xdr:colOff><xdr:row>${p.row.index}</xdr:row><xdr:rowOff>${px(p.row.offset)}</xdr:rowOff></xdr:${tag}>`;
@@ -106,6 +108,7 @@ export function nativeTextBoxAnchorXml(
   drawing: SheetFramedGraphicDrawing,
   sheet: Sheet,
   objectId: number,
+  profile?: TextBoxExportProfile,
 ): string {
   assertSupportedNativeTextBox(
     drawing,
@@ -129,5 +132,5 @@ export function nativeTextBoxAnchorXml(
       : a.mode === "move-only"
         ? `${marker("from", a.origin)}${ext}`
         : `${marker("from", a.start)}${marker("to", a.end)}`;
-  return `<xdr:${tag}>${position}<xdr:sp><xdr:nvSpPr><xdr:cNvPr id="${objectId}" name="${xml(drawing.name)}"/><xdr:cNvSpPr txBox="1"/></xdr:nvSpPr><xdr:spPr><a:xfrm><a:off x="${px(rect.x)}" y="${px(rect.y)}"/><a:ext cx="${px(rect.width)}" cy="${px(rect.height)}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${fill(drawing.shapeStyle?.fill, drawing.fill)}${line(drawing)}<a:effectLst/></xdr:spPr>${textBody(drawing)}</xdr:sp><xdr:clientData/></xdr:${tag}>`;
+  return `<xdr:${tag}>${position}<xdr:sp><xdr:nvSpPr><xdr:cNvPr id="${objectId}" name="${xml(drawing.name)}"/><xdr:cNvSpPr txBox="1"/></xdr:nvSpPr><xdr:spPr><a:xfrm><a:off x="${px(rect.x)}" y="${px(rect.y)}"/><a:ext cx="${px(rect.width)}" cy="${px(rect.height)}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${fill(drawing.shapeStyle?.fill, drawing.fill)}${line(drawing)}<a:effectLst/></xdr:spPr>${textBody(drawing, profile)}</xdr:sp><xdr:clientData/></xdr:${tag}>`;
 }

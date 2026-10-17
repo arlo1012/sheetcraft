@@ -34,6 +34,7 @@ const issueLabels: Readonly<Record<string, MessageKey>> = {
   "number-format-omitted": "xlsx.report.issues.numberFormatOmitted",
   "number-format-degraded": "xlsx.report.issues.numberFormatDegraded",
   "dimension-approximated": "xlsx.report.issues.dimensionApproximated",
+  "textbox-layout-normalized": "xlsx.report.issues.textboxLayoutNormalized",
   "picture-geometry-approximated": "xlsx.report.issues.pictureGeometryApproximated",
   "date-normalized": "xlsx.report.issues.dateNormalized",
   "cell-value-omitted": "xlsx.report.issues.cellValueOmitted",

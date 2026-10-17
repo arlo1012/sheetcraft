@@ -197,7 +197,7 @@ export function finalizeXlsxExport(
     );
     writeXlsxPivotCharts(entries, workbook, nativePivots, filename, report);
     writeXlsxColumnCharts(entries, workbook, report);
-    writeXlsxTextBoxes(entries, workbook);
+    writeXlsxTextBoxes(entries, workbook, { freshExport: true, report });
     reorderNativeDrawingAnchors(entries, workbook);
   }
   const files: Zippable = {};
