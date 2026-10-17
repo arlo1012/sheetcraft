@@ -8,7 +8,7 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 function fixture(extra: Record<string, unknown> = {}) {
-  const commit = vi.fn((..._args: unknown[]) => ({ accepted: true }));
+  const commit = vi.fn((..._args: unknown[]) => ({ accepted: true as const }));
   const wrapper = mount(NumericField, {
     attachTo: document.body,
     props: {
@@ -152,7 +152,7 @@ describe("standard TDesign InputNumber proof", () => {
   test("external lease stays stale until Escape and owner switch resets", async () => {
     const f = fixture();
     await f.input.setValue("4.5");
-    const replacement = vi.fn((..._args: unknown[]) => ({ accepted: true }));
+    const replacement = vi.fn((..._args: unknown[]) => ({ accepted: true as const }));
     await f.wrapper.setProps({ onCommit: replacement, value: { kind: "value", value: 6 } });
     await key(f, "Enter");
     expect(f.input.element.value).toBe("4.5");
@@ -213,7 +213,7 @@ test("owner change during blurred composition retires the old text and cannot wr
   await f.input.trigger("input");
   f.input.element.blur();
   await nextTick();
-  const replacement = vi.fn(() => ({ accepted: true }));
+  const replacement = vi.fn(() => ({ accepted: true as const }));
   await f.wrapper.setProps({
     ownerKey: "object-b",
     value: { kind: "value", value: 6 },

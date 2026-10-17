@@ -25,7 +25,7 @@ test("shared FormatSection uses public Collapse and preserves its field through 
   const header = wrapper.get<HTMLButtonElement>("button[aria-expanded]");
   const field = wrapper.get<HTMLInputElement>('input[aria-label="Retained field"]').element;
   expect(header.attributes("aria-expanded")).toBe("false");
-  expect(wrapper.get(`#${header.attributes("aria-controls")}`).exists()).toBe(true);
+  expect(wrapper.find(`#${header.attributes("aria-controls")}`).exists()).toBe(true);
   await header.trigger("click");
   expect(header.attributes("aria-expanded")).toBe("true");
   await wrapper.get('button[aria-label="Preset"]').trigger("click");

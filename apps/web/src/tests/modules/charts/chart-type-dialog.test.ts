@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
+import type { ComponentPublicInstance } from "vue";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import {
   createWorkbook,
@@ -108,7 +109,11 @@ describe("desktop chart type dialog", () => {
     expect(document.querySelectorAll("[data-chart-type]")).toHaveLength(13);
     expect(wrapper.findComponent(ChartSubtypeControls).props("presentation")).toBe("dialog");
     expect(wrapper.findComponent(OptionList).exists()).toBe(true);
-    expect(wrapper.getComponent(OptionList).props("variant")).toBe("navigation");
+    expect(
+      wrapper
+        .getComponent<ComponentPublicInstance<Parameters<typeof OptionList>[0]>>(OptionList)
+        .props("variant"),
+    ).toBe("navigation");
     expect(
       [...document.querySelectorAll(".chart-type-dialog .t-dialog__footer button")].map((button) =>
         button.textContent?.trim(),
@@ -124,7 +129,7 @@ describe("desktop chart type dialog", () => {
     });
     expect(wrapper.getComponent(Dialog).props("footer")).toBe(true);
     expect(wrapper.getComponent(Dialog).vm.$slots.footer).toBeUndefined();
-    expect(wrapper.getComponent(RangeReferenceInput).exists()).toBe(true);
+    expect(wrapper.findComponent(RangeReferenceInput).exists()).toBe(true);
     expect(document.querySelector(".chart-style-gallery")).toBeNull();
     expect(document.querySelector(".chart-elements-controls")).toBeNull();
     expect(wrapper.emitted("confirm")).toBeUndefined();

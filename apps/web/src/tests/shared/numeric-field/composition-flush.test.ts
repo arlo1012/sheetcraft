@@ -5,7 +5,7 @@ import NumericField from "../../../shared/numeric-field/NumericField.vue";
 import { createShapeTextFieldDrafts } from "../../../modules/sheet-drawings/shape-text-field-drafts";
 
 test("clean numeric composition blocks an outer session flush until composition ends without a document edit", async () => {
-  const commit = vi.fn(() => ({ accepted: true }));
+  const commit = vi.fn(() => ({ accepted: true as const }));
   const wrapper = mount(NumericField, {
     attachTo: document.body,
     props: {

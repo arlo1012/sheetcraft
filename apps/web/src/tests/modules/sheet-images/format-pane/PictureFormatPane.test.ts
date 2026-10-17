@@ -192,9 +192,9 @@ describe("active-page picture format feedback", () => {
     expect(wrapper.get(".picture-format-pane__status").text()).toBe("Sheet is protected");
     const width = input(wrapper, "sizeWidthPt");
     expect(width.attributes("disabled")).toBeDefined();
-    expect(document.getElementById(width.attributes("aria-describedby"))?.textContent).toBe(
-      "Sheet is protected",
-    );
+    const descriptionId = width.attributes("aria-describedby");
+    if (!descriptionId) throw new Error("Width field is missing its feedback reference");
+    expect(document.getElementById(descriptionId)?.textContent).toBe("Sheet is protected");
     await reveal(wrapper, "altTextSection");
     const title = wrapper.get('[data-picture-format-field="altTitle"]');
     const feedback = title.element.closest(".picture-format-field")!.querySelector("p")!;

@@ -227,8 +227,9 @@ test("opacity percentages redisplay cleanly through collapse/remount without rou
     await boundaryThumb.trigger("keyup", { key: "ArrowRight", code: "ArrowRight" });
     expect(commit).toHaveBeenCalledTimes(7);
     // A down/up without drag has no library changeEnd; its temporary global listener must retire.
-    const added = vi.spyOn(window, "addEventListener"),
-      removed = vi.spyOn(window, "removeEventListener");
+    const browserWindow: Window = window;
+    const added = vi.spyOn(browserWindow, "addEventListener"),
+      removed = vi.spyOn(browserWindow, "removeEventListener");
     try {
       await boundaryThumb.trigger("mousedown", { button: 0, clientX: 34, clientY: 0 });
       const pointerUp = added.mock.calls.filter(([type]) => type === "pointerup").at(-1)![1];

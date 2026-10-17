@@ -40,7 +40,7 @@ function fixture(component: Component = PictureGlowEditor, extra: Record<string,
   mounted.push(wrapper);
   return { wrapper, onCommit, select: wrapper.getComponent(Select) };
 }
-async function open(select: VueWrapper) {
+async function open(select: ReturnType<typeof fixture>["select"]) {
   await flushPromises();
   for (const target of select.findAll(".t-input__wrap, .t-input, .t-select-input, .t-select__wrap"))
     vi.spyOn(target.element, "getBoundingClientRect").mockReturnValue(

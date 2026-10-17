@@ -30,6 +30,10 @@ import * as textureSource from "../../../modules/sheet-images/picture-texture";
 import { actualPng } from "../../modules/image-assets/image-header-fixtures";
 
 const mounted: VueWrapper[] = [];
+type SelectWrapper = Pick<
+  VueWrapper<InstanceType<typeof TSelect>>,
+  "get" | "findAll" | "props"
+>;
 afterEach(() => {
   mounted.splice(0).forEach((wrapper) => wrapper.unmount());
   textPaint.clearShapeTextPaintCache();
@@ -171,14 +175,17 @@ async function settle() {
   await new Promise((resolve) => setTimeout(resolve, 0));
   await flushPromises();
 }
-async function choose(select: VueWrapper, label: string) {
+async function choose(select: SelectWrapper, label: string) {
   for (const trigger of select.findAll(".t-input__wrap, .t-input"))
     vi.spyOn(trigger.element, "getBoundingClientRect").mockReturnValue(
       new DOMRect(100, 100, 128, 28),
     );
   await select.get(".t-input").trigger("click");
   await vi.waitFor(() => expect(select.props("popupVisible")).toBe(true));
-  const host = (select.props("popupProps") as { attach: () => HTMLElement }).attach();
+  const attach = select.props("popupProps")?.attach;
+  if (typeof attach !== "function") throw new TypeError("Expected a popup attachment callback.");
+  const host = attach();
+  if (!(host instanceof HTMLElement)) throw new TypeError("Expected an HTML popup host.");
   await vi.waitFor(() => expect(host.querySelector("li.t-select-option")).not.toBeNull());
   const option = [...host.querySelectorAll<HTMLElement>("li.t-select-option")].find(
     (item) => item.textContent?.trim() === label,
@@ -190,7 +197,7 @@ async function choose(select: VueWrapper, label: string) {
   option.click();
   await settle();
 }
-async function openGallery(editor: VueWrapper) {
+async function openGallery(editor: Pick<VueWrapper, "getComponent">) {
   const gallery = editor.getComponent(PictureTextureGallery).getComponent(PanelSelect);
   for (const trigger of gallery.findAll(".t-input__wrap, .t-input"))
     vi.spyOn(trigger.element, "getBoundingClientRect").mockReturnValue(
@@ -203,7 +210,7 @@ async function openGallery(editor: VueWrapper) {
   expect(gallery.get("input").attributes("aria-expanded")).toBe("true");
   return gallery;
 }
-async function closeGallery(gallery: VueWrapper) {
+async function closeGallery(gallery: Pick<VueWrapper, "get">) {
   document.activeElement!.dispatchEvent(
     new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
   );

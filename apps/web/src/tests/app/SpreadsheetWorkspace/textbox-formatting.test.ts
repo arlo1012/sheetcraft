@@ -600,7 +600,7 @@ test("TextBox same-session pane keyboard keeps the private F2 draft and document
   expect(serializeWorkbook(current.session.workbook)).toEqual(before);
 });
 
-async function openNativeFillMode(pane: VueWrapper) {
+async function openNativeFillMode(pane: FormatWrapper) {
   await pane.get('[role="tab"][id$="fill-line-tab"]').trigger("click");
   const editor = fillLine(pane, "shape").getComponent(PicturePaintEditor);
   const select = editor.findAllComponents(TSelect)[0]!;
@@ -797,8 +797,10 @@ test.each([false, true])(
       scrollTop: 73,
     });
     const layer = wrapper.getComponent(SheetDrawingLayer);
+    const root = getActiveSheet(current.session.workbook).drawings?.[0];
+    if (!root) throw new TypeError("Expected a drawing to start text editing.");
     layer.props("startTextEdit")!({
-      root: getActiveSheet(current.session.workbook).drawings![0],
+      root,
       path: owned ? ["group", "box"] : ["box"],
       selection: "all",
     });

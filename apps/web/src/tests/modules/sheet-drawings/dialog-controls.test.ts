@@ -64,7 +64,17 @@ async function openPalette(control: VueWrapper) {
 }
 
 function preview(wrapper: VueWrapper): SheetGraphicDrawing {
-  return wrapper.findAllComponents(DrawingContent).at(-1)!.props("drawing");
+  const drawing = wrapper.findAllComponents(DrawingContent).at(-1)!.props("drawing");
+  switch (drawing.kind) {
+    case "shape":
+    case "textBox":
+    case "wordArt":
+    case "icon":
+    case "equation":
+      return drawing;
+    default:
+      throw new Error(`Expected a graphic preview, received ${drawing.kind}`);
+  }
 }
 
 test.each(["shape", "textBox", "wordArt", "icon", "equation"] as const)(

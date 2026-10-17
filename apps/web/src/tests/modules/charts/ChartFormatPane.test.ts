@@ -909,7 +909,9 @@ describe("shared chart layout numbers", () => {
       { kind: "valueAxis" },
       {
         drawing: drawing({
-          format: { valueAxis: { linkedToSource: false, numberFormat: { kind: "number" } } },
+          format: {
+            valueAxis: { linkedToSource: false, numberFormat: { kind: "number", fractionDigits: 2 } },
+          },
         }),
       },
     );

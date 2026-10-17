@@ -142,6 +142,6 @@ describe("OptionList keyboard interaction", () => {
     mounted.push(wrapper);
     expect(wrapper.get('[role="option"]').text()).toBe("First");
     expect(wrapper.get(".option-list__icon").attributes("aria-hidden")).toBe("true");
-    expect(wrapper.get(".option-list__icon svg").exists()).toBe(true);
+    expect(wrapper.find(".option-list__icon svg").exists()).toBe(true);
   });
 });

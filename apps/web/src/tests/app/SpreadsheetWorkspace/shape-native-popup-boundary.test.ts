@@ -16,6 +16,7 @@ import PictureReflectionEditor from "../../../modules/sheet-images/components/fo
 import PictureShadowEditor from "../../../modules/sheet-images/components/format-pane/PictureShadowEditor.vue";
 import ShapeLineEndsControls from "../../../modules/sheet-drawings/components/ShapeLineEndsControls.vue";
 import ShapeFormatMixedEffect from "../../../modules/sheet-drawings/components/shape-format/ShapeFormatMixedEffect.vue";
+import { resolveShapeDrawing } from "../../../modules/sheet-drawings/resolved-shape-drawing";
 import { materializeDrawingShapeText } from "../../../modules/sheet-drawings/shape-text-options";
 import { groupShapeRoots } from "@sheetcraft/core/shape-group-planning";
 import { isShapeGroupDrawing } from "@sheetcraft/core/shape-group";
@@ -40,6 +41,10 @@ import * as measurement from "../../../modules/sheet-drawings/shape-text-measure
 import * as textPaint from "../../../modules/sheet-drawings/shape-text-paint";
 import * as groupPaint from "../../../modules/sheet-drawings/shape-group-paint";
 const mounted: VueWrapper[] = [];
+type SelectWrapper = Pick<
+  VueWrapper<InstanceType<typeof TSelect>>,
+  "get" | "findAll" | "props"
+>;
 afterEach(() => {
   mounted.splice(0).forEach((wrapper) => wrapper.unmount());
   textPaint.clearShapeTextPaintCache();
@@ -127,9 +132,14 @@ async function fixture(
   }
   const sheet = getActiveSheet(book);
   if (options.mixedShadow) {
-    box.shapeText = materializeDrawingShapeText(box);
+    const metrics = createPictureSheetMetrics(sheet);
+    const boxView = resolveShapeDrawing(box, metrics).view;
+    const siblingView = resolveShapeDrawing(sibling, metrics).view;
+    if (boxView.kind !== "textBox" || siblingView.kind !== "textBox")
+      throw new TypeError("Expected text box projections for mixed shadows.");
+    box.shapeText = materializeDrawingShapeText(boxView);
     box.shapeText.style = { ...box.shapeText.style, shadow: { kind: "none" } };
-    sibling.shapeText = materializeDrawingShapeText(sibling);
+    sibling.shapeText = materializeDrawingShapeText(siblingView);
     sibling.shapeText.style = {
       ...sibling.shapeText.style,
       shadow: { kind: "value", value: createPictureShadow() },
@@ -177,14 +187,17 @@ async function fixture(
     getActiveSheet(current.session.workbook).drawings![0] as SheetFramedGraphicDrawing;
   return { wrapper, current, pane, before, target };
 }
-async function open(select: VueWrapper, text: string) {
+async function open(select: SelectWrapper, text: string) {
   for (const trigger of select.findAll(".t-input__wrap, .t-input"))
     vi.spyOn(trigger.element, "getBoundingClientRect").mockReturnValue(
       new DOMRect(100, 100, 128, 28),
     );
   await select.get(".t-input").trigger("click");
   await vi.waitFor(() => expect(select.props("popupVisible")).toBe(true));
-  const host = (select.props("popupProps") as { attach: () => HTMLElement }).attach();
+  const attach = select.props("popupProps")?.attach;
+  if (typeof attach !== "function") throw new TypeError("Expected a popup attachment callback.");
+  const host = attach();
+  if (!(host instanceof HTMLElement)) throw new TypeError("Expected an HTML popup host.");
   await vi.waitFor(() => expect(host.querySelector("li.t-select-option")).not.toBeNull());
   const option = [...host.querySelectorAll<HTMLElement>("li.t-select-option")].find(
     (item) => item.textContent?.trim() === text,
@@ -198,7 +211,7 @@ function pointer(option: HTMLElement) {
     new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }),
   );
 }
-async function line(pane: VueWrapper) {
+async function line(pane: Pick<VueWrapper, "get" | "getComponent">) {
   await pane.get('[role="tab"][id$="fill-line-tab"]').trigger("click");
   return pane.getComponent(PictureLineEditor);
 }
