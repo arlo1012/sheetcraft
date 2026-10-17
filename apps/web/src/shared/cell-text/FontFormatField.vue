@@ -174,7 +174,7 @@ function blur(_value: unknown, { e }: SelectInputBlurContext): void {
       if (containsTarget(document.activeElement) || binding !== props.draft) return;
       closeMenu();
       emit("focusChange", false);
-      if (!binding.submit("blur")) control.value?.querySelector<HTMLInputElement>("input")?.focus();
+      binding.submit("blur");
     });
     return;
   }
@@ -324,6 +324,7 @@ defineExpose({
           :aria-expanded="open"
           :aria-controls="open ? menuId : undefined"
           @mousedown.prevent
+          @blur="props.draft && blur(undefined, { e: $event, inputValue: inputText })"
           @click.stop="toggleMenu"
           @keydown.stop="onTriggerKeydown"
           ><RibbonDropdownArrow :expanded="open"

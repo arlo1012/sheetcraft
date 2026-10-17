@@ -141,6 +141,134 @@ describe("existing font combo optional controlled draft", () => {
     expect(f.calls.mock.calls[0]?.[0]).toEqual({ kind: "value", value: 100.5 });
     expect(f.input.element.value).toBe("100.5");
   });
+  test.each(["invalid", "rejected"] as const)(
+    "ordinary blur retains %s draft without reclaiming outside focus",
+    async (kind) => {
+      const f = fixture();
+      const outside = document.createElement("button");
+      document.body.append(outside);
+      f.accepted.value = kind !== "rejected";
+      f.input.element.focus();
+      await f.input.setValue(kind === "invalid" ? "oops" : "24");
+      outside.focus();
+      await flushPromises();
+      expect(document.activeElement).toBe(outside);
+      expect(f.input.element.value).toBe(kind === "invalid" ? "oops" : "24");
+      expect(f.state().error.value).toBe(kind === "invalid" ? "Invalid" : "Refused");
+      expect(f.calls).toHaveBeenCalledTimes(kind === "invalid" ? 0 : 1);
+      expect(f.wrapper.getComponent(FontFormatField).emitted("focusChange")?.at(-1)).toEqual([
+        false,
+      ]);
+      f.input.element.focus();
+      await key(f.input, "Escape");
+      expect(f.input.element.value).toBe("11");
+      expect(f.state().error.value).toBeUndefined();
+      expect(f.calls).toHaveBeenCalledTimes(kind === "invalid" ? 0 : 1);
+    },
+  );
+  test.each(["invalid", "rejected", "valid"] as const)(
+    "Tab focus chain through the arrow releases %s draft outside exactly once",
+    async (kind) => {
+      const f = fixture();
+      const outside = document.createElement("button");
+      document.body.append(outside);
+      const arrow = f.wrapper.get<HTMLElement>(".font-format-field__arrow");
+      f.accepted.value = kind !== "rejected";
+      f.input.element.focus();
+      await f.input.setValue(kind === "invalid" ? "0" : "24");
+      await key(f.input, "Enter");
+      await f.input.trigger("keydown", { key: "Tab" });
+      // happy-dom has no native Tab traversal: move to the actual next tab stop.
+      arrow.element.focus();
+      await flushPromises();
+      expect(document.activeElement).toBe(arrow.element);
+      expect(f.wrapper.getComponent(FontFormatField).emitted("focusChange")?.at(-1)).toEqual([
+        true,
+      ]);
+      expect(f.calls).toHaveBeenCalledTimes(kind === "invalid" ? 0 : 1);
+      await arrow.trigger("keydown", { key: "Tab" });
+      outside.focus();
+      await flushPromises();
+      expect(document.activeElement).toBe(outside);
+      expect(f.wrapper.getComponent(FontFormatField).emitted("focusChange")?.at(-1)).toEqual([
+        false,
+      ]);
+      expect(f.input.element.value).toBe(kind === "invalid" ? "0" : "24");
+      expect(f.state().error.value).toBe(
+        kind === "invalid" ? "Invalid" : kind === "rejected" ? "Refused" : undefined,
+      );
+      expect(f.calls).toHaveBeenCalledTimes(kind === "invalid" ? 0 : 1);
+    },
+  );
+  test("arrow blur keeps input and owned popup focus transfers internal", async () => {
+    const f = fixture();
+    const arrow = f.wrapper.get<HTMLElement>(".font-format-field__arrow");
+    f.input.element.focus();
+    await f.input.setValue("17");
+    arrow.element.focus();
+    await flushPromises();
+    f.input.element.focus();
+    await flushPromises();
+    expect(f.calls).not.toHaveBeenCalled();
+    arrow.element.focus();
+    await flushPromises();
+    await arrow.trigger("keydown", { key: "ArrowDown" });
+    await flushPromises();
+    expect(document.activeElement?.getAttribute("role")).toBe("menuitemradio");
+    expect(f.input.attributes("aria-expanded")).toBe("true");
+    expect(f.calls).not.toHaveBeenCalled();
+    expect(f.wrapper.getComponent(FontFormatField).emitted("focusChange")?.at(-1)).toEqual([true]);
+  });
+  test("ordinary blur submits a valid draft once and leaves focus outside", async () => {
+    const f = fixture();
+    const outside = document.createElement("button");
+    document.body.append(outside);
+    f.input.element.focus();
+    await f.input.setValue("24.5");
+    outside.focus();
+    await flushPromises();
+    expect(document.activeElement).toBe(outside);
+    expect(f.calls).toHaveBeenCalledExactlyOnceWith(
+      { kind: "value", value: 24.5 },
+      expect.anything(),
+    );
+    expect(f.input.element.value).toBe("24.5");
+    expect(f.state().error.value).toBeUndefined();
+  });
+  test("compositionend before ordinary blur submits the completed text exactly once", async () => {
+    const f = fixture();
+    const outside = document.createElement("button");
+    document.body.append(outside);
+    f.input.element.focus();
+    await f.input.trigger("compositionstart");
+    f.input.element.value = "15.5";
+    await f.input.trigger("input");
+    await f.input.trigger("compositionend");
+    outside.focus();
+    await flushPromises();
+    expect(f.input.element.value).toBe("15.5");
+    expect(document.activeElement).toBe(outside);
+    expect(f.state().composing.value).toBe(false);
+    expect(f.calls).toHaveBeenCalledExactlyOnceWith(
+      { kind: "value", value: 15.5 },
+      expect.anything(),
+    );
+  });
+  test("queued ordinary blur cannot submit the replaced owner's draft or reclaim focus", async () => {
+    const f = fixture();
+    const outside = document.createElement("button");
+    document.body.append(outside);
+    f.input.element.focus();
+    await f.input.setValue("17");
+    outside.focus();
+    f.source.ownerKey = "shape-b";
+    f.source.value = { kind: "value", value: 9 };
+    await flushPromises();
+    expect(document.activeElement).toBe(outside);
+    expect(f.calls).not.toHaveBeenCalled();
+    expect(f.input.element.value).toBe("9");
+    expect(f.state().error.value).toBeUndefined();
+  });
   test("invalid and intermediate text is retained; Escape cancels without parent action", async () => {
     const f = fixture(),
       parent = vi.fn();

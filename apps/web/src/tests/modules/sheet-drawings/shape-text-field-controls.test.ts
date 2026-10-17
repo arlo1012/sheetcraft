@@ -176,6 +176,30 @@ describe.each(["ribbon", "pane"] as const)(
       expect(f.onIntent).toHaveBeenCalledOnce();
     });
 
+    test("ordinary invalid blur releases focus but an explicit rejected session boundary restores it", async () => {
+      const f = await fixture(kind);
+      f.field.element.focus();
+      await f.field.setValue("invalid size");
+      f.outside.element.focus();
+      await flushPromises();
+      expect(document.activeElement).toBe(f.outside.element);
+      expect(f.field.element.value).toBe("invalid size");
+      expect(f.onIntent).not.toHaveBeenCalled();
+      expect(pointer(f.outside.element).defaultPrevented).toBe(true);
+      await flushPromises();
+      expect(document.activeElement).toBe(f.field.element);
+      f.outside.element.focus();
+      await flushPromises();
+      expect(document.activeElement).toBe(f.outside.element);
+      expect(f.registry.focusRejected("shape-text-7")).toBe(true);
+      expect(document.activeElement).toBe(f.field.element);
+      expect(f.registry.focusRejected("shape-text-8")).toBe(false);
+      await key(f.field.element, "Escape");
+      expect(f.field.element.value).toBe("12");
+      expect(f.registry.focusRejected("shape-text-7")).toBe(false);
+      expect(f.onIntent).not.toHaveBeenCalled();
+    });
+
     test("new typing survives a late own acknowledgement and stays on the acknowledged lease", async () => {
       const f = await fixture(kind);
       await f.field.setValue("24");
@@ -235,10 +259,19 @@ describe("native field feedback presentation", () => {
   test("Ribbon numeric error teleports only while focused, retains one describedby id unfocused, and Escape restores", async () => {
     const f = await fixture("ribbon");
     expect(f.wrapper.find(".numeric-field__unit").exists()).toBe(false);
-    expect(f.field.attributes("aria-valuetext")).toContain("pt");
+    expect(f.field.attributes()).toMatchObject({
+      role: "combobox",
+      "aria-label": "Font size",
+      "aria-description": "pt",
+    });
+    expect(f.field.element.value).toBe("12");
+    // TDesign may omit the explicit false emitted by the native-attribute adapter.
+    expect([undefined, "false"]).toContain(f.field.attributes("aria-invalid"));
+    expect(f.field.attributes("aria-valuetext")).toBeUndefined();
     f.field.element.focus();
     await f.field.setValue("invalid size");
     await key(f.field.element, "Enter");
+    expect(f.field.attributes("aria-invalid")).toBe("true");
     const ids = f.field.attributes("aria-describedby")!.split(/\s+/);
     expect(ids).toHaveLength(1);
     const id = ids[0]!;
@@ -248,8 +281,17 @@ describe("native field feedback presentation", () => {
     expect(message.closest("[data-field-feedback-floating]")?.parentElement).toBe(document.body);
     expect(document.querySelectorAll(`[id="${id}"]`)).toHaveLength(1);
     expect(f.wrapper.element.contains(message)).toBe(false);
+    const arrow = f.wrapper.get<HTMLElement>(".font-format-field__arrow");
+    expect((await key(f.field.element, "Tab")).defaultPrevented).toBe(false);
+    // Follow the real input → arrow → next control Tab order in happy-dom.
+    arrow.element.focus();
+    await flushPromises();
+    expect(document.activeElement).toBe(arrow.element);
+    expect(document.querySelector("[data-field-feedback-floating]")).not.toBeNull();
+    expect((await key(arrow.element, "Tab")).defaultPrevented).toBe(false);
     f.outside.element.focus();
     await flushPromises();
+    expect(document.activeElement).toBe(f.outside.element);
     expect(document.querySelector("[data-field-feedback-floating]")).toBeNull();
     message = document.getElementById(id)!;
     expect(message.classList.contains("field-feedback--description-only")).toBe(true);
@@ -259,7 +301,8 @@ describe("native field feedback presentation", () => {
     f.field.element.focus();
     await key(f.field.element, "Escape");
     expect(f.field.element.value).toBe("12");
-    expect(f.field.attributes("aria-invalid")).toBeUndefined();
+    expect([undefined, "false"]).toContain(f.field.attributes("aria-invalid"));
+    expect(f.field.attributes("aria-describedby")).toBeUndefined();
     expect(document.getElementById(id)).toBeNull();
     expect(f.onIntent).not.toHaveBeenCalled();
   });
