@@ -1,3 +1,4 @@
+import { equalDrawingEncodingRects } from "@sheetcraft/core/picture-frame";
 import { readNativePictureStyle, type NativePictureStyle } from "./picture-native-style.js";
 import type { NativeTextBoxTheme } from "./textbox-theme.js";
 import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
@@ -337,6 +338,20 @@ export function readXlsxPictures(
                   height: transform ? transform.height : markerRect.height,
                 },
               };
+      if (
+        source.editAs === "absolute" &&
+        source.anchor.mode === "move-and-size" &&
+        anchor.mode === "fixed" &&
+        transform &&
+        equalDrawingEncodingRects(markerRect, transform) &&
+        isIdentityNativePictureGeometry(source.geometry)
+      )
+        anchor.exportEncoding = {
+          kind: "two-cell-absolute-v1",
+          start: source.anchor.start,
+          end: source.anchor.end,
+          referenceRect: { ...transform },
+        };
       const rect = resolvePictureAnchorRect(anchor, metrics);
       // Initial native geometry must be positive. Persisted V86 frames may
       // later collapse through grid edits without losing their logical points.

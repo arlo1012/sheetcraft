@@ -338,6 +338,8 @@ export type WorkbookSnapshotV86 = Omit<WorkbookSnapshotV85, "version"> & { versi
 export type WorkbookSnapshotV87 = Omit<WorkbookSnapshotV86, "version"> & { version: 87 };
 /** Conditional envelope for sparse legend text and surface formatting. */
 export type WorkbookSnapshotV88 = Omit<WorkbookSnapshotV87, "version"> & { version: 88 };
+/** Guarded fixed-anchor source encoding, independent of canonical layout. */
+export type WorkbookSnapshotV89 = Omit<WorkbookSnapshotV88, "version"> & { version: 89 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -384,8 +386,9 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV85
   | WorkbookSnapshotV86
   | WorkbookSnapshotV87
-  | WorkbookSnapshotV88;
-type WorkbookWritePayload = Omit<WorkbookSnapshotV88, "version"> & {
+  | WorkbookSnapshotV88
+  | WorkbookSnapshotV89;
+type WorkbookWritePayload = Omit<WorkbookSnapshotV89, "version"> & {
   version: WorkbookSnapshot["version"];
 };
 export type SheetSnapshot = SheetSnapshotV7 & {
@@ -493,7 +496,8 @@ type SnapshotVersion =
   | 85
   | 86
   | 87
-  | 88;
+  | 88
+  | 89;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -1127,6 +1131,15 @@ function hasPictureFreePixelOffsetField(image: unknown): boolean {
   const frame = pictureDataField(image, "frame");
   const anchor = pictureDataField(frame, "anchor");
   return !!anchor && typeof anchor === "object" && "offsetMode" in anchor;
+}
+/** Only worksheet roots own export anchor hints. Gate raw presence before normalization. */
+function hasFixedDrawingExportEncoding(value: unknown): boolean {
+  for (const field of ["frame", "shapeFrame"]) {
+    const frame = pictureDataField(value, field);
+    const anchor = pictureDataField(frame, "anchor");
+    if (anchor && typeof anchor === "object" && "exportEncoding" in anchor) return true;
+  }
+  return false;
 }
 /** Raw bounded traversal preserves field presence, including default-valued fields of old payloads. */
 function hasPicturePropertyFields(image: unknown): boolean {
@@ -2071,6 +2084,12 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       );
     }
   }
+  const hasDrawingExportEncoding = [
+    ...(Array.isArray(record.floatingImages) ? record.floatingImages : []),
+    ...(Array.isArray(record.drawings) ? record.drawings : []),
+  ].some(hasFixedDrawingExportEncoding);
+  if (hasDrawingExportEncoding && version !== undefined && version < 89)
+    return fail(path, "Drawing export encoding requires snapshot version 89.");
   let hasPictureFreePixelOffset = false;
   try {
     if (Array.isArray(record.floatingImages)) {
@@ -2550,6 +2569,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasPictureFreePixelOffset) version = 86;
     if (Object.hasOwn(record, "defaultRowHeight")) version = 87;
     if (hasChartLegendFormat) version = 88;
+    if (hasDrawingExportEncoding) version = 89;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -2973,6 +2993,12 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     )
   )
     snapshot.version = 88;
+  if (
+    sheets.some((sheet) =>
+      [...sheet.floatingImages, ...(sheet.drawings ?? [])].some(hasFixedDrawingExportEncoding),
+    )
+  )
+    snapshot.version = 89;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -3068,7 +3094,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 85 &&
     record.version !== 86 &&
     record.version !== 87 &&
-    record.version !== 88
+    record.version !== 88 &&
+    record.version !== 89
   ) {
     throw new WorkbookDomainError(
       {

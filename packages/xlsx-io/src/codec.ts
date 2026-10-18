@@ -1,3 +1,5 @@
+import { canReuseFixedDrawingExportEncoding } from "@sheetcraft/core/picture-frame";
+import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import { readXlsxTextBoxes } from "./textbox-reader.js";
 import { assertSupportedNativeTextBox } from "./textbox-capabilities.js";
 import { unsupportedNativeChartStyles } from "./native-chart-style-capabilities.js";
@@ -1275,6 +1277,21 @@ export async function encodeWithNativeXlsx(
           sheet,
           `${sheet.name}.drawings[${JSON.stringify(drawing.id)}]`,
         );
+        const anchor = drawing.shapeFrame.anchor;
+        if (
+          anchor.mode === "fixed" &&
+          anchor.exportEncoding &&
+          !canReuseFixedDrawingExportEncoding(
+            anchor.exportEncoding,
+            { x: anchor.x, y: anchor.y, ...anchor.size },
+            createPictureSheetMetrics(sheet),
+          )
+        )
+          report.add(
+            "dimension-approximated",
+            "warning",
+            `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].shapeFrame.anchor.exportEncoding`,
+          );
         continue;
       }
       if (!hasShapeObjectFrame(drawing)) {
@@ -1515,6 +1532,23 @@ export async function encodeWithNativeXlsx(
         `${sheet.name}.floatingImages[${JSON.stringify(image.id)}]`,
         sheet,
       );
+      if (isFramedPictureObject(image)) {
+        const anchor = image.frame.anchor;
+        if (
+          anchor.mode === "fixed" &&
+          anchor.exportEncoding &&
+          !canReuseFixedDrawingExportEncoding(
+            anchor.exportEncoding,
+            { x: anchor.x, y: anchor.y, ...anchor.size },
+            createPictureSheetMetrics(sheet),
+          )
+        )
+          report.add(
+            "picture-geometry-approximated",
+            "warning",
+            `${sheet.name}.floatingImages[${JSON.stringify(image.id)}].frame.anchor.exportEncoding`,
+          );
+      }
       if (image.hidden) {
         add(
           report,

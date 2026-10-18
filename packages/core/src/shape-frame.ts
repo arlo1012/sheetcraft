@@ -1,3 +1,7 @@
+import {
+  retainFixedDrawingExportEncoding,
+  type FixedDrawingExportEncoding,
+} from "./drawing-export-encoding.js";
 import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "./sheet-limits.js";
 import {
   comparePictureAxisPoints,
@@ -24,7 +28,13 @@ export type ShapeFrameSize = { width: number; height: number };
 export type ShapeFrameRect = ShapeFramePoint & ShapeFrameSize;
 export type ShapeFrameAnchor =
   | { mode: "move-only"; origin: PictureCellPoint; size: ShapeFrameSize }
-  | { mode: "fixed"; x: number; y: number; size: ShapeFrameSize }
+  | {
+      mode: "fixed";
+      x: number;
+      y: number;
+      size: ShapeFrameSize;
+      exportEncoding?: FixedDrawingExportEncoding;
+    }
   | { mode: "move-and-size"; start: PictureCellPoint; end: PictureCellPoint };
 /** Source-free local geometry. Rotation remains on the owning drawing. */
 export type ShapeFrame = { kind: "shape-frame-v1"; anchor: ShapeFrameAnchor };
@@ -111,18 +121,27 @@ function assertRect(value: ShapeFrameRect): ShapeFrameRect {
 export function normalizeShapeFrameAnchor(value: ShapeFrameAnchor): ShapeFrameAnchor {
   const anchor = record(
     value,
-    ["mode", "origin", "size", "x", "y", "start", "end"],
+    ["mode", "origin", "size", "x", "y", "start", "end", "exportEncoding"],
     "shape frame anchor",
   );
   if (anchor.mode === "fixed") {
-    record(anchor, ["mode", "x", "y", "size"], "fixed shape anchor");
+    record(anchor, ["mode", "x", "y", "size", "exportEncoding"], "fixed shape anchor");
     const size = normalizeShapeFrameSize(anchor.size as ShapeFrameSize);
     const rect = assertRect({
       x: finite(anchor.x, "Shape x"),
       y: finite(anchor.y, "Shape y"),
       ...size,
     });
-    return { mode: "fixed", x: rect.x, y: rect.y, size };
+    const exportEncoding = Object.hasOwn(anchor, "exportEncoding")
+      ? retainFixedDrawingExportEncoding(anchor.exportEncoding, rect)
+      : undefined;
+    return {
+      mode: "fixed",
+      x: rect.x,
+      y: rect.y,
+      size,
+      ...(exportEncoding ? { exportEncoding } : {}),
+    };
   }
   if (anchor.mode === "move-only") {
     record(anchor, ["mode", "origin", "size"], "moving shape anchor");

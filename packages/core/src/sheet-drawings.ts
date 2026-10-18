@@ -822,6 +822,11 @@ export function normalizeSheetDrawing(value: SheetDrawing): SheetDrawing {
       SheetGraphicDrawing,
       "anchor" | "offsetX" | "offsetY" | "width" | "height"
     >;
+    if (
+      shapeFrame.anchor.mode === "fixed" &&
+      (appearance.rotation !== 0 || value.kind !== "textBox")
+    )
+      delete shapeFrame.anchor.exportEncoding;
     return {
       ...appearance,
       kind: value.kind,

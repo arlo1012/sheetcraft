@@ -1,3 +1,4 @@
+import { equalDrawingEncodingRects } from "@sheetcraft/core/picture-frame";
 import {
   createPictureSheetMetrics,
   locatePictureAxisPoint,
@@ -696,6 +697,19 @@ export function readXlsxTextBoxes(
                 origin: anchor.start,
                 size: { width: markerRect.width, height: markerRect.height },
               };
+      if (
+        source.editAs === "absolute" &&
+        source.anchor.mode === "move-and-size" &&
+        anchor.mode === "fixed" &&
+        transform &&
+        equalDrawingEncodingRects(markerRect, transform)
+      )
+        anchor.exportEncoding = {
+          kind: "two-cell-absolute-v1",
+          start: source.anchor.start,
+          end: source.anchor.end,
+          referenceRect: { ...transform },
+        };
       const rect = resolveShapeAnchorRect(anchor, metrics);
       if (rect.width < 1 || rect.height < 1) reject(`${source.location}.anchor`);
       let id = `xlsx-textbox-${source.sheetIndex + 1}-${source.objectId}`;

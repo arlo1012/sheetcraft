@@ -1,3 +1,4 @@
+import { canReuseFixedDrawingExportEncoding } from "@sheetcraft/core/picture-frame";
 import type { SheetFramedGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { Sheet } from "@sheetcraft/core/workbook";
 import {
@@ -120,17 +121,25 @@ export function nativeTextBoxAnchorXml(
   const { rect } = resolveShapeFrame(drawing.shapeFrame, createPictureSheetMetrics(sheet), 0);
   const a = drawing.shapeFrame.anchor,
     ext = `<xdr:ext cx="${px(rect.width)}" cy="${px(rect.height)}"/>`;
-  const tag =
-    a.mode === "fixed"
+  const encoding =
+    a.mode === "fixed" &&
+    drawing.rotation === 0 &&
+    canReuseFixedDrawingExportEncoding(a.exportEncoding, rect, createPictureSheetMetrics(sheet))
+      ? a.exportEncoding
+      : undefined;
+  const tag = encoding
+    ? "twoCellAnchor"
+    : a.mode === "fixed"
       ? "absoluteAnchor"
       : a.mode === "move-only"
         ? "oneCellAnchor"
         : "twoCellAnchor";
-  const position =
-    a.mode === "fixed"
+  const position = encoding
+    ? `${marker("from", encoding.start)}${marker("to", encoding.end)}`
+    : a.mode === "fixed"
       ? `<xdr:pos x="${px(a.x)}" y="${px(a.y)}"/>${ext}`
       : a.mode === "move-only"
         ? `${marker("from", a.origin)}${ext}`
         : `${marker("from", a.start)}${marker("to", a.end)}`;
-  return `<xdr:${tag}>${position}<xdr:sp><xdr:nvSpPr><xdr:cNvPr id="${objectId}" name="${xml(drawing.name)}"/><xdr:cNvSpPr txBox="1"/></xdr:nvSpPr><xdr:spPr><a:xfrm><a:off x="${px(rect.x)}" y="${px(rect.y)}"/><a:ext cx="${px(rect.width)}" cy="${px(rect.height)}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${fill(drawing.shapeStyle?.fill, drawing.fill)}${line(drawing)}<a:effectLst/></xdr:spPr>${textBody(drawing, profile)}</xdr:sp><xdr:clientData/></xdr:${tag}>`;
+  return `<xdr:${tag}${encoding ? ' editAs="absolute"' : ""}>${position}<xdr:sp><xdr:nvSpPr><xdr:cNvPr id="${objectId}" name="${xml(drawing.name)}"/><xdr:cNvSpPr txBox="1"/></xdr:nvSpPr><xdr:spPr><a:xfrm><a:off x="${px(rect.x)}" y="${px(rect.y)}"/><a:ext cx="${px(rect.width)}" cy="${px(rect.height)}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${fill(drawing.shapeStyle?.fill, drawing.fill)}${line(drawing)}<a:effectLst/></xdr:spPr>${textBody(drawing, profile)}</xdr:sp><xdr:clientData/></xdr:${tag}>`;
 }

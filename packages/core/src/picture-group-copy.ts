@@ -83,6 +83,9 @@ export function clonePictureRootsForClipboard(
     if (node.kind === "grouped-group-v1") for (const child of node.members) remapChild(child);
   }
   for (const root of roots) {
+    // Clipboard copies may cross sheets whose producer font metrics differ.
+    if ("frame" in root && root.frame.anchor.mode === "fixed")
+      delete root.frame.anchor.exportEncoding;
     root.id = nodes.get(root.id)!;
     if (isPictureGroup(root)) {
       for (const child of root.members) remapChild(child);

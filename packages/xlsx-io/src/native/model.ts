@@ -23,7 +23,7 @@ export type NativeImageAnchor = {
   tl: { nativeCol: number; nativeColOff: number; nativeRow: number; nativeRowOff: number };
   ext: { width: number; height: number };
   placement?:
-    | { kind: "twoCell"; end: NativeImageAnchor["tl"] }
+    | { kind: "twoCell"; end: NativeImageAnchor["tl"]; editAs?: "absolute" }
     | { kind: "absolute"; x: number; y: number };
   geometry?: NativePictureGeometry;
   style?: NativePictureStyle;

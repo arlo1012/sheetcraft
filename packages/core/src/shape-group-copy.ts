@@ -98,6 +98,9 @@ function cloneNormalizedRoots(
     if (child.kind === "shapeGroup") for (const member of child.members) remapChild(member);
   }
   for (const root of roots) {
+    // Clipboard copies may cross sheets whose producer font metrics differ.
+    if ("shapeFrame" in root && root.shapeFrame.anchor.mode === "fixed")
+      delete root.shapeFrame.anchor.exportEncoding;
     root.id = remapped.get(root.id)!;
     remapConnector(root);
     if (isShapeGroupDrawing(root)) for (const child of root.members) remapChild(child);

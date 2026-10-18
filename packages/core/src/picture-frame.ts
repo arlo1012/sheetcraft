@@ -1,3 +1,7 @@
+import {
+  retainFixedDrawingExportEncoding,
+  type FixedDrawingExportEncoding,
+} from "./drawing-export-encoding.js";
 import { normalizePictureCropShape } from "./shape-presets/contract.js";
 import type { PictureCropShape } from "./shape-presets/types.js";
 import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "./sheet-limits.js";
@@ -30,7 +34,13 @@ export type PictureFrameAnchor =
       origin: PictureCellPoint;
       size: PictureFrameSize;
     } & PictureRelativeOffsetMode)
-  | { mode: "fixed"; x: number; y: number; size: PictureFrameSize }
+  | {
+      mode: "fixed";
+      x: number;
+      y: number;
+      size: PictureFrameSize;
+      exportEncoding?: FixedDrawingExportEncoding;
+    }
   | ({
       mode: "move-and-size";
       start: PictureCellPoint;
@@ -113,13 +123,20 @@ export function normalizePictureFrameAnchor(value: PictureFrameAnchor): PictureF
   if (
     value &&
     typeof value === "object" &&
+    "exportEncoding" in value &&
+    !Object.hasOwn(value, "exportEncoding")
+  )
+    throw new TypeError("Drawing export encoding must be an own data field.");
+  if (
+    value &&
+    typeof value === "object" &&
     "offsetMode" in value &&
     !Object.hasOwn(value, "offsetMode")
   )
     throw new TypeError("Picture anchor offset mode must be an own data field.");
   const a = record(
     value,
-    ["mode", "origin", "size", "x", "y", "start", "end", "offsetMode"],
+    ["mode", "origin", "size", "x", "y", "start", "end", "offsetMode", "exportEncoding"],
     "picture frame anchor",
   );
   if (Object.hasOwn(a, "offsetMode") && a.offsetMode !== "free-pixels")
@@ -127,13 +144,21 @@ export function normalizePictureFrameAnchor(value: PictureFrameAnchor): PictureF
   const offsetMode = a.offsetMode === "free-pixels" ? { offsetMode: "free-pixels" as const } : {};
   let anchor: PictureFrameAnchor;
   if (a.mode === "fixed") {
-    record(a, ["mode", "x", "y", "size"], "fixed picture anchor");
+    record(a, ["mode", "x", "y", "size", "exportEncoding"], "fixed picture anchor");
     anchor = {
       mode: "fixed",
       x: finite(a.x, "Picture x"),
       y: finite(a.y, "Picture y"),
       size: normalizeSize(a.size),
     };
+    if (Object.hasOwn(a, "exportEncoding")) {
+      const exportEncoding = retainFixedDrawingExportEncoding(a.exportEncoding, {
+        x: anchor.x,
+        y: anchor.y,
+        ...anchor.size,
+      });
+      if (exportEncoding) anchor.exportEncoding = exportEncoding;
+    }
   } else if (a.mode === "move-only") {
     record(a, ["mode", "origin", "size", "offsetMode"], "moving picture anchor");
     anchor = {
@@ -190,6 +215,18 @@ export function normalizePictureFrame(frame: PictureFrame): PictureFrame {
   const cropShape = normalizePictureCropShape(v.cropShape as PictureCropShape | undefined);
   for (const key of ["flipHorizontal", "flipVertical"] as const)
     if (v[key] !== undefined && typeof v[key] !== "boolean") throw new TypeError(`Invalid ${key}.`);
+  if (
+    anchor.mode === "fixed" &&
+    (angleDeg !== 0 ||
+      v.flipHorizontal ||
+      v.flipVertical ||
+      cropShape ||
+      source.widthRatio !== 1 ||
+      source.heightRatio !== 1 ||
+      source.offsetXRatio !== 0 ||
+      source.offsetYRatio !== 0)
+  )
+    delete anchor.exportEncoding;
   return {
     kind: "object-frame-v1",
     anchor,
@@ -507,3 +544,8 @@ export function resizePictureCropFrame(
     },
   });
 }
+
+export {
+  canReuseFixedDrawingExportEncoding,
+  equalDrawingEncodingRects,
+} from "./drawing-export-encoding.js";

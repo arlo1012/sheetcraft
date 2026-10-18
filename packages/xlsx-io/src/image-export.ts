@@ -11,7 +11,10 @@ import {
   type StandalonePictureObject,
 } from "@sheetcraft/core/picture-object";
 import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
-import { resolvePictureFrame } from "@sheetcraft/core/picture-frame";
+import {
+  resolvePictureFrame,
+  canReuseFixedDrawingExportEncoding,
+} from "@sheetcraft/core/picture-frame";
 import { XlsxCompatibilityError } from "./types.js";
 import type { CellImage } from "@sheetcraft/core/formula";
 import { normalizeImageTransform, type FloatingImage, type Sheet } from "@sheetcraft/core/workbook";
@@ -129,7 +132,8 @@ function floatingAnchor(sheet: Sheet, image: StandalonePictureObject): XlsxImage
   }) => {
     if (point.column.index >= metrics.columns.count || point.row.index >= metrics.rows.count)
       throw new RangeError("Picture geometry exceeds the XLSX worksheet boundary.");
-    const free = frame.mode !== "fixed" && frame.offsetMode === "free-pixels";
+    const free =
+      frame.mode === "fixed" ? !!frame.exportEncoding : frame.offsetMode === "free-pixels";
     if (
       !free &&
       (point.column.offset > metrics.columns.visibleSize(point.column.index) ||
@@ -146,6 +150,16 @@ function floatingAnchor(sheet: Sheet, image: StandalonePictureObject): XlsxImage
     };
   };
   const ext = { width: rect.width, height: rect.height };
+  if (
+    frame.mode === "fixed" &&
+    canReuseFixedDrawingExportEncoding(frame.exportEncoding, rect, metrics) &&
+    isIdentityNativePictureGeometry(assertNativePictureGeometryPrecision(image.frame, rect))
+  )
+    return {
+      tl: marker(frame.exportEncoding.start),
+      ext,
+      placement: { kind: "twoCell", end: marker(frame.exportEncoding.end), editAs: "absolute" },
+    };
   if (frame.mode === "fixed")
     return {
       tl: { nativeCol: 0, nativeColOff: 0, nativeRow: 0, nativeRowOff: 0 },
