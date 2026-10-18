@@ -616,6 +616,8 @@ export type NativeChartPart = {
   anchor: XmlNode;
   frame: XmlNode;
   chartSpace: XmlNode;
+  /** Explicit tx1 resolution only; chart color maps/theme overrides remain rejected. */
+  textThemeColor?: string;
   wpsChartProperties: boolean;
   drawingOrder?: number;
 };
@@ -768,6 +770,35 @@ export async function collectNativeChartParts(
     if (themePart && (await rels(themePart)).size) reject();
     textBoxTheme = readNativeTextBoxTheme(bytes, themePart);
     return textBoxTheme;
+  };
+  let chartThemeRead = false;
+  let chartTextThemeColor: string | undefined;
+  const getChartTextThemeColor = async () => {
+    if (!chartThemeRead) {
+      chartThemeRead = true;
+      try {
+        // Reuse strict namespace/relationship/theme validation, never the workbook
+        // model's repaired/default palette. An unresolvable theme leaves a warning.
+        const theme = await getTextBoxTheme();
+        const relation = [...workbookRels.values()].find((item) => item.type === `${REL_NS}/theme`);
+        const bytes = relation && entries[relation.target];
+        if (!bytes) reject();
+        // The shared theme parser validates consumed fields, but does not reject
+        // additional document roots. Do not inherit that permissive boundary here.
+        const raw = preservedParser.parse(strFromU8(bytes)) as XmlNode;
+        const roots = Object.keys(raw).filter((key) => !key.startsWith("?"));
+        if (
+          roots.length !== 1 ||
+          roots[0]!.split(":").at(-1) !== "theme" ||
+          values(raw[roots[0]!]).length !== 1
+        )
+          reject();
+        chartTextThemeColor = theme.colors.dk1;
+      } catch {
+        chartTextThemeColor = undefined;
+      }
+    }
+    return chartTextThemeColor;
   };
   const claimed = new Set<string>();
   for (const [sheetIndex, sheet] of nodes(child(workbook, "sheets").sheet).entries()) {
@@ -1128,6 +1159,7 @@ export async function collectNativeChartParts(
         anchor,
         frame,
         chartSpace,
+        textThemeColor: kind === "ordinary" ? await getChartTextThemeColor() : undefined,
         wpsChartProperties: nativeChart.extLst !== undefined,
         drawingOrder,
       });

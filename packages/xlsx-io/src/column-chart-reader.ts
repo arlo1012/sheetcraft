@@ -276,7 +276,16 @@ export function readXlsxColumnCharts(
         }
       }
       const { chart, normalized } = recoverSource(workbook, sheet, series, chartBase);
-      readNativeChartStyles(part.chartSpace, native, plot, bar, chart, part.chartPart, report);
+      readNativeChartStyles(
+        part.chartSpace,
+        native,
+        plot,
+        bar,
+        chart,
+        part.chartPart,
+        report,
+        part.textThemeColor,
+      );
       const geometry = readNativeChartGeometry(
         sheet,
         part.anchorKind,

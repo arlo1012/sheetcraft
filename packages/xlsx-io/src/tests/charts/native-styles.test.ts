@@ -201,7 +201,7 @@ test("missing title fonts and unresolved theme colors warn on their exact leaves
   entries["xl/charts/chart1.xml"] = strToU8(
     xml(out.bytes)
       .replace('<a:latin typeface="Arial"/><a:ea typeface="Arial"/><a:cs typeface="Arial"/>', "")
-      .replace('<a:srgbClr val="123456"/>', '<a:schemeClr val="tx1"/>'),
+      .replace('<a:srgbClr val="123456"/>', '<a:schemeClr val="phClr"/>'),
   );
   const read = await decodeXlsx(zipSync(entries)),
     chart = imported(read).chart;
@@ -225,12 +225,12 @@ test("actual WPS RGB producer preserves three editable styles and B2=90", async 
     expect(drawing.chart.presentation).toEqual({ palette: ["#2468ac", "#d15a28"] });
     expect(drawing.chart.format).toEqual({
       ...explicit().drawing.chart.format,
-      legend: { text: { fontSize: 1000 / 75, bold: false, italic: false } },
+      legend: { text: { fontSize: 1000 / 75, bold: false, italic: false, color: "#000000" } },
     });
     expect(read.report.issues.flatMap((issue) => issue.locations)).toEqual(
       expect.arrayContaining([
         expect.stringMatching(/format\.legend\.text\.fontFamily$/),
-        expect.stringMatching(/format\.legend\.text\.color$/),
+        expect.stringMatching(/format\.legend\.text\.color\.themeMaterialization$/),
       ]),
     );
     expect(drawing.chart.rectangleSeries).toBeUndefined();

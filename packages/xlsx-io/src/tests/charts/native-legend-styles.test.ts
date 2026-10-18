@@ -115,7 +115,7 @@ test("hidden legend and style getters fail closed", () => {
   expect(getter).not.toHaveBeenCalled();
 });
 test.each([
-  ['<a:srgbClr val="FF0000"/>', '<a:schemeClr val="tx1"/>', "text.color"],
+  ['<a:srgbClr val="FF0000"/>', '<a:schemeClr val="phClr"/>', "text.color"],
   ['<a:ea typeface="Liberation Sans"/>', '<a:ea typeface="Arial"/>', "text.fontFamily"],
   [' i="1"', ' i="bogus"', "text.italic"],
   ['<a:ln w="19050">', '<a:ln w="0">', "surface.strokeWidth"],

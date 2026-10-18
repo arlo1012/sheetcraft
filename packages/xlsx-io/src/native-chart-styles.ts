@@ -66,7 +66,9 @@ export function nativeChartLegendSurface(surface?: ChartSurfaceFormat): string {
 
 type TextLeaf = "fontFamily" | "fontSize" | "bold" | "color";
 const leaves: readonly TextLeaf[] = ["fontFamily", "fontSize", "bold", "color"];
-type TextChoices = Partial<Record<TextLeaf, string | number | boolean | null>>;
+type TextChoices = Partial<Record<TextLeaf, string | number | boolean | null>> & {
+  colorMaterialized?: boolean;
+};
 function optional(parent: XmlNode, key: string): XmlNode | undefined {
   return parent[key] === undefined ? undefined : single(parent, key);
 }
@@ -90,7 +92,31 @@ function rgbFill(parent: XmlNode): string | undefined {
   const value = attr(rgb, "val");
   return /^[\da-f]{6}$/i.test(value) ? `#${value.toLowerCase()}` : undefined;
 }
-function properties(node?: XmlNode): TextChoices {
+/** Narrow WPS text profile: untransformed tx1 with the default text mapping.
+ * Chart-level clrMapOvr and themeOverride relationships are rejected by the package reader.
+ * Other scheme slots/transforms are deliberately unresolved, including alpha/luminance.
+ */
+function textColor(node: XmlNode, themeColor?: string): string | undefined {
+  const rgb = rgbFill(node);
+  if (rgb) return rgb;
+  if (
+    !themeColor ||
+    ["noFill", "gradFill", "pattFill", "grpFill"].some((key) => node[key] !== undefined)
+  )
+    return;
+  const fill = optional(node, "solidFill");
+  const only = (node: XmlNode, key: string) =>
+    Object.keys(node).every(
+      (name) =>
+        name.startsWith("@_xmlns") ||
+        name === key ||
+        (name === "#text" && !String(node[name]).trim()),
+    );
+  if (!fill || !only(fill, "schemeClr")) return;
+  const scheme = optional(fill, "schemeClr");
+  return scheme && only(scheme, "@_val") && attr(scheme, "val") === "tx1" ? themeColor : undefined;
+}
+function properties(node?: XmlNode, themeColor?: string): TextChoices {
   if (!node) return {};
   const out: TextChoices = {};
   if (node["@_sz"] !== undefined) {
@@ -110,8 +136,10 @@ function properties(node?: XmlNode): TextChoices {
     ["solidFill", "noFill", "gradFill", "pattFill", "grpFill"].some(
       (key) => node[key] !== undefined,
     )
-  )
-    out.color = rgbFill(node) ?? null;
+  ) {
+    out.color = textColor(node, themeColor) ?? null;
+    out.colorMaterialized = typeof out.color === "string" && !rgbFill(node);
+  }
   const fonts = ["latin", "ea", "cs"].map((key) => optional(node, key));
   if (fonts.some(Boolean)) {
     const names = fonts.map((font) => font && attr(font, "typeface"));
@@ -123,29 +151,31 @@ function properties(node?: XmlNode): TextChoices {
   }
   return out;
 }
-function bodyDefaults(body?: XmlNode): TextChoices {
+function bodyDefaults(body?: XmlNode, themeColor?: string): TextChoices {
   if (!body) return {};
   const paragraphs = nodes(body.p);
   if (paragraphs.length !== 1) return Object.fromEntries(leaves.map((key) => [key, null]));
   const paragraph = paragraphs[0]!;
-  return properties(optional(optional(paragraph, "pPr") ?? {}, "defRPr"));
+  return properties(optional(optional(paragraph, "pPr") ?? {}, "defRPr"), themeColor);
 }
 function uniformText(
   body: XmlNode | undefined,
   base: TextChoices,
   path: string,
   warn: (path: string) => void,
+  themeColor?: string,
 ): ChartTextFormat | undefined {
   const choices: TextChoices[] = [];
   if (body) {
     for (const paragraph of nodes(body.p)) {
       const defaults = {
         ...base,
-        ...properties(optional(optional(paragraph, "pPr") ?? {}, "defRPr")),
+        ...properties(optional(optional(paragraph, "pPr") ?? {}, "defRPr"), themeColor),
       };
       const runs = nodes(paragraph.r);
       if (runs.length)
-        for (const run of runs) choices.push({ ...defaults, ...properties(optional(run, "rPr")) });
+        for (const run of runs)
+          choices.push({ ...defaults, ...properties(optional(run, "rPr"), themeColor) });
       else choices.push(defaults);
     }
   }
@@ -165,7 +195,12 @@ function uniformText(
     if (leaf === "fontFamily" && typeof value === "string") out.fontFamily = value;
     if (leaf === "fontSize" && typeof value === "number") out.fontSize = value;
     if (leaf === "bold" && typeof value === "boolean") out.bold = value;
-    if (leaf === "color" && typeof value === "string") out.color = value;
+    if (leaf === "color" && typeof value === "string") {
+      out.color = value;
+      // Core stores explicit RGB, not a live theme reference. Disclose that loss.
+      if (choices.some((choice) => choice.colorMaterialized))
+        warn(`${path}.color.themeMaterialization`);
+    }
   }
   return Object.keys(out).length ? out : undefined;
 }
@@ -175,6 +210,7 @@ function readLegendStyle(
   legend: XmlNode,
   rootDefaults: TextChoices,
   warn: (path: string) => void,
+  themeColor?: string,
 ): NonNullable<ChartFormatSettings["legend"]> | undefined {
   const get = (node: XmlNode, key: string): XmlNode | undefined => {
     if (node[key] === undefined) return;
@@ -279,7 +315,7 @@ function readLegendStyle(
       }
       // Rich runs/fields are not a single legend-wide text format.
       if (paragraph.r === undefined && paragraph.fld === undefined && paragraph.br === undefined) {
-        const text = uniformText(body, rootDefaults, path, warn) ?? {};
+        const text = uniformText(body, rootDefaults, path, warn, themeColor) ?? {};
         const symbol = props && get(props, "sym");
         if (symbol && attr(symbol, "typeface") !== text.fontFamily) {
           delete text.fontFamily;
@@ -292,7 +328,9 @@ function readLegendStyle(
           else warn(`${path}.italic`);
         }
         if (props && props.solidFill !== undefined) {
-          const color = paint(props, `${path}.color`);
+          const color = rgbFill(props)
+            ? paint(props, `${path}.color`)
+            : textColor(props, themeColor);
           if (color !== undefined && color !== "transparent") text.color = color;
           else delete text.color;
         }
@@ -312,6 +350,7 @@ export function readNativeChartStyles(
   chart: SheetChart,
   chartPart: string,
   report: CompatibilityReportBuilder,
+  themeColor?: string,
 ): void {
   const warned = new Set<string>();
   const warn = (path: string) => warned.add(path);
@@ -321,12 +360,18 @@ export function readNativeChartStyles(
     return;
   }
   const format: ChartFormatSettings = {};
-  const rootDefaults = bodyDefaults(optional(chartSpace, "txPr"));
+  const rootDefaults = bodyDefaults(optional(chartSpace, "txPr"), themeColor);
   if (native.title !== undefined && chart.title) {
     const title = single(native, "title");
-    const defaults = { ...rootDefaults, ...bodyDefaults(optional(title, "txPr")) };
+    const defaults = { ...rootDefaults, ...bodyDefaults(optional(title, "txPr"), themeColor) };
     const tx = optional(title, "tx");
-    const text = uniformText(tx && optional(tx, "rich"), defaults, "format.title", warn);
+    const text = uniformText(
+      tx && optional(tx, "rich"),
+      defaults,
+      "format.title",
+      warn,
+      themeColor,
+    );
     if (
       text &&
       !(
@@ -344,11 +389,11 @@ export function readNativeChartStyles(
   ] as const) {
     const axis = single(plot, axisName);
     const body = optional(axis, "txPr");
-    const text = uniformText(body, rootDefaults, `format.${field}.text`, warn);
+    const text = uniformText(body, rootDefaults, `format.${field}.text`, warn, themeColor);
     if (text) format[field] = { text };
   }
   if (native.legend !== undefined) {
-    const legend = readLegendStyle(single(native, "legend"), rootDefaults, warn);
+    const legend = readLegendStyle(single(native, "legend"), rootDefaults, warn, themeColor);
     if (legend) format.legend = legend;
   }
   if (Object.keys(format).length) chart.format = format;
