@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
-import { createSheet, createSheetEvaluator } from "@sheetcraft/core/workbook";
+import { createSheet, createSheetEvaluator, createWorkbook } from "@sheetcraft/core/workbook";
 import {
   createChartPrintFontLease,
   type ChartPrintFontLease,
@@ -16,7 +16,10 @@ import {
   type PrintChartEntry,
   type PrintChartPass,
 } from "../../../modules/page-layout/page-print-charts";
-import { createPrintChartPixels } from "../../../modules/page-layout/page-print-chart-pixels";
+import {
+  createPrintChartPixels,
+  getPrintChartFontStacks,
+} from "../../../modules/page-layout/page-print-chart-pixels";
 import { ensureCellFontResource } from "../../../shared/cell-text/font-resources";
 
 vi.mock("../../../shared/cell-text/font-resources", async (importOriginal) => ({
@@ -733,4 +736,30 @@ describe("Chart pixel paint and font invalidation", () => {
     expect(f.consumer.isReady(f.pass)).toBe(false);
     await expect(f.consumer.prepare(f.pass, 1, current)).rejects.toThrow(/outdated/);
   });
+});
+
+test("print preheat includes all script families resolved against the captured workbook theme", () => {
+  const sheet = createSheet("Fonts", "fonts");
+  const drawing = chart(0);
+  drawing.chart.format = {
+    title: {
+      scriptFonts: {
+        latin: { kind: "theme", role: "minor", slot: "latin" },
+        eastAsia: { kind: "family", family: "宋体" },
+        complexScript: { kind: "automatic" },
+      },
+    },
+  };
+  sheet.drawings = [drawing];
+  const theme = createWorkbook({ id: "font-theme", sheetId: "font-sheet" }).theme;
+  theme.bodyFont = "Inter";
+  const pass = capturePrintChartPass({
+    sheet,
+    metrics: createPictureSheetMetrics(sheet),
+    evaluator: createSheetEvaluator(sheet),
+    theme,
+  });
+  expect(getPrintChartFontStacks(pass, document)).toEqual(
+    expect.arrayContaining(["Inter", "宋体"]),
+  );
 });

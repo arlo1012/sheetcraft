@@ -1,3 +1,12 @@
+import {
+  createChartTextPlan,
+  chartRichStyles,
+  chartRichText,
+  measureChartText,
+  truncateChartText,
+  type ChartTextPlan,
+  type ChartFontContext,
+} from "./chart-script-fonts";
 import type {
   EChartsOption,
   EChartsType,
@@ -5,7 +14,7 @@ import type {
   XAXisComponentOption,
   YAXisComponentOption,
 } from "echarts";
-import { normalizeChartFormat } from "@sheetcraft/core/chart-format";
+import { normalizeChartFormat, type ChartTextFormat } from "@sheetcraft/core/chart-format";
 import { formatCellNumberValue } from "@sheetcraft/core/number-format";
 import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
 import type { ChartComboSeriesChange } from "@sheetcraft/core/chart-combo";
@@ -39,6 +48,8 @@ type TableText = Readonly<{
   text: string;
   fontFamily: string;
   width: number;
+  fontFormat?: ChartTextFormat;
+  rich?: ReturnType<typeof chartRichStyles>;
   color?: string;
 }>;
 export type ChartDataTablePlan = Readonly<{
@@ -67,7 +78,7 @@ export type ChartDataTablePlan = Readonly<{
   primitiveUpperBound: number;
   document?: Document;
 }>;
-type Dimensions = {
+type Dimensions = ChartFontContext & {
   width: number;
   height: number;
   resolveFontFamily?: (original: string) => string;
@@ -197,7 +208,25 @@ export function createChartDataTablePlan(
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0)
     unavailable("requires finite positive dimensions.");
   const format = chart.format === undefined ? undefined : normalizeChartFormat(chart.format);
-  const originalFamily = format?.categoryAxis?.text?.fontFamily ?? "Arial, sans-serif";
+  const textFormat = format?.categoryAxis?.text;
+  const originalFamily = textFormat?.fontFamily ?? "Arial, sans-serif";
+  // Tables retain their fixed 12px presentation, but inherit semantic script faces.
+  const fontFormat = textFormat?.scriptFonts
+    ? { scriptFonts: textFormat.scriptFonts, fontSize: 12 }
+    : { fontFamily: originalFamily, fontSize: 12 };
+  const rich =
+    textFormat?.scriptFonts && typeof Intl.Segmenter === "function"
+      ? chartRichStyles(fontFormat, dimensions.theme, originalFamily, dimensions.resolveFontFamily)
+      : undefined;
+  const resolvedFormat: ChartTextFormat | undefined = rich
+    ? {
+        scriptFonts: {
+          latin: { kind: "family", family: rich.sc_latin!.fontFamily },
+          eastAsia: { kind: "family", family: rich.sc_eastAsia!.fontFamily },
+          complexScript: { kind: "family", family: rich.sc_complexScript!.fontFamily },
+        },
+      }
+    : undefined;
   const measurement = createMeasurementSession(dimensions.document);
   try {
     let generatedTextUnits = 0;
@@ -224,7 +253,11 @@ export function createChartDataTablePlan(
       return {
         text: singleLine,
         fontFamily,
-        width: measurement.measure(singleLine, fontFamily),
+        ...(rich ? { rich, fontFormat: resolvedFormat } : {}),
+        width: measureChartText(
+          createChartTextPlan(singleLine, resolvedFormat ?? { fontFamily }, undefined, fontFamily),
+          measurement.measure,
+        ),
         ...(color ? { color } : {}),
       };
     };
@@ -473,20 +506,28 @@ function scalar(instance: EChartsType, axis: "x" | "y", index: number, value: nu
     unavailable("native category coordinates are unavailable.");
   return pixel;
 }
-function ellipsized(label: TableText, width: number, measurement: MeasurementSession): string {
-  if (label.width <= width) return label.text;
-  if (measurement.measure("…", label.fontFamily) > width)
+function tableTextPlan(label: TableText, text: string): ChartTextPlan {
+  return createChartTextPlan(
+    text,
+    label.fontFormat ?? { fontFamily: label.fontFamily },
+    undefined,
+    label.fontFamily,
+  );
+}
+function ellipsized(
+  label: TableText,
+  width: number,
+  measurement: MeasurementSession,
+): ChartTextPlan {
+  if (label.width <= width) return tableTextPlan(label, label.text);
+  if (measureChartText(tableTextPlan(label, "…"), measurement.measure) > width)
     unavailable("label gutter is too narrow for readable text.");
-  const characters = Array.from(label.text);
-  let low = 0,
-    high = characters.length;
-  while (low < high) {
-    const middle = Math.ceil((low + high) / 2);
-    if (measurement.measure(characters.slice(0, middle).join("") + "…", label.fontFamily) <= width)
-      low = middle;
-    else high = middle - 1;
-  }
-  return characters.slice(0, low).join("") + "…";
+  return truncateChartText(
+    label.text,
+    width,
+    (text) => tableTextPlan(label, text),
+    measurement.measure,
+  );
 }
 
 /** Pass 2: public native geometry and visuals, shared unchanged by screen SVG and print Canvas. */
@@ -604,11 +645,15 @@ export function applyChartDataTableGraphics(
       numeric = false,
     ) => {
       if (!label.text) return;
+      const textPlan = numeric
+        ? tableTextPlan(label, label.text)
+        : ellipsized(label, width, measurement!);
       children.push({
         type: "text",
         silent: true,
         style: {
-          text: numeric ? label.text : ellipsized(label, width, measurement!),
+          text: label.rich ? chartRichText(textPlan) : textPlan.text,
+          ...(label.rich ? { rich: label.rich } : {}),
           x,
           y,
           fontFamily: label.fontFamily,

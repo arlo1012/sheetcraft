@@ -202,6 +202,7 @@ const legacyBodyTransform = computed(() =>
       v-if="drawing.kind === 'chart' && sheet && evaluator"
       :drawing="drawing"
       :paint-chart="paintChart"
+      :theme="theme"
       :editable-legend="chartEditing"
       :selected-element="chartSelectedElement"
       :sheet="sheet"

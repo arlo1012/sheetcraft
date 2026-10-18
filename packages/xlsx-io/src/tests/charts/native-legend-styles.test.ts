@@ -133,9 +133,20 @@ test.each([
       ),
     );
     const read = await decodeXlsx(zipSync(entries));
-    expect(read.report.issues.flatMap((issue) => issue.locations)).toContain(
-      `xl/charts/chart1.xml.format.legend.${path}`,
-    );
+    if (path === "text.fontFamily") {
+      expect(chart(read).format?.legend?.text?.scriptFonts).toEqual({
+        latin: { kind: "family", family: "Liberation Sans" },
+        eastAsia: { kind: "family", family: "Arial" },
+        complexScript: { kind: "family", family: "Liberation Sans" },
+      });
+      expect(read.report.issues.flatMap((issue) => issue.locations)).not.toContain(
+        `xl/charts/chart1.xml.format.legend.${path}`,
+      );
+    } else {
+      expect(read.report.issues.flatMap((issue) => issue.locations)).toContain(
+        `xl/charts/chart1.xml.format.legend.${path}`,
+      );
+    }
   },
 );
 test.each([

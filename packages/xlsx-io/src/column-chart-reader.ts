@@ -285,6 +285,7 @@ export function readXlsxColumnCharts(
         part.chartPart,
         report,
         part.textThemeColor,
+        part.textThemeFonts,
       );
       const geometry = readNativeChartGeometry(
         sheet,

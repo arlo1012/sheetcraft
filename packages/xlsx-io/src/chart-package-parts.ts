@@ -1,4 +1,9 @@
 import {
+  readNativeChartFontTheme,
+  readXlsxWorkbookTheme,
+  type NativeChartFontTheme,
+} from "./workbook-theme.js";
+import {
   inspectNativeTextBox,
   readNativeTextBoxTheme,
   MAX_XLSX_TEXT_BOXES,
@@ -618,6 +623,7 @@ export type NativeChartPart = {
   chartSpace: XmlNode;
   /** Explicit tx1 resolution only; chart color maps/theme overrides remain rejected. */
   textThemeColor?: string;
+  textThemeFonts?: NativeChartFontTheme;
   wpsChartProperties: boolean;
   drawingOrder?: number;
 };
@@ -773,6 +779,7 @@ export async function collectNativeChartParts(
   };
   let chartThemeRead = false;
   let chartTextThemeColor: string | undefined;
+  let chartTextThemeFonts: NativeChartFontTheme | undefined;
   const getChartTextThemeColor = async () => {
     if (!chartThemeRead) {
       chartThemeRead = true;
@@ -794,6 +801,24 @@ export async function collectNativeChartParts(
         )
           reject();
         chartTextThemeColor = theme.colors.dk1;
+        chartTextThemeFonts =
+          relation?.target === "xl/theme/theme1.xml" ? readNativeChartFontTheme(bytes) : undefined;
+        // Source evidence is necessary but also must survive the workbook theme
+        // projection. A repaired/fallback model cannot carry a live source binding.
+        const projected = readXlsxWorkbookTheme(bytes);
+        for (const role of ["major", "minor"] as const) {
+          const fonts = chartTextThemeFonts?.[role];
+          if (!fonts) continue;
+          const heading = role === "major";
+          if (
+            fonts.latin !== (heading ? projected.headingFont : projected.bodyFont) ||
+            fonts.eastAsia !==
+              (heading ? projected.fonts?.headingEastAsia : projected.fonts?.bodyEastAsia) ||
+            fonts.complexScript !==
+              (heading ? projected.fonts?.headingComplexScript : projected.fonts?.bodyComplexScript)
+          )
+            delete chartTextThemeFonts![role];
+        }
       } catch {
         chartTextThemeColor = undefined;
       }
@@ -1160,6 +1185,7 @@ export async function collectNativeChartParts(
         frame,
         chartSpace,
         textThemeColor: kind === "ordinary" ? await getChartTextThemeColor() : undefined,
+        textThemeFonts: kind === "ordinary" ? chartTextThemeFonts : undefined,
         wpsChartProperties: nativeChart.extLst !== undefined,
         drawingOrder,
       });

@@ -1,3 +1,4 @@
+import { getChartFontFamilies } from "../charts/chart-script-fonts";
 import {
   createChartPrintFontLease,
   getChartPrintOwnedFontFamilies,
@@ -34,15 +35,7 @@ export function getPrintChartFontStacks(pass: PrintChartPass, ownerDocument: Doc
     : "sans-serif";
   const result = new Set([defaultFamily, "Arial, sans-serif"]);
   for (const entry of pass.entries) {
-    const format = entry.drawing.chart.format;
-    for (const family of [
-      format?.title?.fontFamily,
-      format?.legend?.text?.fontFamily,
-      format?.categoryAxis?.text?.fontFamily,
-      format?.valueAxis?.text?.fontFamily,
-      format?.secondaryValueAxis?.text?.fontFamily,
-    ])
-      if (family) result.add(family);
+    for (const family of getChartFontFamilies(entry.drawing.chart, pass.theme)) result.add(family);
     if (entry.drawing.chart.type === "wordCloud")
       result.add(
         ownerDocument.defaultView?.getComputedStyle(
@@ -212,6 +205,7 @@ export function createPrintChartPixels(
             entry.drawing,
             entry.data,
             {
+              theme: pass.theme,
               document: ownerDocument,
               width: entry.rect.width,
               height: entry.rect.height,

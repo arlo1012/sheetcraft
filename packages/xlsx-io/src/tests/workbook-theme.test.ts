@@ -63,9 +63,13 @@ describe("XLSX workbook themes", () => {
     expect(strFromU8(unzipSync(encoded.bytes)["xl/theme/theme1.xml"]!)).toContain(
       "sheetcraft:themeCatalog",
     );
-    expect((await decodeXlsx(encoded.bytes)).workbook.theme).toEqual(
-      normalizeWorkbookTheme(workbook.theme),
-    );
+    // Legacy XLSX output contains schema-required empty CS slots. The new reader
+    // now retains that actual source state, without changing the old writer.
+    const expected = normalizeWorkbookTheme(workbook.theme);
+    expect((await decodeXlsx(encoded.bytes)).workbook.theme).toEqual({
+      ...expected,
+      fonts: { ...expected.fonts, headingComplexScript: "", bodyComplexScript: "" },
+    });
   });
 
   test("retains all DrawingML scheme colors, East Asian fonts, and effect choices", async () => {
@@ -115,6 +119,7 @@ describe("XLSX workbook themes", () => {
     expect(themeXml).toContain("<a:bevelT");
     expect((await decodeXlsx(encoded.bytes)).workbook.theme).toEqual({
       ...workbook.theme,
+      fonts: { ...workbook.theme.fonts, headingComplexScript: "", bodyComplexScript: "" },
       id: "a-b",
     });
   });

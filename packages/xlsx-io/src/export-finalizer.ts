@@ -179,7 +179,47 @@ export function finalizeXlsxExport(
     );
   }
   if (calculation) writeWorkbookCalculationSettings(entries, calculation);
-  if (theme) writeXlsxWorkbookTheme(entries, theme);
+  if (theme) {
+    const exactScriptFonts = sheets.some((sheet) =>
+      sheet.drawings?.some((drawing) => {
+        if (drawing.kind !== "chart") return false;
+        const format = drawing.chart.format;
+        return [
+          format?.title,
+          format?.legend?.text,
+          format?.categoryAxis?.text,
+          format?.valueAxis?.text,
+          format?.secondaryValueAxis?.text,
+        ].some((text) => text?.scriptFonts !== undefined);
+      }),
+    );
+    if (exactScriptFonts)
+      for (const sheet of sheets)
+        for (const drawing of sheet.drawings ?? []) {
+          if (drawing.kind !== "chart") continue;
+          const format = drawing.chart.format;
+          for (const [path, text] of [
+            ["title", format?.title],
+            ["legend.text", format?.legend?.text],
+            ["categoryAxis.text", format?.categoryAxis?.text],
+            ["valueAxis.text", format?.valueAxis?.text],
+          ] as const) {
+            const choice = text?.scriptFonts?.complexScript;
+            if (
+              choice?.kind === "theme" &&
+              theme.fonts?.[
+                choice.role === "major" ? "headingComplexScript" : "bodyComplexScript"
+              ] === undefined
+            )
+              report?.add(
+                "style-omitted",
+                "warning",
+                `${sheet.name}.drawings["${drawing.id}"].chart.format.${path}.scriptFonts.complexScript.unresolvedTheme`,
+              );
+          }
+        }
+    writeXlsxWorkbookTheme(entries, theme, exactScriptFonts);
+  }
   if (workbook) {
     const nativePivots = writeXlsxPivotTables(
       entries,

@@ -647,7 +647,9 @@ export async function decodeWithNativeXlsx(bytes: Uint8Array): Promise<XlsxDecod
   const pageSetups = readXlsxPageSetups(bytes, source.worksheets, report);
   const dateSystem = source.properties.date1904 ? "1904" : "1900";
   const calculation = readWorkbookCalculationSettings(bytes);
-  const theme = readXlsxWorkbookTheme(archive["xl/theme/theme1.xml"]);
+  const theme = readXlsxWorkbookTheme(archive["xl/theme/theme1.xml"], () =>
+    report.add("style-omitted", "warning", "xl/theme/theme1.xml.chartFontSlots"),
+  );
   let importedCells = 0;
   const sheets = source.worksheets.map((sourceSheet, sheetIndex) => {
     const sheet = createSheet(

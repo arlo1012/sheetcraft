@@ -1,3 +1,5 @@
+import { XMLParser, XMLValidator } from "fast-xml-parser";
+import { isNativeChartFontFamily } from "./native-chart-style-capabilities.js";
 import { strFromU8, strToU8, type Zippable } from "fflate/browser";
 import {
   cloneWorkbookTheme,
@@ -6,6 +8,219 @@ import {
   type WorkbookTheme,
   type WorkbookThemeEffects,
 } from "@sheetcraft/core/workbook-theme";
+
+type ChartFontPresence = { version: 1; headingComplexScript: boolean; bodyComplexScript: boolean };
+/** Private extension metadata can express model absence, never invent a source font. */
+function chartFontPresence(
+  raw: Record<string, unknown>,
+): ChartFontPresence | "invalid" | undefined {
+  const found: { node: Record<string, unknown>; namespace: string; path: string; uri?: unknown }[] =
+    [];
+  function walk(
+    parent: Record<string, unknown>,
+    bindings = new Map<string, string>(),
+    path: string[] = [],
+    uri?: unknown,
+  ) {
+    for (const [name, value] of Object.entries(parent)) {
+      if (name.startsWith("@_") || name.startsWith("?") || name === "#text") continue;
+      for (const item of Array.isArray(value) ? value : [value]) {
+        if (!item || typeof item !== "object") continue;
+        const node = item as Record<string, unknown>,
+          scoped = new Map(bindings);
+        for (const [key, value] of Object.entries(node)) {
+          if (key === "@_xmlns") scoped.set("", String(value));
+          else if (key.startsWith("@_xmlns:")) scoped.set(key.slice(8), String(value));
+        }
+        const local = name.split(":").at(-1)!;
+        const namespace = scoped.get(name.includes(":") ? name.split(":")[0]! : "") ?? "";
+        const nextPath = [...path, `${namespace}|${local}`];
+        if (local === "themeCatalog")
+          found.push({ node, namespace, path: nextPath.join("/"), uri });
+        walk(node, scoped, nextPath, local === "ext" ? node["@_uri"] : uri);
+      }
+    }
+  }
+  walk(raw);
+  if (!found.length) return;
+  if (found.length !== 1) return "invalid";
+  const entry = found[0]!;
+  try {
+    if (typeof entry.node["@_data"] !== "string") return "invalid";
+    const catalog = JSON.parse(decodeURIComponent(entry.node["@_data"]));
+    if (!catalog || typeof catalog !== "object" || Array.isArray(catalog)) return "invalid";
+    if (!Object.hasOwn(catalog, "chartFontSlots")) return;
+    const art = "http://schemas.openxmlformats.org/drawingml/2006/main";
+    if (
+      entry.path !==
+        [
+          `${art}|theme`,
+          `${art}|extLst`,
+          `${art}|ext`,
+          "urn:sheetcraft:theme-catalog|themeCatalog",
+        ].join("/") ||
+      entry.uri !== catalogUri ||
+      Object.keys(entry.node).some(
+        (key) =>
+          key !== "@_data" &&
+          !key.startsWith("@_xmlns") &&
+          !(key === "#text" && !String(entry.node[key]).trim()),
+      )
+    )
+      return "invalid";
+    const value = catalog.chartFontSlots;
+    if (
+      !value ||
+      typeof value !== "object" ||
+      Array.isArray(value) ||
+      Object.keys(value).length !== 3 ||
+      value.version !== 1 ||
+      typeof value.headingComplexScript !== "boolean" ||
+      typeof value.bodyComplexScript !== "boolean"
+    )
+      return "invalid";
+    return value as ChartFontPresence;
+  } catch {
+    return "invalid";
+  }
+}
+
+/** Source evidence only: never populate this from normalized/default workbook fonts. */
+export type NativeChartFontTheme = Partial<
+  Record<"major" | "minor", Partial<Record<"latin" | "eastAsia" | "complexScript", string>>>
+>;
+export function readNativeChartFontTheme(
+  bytes: Uint8Array | undefined,
+  invalidPresence?: () => void,
+): NativeChartFontTheme {
+  return readChartFontTheme(bytes, invalidPresence, false);
+}
+function readChartFontTheme(
+  bytes: Uint8Array | undefined,
+  invalidPresence: (() => void) | undefined,
+  ignorePresence: boolean,
+): NativeChartFontTheme {
+  if (!bytes) return {};
+  try {
+    const xml = strFromU8(bytes);
+    if (/<!DOCTYPE|<!ENTITY/i.test(xml) || XMLValidator.validate(xml) !== true) return {};
+    const raw = new XMLParser({
+      ignoreAttributes: false,
+      parseTagValue: false,
+      trimValues: false,
+    }).parse(xml);
+    const roots = Object.keys(raw).filter((key) => !key.startsWith("?"));
+    if (roots.length !== 1 || roots[0]!.split(":").at(-1) !== "theme") return {};
+    function selected(
+      parent: Record<string, unknown>,
+      local: string,
+      inherited: Map<string, string>,
+    ): { node: Record<string, unknown>; bindings: Map<string, string> } {
+      const matches = Object.entries(parent).filter(
+        ([key]) => !key.startsWith("@_") && key.split(":").at(-1) === local,
+      );
+      if (matches.length !== 1) throw new Error("Ambiguous theme font");
+      const [key, value] = matches[0]!;
+      if (!value || typeof value !== "object" || Array.isArray(value))
+        throw new Error("Invalid theme font");
+      const node = value as Record<string, unknown>,
+        bindings = new Map(inherited);
+      for (const [key, value] of Object.entries(node)) {
+        if (key === "@_xmlns") bindings.set("", String(value));
+        else if (key.startsWith("@_xmlns:")) bindings.set(key.slice(8), String(value));
+      }
+      if (
+        bindings.get(key.includes(":") ? key.split(":")[0]! : "") !==
+        "http://schemas.openxmlformats.org/drawingml/2006/main"
+      )
+        throw new Error("Invalid font namespace");
+      return { node, bindings };
+    }
+    const root = selected(raw, "theme", new Map());
+    const elements = selected(root.node, "themeElements", root.bindings);
+    const scheme = selected(elements.node, "fontScheme", elements.bindings);
+    if (
+      Object.keys(scheme.node).some(
+        (key) =>
+          key !== "@_name" &&
+          !key.startsWith("@_xmlns") &&
+          !["majorFont", "minorFont"].includes(key.split(":").at(-1)!) &&
+          !(key === "#text" && !String(scheme.node[key]).trim()),
+      )
+    )
+      return {};
+    const presence = ignorePresence ? undefined : chartFontPresence(raw);
+    if (presence === "invalid") {
+      invalidPresence?.();
+      return {};
+    }
+    const output: NativeChartFontTheme = {};
+    for (const role of ["major", "minor"] as const) {
+      try {
+        const group = selected(scheme.node, `${role}Font`, scheme.bindings);
+        if (
+          Object.keys(group.node).some(
+            (key) =>
+              !key.startsWith("@_xmlns") &&
+              !["latin", "ea", "cs"].includes(key.split(":").at(-1)!) &&
+              !(key === "#text" && !String(group.node[key]).trim()),
+          )
+        )
+          continue;
+        const slots: NonNullable<NativeChartFontTheme["major"]> = {};
+        for (const [element, slot] of [
+          ["latin", "latin"],
+          ["ea", "eastAsia"],
+          ["cs", "complexScript"],
+        ] as const) {
+          const present = Object.keys(group.node).some(
+            (key) => !key.startsWith("@_") && key.split(":").at(-1) === element,
+          );
+          if (!present && element === "cs") continue;
+          const font = selected(group.node, element, group.bindings).node;
+          if (
+            Object.keys(font).some(
+              (key) =>
+                key !== "@_typeface" &&
+                !key.startsWith("@_xmlns") &&
+                !(key === "#text" && !String(font[key]).trim()),
+            )
+          )
+            throw new Error("Unsupported font descriptor");
+          const face = font["@_typeface"];
+          if (!isNativeChartFontFamily(face) && !(slot === "complexScript" && face === ""))
+            throw new Error("Unrepresented font");
+          slots[slot] = face as string;
+        }
+        output[role] = slots;
+      } catch {
+        /* Unproven role remains absent, never repaired. */
+      }
+    }
+    if (presence) {
+      for (const [role, field] of [
+        ["major", "headingComplexScript"],
+        ["minor", "bodyComplexScript"],
+      ] as const) {
+        const slots = output[role];
+        // False is valid only for an exact empty DrawingML placeholder. A
+        // nonempty font or missing/unsupported slot cannot be hidden by metadata.
+        if (
+          !slots ||
+          slots.complexScript === undefined ||
+          (!presence[field] && slots.complexScript !== "")
+        ) {
+          invalidPresence?.();
+          return {};
+        }
+        if (!presence[field]) delete slots.complexScript;
+      }
+    }
+    return output;
+  } catch {
+    return {};
+  }
+}
 
 const themeEntry = "xl/theme/theme1.xml";
 const catalogUri = "{A2D8FC83-5106-4D1E-9D45-8D6B870A6F4D}";
@@ -44,10 +259,26 @@ function readThemeCatalog(xml: string): Pick<WorkbookTheme, "customColors" | "cu
     return {};
   }
 }
-function writeThemeCatalog(xml: string, theme: Required<WorkbookTheme>): string {
+function writeThemeCatalog(
+  xml: string,
+  theme: Required<WorkbookTheme>,
+  scriptState: boolean,
+): string {
   const data = escapeXml(
     encodeURIComponent(
-      JSON.stringify({ customColors: theme.customColors, customFonts: theme.customFonts }),
+      JSON.stringify({
+        customColors: theme.customColors,
+        customFonts: theme.customFonts,
+        ...(scriptState
+          ? {
+              chartFontSlots: {
+                version: 1,
+                headingComplexScript: theme.fonts.headingComplexScript !== undefined,
+                bodyComplexScript: theme.fonts.bodyComplexScript !== undefined,
+              },
+            }
+          : {}),
+      }),
     ),
   );
   const extension = `<a:ext uri="${catalogUri}"><sheetcraft:themeCatalog xmlns:sheetcraft="urn:sheetcraft:theme-catalog" data="${data}"/></a:ext>`;
@@ -112,7 +343,10 @@ function effects(xml: string): WorkbookThemeEffects | undefined {
     gradient: /<a:gradFill\b/i.test(body),
   };
 }
-export function readXlsxWorkbookTheme(value: Uint8Array | undefined): WorkbookTheme {
+export function readXlsxWorkbookTheme(
+  value: Uint8Array | undefined,
+  invalidPresence?: () => void,
+): WorkbookTheme {
   if (!value) return cloneWorkbookTheme(DEFAULT_WORKBOOK_THEME);
   const xml = strFromU8(value);
   const colors = colorTags.map((tag) => schemeColor(xml, tag));
@@ -144,6 +378,14 @@ export function readXlsxWorkbookTheme(value: Uint8Array | undefined): WorkbookTh
         hyperlink: colors[10]!,
         followedHyperlink: colors[11]!,
       };
+    let invalid = false;
+    let scriptFonts = readNativeChartFontTheme(value, () => {
+      invalid = true;
+      invalidPresence?.();
+    });
+    // Invalid private hints never hide actual nonempty/empty source slots. They
+    // cannot prove chart bindings, but the workbook still retains the raw fonts.
+    if (invalid) scriptFonts = readChartFontTheme(value, undefined, true);
     const headingEastAsia = font(xml, "majorFont", "ea");
     const bodyEastAsia = font(xml, "minorFont", "ea");
     if (headingEastAsia || bodyEastAsia)
@@ -151,6 +393,12 @@ export function readXlsxWorkbookTheme(value: Uint8Array | undefined): WorkbookTh
         name: decodeXml(/<[\w-]+:fontScheme\s+name="([^"]*)"/i.exec(xml)?.[1] || name),
         headingEastAsia: headingEastAsia ?? DEFAULT_WORKBOOK_THEME.fonts.headingEastAsia,
         bodyEastAsia: bodyEastAsia ?? DEFAULT_WORKBOOK_THEME.fonts.bodyEastAsia,
+        ...(scriptFonts.major?.complexScript !== undefined
+          ? { headingComplexScript: scriptFonts.major.complexScript }
+          : {}),
+        ...(scriptFonts.minor?.complexScript !== undefined
+          ? { bodyComplexScript: scriptFonts.minor.complexScript }
+          : {}),
       };
     const formatEffects = effects(xml);
     if (formatEffects) theme.effects = formatEffects;
@@ -183,7 +431,11 @@ function formatScheme(theme: Required<WorkbookTheme>): string {
     : '<a:solidFill><a:schemeClr val="phClr"/></a:solidFill>';
   return `<a:fmtScheme name="${escapeXml(effect.name)}"><a:fillStyleLst>${gradient}<a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="${width}"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/></a:ln><a:ln w="${width}"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/></a:ln><a:ln w="${width}"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst>${shadow}${reflection}</a:effectLst><a:sp3d>${bevel}</a:sp3d></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme>`;
 }
-export function writeXlsxWorkbookTheme(entries: Zippable, theme: WorkbookTheme): void {
+export function writeXlsxWorkbookTheme(
+  entries: Zippable,
+  theme: WorkbookTheme,
+  exactScriptFonts = false,
+): void {
   const source = entries[themeEntry];
   if (!(source instanceof Uint8Array)) return;
   const extended = normalizeWorkbookTheme(theme);
@@ -203,23 +455,43 @@ export function writeXlsxWorkbookTheme(entries: Zippable, theme: WorkbookTheme):
       /(<a:minorFont>[\s\S]*?<a:latin\s+typeface=")[^"]*(")/i,
       (_, before, after) => `${before}${escapeXml(theme.bodyFont)}${after}`,
     );
-  if (extended.fonts)
-    xml = xml
-      .replace(
-        /(<a:fontScheme\b[^>]*\bname=")[^"]*(")/i,
-        (_, before, after) => `${before}${escapeXml(extended.fonts.name)}${after}`,
-      )
-      .replace(
-        /(<a:majorFont>[\s\S]*?<a:ea\s+typeface=")[^"]*(")/i,
-        (_, before, after) => `${before}${escapeXml(extended.fonts.headingEastAsia)}${after}`,
-      )
-      .replace(
-        /(<a:minorFont>[\s\S]*?<a:ea\s+typeface=")[^"]*(")/i,
-        (_, before, after) => `${before}${escapeXml(extended.fonts.bodyEastAsia)}${after}`,
-      );
+  if (
+    exactScriptFonts ||
+    extended.fonts.headingComplexScript !== undefined ||
+    extended.fonts.bodyComplexScript !== undefined
+  ) {
+    // Write only model-owned slots. A template's supplemental mappings would silently
+    // change empty-CS and script bindings after reload and cannot be replayed here.
+    const fonts = extended.fonts;
+    const group = (role: "major" | "minor", latin: string, ea: string, cs: string | undefined) =>
+      `<a:${role}Font><a:latin typeface="${escapeXml(latin)}"/><a:ea typeface="${escapeXml(ea)}"/><a:cs typeface="${escapeXml(cs ?? "")}"/></a:${role}Font>`;
+    const fontScheme = `<a:fontScheme name="${escapeXml(fonts.name)}">${group("major", extended.headingFont, fonts.headingEastAsia, fonts.headingComplexScript)}${group("minor", extended.bodyFont, fonts.bodyEastAsia, fonts.bodyComplexScript)}</a:fontScheme>`;
+    xml = xml.replace(/<a:fontScheme\b[^>]*>[\s\S]*?<\/a:fontScheme>/i, () => fontScheme);
+  } else {
+    if (extended.fonts)
+      xml = xml
+        .replace(
+          /(<a:fontScheme\b[^>]*\bname=")[^"]*(")/i,
+          (_, before, after) => `${before}${escapeXml(extended.fonts.name)}${after}`,
+        )
+        .replace(
+          /(<a:majorFont>[\s\S]*?<a:ea\s+typeface=")[^"]*(")/i,
+          (_, before, after) => `${before}${escapeXml(extended.fonts.headingEastAsia)}${after}`,
+        )
+        .replace(
+          /(<a:minorFont>[\s\S]*?<a:ea\s+typeface=")[^"]*(")/i,
+          (_, before, after) => `${before}${escapeXml(extended.fonts.bodyEastAsia)}${after}`,
+        );
+  }
   const nextFormatScheme = formatScheme(extended);
   if (nextFormatScheme)
     xml = xml.replace(/<a:fmtScheme\b[^>]*>[\s\S]*?<\/a:fmtScheme>/i, () => nextFormatScheme);
-  xml = writeThemeCatalog(xml, extended);
+  xml = writeThemeCatalog(
+    xml,
+    extended,
+    exactScriptFonts ||
+      extended.fonts.headingComplexScript !== undefined ||
+      extended.fonts.bodyComplexScript !== undefined,
+  );
   entries[themeEntry] = strToU8(xml);
 }

@@ -1,3 +1,4 @@
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
 import type { ChartComboSeriesChange } from "@sheetcraft/core/chart-combo";
 import { init } from "./chart-runtime";
@@ -14,7 +15,7 @@ import {
 export function preflightChartDataTable(
   chart: SheetChart,
   data: ChartData,
-  dimensions: { width: number; height: number },
+  dimensions: { width: number; height: number; theme?: WorkbookTheme },
   sourceData: ChartData = data,
   comboSeriesChanges?: readonly ChartComboSeriesChange[],
 ): void {

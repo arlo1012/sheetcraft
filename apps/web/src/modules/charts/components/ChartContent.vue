@@ -1,4 +1,13 @@
 <script setup lang="ts">
+import ChartPreviewNotices from "./ChartPreviewNotices.vue";
+import type { ChartTextFormat } from "@sheetcraft/core/chart-format";
+import { formatCellNumberValue } from "@sheetcraft/core/number-format";
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
+import {
+  createChartTextPlan,
+  getChartFontFamilies,
+  createChartWordTitlePlan,
+} from "../chart-script-fonts";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
@@ -32,6 +41,7 @@ import {
 import { useAppI18n } from "../../../shared/i18n";
 const props = defineProps<{
   drawing: SheetChartDrawing;
+  theme?: WorkbookTheme;
   paintChart?: SheetChart;
   editableLegend?: boolean;
   selectedElement?: ChartFormatTarget;
@@ -44,6 +54,7 @@ const props = defineProps<{
 const emit = defineEmits<{ selectElement: [target: ChartFormatTarget, openPane: boolean] }>();
 const { t } = useAppI18n();
 const root = ref<HTMLElement>();
+const noticeAnchor = ref<HTMLElement | null>(null);
 let chart: EChartsType | undefined;
 let observer: ResizeObserver | undefined;
 const paintChart = computed(() => props.paintChart ?? props.drawing.chart);
@@ -84,7 +95,7 @@ const fontRevision = ref(0);
 const legendLayout = computed(() => {
   void fontRevision.value;
   return props.editableLegend && !result.value.invalid
-    ? getChartLegendLayout(paintChart.value, data.value, props.drawing)
+    ? getChartLegendLayout(paintChart.value, data.value, { ...props.drawing, theme: props.theme })
     : undefined;
 });
 const legendSelectionStyle = computed(() => {
@@ -105,20 +116,58 @@ let eventCleanup: (() => void) | undefined;
 let paginationPoint: { x: number; y: number } | undefined;
 let legendDoubleClickHandled = false;
 let fontRequest = 0;
-const fontFamilies = computed(() => {
-  const format = paintChart.value.format;
-  return [
-    ...new Set(
-      [
-        format?.title?.fontFamily,
-        format?.legend?.text?.fontFamily,
-        format?.categoryAxis?.text?.fontFamily,
-        format?.valueAxis?.text?.fontFamily,
-        format?.secondaryValueAxis?.text?.fontFamily,
-      ].flatMap((family) => (family ? getCellFontResourceFamilies(family) : [])),
-    ),
-  ];
+const fontFamilies = computed(() => [
+  ...new Set(
+    getChartFontFamilies(paintChart.value, props.theme).flatMap(getCellFontResourceFamilies),
+  ),
+]);
+const wordTitlePlan = computed(() =>
+  createChartWordTitlePlan(
+    paintChart.value.title,
+    paintChart.value.format?.title,
+    props.theme,
+    "inherit",
+  ),
+);
+const singleLineTitleLimited = computed(
+  () =>
+    paintChart.value.type === "wordCloud" &&
+    !!paintChart.value.format?.title?.scriptFonts &&
+    paintChart.value.title.includes("\n"),
+);
+const scriptFontLimited = computed(() => {
+  const f = paintChart.value.format;
+  const limited = (text: ChartTextFormat | undefined, labels: string[]) =>
+    !!text?.scriptFonts &&
+    labels.some((label) => createChartTextPlan(label, text, props.theme).limitations.length > 0);
+  const names = ["pie", "doughnut"].includes(paintChart.value.type)
+    ? data.value.categories
+    : data.value.series.map((series) => series.name);
+  const numeric = (axis: NonNullable<typeof f>["valueAxis"]) =>
+    data.value.series.flatMap((series) =>
+      series.values
+        .filter((value): value is number => value !== null)
+        .map(
+          (value) => formatCellNumberValue(value, axis?.numberFormat ?? series.numberFormat).text,
+        ),
+    );
+  return (
+    limited(f?.title, [paintChart.value.title]) ||
+    limited(f?.legend?.text, names) ||
+    limited(f?.categoryAxis?.text, [...data.value.categories, f?.categoryAxis?.title ?? ""]) ||
+    limited(f?.valueAxis?.text, [f?.valueAxis?.title ?? "", ...numeric(f?.valueAxis)]) ||
+    limited(f?.secondaryValueAxis?.text, [
+      f?.secondaryValueAxis?.title ?? "",
+      ...numeric(f?.secondaryValueAxis),
+    ])
+  );
 });
+
+const previewNotices = computed(() => [
+  ...(singleLineTitleLimited.value ? [t("chart.singleLineTitlePreviewLimited")] : []),
+  ...(scriptFontLimited.value ? [t("chart.scriptFontPreviewLimited")] : []),
+  ...(fontError.value ? [t("chart.formatFontLoadFailed")] : []),
+]);
 function loadFonts(retry = false) {
   const owner = props.drawing,
     revision = props.revision,
@@ -349,6 +398,7 @@ function render() {
       {
         width: props.drawing.width,
         height: props.drawing.height,
+        theme: props.theme,
       },
       props.comboSeriesChanges,
     );
@@ -356,7 +406,13 @@ function render() {
       option.legend = {
         ...option.legend,
         ...legendLayout.value.option,
-        textStyle: { ...option.legend.textStyle, ...legendLayout.value.option.textStyle },
+        textStyle: {
+          ...option.legend.textStyle,
+          ...legendLayout.value.option.textStyle,
+          ...(paintChart.value.format?.legend?.text?.scriptFonts
+            ? { overflow: "none" as const }
+            : {}),
+        },
         formatter: option.legend.formatter,
         selectedMode: false,
         // Selection is a separate DOM outline; never replace the user's border.
@@ -372,7 +428,7 @@ function render() {
     const table = createChartDataTablePlan(
       paintChart.value,
       data.value,
-      props.drawing,
+      { ...props.drawing, theme: props.theme },
       props.comboSeriesChanges,
     );
     chart.setOption(prepareChartDataTableOption(option, table), { notMerge: true });
@@ -408,6 +464,7 @@ watch(
     paintChart,
     () => props.comboSeriesChanges,
     () => props.editableLegend,
+    () => props.theme,
   ],
   render,
   {
@@ -428,6 +485,7 @@ onBeforeUnmount(() => {
 </script>
 <template>
   <div
+    ref="noticeAnchor"
     class="chart-content"
     style="pointer-events: auto"
     @pointerdown="legendPointerDown"
@@ -447,15 +505,21 @@ onBeforeUnmount(() => {
         :x="drawing.width / 2"
         y="22"
         text-anchor="middle"
-        :font-size="drawing.chart.format?.title?.fontSize ?? 15"
-        :font-family="drawing.chart.format?.title?.fontFamily"
-        :font-weight="drawing.chart.format?.title?.bold ? 'bold' : 'normal'"
-        :font-style="drawing.chart.format?.title?.italic ? 'italic' : 'normal'"
-        :fill="drawing.chart.format?.title?.color ?? '#000000'"
+        :font-size="paintChart.format?.title?.fontSize ?? 15"
+        :font-family="paintChart.format?.title?.fontFamily"
+        :font-weight="paintChart.format?.title?.bold ? 'bold' : 'normal'"
+        :font-style="paintChart.format?.title?.italic ? 'italic' : 'normal'"
+        :fill="paintChart.format?.title?.color ?? '#000000'"
         @click="emit('selectElement', { kind: 'title' }, false)"
         @dblclick="emit('selectElement', { kind: 'title' }, true)"
       >
-        {{ drawing.chart.title }}
+        <tspan
+          v-for="(run, index) in wordTitlePlan.runs"
+          :key="index"
+          :font-family="run.fontFamily"
+        >
+          {{ run.text }}
+        </tspan>
       </text>
       <text
         v-for="(word, index) in words"
@@ -478,12 +542,13 @@ onBeforeUnmount(() => {
       :style="legendSelectionStyle"
       aria-hidden="true"
     />
-    <div v-if="fontError" class="chart-content__font-error" role="status">
-      {{ t("chart.formatFontLoadFailed") }}
-      <button type="button" @pointerdown.stop @click.stop="loadFonts(true)">
-        {{ t("chart.formatFontRetry") }}
-      </button>
-    </div>
+    <ChartPreviewNotices
+      v-if="previewNotices.length"
+      :anchor="noticeAnchor"
+      :messages="previewNotices"
+      :retry="fontError"
+      @retry="loadFonts(true)"
+    />
     <div
       v-if="
         (!drawing.chart.source && !drawing.chart.range && !drawing.chart.dataCache) ||
@@ -523,13 +588,6 @@ onBeforeUnmount(() => {
     background: white;
     padding: 16px;
     text-align: center;
-  }
-  &__font-error {
-    position: absolute;
-    inset: auto 4px 4px;
-    color: #b91c1c;
-    background: #fff;
-    font-size: 12px;
   }
 }
 </style>

@@ -1,12 +1,18 @@
+import { createChartTextPlan, measureChartText, type ChartFontContext } from "./chart-script-fonts";
 import type { EChartsOption, LegendComponentOption } from "echarts";
 import { format } from "echarts/core";
 import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
 import { getChartElementCapabilities, getChartElementSettings } from "./chart-elements";
-type ChartDimensions = { width: number; height: number };
+type ChartDimensions = { width: number; height: number } & ChartFontContext;
 export type ChartLegendBounds = { x: number; y: number; width: number; height: number };
 
 /** Public legend options and hit geometry use exactly the same text metrics. */
-function legendMetrics(chart: SheetChart, names: string[], height: number) {
+function legendMetrics(
+  chart: SheetChart,
+  names: string[],
+  height: number,
+  context?: ChartFontContext,
+) {
   const settings = chart.format?.legend;
   const text = settings?.text;
   const surface = settings?.surface;
@@ -18,13 +24,25 @@ function legendMetrics(chart: SheetChart, names: string[], height: number) {
   const fontFamily = text?.fontFamily ?? "Arial, sans-serif";
   const fontWeight = text?.bold ? "bold" : "normal";
   const fontStyle = text?.italic ? "italic" : "normal";
-  const font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+  const measure = (value: string, family: string) =>
+    format.getTextRect(value, `${fontStyle} ${fontWeight} ${fontSize}px ${family}`).width;
   const lineHeight = settings ? Math.ceil(fontSize * 1.2) : fontSize;
   const measuredWidth =
     Math.ceil(
       Math.max(
         0,
-        ...names.map((name) => format.getTextRect(name.replace(/[\r\n]+/g, " "), font).width),
+        ...names.map((name) =>
+          measureChartText(
+            createChartTextPlan(
+              name.replace(/[\r\n]+/g, " "),
+              text,
+              context?.theme,
+              fontFamily,
+              context?.resolveFontFamily,
+            ),
+            measure,
+          ),
+        ),
       ),
     ) + 1;
   return {
@@ -103,7 +121,7 @@ export function createChartElementLayout(
     const gap = Math.min(8, plot.width * 0.04, plot.height * 0.04);
     // A bounded scroll viewport and truncated one-line names keep even very long
     // legends in their reserved strip. Moving legend coordinates alone cannot do this.
-    const metrics = legendMetrics(chart, names, plot.height);
+    const metrics = legendMetrics(chart, names, plot.height, dimensions);
     const styled = chart.format?.legend !== undefined;
     const legendWidth = vertical
       ? Math.min(
@@ -206,7 +224,7 @@ export function getChartLegendLayout(
       ? data.categories
       : series.map((entry) => entry.name);
   if (!names.length) return;
-  const metrics = legendMetrics(chart, names, viewport.height);
+  const metrics = legendMetrics(chart, names, viewport.height, dimensions);
   const { fontSize, lineHeight, padding, border } = metrics;
   // On tiny drawings reduce padding before shrinking the native scroll viewport.
   const inset = Math.min(metrics.inset, Math.max(0, Math.min(viewport.width, viewport.height) - 1));

@@ -1,3 +1,11 @@
+import { format as echartsFormat } from "echarts/core";
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
+import {
+  chartRichStyles,
+  chartRichText,
+  createChartTextPlan,
+  truncateChartText,
+} from "./chart-script-fonts";
 import type {
   EChartsOption,
   ScrollableLegendComponentOption,
@@ -491,4 +499,131 @@ export function applyChartCommonFormat(
       };
     });
   return next;
+}
+
+/** Last-stage text projection: preserve existing numeric/identity formatters and
+ * compose rich script faces only after ordinary chart layout/style decisions. */
+export function applyChartScriptFontFormat(
+  option: EChartsOption,
+  chart: SheetChart,
+  theme?: WorkbookTheme,
+  resolveFontFamily?: (family: string) => string,
+): EChartsOption {
+  const f = chart.format;
+  if (!f || typeof Intl.Segmenter !== "function") return option;
+  type BaseText = {
+    fontFamily?: string;
+    fontSize?: number | string;
+    fontWeight?: string | number;
+    fontStyle?: string;
+    width?: number | string;
+  };
+  const baseSize = (base?: BaseText) => {
+    const value =
+      typeof base?.fontSize === "string" ? Number.parseFloat(base.fontSize) : base?.fontSize;
+    return value !== undefined && Number.isFinite(value) ? value : 12;
+  };
+  const paint = (text: string, settings: ChartTextFormat, base?: BaseText) => {
+    const fallback = base?.fontFamily ?? "sans-serif";
+    const effective = { ...settings, fontSize: settings.fontSize ?? baseSize(base) };
+    const make = (value: string) =>
+      createChartTextPlan(value, effective, theme, fallback, resolveFontFamily);
+    const measure = (value: string, family: string) =>
+      echartsFormat.getTextRect(
+        value,
+        `${effective.italic ? "italic" : (base?.fontStyle ?? "normal")} ${effective.bold === undefined ? (base?.fontWeight ?? "normal") : effective.bold ? "bold" : "normal"} ${effective.fontSize}px ${family}`,
+      ).width;
+    const plan =
+      typeof base?.width === "number"
+        ? truncateChartText(text, base.width, make, measure)
+        : make(text);
+    return chartRichText(plan);
+  };
+  const rich = (settings: ChartTextFormat, base?: BaseText) => ({
+    fontFamily: base?.fontFamily ?? "sans-serif",
+    rich: chartRichStyles(
+      { ...settings, fontSize: settings.fontSize ?? baseSize(base) },
+      theme,
+      base?.fontFamily ?? "sans-serif",
+    ),
+    // Native rich truncation can split graphemes. Width is handled before encoding.
+    overflow: "none" as const,
+  });
+  const axis = <T extends AxisOption>(entry: T, settings?: ChartTextFormat): T => {
+    if (!settings?.scriptFonts) return entry;
+    const formatter = entry.axisLabel?.formatter;
+    return {
+      ...entry,
+      ...(entry.name ? { name: paint(entry.name, settings, entry.nameTextStyle) } : {}),
+      nameTextStyle: { ...entry.nameTextStyle, ...rich(settings, entry.nameTextStyle) },
+      axisLabel: {
+        ...entry.axisLabel,
+        ...rich(settings, entry.axisLabel),
+        formatter: (value: string | number, index: number, extra?: unknown) => {
+          const text =
+            typeof formatter === "function"
+              ? (formatter as (value: string | number, index: number, extra?: unknown) => string)(
+                  value,
+                  index,
+                  extra,
+                )
+              : typeof formatter === "string"
+                ? formatter.replaceAll("{value}", String(value))
+                : entry.type === "value" && typeof value === "number"
+                  ? echartsFormat.addCommas(value)
+                  : String(value);
+          return paint(text, settings, entry.axisLabel);
+        },
+      },
+    };
+  };
+  const axes = (entries: EChartsOption["xAxis"] | EChartsOption["yAxis"], horizontal: boolean) => {
+    if (!entries) return entries;
+    const apply = (entry: AxisOption, index: number) =>
+      axis(
+        entry,
+        entry.type === "category"
+          ? f.categoryAxis?.text
+          : index > 0 && horizontal === (chart.type === "bar")
+            ? f.secondaryValueAxis?.text
+            : f.valueAxis?.text,
+      );
+    return Array.isArray(entries) ? entries.map(apply) : apply(entries, 0);
+  };
+  const legend = (entry: ScrollableLegendComponentOption): ScrollableLegendComponentOption => {
+    const settings = f.legend?.text;
+    if (!settings?.scriptFonts) return entry;
+    const formatter = entry.formatter;
+    return {
+      ...entry,
+      textStyle: { ...entry.textStyle, ...rich(settings, entry.textStyle) },
+      formatter: (name: string) =>
+        paint(
+          typeof formatter === "function"
+            ? formatter(name)
+            : typeof formatter === "string"
+              ? formatter.replaceAll("{name}", name)
+              : name,
+          settings,
+          entry.textStyle,
+        ),
+    };
+  };
+  return {
+    ...option,
+    ...(option.title && !Array.isArray(option.title) && f.title?.scriptFonts
+      ? {
+          title: {
+            ...option.title,
+            text: paint(option.title.text ?? "", f.title, option.title.textStyle),
+            textStyle: { ...option.title.textStyle, ...rich(f.title, option.title.textStyle) },
+          },
+        }
+      : {}),
+    ...(option.legend
+      ? { legend: Array.isArray(option.legend) ? option.legend.map(legend) : legend(option.legend) }
+      : {}),
+    ...(option.xAxis ? { xAxis: axes(option.xAxis, true) as EChartsOption["xAxis"] } : {}),
+    ...(option.yAxis ? { yAxis: axes(option.yAxis, false) as EChartsOption["yAxis"] } : {}),
+  };
 }

@@ -406,8 +406,8 @@ export function useChartActions(options: {
         error.value = true;
         return;
       }
-      createChartOption(next.chart, data, next);
-      preflightChartDataTable(next.chart, data, next, rawData);
+      createChartOption(next.chart, data, { ...next, theme: target.workbook.theme });
+      preflightChartDataTable(next.chart, data, { ...next, theme: target.workbook.theme }, rawData);
       if (!isCurrent(target) || !allowed(target.sheet)) return;
       const current = target.sheet.drawings ?? [];
       let drawings: SheetDrawing[];

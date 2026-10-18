@@ -141,7 +141,7 @@ test("only palette presentation opens; 17 series and source metadata stay blocke
   f.drawing.chart.range!.end.column = 17;
   expect(unsupportedNativeChartStyles(f.drawing.chart)).toEqual(["format", "presentation"]);
 });
-test("different script fonts warn on the exact leaf while retaining size/bold/color", async () => {
+test("different concrete script fonts retain all slots and size/bold/color", async () => {
   const f = explicit(),
     out = await encodeXlsx(f.workbook),
     entries = unzipSync(out.bytes);
@@ -150,8 +150,17 @@ test("different script fonts warn on the exact leaf while retaining size/bold/co
   );
   const read = await decodeXlsx(zipSync(entries)),
     chart = imported(read).chart;
-  expect(chart.format?.title).toEqual({ fontSize: 15, bold: false, color: "#123456" });
-  expect(read.report.issues.flatMap((issue) => issue.locations)).toContain(
+  expect(chart.format?.title).toEqual({
+    fontSize: 15,
+    bold: false,
+    color: "#123456",
+    scriptFonts: {
+      latin: { kind: "family", family: "Arial" },
+      eastAsia: { kind: "family", family: "宋体" },
+      complexScript: { kind: "family", family: "Arial" },
+    },
+  });
+  expect(read.report.issues.flatMap((issue) => issue.locations)).not.toContain(
     "xl/charts/chart1.xml.format.title.fontFamily",
   );
 });
@@ -225,11 +234,22 @@ test("actual WPS RGB producer preserves three editable styles and B2=90", async 
     expect(drawing.chart.presentation).toEqual({ palette: ["#2468ac", "#d15a28"] });
     expect(drawing.chart.format).toEqual({
       ...explicit().drawing.chart.format,
-      legend: { text: { fontSize: 1000 / 75, bold: false, italic: false, color: "#000000" } },
+      legend: {
+        text: {
+          fontSize: 1000 / 75,
+          bold: false,
+          italic: false,
+          color: "#000000",
+          scriptFonts: {
+            latin: { kind: "theme", role: "minor", slot: "latin" },
+            eastAsia: { kind: "theme", role: "minor", slot: "eastAsia" },
+            complexScript: { kind: "theme", role: "minor", slot: "complexScript" },
+          },
+        },
+      },
     });
     expect(read.report.issues.flatMap((issue) => issue.locations)).toEqual(
       expect.arrayContaining([
-        expect.stringMatching(/format\.legend\.text\.fontFamily$/),
         expect.stringMatching(/format\.legend\.text\.color\.themeMaterialization$/),
       ]),
     );

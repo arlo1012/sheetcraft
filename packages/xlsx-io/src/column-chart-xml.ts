@@ -102,7 +102,12 @@ export function columnChartXml(
     .join("");
   const titleStyle =
     pivotIdentity === undefined
-      ? { fontFamily: "Arial", fontSize: 15, bold: false, ...drawing.chart.format?.title }
+      ? {
+          ...(drawing.chart.format?.title?.scriptFonts ? {} : { fontFamily: "Arial" }),
+          fontSize: 15,
+          bold: false,
+          ...drawing.chart.format?.title,
+        }
       : undefined;
   const title = drawing.chart.title
     ? `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p>${titleStyle ? `<a:pPr>${nativeChartTextProperties(titleStyle)}</a:pPr>` : ""}<a:r><a:t>${xml(drawing.chart.title)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="${Number(elements?.titleOverlay ?? false)}"/></c:title>`

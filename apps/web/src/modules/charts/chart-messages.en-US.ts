@@ -1,5 +1,11 @@
 export const chartsEnUS = {
   "chart.comboCategory": "Combo",
+  "chart.scriptOrThemeFont": "Script/theme fonts",
+  "chart.scriptFontPreviewLimited":
+    "Some script-specific fonts cannot be accurately shown in this preview. The preview may use fallback fonts; the original font settings are preserved.",
+  "chart.singleLineTitlePreviewLimited":
+    "Word cloud title preview is single-line; the original title text is retained.",
+  "chart.previewNotices": "Preview notices",
   "chart.defaultTitle": "Chart Title",
   "chart.previewNoData": "No numeric data to preview. Select data and check the header settings.",
   "chart.insertDialog": "Insert Chart",

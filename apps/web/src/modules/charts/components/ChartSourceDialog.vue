@@ -932,6 +932,7 @@ onBeforeUnmount(() => {
       <div class="chart-source-editor__preview" :aria-label="t('chart.sourcePreview')">
         <ChartContent
           :drawing="previewDrawing"
+          :theme="workbook.theme"
           :sheet="sheet"
           :evaluator="evaluator"
           :revision="revision"

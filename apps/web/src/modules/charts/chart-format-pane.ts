@@ -397,6 +397,18 @@ export function setChartFormatField<T extends object, K extends keyof T>(
   else next[field] = value;
   return Object.keys(next).length ? next : undefined;
 }
+/** A single-family selection deliberately replaces every script/theme binding. */
+export function setChartTextFontFamily(
+  current: ChartTextFormat,
+  family: string | undefined,
+): ChartTextFormat | undefined {
+  const next = { ...current };
+  delete next.scriptFonts;
+  delete next.fontFamily;
+  if (family) next.fontFamily = family;
+  return Object.keys(next).length ? next : undefined;
+}
+
 export function compactChartAxis<T extends ChartCategoryAxisFormat | ChartValueAxisFormat>(
   axis: T,
 ): T | undefined {

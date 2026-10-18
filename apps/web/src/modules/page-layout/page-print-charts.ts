@@ -1,3 +1,4 @@
+import { cloneWorkbookTheme, type WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import {
   normalizeSheetDrawing,
   normalizeSheetDrawings,
@@ -103,6 +104,7 @@ export type PrintChartEntry = Readonly<{
   bounds: Readonly<{ left: number; top: number; right: number; bottom: number }>;
 }>;
 export type PrintChartPass = Readonly<{
+  theme?: WorkbookTheme;
   entries: readonly PrintChartEntry[];
   revision: number;
   key: string;
@@ -144,6 +146,7 @@ function sheetGeometryKey(sheet: Sheet): string {
 }
 
 export function capturePrintChartPass(options: {
+  theme?: WorkbookTheme;
   sheet: Sheet;
   metrics: PictureSheetMetrics;
   evaluator: SheetEvaluator;
@@ -152,6 +155,9 @@ export function capturePrintChartPass(options: {
   isCurrent?: () => boolean;
 }): PrintChartPass {
   const { sheet, metrics, evaluator, resolveSheet } = options;
+  const theme = options.theme ? cloneWorkbookTheme(options.theme) : undefined;
+  const themeKey = JSON.stringify(theme);
+  freezeData(theme);
   const forest = sheet.drawings;
   const roots = getPrintableChartRoots(sheet);
   if (roots.length > MAX_PRINT_CHARTS)
@@ -296,6 +302,11 @@ export function capturePrintChartPass(options: {
     }
   }
   const assertCurrent = () => {
+    if (JSON.stringify(options.theme ? cloneWorkbookTheme(options.theme) : undefined) !== themeKey)
+      throw new ChartPrintUnavailableError(
+        roots.map((root) => root.id),
+        "The chart theme changed.",
+      );
     if (options.isCurrent && !options.isCurrent())
       throw new ChartPrintUnavailableError(
         roots.map((root) => root.id),
@@ -352,16 +363,18 @@ export function capturePrintChartPass(options: {
   };
   assertCurrent();
   return Object.freeze({
+    theme,
     entries: Object.freeze(entries),
     revision: options.revision ?? 0,
-    key: JSON.stringify(
+    key: JSON.stringify([
+      theme,
       entries.map((entry) => [
         entry.order,
         entry.rect,
         entry.rotation,
         signatures.get(entry.sourceRoot),
       ]),
-    ),
+    ]),
     assertCurrent,
   });
 }

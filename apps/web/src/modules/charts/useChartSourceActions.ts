@@ -225,6 +225,7 @@ export function useChartSourceActions(options: {
         target.workbook.sheets.get(id),
       );
       createChartOption(chart, data, {
+        theme: target.workbook.theme,
         width: target.initial.width,
         height: target.initial.height,
       });
@@ -233,7 +234,7 @@ export function useChartSourceActions(options: {
         close(target);
         return true;
       }
-      preflightChartDataTable(chart, data, target.initial);
+      preflightChartDataTable(chart, data, { ...target.initial, theme: target.workbook.theme });
       const forest = target.sheet.drawings;
       if (!forest?.includes(target.initial)) return false;
       const next = { ...target.initial, chart };

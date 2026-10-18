@@ -1,3 +1,4 @@
+import type { ChartFontContext } from "./chart-script-fonts";
 import { createChartElementLayout, getChartLegendLayout } from "./chart-element-layout";
 import { applySeriesLegendIdentity } from "./chart-series-legend";
 import type { EChartsOption, SeriesOption } from "echarts";
@@ -14,14 +15,18 @@ import {
 } from "@sheetcraft/core/chart-presentation";
 import type { ChartComboSeriesChange } from "@sheetcraft/core/chart-combo";
 import { getChartElementSettings } from "./chart-elements";
-import { applyChartCommonFormat, getChartComboDataSeriesSettings } from "./chart-format-render";
+import {
+  applyChartCommonFormat,
+  applyChartScriptFontFormat,
+  getChartComboDataSeriesSettings,
+} from "./chart-format-render";
 import {
   chartPercentAxisDomain,
   createChartPresentationData,
   getChartRenderPresentation,
 } from "./chart-presentation-render";
 const colors = DEFAULT_CHART_PALETTE;
-type ChartDimensions = { width: number; height: number };
+type ChartDimensions = { width: number; height: number } & ChartFontContext;
 
 /** Explicit sources keep each series' original palette slot when reordered. */
 function seriesAppearance(series: ChartData["series"][number], palette: readonly string[]) {
@@ -493,5 +498,9 @@ export function createChartOption(
       ...legendLayout.option,
       textStyle: { ...formatted.legend.textStyle, ...legendLayout.option.textStyle },
     };
-  return applySeriesLegendIdentity(formatted, chart, renderedData);
+  return applySeriesLegendIdentity(
+    applyChartScriptFontFormat(formatted, chart, dimensions?.theme, dimensions?.resolveFontFamily),
+    chart,
+    renderedData,
+  );
 }

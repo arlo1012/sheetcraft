@@ -424,6 +424,7 @@ function onDialogKeydown(event: KeyboardEvent): void {
           <ChartContent
             v-else
             :drawing="previewDrawing"
+            :theme="workbook.theme"
             :combo-series-changes="activeComboChanges"
             :sheet="sheet"
             :evaluator="evaluator"

@@ -822,3 +822,53 @@ test.each([false, true])(
     }
   },
 );
+
+test("script fonts use independent leased faces in native title, legend, axes and data table", () => {
+  const scriptFonts = {
+    latin: { kind: "family" as const, family: "Original Latin face" },
+    eastAsia: { kind: "family" as const, family: "Original East Asian face" },
+    complexScript: { kind: "automatic" as const },
+  };
+  const source: ChartData = {
+    categories: ["A中", "B文"],
+    series: [{ name: "Series系列", values: [2, 4] }],
+    records: [],
+  };
+  const result = renderChartPrintPresentation(
+    drawing({
+      title: "Title标题",
+      legend: true,
+      elements: { dataTable: "withLegendKeys" },
+      format: {
+        title: { scriptFonts },
+        legend: { text: { scriptFonts } },
+        categoryAxis: { text: { scriptFonts } },
+        valueAxis: { text: { scriptFonts } },
+      },
+    }),
+    source,
+    { ...options, resolveFontFamily: (family) => family.replace("Original", "Leased") },
+  );
+  try {
+    const texts = contexts
+      .get(result.canvas)!
+      .copies[0]!.paints.filter((p) => p.operation === "text");
+    expect(texts.some((p) => p.text === "Title" && p.font.includes("Leased Latin face"))).toBe(
+      true,
+    );
+    expect(texts.some((p) => p.text === "标题" && p.font.includes("Leased East Asian face"))).toBe(
+      true,
+    );
+    expect(texts.some((p) => p.text === "中" && p.font.includes("Leased East Asian face"))).toBe(
+      true,
+    );
+    expect(texts.some((p) => p.text === "Series" && p.font.includes("Leased Latin face"))).toBe(
+      true,
+    );
+    expect(texts.some((p) => p.font.includes("Original"))).toBe(false);
+    expect(allMeasures.some((p) => p.font.includes("Original"))).toBe(false);
+    expect(allMeasures.some((p) => p.font.includes("Leased East Asian face"))).toBe(true);
+  } finally {
+    result.dispose();
+  }
+});

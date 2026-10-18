@@ -28,7 +28,14 @@ export type WorkbookThemeColors = {
   hyperlink: string;
   followedHyperlink: string;
 };
-export type WorkbookThemeFonts = { name: string; headingEastAsia: string; bodyEastAsia: string };
+export type WorkbookThemeFonts = {
+  name: string;
+  headingEastAsia: string;
+  bodyEastAsia: string;
+  /** Absent means unknown; empty means an explicit automatic theme slot. */
+  headingComplexScript?: string;
+  bodyComplexScript?: string;
+};
 export type WorkbookThemeEffects = {
   id: string;
   name: string;
@@ -130,13 +137,42 @@ function fonts(value: unknown, fallbackName: string): WorkbookThemeFonts {
   const source = value === undefined ? DEFAULT_WORKBOOK_THEME.fonts : value;
   if (!source || typeof source !== "object")
     throw new TypeError("Workbook theme fonts must be an object.");
+  const prototype: unknown = Object.getPrototypeOf(source);
+  if (prototype !== null && prototype !== Object.prototype)
+    throw new TypeError("Workbook theme fonts require an ordinary data record.");
+  const keys = [
+    "name",
+    "headingEastAsia",
+    "bodyEastAsia",
+    "headingComplexScript",
+    "bodyComplexScript",
+  ];
+  for (const key of keys)
+    if (key in source && !Object.hasOwn(source, key))
+      throw new TypeError("Workbook theme fonts require own data fields.");
+  for (const key of Reflect.ownKeys(source)) {
+    const descriptor = Object.getOwnPropertyDescriptor(source, key)!;
+    if (typeof key !== "string" || !keys.includes(key) || !("value" in descriptor))
+      throw new TypeError("Workbook theme fonts require known own data fields.");
+  }
   const record = source as Record<string, unknown>;
-  return {
+  const result: WorkbookThemeFonts = {
     name: text(record.name ?? fallbackName, "font scheme name"),
     headingEastAsia: text(record.headingEastAsia, "heading East Asian font"),
     bodyEastAsia: text(record.bodyEastAsia, "body East Asian font"),
   };
+  for (const key of ["headingComplexScript", "bodyComplexScript"] as const) {
+    if (!Object.hasOwn(record, key)) continue;
+    const value = record[key];
+    if (typeof value !== "string" || value.length > 256 || (value !== "" && !value.trim()))
+      throw new TypeError(
+        "Workbook theme complex-script font must be bounded text or explicitly empty.",
+      );
+    result[key] = value;
+  }
+  return result;
 }
+
 function effects(value: unknown, fallbackName: string): WorkbookThemeEffects {
   const source = value === undefined ? DEFAULT_WORKBOOK_THEME.effects : value;
   if (!source || typeof source !== "object")

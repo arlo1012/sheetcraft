@@ -1,5 +1,10 @@
 export const chartsZhCN = {
   "chart.comboCategory": "组合图",
+  "chart.scriptOrThemeFont": "按脚本/主题字体",
+  "chart.scriptFontPreviewLimited":
+    "部分文字的分脚本字体无法在此预览中准确呈现；预览可能使用回退字体，原有字体设置仍保留。",
+  "chart.singleLineTitlePreviewLimited": "词云标题预览仅显示单行；原始标题文本保留。",
+  "chart.previewNotices": "预览提示",
   "chart.defaultTitle": "图表标题",
   "chart.previewNoData": "当前范围没有可绘制的数值。请选择数据并检查表头设置。",
   "chart.insertDialog": "插入图表",

@@ -60,6 +60,7 @@ import {
   getChartValueAxisDraftError,
   type ChartValueAxisDraftError,
   setChartFormatField,
+  setChartTextFontFamily,
   syncChartFormatDraft,
   type ChartFormatDraft,
   type ChartFormatDraftError,
@@ -796,6 +797,11 @@ function setText<K extends keyof ChartTextFormat>(
   const intent = textIntent(setChartFormatField(textFormat.value, field, value));
   if (intent) submit(intent);
 }
+function setFontFamily(value: unknown): void {
+  if (typeof value !== "string") return;
+  const intent = textIntent(setChartTextFontFamily(textFormat.value, value || undefined));
+  if (intent) submit(intent);
+}
 function setLineColor(value: string | null): void {
   if (kind.value === "legend") {
     submit(
@@ -1091,9 +1097,12 @@ const numberPreview = computed(() => {
     return { text: "####" };
   }
 });
-const { fontOptions } = useFontCatalog(() =>
-  textFormat.value.fontFamily ? [textFormat.value.fontFamily] : [],
-);
+const { fontOptions } = useFontCatalog(() => [
+  ...(textFormat.value.fontFamily ? [textFormat.value.fontFamily] : []),
+  ...Object.values(textFormat.value.scriptFonts ?? {}).flatMap((choice) =>
+    choice.kind === "family" ? [choice.family] : [],
+  ),
+]);
 const fontFamilyOptions = computed(() => [
   { value: "", label: t("chart.formatDefault") },
   ...fontOptions.value,
@@ -1622,19 +1631,15 @@ function escapeDraft(event: KeyboardEvent): void {
         <div class="chart-format-pane__field">
           <span>{{ t("format.fontFamily") }}</span
           ><FontFormatField
-            :model-value="textFormat.fontFamily ?? ''"
+            :model-value="textFormat.scriptFonts ? undefined : (textFormat.fontFamily ?? '')"
+            :placeholder="textFormat.scriptFonts ? t('chart.scriptOrThemeFont') : undefined"
             :options="fontFamilyOptions"
             :label="t('format.fontFamily')"
             :search-label="t('format.searchFonts')"
             :empty-label="t('format.noMatchingFonts')"
             :disabled="disabled"
             :popup-attach="() => root!"
-            :onChange="
-              captureAction(
-                (value: unknown) =>
-                  typeof value === 'string' && setText('fontFamily', value || undefined),
-              )
-            "
+            :onChange="captureAction(setFontFamily)"
             ><template #searchAction="{ close }"><FontSettingsAction @open="close" /></template
           ></FontFormatField>
         </div>

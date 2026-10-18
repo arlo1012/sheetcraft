@@ -1,9 +1,24 @@
+import type { WorkbookTheme } from "./workbook-theme.js";
 import { readPictureDataArray } from "./picture-data-array.js";
 import { normalizeCellNumberFormat, type CellNumberFormat } from "./style.js";
+
+export type ChartFontScript = "latin" | "eastAsia" | "complexScript";
+export type ChartScriptFontChoice =
+  | { kind: "family"; family: string }
+  | { kind: "theme"; role: "major" | "minor"; slot: ChartFontScript }
+  | { kind: "automatic" };
+export type ChartScriptFonts = Partial<Record<ChartFontScript, ChartScriptFontChoice>>;
+export type ChartResolvedScriptFont =
+  | { kind: "family"; family: string }
+  | { kind: "automatic" }
+  | { kind: "inherit" }
+  | { kind: "unresolved" };
 
 /** Sparse text choices; omission retains the chart's existing presentation. */
 export type ChartTextFormat = {
   fontFamily?: string;
+  /** Per-script choices are exclusive with the legacy all-script family. */
+  scriptFonts?: ChartScriptFonts;
   fontSize?: number;
   color?: string;
   bold?: boolean;
@@ -111,18 +126,92 @@ function title(value: unknown): string {
     throw new RangeError("Chart axis title must be bounded text.");
   return value;
 }
-function text(value: unknown): ChartTextFormat {
-  const source = record(value, ["fontFamily", "fontSize", "color", "bold", "italic"]);
-  const result: ChartTextFormat = {};
-  if (Object.hasOwn(source, "fontFamily")) {
-    if (
-      typeof source.fontFamily !== "string" ||
-      !source.fontFamily.trim() ||
-      source.fontFamily.length > 256
-    )
-      throw new RangeError("Chart font family must be bounded nonempty text.");
-    result.fontFamily = source.fontFamily;
+function family(value: unknown): string {
+  if (typeof value !== "string" || !value.trim() || value.length > 256)
+    throw new RangeError("Chart font family must be bounded nonempty text.");
+  return value;
+}
+function scriptFonts(value: unknown): ChartScriptFonts {
+  const source = record(value, ["latin", "eastAsia", "complexScript"]);
+  if (Reflect.ownKeys(source).length === 0)
+    throw new TypeError("Chart script fonts require at least one choice.");
+  const result: ChartScriptFonts = {};
+  for (const slot of ["latin", "eastAsia", "complexScript"] as const) {
+    if (!Object.hasOwn(source, slot)) continue;
+    const choice = record(source[slot], ["kind", "family", "role", "slot"]);
+    switch (choice.kind) {
+      case "family": {
+        record(choice, ["kind", "family"]);
+        result[slot] = { kind: "family", family: family(choice.family) };
+        break;
+      }
+      case "theme": {
+        record(choice, ["kind", "role", "slot"]);
+        if (choice.role !== "major" && choice.role !== "minor")
+          throw new TypeError("Invalid chart theme font role.");
+        if (
+          choice.slot !== "latin" &&
+          choice.slot !== "eastAsia" &&
+          choice.slot !== "complexScript"
+        )
+          throw new TypeError("Invalid chart theme font slot.");
+        if (choice.slot !== slot)
+          throw new TypeError("Chart theme font slot must match its script.");
+        result[slot] = { kind: "theme", role: choice.role, slot: choice.slot };
+        break;
+      }
+      case "automatic":
+        record(choice, ["kind"]);
+        result[slot] = { kind: "automatic" };
+        break;
+      default:
+        throw new TypeError("Invalid chart script font choice.");
+    }
   }
+  return result;
+}
+/** Resolve one script without replacing retained bindings or inventing host fallback fonts. */
+export function resolveChartScriptFont(
+  format: ChartTextFormat | undefined,
+  script: ChartFontScript,
+  theme: WorkbookTheme,
+): ChartResolvedScriptFont {
+  if (format?.fontFamily !== undefined) return { kind: "family", family: format.fontFamily };
+  const choice = format?.scriptFonts?.[script];
+  if (!choice) return { kind: "inherit" };
+  if (choice.kind === "family") return { kind: "family", family: choice.family };
+  if (choice.kind === "automatic") return { kind: "automatic" };
+  const major = choice.role === "major";
+  const value =
+    choice.slot === "latin"
+      ? major
+        ? theme.headingFont
+        : theme.bodyFont
+      : choice.slot === "eastAsia"
+        ? major
+          ? theme.fonts?.headingEastAsia
+          : theme.fonts?.bodyEastAsia
+        : major
+          ? theme.fonts?.headingComplexScript
+          : theme.fonts?.bodyComplexScript;
+  if (value === undefined) return { kind: "unresolved" };
+  if (value === "") return { kind: "automatic" };
+  return { kind: "family", family: value };
+}
+function text(value: unknown): ChartTextFormat {
+  const source = record(value, [
+    "fontFamily",
+    "scriptFonts",
+    "fontSize",
+    "color",
+    "bold",
+    "italic",
+  ]);
+  const result: ChartTextFormat = {};
+  if (Object.hasOwn(source, "fontFamily") && Object.hasOwn(source, "scriptFonts"))
+    throw new TypeError("Chart fontFamily and scriptFonts are mutually exclusive.");
+  if (Object.hasOwn(source, "fontFamily")) result.fontFamily = family(source.fontFamily);
+  if (Object.hasOwn(source, "scriptFonts")) result.scriptFonts = scriptFonts(source.scriptFonts);
   if (Object.hasOwn(source, "fontSize"))
     result.fontSize = number(source.fontSize, 1, 256, "font size");
   if (Object.hasOwn(source, "color")) result.color = color(source.color);

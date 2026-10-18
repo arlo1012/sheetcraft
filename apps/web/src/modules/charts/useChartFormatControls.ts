@@ -101,7 +101,11 @@ export function useChartFormatControls(options: {
             workbook.sheets.get(sheetId),
           );
           // Validate real mathematical domain/interval budgets before a history write.
-          createChartOption(chart, preparedData, { width: drawing.width, height: drawing.height });
+          createChartOption(chart, preparedData, {
+            width: drawing.width,
+            height: drawing.height,
+            theme: workbook.theme,
+          });
           if (!allowed()) return false;
           if (JSON.stringify(chart) === JSON.stringify(drawing.chart)) {
             error.value = false;
@@ -110,7 +114,7 @@ export function useChartFormatControls(options: {
           preflightChartDataTable(
             chart,
             preparedData,
-            drawing,
+            { ...drawing, theme: workbook.theme },
             getSheetChartSourceData(sheet, chart, options.getEvaluator(), (sheetId) =>
               workbook.sheets.get(sheetId),
             ),

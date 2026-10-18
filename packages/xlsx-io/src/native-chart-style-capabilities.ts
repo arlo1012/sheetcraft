@@ -49,7 +49,28 @@ function record(value: unknown, known: readonly string[]): Record<string, unknow
   }
   return out;
 }
-const textKeys = ["fontFamily", "fontSize", "bold", "color", "italic"];
+function validScriptFonts(value: unknown): boolean {
+  try {
+    const slots = record(value, ["latin", "eastAsia", "complexScript"]);
+    if (!Object.keys(slots).length) return false;
+    return Object.entries(slots).every(([slot, value]) => {
+      if (!["latin", "eastAsia", "complexScript"].includes(slot)) return false;
+      const choice = record(value, ["kind", "family", "role", "slot"]);
+      if (choice.kind === "automatic") return Object.keys(choice).length === 1;
+      if (choice.kind === "family")
+        return Object.keys(choice).length === 2 && isNativeChartFontFamily(choice.family);
+      return (
+        choice.kind === "theme" &&
+        Object.keys(choice).length === 3 &&
+        ["major", "minor"].includes(String(choice.role)) &&
+        choice.slot === slot
+      );
+    });
+  } catch {
+    return false;
+  }
+}
+const textKeys = ["scriptFonts", "fontFamily", "fontSize", "bold", "color", "italic"];
 const formatKeys = [
   "title",
   "legend",
@@ -90,23 +111,26 @@ export function unsupportedNativeChartStyles(chart: SheetChart): readonly string
       issues.add(path);
       return;
     }
+    if ("fontFamily" in fields && "scriptFonts" in fields) issues.add(`${path}.scriptFonts`);
     for (const [key, choice] of Object.entries(fields)) {
       const valid =
-        key === "fontFamily"
-          ? isNativeChartFontFamily(choice)
-          : key === "fontSize"
-            ? typeof choice === "number" &&
-              Number.isFinite(choice) &&
-              choice >= 4 / 3 &&
-              choice <= 256 &&
-              (legend
-                ? Math.round(choice * 75) / 75 === choice
-                : Math.abs(choice * 75 - Math.round(choice * 75)) < 1e-8)
-            : key === "bold" || (legend && key === "italic")
-              ? typeof choice === "boolean"
-              : key === "color"
-                ? nativeChartRgb(choice) !== undefined
-                : false;
+        key === "scriptFonts"
+          ? validScriptFonts(choice)
+          : key === "fontFamily"
+            ? isNativeChartFontFamily(choice)
+            : key === "fontSize"
+              ? typeof choice === "number" &&
+                Number.isFinite(choice) &&
+                choice >= 4 / 3 &&
+                choice <= 256 &&
+                (legend
+                  ? Math.round(choice * 75) / 75 === choice
+                  : Math.abs(choice * 75 - Math.round(choice * 75)) < 1e-8)
+              : key === "bold" || (legend && key === "italic")
+                ? typeof choice === "boolean"
+                : key === "color"
+                  ? nativeChartRgb(choice) !== undefined
+                  : false;
       if (!valid) issues.add(`${path}.${key}`);
     }
   };

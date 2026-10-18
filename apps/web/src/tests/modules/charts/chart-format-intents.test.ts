@@ -1,3 +1,7 @@
+import {
+  setChartFormatField,
+  setChartTextFontFamily,
+} from "../../../modules/charts/chart-format-pane";
 import { describe, expect, test, vi } from "vitest";
 import { normalizeSheetChart, type SheetChart } from "@sheetcraft/core/sheet-charts";
 import { applyChartFormatIntent } from "../../../modules/charts/chart-format-intents";
@@ -454,3 +458,55 @@ test("legend styles reject wrong targets, hidden/unsupported legends and mixed i
     } as ChartFormatIntent),
   ).toThrow();
 });
+
+test.each(["title", "legend", "categoryAxis", "valueAxis", "secondaryValueAxis"] as const)(
+  "%s text edits retain bindings, family/default replacement deletes them without affecting siblings",
+  (kind) => {
+    const scriptFonts = {
+      latin: { kind: "theme", role: "minor", slot: "latin" },
+      eastAsia: { kind: "family", family: "宋体" },
+      complexScript: { kind: "automatic" },
+    } as const;
+    const text = { scriptFonts, bold: true, fontSize: 16 };
+    const original = chart();
+    original.format = {
+      title: text,
+      legend: { text },
+      categoryAxis: { text, title: "Category" },
+      valueAxis: { text, title: "Value" },
+      secondaryValueAxis: { text, title: "Secondary" },
+    };
+    const originalBranch = original.format[kind];
+    const apply = (next: typeof text | ReturnType<typeof setChartTextFontFamily>) =>
+      applyChartFormatIntent(original, { kind }, {
+        kind,
+        format: kind === "title" ? next : { ...originalBranch, text: next },
+      } as ChartFormatIntent);
+    for (const [field, value] of [
+      ["fontSize", 18],
+      ["bold", false],
+      ["italic", true],
+      ["color", "#123456"],
+    ] as const) {
+      const next = setChartFormatField<
+        import("@sheetcraft/core/chart-format").ChartTextFormat,
+        typeof field
+      >(text, field, value);
+      const changed = apply(next);
+      const actual = kind === "title" ? changed.format!.title : changed.format![kind]!.text;
+      expect(actual?.scriptFonts).toEqual(scriptFonts);
+    }
+    for (const family of ["Arial", undefined]) {
+      const changed = apply(setChartTextFontFamily(text, family));
+      const actual = kind === "title" ? changed.format!.title : changed.format![kind]!.text;
+      expect(actual).toEqual({
+        bold: true,
+        fontSize: 16,
+        ...(family ? { fontFamily: family } : {}),
+      });
+      expect({ ...changed.format, [kind]: originalBranch }).toEqual(original.format);
+    }
+    expect(() => apply({ ...text, fontFamily: "Arial" } as typeof text)).toThrow();
+    expect(() => apply({ ...text, scriptFonts: undefined } as unknown as typeof text)).toThrow();
+  },
+);

@@ -105,6 +105,7 @@ function fixture(
           template: '<button type="button" :disabled="disabled" :aria-label="label" />',
         },
         FontFormatField: {
+          name: "FontFormatField",
           props: ["modelValue", "disabled", "label"],
           emits: ["change"],
           template: '<input :value="modelValue" :disabled="disabled" :aria-label="label" />',
@@ -910,7 +911,10 @@ describe("shared chart layout numbers", () => {
       {
         drawing: drawing({
           format: {
-            valueAxis: { linkedToSource: false, numberFormat: { kind: "number", fractionDigits: 2 } },
+            valueAxis: {
+              linkedToSource: false,
+              numberFormat: { kind: "number", fractionDigits: 2 },
+            },
           },
         }),
       },
@@ -1245,5 +1249,35 @@ describe("legend text and surface panes", () => {
     await wrapper.setProps({ drawing: drawing({ legend: false, format: { legend } }) });
     expect(wrapper.emitted("update:target")?.at(-1)).toEqual([{ kind: "chart" }]);
     expect(wrapper.props("drawing").chart.format?.legend).toEqual(legend);
+  });
+});
+
+test("script/theme selection is honest and single-family/default edits remove all bindings", async () => {
+  const scriptFonts = {
+    latin: { kind: "theme", role: "minor", slot: "latin" },
+    eastAsia: { kind: "family", family: "宋体" },
+    complexScript: { kind: "automatic" },
+  } as const;
+  const { wrapper, apply } = fixture(
+    { kind: "title" },
+    {
+      drawing: drawing({ format: { title: { scriptFonts, bold: true, fontSize: 14 } } }),
+    },
+  );
+  const font = wrapper.findComponent({ name: "FontFormatField" });
+  expect(font.props("modelValue")).toBeUndefined();
+  expect(font.attributes("placeholder")).toBe("Script/theme fonts");
+  font.vm.$emit("change", "Arial");
+  expect(apply).toHaveBeenLastCalledWith({
+    kind: "title",
+    format: { fontFamily: "Arial", bold: true, fontSize: 14 },
+  });
+  font.vm.$emit("change", "");
+  expect(apply).toHaveBeenLastCalledWith({ kind: "title", format: { bold: true, fontSize: 14 } });
+  await input(wrapper, "fontSize").setValue("18");
+  await input(wrapper, "fontSize").trigger("keydown", { key: "Enter" });
+  expect(apply).toHaveBeenLastCalledWith({
+    kind: "title",
+    format: { scriptFonts, bold: true, fontSize: 18 },
   });
 });

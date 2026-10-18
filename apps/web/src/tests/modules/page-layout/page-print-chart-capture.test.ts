@@ -1025,3 +1025,16 @@ describe("source-owned visibility print leases", () => {
     expect(fixture(drawings).capture).toThrow(/text or value budget/);
   });
 });
+
+test("print capture freezes theme bindings and rejects a changed theme", () => {
+  const f = fixture();
+  const theme = createWorkbook({ id: "font-theme", sheetId: "font-sheet" }).theme;
+  const pass = capturePrintChartPass({ ...f, theme });
+  expect(pass.theme).toEqual(theme);
+  expect(pass.theme).not.toBe(theme);
+  expect(Object.isFrozen(pass.theme)).toBe(true);
+  theme.bodyFont = "Arial";
+  expect(() => pass.assertCurrent()).toThrow(/theme changed/);
+  const next = capturePrintChartPass({ ...f, theme });
+  expect(next.key).not.toBe(pass.key);
+});

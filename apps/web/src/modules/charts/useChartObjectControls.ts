@@ -120,7 +120,7 @@ export function useChartObjectControls(options: {
         preflightChartDataTable(
           chart,
           options.getData(drawing, chart),
-          drawing,
+          { ...drawing, theme: workbook.theme },
           options.getSourceData?.(drawing, chart),
         );
       }

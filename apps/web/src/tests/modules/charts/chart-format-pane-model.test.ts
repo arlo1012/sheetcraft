@@ -14,6 +14,7 @@ import {
   getChartValueAxisDraftError,
   parseChartFormatNumber,
   setChartFormatField,
+  setChartTextFontFamily,
   syncChartFormatDraft,
 } from "../../../modules/charts/chart-format-pane";
 
@@ -315,4 +316,25 @@ test.each([
 ] as const)("axis reason preserves validation precedence and tolerance for %j", (axis, reason) => {
   expect(getChartValueAxisDraftError(axis)).toBe(reason);
   expect(isChartValueAxisDraftValid(axis)).toBe(reason === undefined);
+});
+
+test("single-family selection replaces script bindings atomically, default clears font choices only", () => {
+  const current = {
+    scriptFonts: { latin: { kind: "theme", role: "minor", slot: "latin" } },
+    bold: true,
+    fontSize: 17,
+  } as const;
+  expect(setChartTextFontFamily(current, "Arial")).toEqual({
+    fontFamily: "Arial",
+    bold: true,
+    fontSize: 17,
+  });
+  expect(setChartTextFontFamily(current, undefined)).toEqual({ bold: true, fontSize: 17 });
+  expect(setChartTextFontFamily({ fontFamily: "Arial" }, undefined)).toBeUndefined();
+  expect(setChartTextFontFamily({ scriptFonts: current.scriptFonts }, undefined)).toBeUndefined();
+  expect(setChartFormatField(current, "fontSize", undefined)).toEqual({
+    scriptFonts: current.scriptFonts,
+    bold: true,
+  });
+  expect(current.scriptFonts.latin.kind).toBe("theme");
 });

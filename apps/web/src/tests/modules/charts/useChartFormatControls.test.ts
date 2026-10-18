@@ -1,3 +1,4 @@
+import { setChartTextFontFamily } from "../../../modules/charts/chart-format-pane";
 import { effectScope, ref, shallowRef, type EffectScope } from "vue";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createSetSheetDrawingsCommand } from "@sheetcraft/core/commands";
@@ -520,4 +521,35 @@ test("legend text and surface are one owned undoable edit, survive snapshot and 
   expect(f.current()).toEqual(changed);
   expect(f.controls.snapshot.value!.apply({ kind: "legend", reset: true })).toBe(true);
   expect(f.current().chart.format?.legend).toEqual(legend);
+});
+
+test("font replacement and default undo restore exact script bindings and sibling text", () => {
+  const f = fixture();
+  const scriptFonts = {
+    latin: { kind: "theme", role: "minor", slot: "latin" },
+    eastAsia: { kind: "family", family: "宋体" },
+    complexScript: { kind: "automatic" },
+  } as const;
+  f.first.chart.format!.title = { scriptFonts, bold: true, fontSize: 16 };
+  f.first.chart.format!.legend = { text: { scriptFonts, italic: true } };
+  const before = structuredClone(f.ownerSheet.drawings);
+  for (const family of ["Arial", undefined]) {
+    const format = setChartTextFontFamily(f.current().chart.format!.title!, family);
+    expect(f.controls.snapshot.value!.apply({ kind: "title", format })).toBe(true);
+    expect(f.current().chart.format!.title).toEqual({
+      bold: true,
+      fontSize: 16,
+      ...(family ? { fontFamily: family } : {}),
+    });
+    expect(f.current().chart.format!.legend).toEqual(f.first.chart.format!.legend);
+    const after = structuredClone(f.ownerSheet.drawings);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    f.revision.value++;
+    expect(f.ownerSheet.drawings).toEqual(before);
+    expect(redoWorkbookCommand(f.session)).toBe(true);
+    f.revision.value++;
+    expect(f.ownerSheet.drawings).toEqual(after);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    f.revision.value++;
+  }
 });

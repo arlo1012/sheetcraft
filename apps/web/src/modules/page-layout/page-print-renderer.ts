@@ -306,6 +306,7 @@ export function createPrintPreviewDocument(options: {
     : { rowCount: 0, columnCount: 0 };
   const chartPrintPass = options.nativeChartConsumer
     ? capturePrintChartPass({
+        theme: options.theme,
         sheet: options.sheet,
         metrics: shapeMetrics,
         evaluator: options.evaluator,

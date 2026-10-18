@@ -1,3 +1,5 @@
+import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
+import { createChartWordTitlePlan } from "./chart-script-fonts";
 import type { EChartsOption, SeriesOption } from "echarts";
 import { use } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
@@ -28,6 +30,7 @@ export const CHART_PRINT_MAX_DENSITY = 8;
 export type ChartPrintPresentationOptions = {
   /** Original application document, whose fonts the caller has already warmed. */
   document: Document;
+  theme?: WorkbookTheme;
   width: number;
   height: number;
   density: number;
@@ -143,12 +146,33 @@ function printOption(
       ? "Microsoft YaHei"
       : "sans-serif");
   const family = resolveFontFamily?.(originalFamily) ?? originalFamily;
-  const withFamily = <T extends { fontFamily?: string }>(style: T | undefined) => ({
+  const withFamily = <
+    T extends { fontFamily?: string; rich?: Record<string, { fontFamily?: string }> },
+  >(
+    style: T | undefined,
+  ) => ({
     ...style,
     fontFamily:
       resolveFontFamily?.(style?.fontFamily ?? originalFamily) ??
       style?.fontFamily ??
       originalFamily,
+    ...(style?.rich
+      ? {
+          rich: Object.fromEntries(
+            Object.entries(style.rich).map(([key, value]) => [
+              key,
+              {
+                ...value,
+                fontFamily:
+                  resolveFontFamily?.(value.fontFamily ?? style.fontFamily ?? originalFamily) ??
+                  value.fontFamily ??
+                  style.fontFamily ??
+                  originalFamily,
+              },
+            ]),
+          ),
+        }
+      : {}),
   });
   const xAxis = (entry: Exclude<EChartsOption["xAxis"], undefined | unknown[]>) => ({
     ...entry,
@@ -249,12 +273,34 @@ function paintWordCloud(
     context.textAlign = "center";
     if (layout.title.show) {
       context.textBaseline = "alphabetic";
-      const titleFamily = format?.fontFamily
-        ? (options.resolveFontFamily?.(format.fontFamily) ?? format.fontFamily)
-        : inheritedFamily;
-      context.font = `${format?.italic ? "italic" : "normal"} ${format?.bold ? "bold" : "normal"} ${format?.fontSize ?? 15}px ${titleFamily}`;
-      context.fillStyle = format?.color ?? "#000000";
-      context.fillText(drawing.chart.title, options.width / 2, 22);
+      const plan = createChartWordTitlePlan(
+        drawing.chart.title,
+        format,
+        options.theme,
+        originalInheritedFamily,
+        options.resolveFontFamily,
+      );
+      const font = (family: string) =>
+        `${format?.italic ? "italic" : "normal"} ${format?.bold ? "bold" : "normal"} ${format?.fontSize ?? 15}px ${family}`;
+      if (plan.runs.length === 1) {
+        context.font = font(plan.runs[0]!.fontFamily);
+        context.fillStyle = format?.color ?? "#000000";
+        context.fillText(plan.text, options.width / 2, 22);
+      } else {
+        const widths = plan.runs.map((run) => {
+          context.font = font(run.fontFamily);
+          return context.measureText(run.text).width;
+        });
+        let x = options.width / 2 - widths.reduce((total, width) => total + width, 0) / 2;
+        context.textAlign = "left";
+        context.fillStyle = format?.color ?? "#000000";
+        plan.runs.forEach((run, index) => {
+          context.font = font(run.fontFamily);
+          context.fillText(run.text, x, 22);
+          x += widths[index]!;
+        });
+        context.textAlign = "center";
+      }
     }
     context.textBaseline = "middle";
     for (const word of layout.words) {
