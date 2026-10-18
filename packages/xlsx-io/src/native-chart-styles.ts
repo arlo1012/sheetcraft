@@ -50,10 +50,76 @@ export function nativeChartTextProperties(format: ChartTextFormat, legend = fals
           .join("");
   return `<a:defRPr${attributes}>${color}${font}</a:defRPr>`;
 }
-export function nativeChartTextBody(format?: ChartTextFormat, legend = false): string {
-  return format && Object.keys(format).length
-    ? `<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr>${nativeChartTextProperties(format, legend)}</a:pPr><a:endParaRPr/></a:p></c:txPr>`
+export function nativeChartTextBody(
+  format?: ChartTextFormat,
+  legend = false,
+  categoryLabelAngle?: number,
+): string {
+  const hasText = format && Object.keys(format).length;
+  // ECharts positive rotation rises left-to-right; native bodyPr positive falls.
+  // Keep explicit zero distinct from Auto (an absent sparse property).
+  const rotation =
+    categoryLabelAngle === undefined ? "" : ` rot="${-Math.round(categoryLabelAngle * 60000)}"`;
+  return hasText || categoryLabelAngle !== undefined
+    ? `<c:txPr><a:bodyPr${rotation}/><a:lstStyle/><a:p>${hasText ? `<a:pPr>${nativeChartTextProperties(format, legend)}</a:pPr>` : ""}<a:endParaRPr/></a:p></c:txPr>`
     : "";
+}
+
+/** Ordinary category rotation only. Other text-body layout is still lossy. */
+function categoryLabelAngle(
+  body: XmlNode | undefined,
+  axis: XmlNode,
+  type: SheetChart["type"],
+  warn: (path: string) => void,
+): number | undefined {
+  if (!body || body.bodyPr === undefined) return;
+  const path = "format.categoryAxis.labelAngle";
+  const bodies = nodes(body.bodyPr);
+  // Empty bodyPr is parsed as a string; duplicate/malformed nodes are not an angle.
+  if (Array.isArray(body.bodyPr) || bodies.length > 1) {
+    warn(path);
+    return;
+  }
+  const properties = bodies[0];
+  if (!properties) return;
+  const fields = Object.keys(properties).filter(
+    (key) => !key.startsWith("@_xmlns") && !(key === "#text" && !String(properties[key]).trim()),
+  );
+  if (fields.some((key) => key !== "@_rot")) warn("format.categoryAxis.text.bodyPr");
+  if (properties["@_rot"] === undefined) return;
+  const raw = attr(properties, "rot"),
+    units = Number(raw);
+  // These layout-only attributes do not alter the angle, but are NOT preserved.
+  const layout = [
+    "@_rot",
+    "@_vert",
+    "@_spcFirstLastPara",
+    "@_vertOverflow",
+    "@_horzOverflow",
+    "@_wrap",
+    "@_anchor",
+    "@_anchorCtr",
+    "@_lIns",
+    "@_rIns",
+    "@_tIns",
+    "@_bIns",
+    "@_rtlCol",
+    "@_numCol",
+    "@_spcCol",
+  ];
+  if (
+    !/^[+-]?\d+$/.test(raw) ||
+    !Number.isSafeInteger(units) ||
+    Math.abs(units) > 5400000 ||
+    fields.some((key) => !layout.includes(key)) ||
+    (properties["@_vert"] !== undefined && attr(properties, "vert") !== "horz") ||
+    attr(single(axis, "axPos"), "val") !== (type === "bar" ? "l" : "b")
+  ) {
+    // Includes WPS -60000000: never clamp, wrap, or interpret this sentinel as degrees.
+    warn(path);
+    return;
+  }
+  return units === 0 ? 0 : -units / 60000;
 }
 
 /** Only the legend's explicitly admitted solid paint; widths are CSS px to exact EMU. */
@@ -484,6 +550,10 @@ export function readNativeChartStyles(
       themeFonts,
     );
     if (text) format[field] = { text };
+    if (field === "categoryAxis") {
+      const labelAngle = categoryLabelAngle(body, axis, chart.type, warn);
+      if (labelAngle !== undefined) format.categoryAxis = { ...format.categoryAxis, labelAngle };
+    }
   }
   if (native.legend !== undefined) {
     const legend = readLegendStyle(

@@ -226,7 +226,16 @@ export function unsupportedNativeChartStyles(chart: SheetChart): readonly string
           try {
             for (const [leaf, choice] of Object.entries(record(value, axisKeys)))
               if (leaf === "text") text(choice, `${path}.text`);
-              else issues.add(`${path}.${leaf}`);
+              else if (key === "categoryAxis" && leaf === "labelAngle") {
+                if (
+                  typeof choice !== "number" ||
+                  !Number.isFinite(choice) ||
+                  choice < -90 ||
+                  choice > 90 ||
+                  Math.round(choice * 60000) / 60000 !== choice
+                )
+                  issues.add(`${path}.${leaf}`);
+              } else issues.add(`${path}.${leaf}`);
           } catch {
             issues.add(path);
           }
