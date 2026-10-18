@@ -1,5 +1,6 @@
 import type {
   ChartFormatSettings,
+  ChartValueAxisFormat,
   ChartTextFormat,
   ChartSurfaceFormat,
 } from "@sheetcraft/core/chart-format";
@@ -11,8 +12,13 @@ import type { SheetChart } from "@sheetcraft/core/sheet-charts";
 import { single } from "./chart-package-parts.js";
 import { attr, nodes, type XmlNode } from "./pivot-xml.js";
 import { xml } from "./pivot-xml.js";
-import { isNativeChartFontFamily, nativeChartRgb } from "./native-chart-style-capabilities.js";
+import {
+  isNativeChartFontFamily,
+  nativeChartRgb,
+  nativeValueAxisNumberCode,
+} from "./native-chart-style-capabilities.js";
 import type { NativeChartFontTheme } from "./workbook-theme.js";
+import { fromExcelNumberFormat } from "./number-format.js";
 import type { CompatibilityReportBuilder } from "./report.js";
 
 export function nativeChartSeriesColors(
@@ -488,6 +494,45 @@ function readLegendStyle(
   return Object.keys(result).length ? result : undefined;
 }
 
+/** numFmt leaves are coupled: an unknown link must never activate a latent code. */
+function readValueAxisNumberFormat(
+  axis: XmlNode,
+  warn: (path: string) => void,
+): ChartValueAxisFormat {
+  const numberPath = "format.valueAxis.numberFormat";
+  const linkPath = "format.valueAxis.linkedToSource";
+  if (axis.numFmt === undefined) return {};
+  const entries = nodes(axis.numFmt);
+  if (entries.length !== 1 || Array.isArray(axis.numFmt)) {
+    warn(numberPath);
+    warn(linkPath);
+    return {};
+  }
+  const entry = entries[0]!;
+  if (Object.keys(entry).some((key) => !["@_formatCode", "@_sourceLinked"].includes(key))) {
+    warn(numberPath);
+    warn(linkPath);
+    return {};
+  }
+  const link = entry["@_sourceLinked"];
+  if (typeof link !== "string" || !["0", "1", "false", "true"].includes(link)) {
+    warn(linkPath);
+    warn(numberPath);
+    return {};
+  }
+  const linkedToSource = link === "1" || link === "true";
+  const code = entry["@_formatCode"];
+  const parsed = fromExcelNumberFormat(code);
+  // General/1 is the historical baseline. General/0 is explicit, never inherit.
+  if (code === "General") return linkedToSource ? {} : { linkedToSource: false };
+  if (!parsed || nativeValueAxisNumberCode(parsed) !== code) {
+    warn(numberPath);
+    return { linkedToSource };
+  }
+  if (linkedToSource) warn(numberPath); // Preserve latent data, but export remains blocked.
+  return { numberFormat: parsed, linkedToSource };
+}
+
 /** Restore only independently representable leaves; report unresolved fonts/colors precisely. */
 export function readNativeChartStyles(
   chartSpace: XmlNode,
@@ -550,6 +595,10 @@ export function readNativeChartStyles(
       themeFonts,
     );
     if (text) format[field] = { text };
+    if (field === "valueAxis") {
+      const number = readValueAxisNumberFormat(axis, warn);
+      if (Object.keys(number).length) format.valueAxis = { ...format.valueAxis, ...number };
+    }
     if (field === "categoryAxis") {
       const labelAngle = categoryLabelAngle(body, axis, chart.type, warn);
       if (labelAngle !== undefined) format.categoryAxis = { ...format.categoryAxis, labelAngle };

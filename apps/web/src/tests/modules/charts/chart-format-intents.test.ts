@@ -510,3 +510,30 @@ test.each(["title", "legend", "categoryAxis", "valueAxis", "secondaryValueAxis"]
     expect(() => apply({ ...text, scriptFonts: undefined } as unknown as typeof text)).toThrow();
   },
 );
+
+test("value-axis number transitions replace sparsely and reject own undefined number leaves", () => {
+  const original = chart();
+  original.format!.valueAxis = {
+    title: "Primary",
+    min: 20,
+    numberFormat: { kind: "percent", fractionDigits: 2 },
+    linkedToSource: false,
+  };
+  const next = applyChartFormatIntent(
+    original,
+    { kind: "valueAxis" },
+    { kind: "valueAxis", format: { title: "Primary", min: 20, linkedToSource: true } },
+  );
+  expect(next.format!.valueAxis).toEqual({ title: "Primary", min: 20, linkedToSource: true });
+  expect(next.format!.valueAxis).not.toHaveProperty("numberFormat");
+  expect({ ...next.format, valueAxis: original.format!.valueAxis }).toEqual(original.format);
+  for (const field of ["numberFormat", "linkedToSource"]) {
+    expect(() =>
+      applyChartFormatIntent(
+        original,
+        { kind: "valueAxis" },
+        { kind: "valueAxis", format: { min: 20, [field]: undefined } },
+      ),
+    ).toThrow();
+  }
+});

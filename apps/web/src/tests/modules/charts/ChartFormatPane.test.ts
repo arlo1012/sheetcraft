@@ -342,34 +342,159 @@ describe("chart format right pane", () => {
     expect(select(scatter.wrapper, "Category").props("value")).toBe("number");
     expect(scatter.wrapper.get("output").text()).toBe("30.00");
   });
-  test("General removes the override and link flag; source ON retains a dormant manual format", async () => {
+  test.each(["column", "bar", "line"] as const)(
+    "%s primary number edits follow explicit General and relink semantics",
+    async (type) => {
+      let current = drawing({ type, format: { valueAxis: { min: 20, title: "Value" } } });
+      const { wrapper, apply } = fixture({ kind: "valueAxis" }, { drawing: current });
+      const accept = async () => {
+        const intent = apply.mock.lastCall![0];
+        expect(intent.kind).toBe("valueAxis");
+        if (intent.kind !== "valueAxis") throw new Error("Wrong target");
+        if (intent.format) expect(Object.values(intent.format)).not.toContain(undefined);
+        current = drawing({ type, format: { valueAxis: intent.format } });
+        await wrapper.setProps({ drawing: current });
+      };
+      select(wrapper, "Category").vm.$emit("change", "percent");
+      await accept();
+      expect(current.chart.format?.valueAxis).toEqual({
+        min: 20,
+        title: "Value",
+        linkedToSource: false,
+        numberFormat: { kind: "percent", fractionDigits: 2 },
+      });
+      checkbox(wrapper, "Linked to source").vm.$emit("change", true);
+      await accept();
+      expect(current.chart.format?.valueAxis).toEqual({
+        min: 20,
+        title: "Value",
+        linkedToSource: true,
+      });
+      expect(select(wrapper, "Category").props("value")).toBe("general");
+      checkbox(wrapper, "Linked to source").vm.$emit("change", false);
+      await accept();
+      expect(current.chart.format?.valueAxis).toEqual({
+        min: 20,
+        title: "Value",
+        linkedToSource: false,
+      });
+      expect(select(wrapper, "Category").props("value")).toBe("general");
+      select(wrapper, "Category").vm.$emit("change", "number");
+      await accept();
+      select(wrapper, "Category").vm.$emit("change", "general");
+      await accept();
+      expect(current.chart.format?.valueAxis).toEqual({
+        min: 20,
+        title: "Value",
+        linkedToSource: false,
+        numberFormat: { kind: "custom", code: "General" },
+      });
+      expect(select(wrapper, "Category").props("value")).toBe("general");
+      await wrapper.get('[data-chart-format-reset="element"]').trigger("click");
+      await accept();
+      expect(current.chart.format?.valueAxis).toBeUndefined();
+      expect(checkbox(wrapper, "Linked to source").props("checked")).toBe(true);
+    },
+  );
+  test.each([
+    { type: "area" },
+    { type: "scatter" },
+    { type: "combo" },
+    { stacked: true },
+    { pivotTableId: "pivot-one" },
+  ] as Partial<SheetChart>[])(
+    "nonordinary primary axis retains existing number semantics: %j",
+    async (changes) => {
+      const format = {
+        min: 20,
+        linkedToSource: false,
+        numberFormat: { kind: "number" as const, fractionDigits: 1 },
+      };
+      const { wrapper, apply } = fixture(
+        { kind: "valueAxis" },
+        { drawing: drawing({ ...changes, format: { valueAxis: format } }) },
+      );
+      select(wrapper, "Category").vm.$emit("change", "general");
+      expect(apply).toHaveBeenLastCalledWith({ kind: "valueAxis", format: { min: 20 } });
+      checkbox(wrapper, "Linked to source").vm.$emit("change", true);
+      expect(apply).toHaveBeenLastCalledWith({
+        kind: "valueAxis",
+        format: { ...format, linkedToSource: true },
+      });
+    },
+  );
+  test("secondary axis retains dormant format and custom General category", async () => {
+    const format = {
+      linkedToSource: false,
+      numberFormat: { kind: "custom" as const, code: "General" },
+    };
     const { wrapper, apply } = fixture(
-      { kind: "valueAxis" },
+      { kind: "secondaryValueAxis" },
       {
         drawing: drawing({
-          format: {
-            valueAxis: {
-              min: 20,
-              linkedToSource: false,
-              numberFormat: { kind: "number", fractionDigits: 1 },
-            },
-          },
+          format: { secondaryValueAxis: format, series: [{ id: "pears", axis: "secondary" }] },
         }),
       },
     );
-    select(wrapper, "Category").vm.$emit("change", "general");
-    await flushPromises();
-    expect(apply).toHaveBeenLastCalledWith({ kind: "valueAxis", format: { min: 20 } });
+    expect(select(wrapper, "Category").props("value")).toBe("custom");
     checkbox(wrapper, "Linked to source").vm.$emit("change", true);
-    await flushPromises();
     expect(apply).toHaveBeenLastCalledWith({
-      kind: "valueAxis",
-      format: {
-        min: 20,
-        linkedToSource: true,
-        numberFormat: { kind: "number", fractionDigits: 1 },
+      kind: "secondaryValueAxis",
+      format: { ...format, linkedToSource: true },
+    });
+    select(wrapper, "Category").vm.$emit("change", "general");
+    expect(apply).toHaveBeenLastCalledWith({ kind: "secondaryValueAxis", format: undefined });
+  });
+  test("the real Select ignores an already selected General option and keeps source linking", async () => {
+    const { wrapper, apply } = fixture();
+    // Mount the same native Select props with its popup explicitly open, then
+    // click its actual option rather than synthesizing a change callback.
+    const native = mount(Select, {
+      attachTo: document.body,
+      props: {
+        value: select(wrapper, "Category").props("value"),
+        options: select(wrapper, "Category").props("options"),
+        onChange: select(wrapper, "Category").props("onChange"),
+        popupVisible: true,
       },
     });
+    wrappers.push(native);
+    await flushPromises();
+    await vi.waitFor(() => expect(document.querySelector(".t-select-option")).not.toBeNull());
+    const option = Array.from(document.querySelectorAll<HTMLElement>(".t-select-option")).find(
+      (entry) => entry.textContent?.trim() === "General",
+    );
+    expect(option).toBeDefined();
+    option!.click();
+    await flushPromises();
+    expect(apply).not.toHaveBeenCalled();
+    expect(checkbox(wrapper, "Linked to source").props("checked")).toBe(true);
+    const numeric = Array.from(document.querySelectorAll<HTMLElement>(".t-select-option")).find(
+      (entry) => entry.textContent?.trim() === "Number",
+    );
+    expect(numeric).toBeDefined();
+    numeric!.click();
+    await flushPromises();
+    expect(apply).toHaveBeenCalledTimes(1);
+    expect(apply).toHaveBeenLastCalledWith({
+      kind: "valueAxis",
+      format: { numberFormat: { kind: "number", fractionDigits: 2 }, linkedToSource: false },
+    });
+  });
+  test("opening an ordinary linked axis does not normalize its dormant manual format", async () => {
+    const format = {
+      min: 20,
+      linkedToSource: true,
+      numberFormat: { kind: "percent" as const, fractionDigits: 2 },
+    };
+    const { wrapper, apply } = fixture(
+      { kind: "valueAxis" },
+      { drawing: drawing({ format: { valueAxis: format } }) },
+    );
+    expect(apply).not.toHaveBeenCalled();
+    await input(wrapper, "min").setValue("10");
+    await input(wrapper, "min").trigger("keydown", { key: "Enter" });
+    expect(apply).toHaveBeenLastCalledWith({ kind: "valueAxis", format: { ...format, min: 10 } });
   });
   test("manual decimal/code changes are complete drafts and rejected code is retained", async () => {
     const { wrapper, apply } = fixture(

@@ -1,3 +1,5 @@
+import type { CellNumberFormat } from "@sheetcraft/core/style";
+import { toExcelNumberFormat } from "./number-format.js";
 import type { SheetChart } from "@sheetcraft/core/sheet-charts";
 
 /** One concrete family name, never a CSS fallback list or a theme font token. */
@@ -49,6 +51,28 @@ function record(value: unknown, known: readonly string[]): Record<string, unknow
   }
   return out;
 }
+/** A deliberately narrow axis contract; other cell formats are not chart admission. */
+export function nativeValueAxisNumberCode(value: unknown): string | undefined {
+  try {
+    const fields = record(value, ["kind", "fractionDigits", "useGrouping", "code"]);
+    if (fields.kind === "custom")
+      return Object.keys(fields).length === 2 && fields.code === "General" ? "General" : undefined;
+    if (
+      !["number", "percent"].includes(fields.kind as string) ||
+      Object.keys(fields).some((key) => !["kind", "fractionDigits", "useGrouping"].includes(key)) ||
+      typeof fields.fractionDigits !== "number" ||
+      !Number.isInteger(fields.fractionDigits) ||
+      fields.fractionDigits < 0 ||
+      fields.fractionDigits > 20 ||
+      ("useGrouping" in fields && typeof fields.useGrouping !== "boolean")
+    )
+      return undefined;
+    return toExcelNumberFormat(fields as CellNumberFormat);
+  } catch {
+    return undefined;
+  }
+}
+
 function validScriptFonts(value: unknown): boolean {
   try {
     const slots = record(value, ["latin", "eastAsia", "complexScript"]);
@@ -224,7 +248,8 @@ export function unsupportedNativeChartStyles(chart: SheetChart): readonly string
           }
         } else if (key === "categoryAxis" || key === "valueAxis") {
           try {
-            for (const [leaf, choice] of Object.entries(record(value, axisKeys)))
+            const axis = record(value, axisKeys);
+            for (const [leaf, choice] of Object.entries(axis))
               if (leaf === "text") text(choice, `${path}.text`);
               else if (key === "categoryAxis" && leaf === "labelAngle") {
                 if (
@@ -235,6 +260,12 @@ export function unsupportedNativeChartStyles(chart: SheetChart): readonly string
                   Math.round(choice * 60000) / 60000 !== choice
                 )
                   issues.add(`${path}.${leaf}`);
+              } else if (key === "valueAxis" && leaf === "numberFormat") {
+                // Re-linking retains a latent format in Core; WPS preservation is unproven.
+                if (nativeValueAxisNumberCode(choice) === undefined || axis.linkedToSource === true)
+                  issues.add(`${path}.${leaf}`);
+              } else if (key === "valueAxis" && leaf === "linkedToSource") {
+                if (typeof choice !== "boolean") issues.add(`${path}.${leaf}`);
               } else issues.add(`${path}.${leaf}`);
           } catch {
             issues.add(path);

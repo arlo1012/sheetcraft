@@ -177,6 +177,15 @@ const isValueAxis = computed(
   () => kind.value === "valueAxis" || kind.value === "secondaryValueAxis",
 );
 const percentageAxis = computed(() => !!chart.value.presentation?.percentStacked);
+// Keep native-number interaction changes scoped to verified ordinary primary axes.
+const ordinaryPrimaryValueAxis = computed(
+  () =>
+    kind.value === "valueAxis" &&
+    ["column", "bar", "line"].includes(chart.value.type) &&
+    !chart.value.stacked &&
+    !percentageAxis.value &&
+    !chart.value.pivotTableId,
+);
 const isAxis = computed(() => kind.value === "categoryAxis" || isValueAxis.value);
 const valueAxis = computed<ChartValueAxisFormat>(() =>
   kind.value === "secondaryValueAxis"
@@ -544,7 +553,7 @@ const numberFormat = computed<CellNumberFormat | undefined>(() =>
       : valueAxis.value.numberFormat,
 );
 const numberCategory = computed(() =>
-  percentageAxis.value &&
+  (percentageAxis.value || ordinaryPrimaryValueAxis.value) &&
   numberFormat.value?.kind === "custom" &&
   numberFormat.value.code === "General"
     ? "general"
@@ -968,7 +977,10 @@ function applyNumberFormat(format: CellNumberFormat | undefined): boolean {
 }
 function toggleSourceLink(value: unknown): void {
   if (percentageAxis.value) return;
-  const intent = axisIntent({ ...valueAxis.value, linkedToSource: !!value });
+  const next = { ...valueAxis.value, linkedToSource: !!value };
+  // Relinking is an explicit edit, never a normalization of dormant input state.
+  if (ordinaryPrimaryValueAxis.value && value) delete next.numberFormat;
+  const intent = axisIntent(next);
   if (intent) submit(intent);
 }
 type NumberCategory = CellNumberFormat["kind"] | "general";
@@ -993,7 +1005,7 @@ function selectNumberCategory(value: unknown): void {
   if (typeof value !== "string" || !Object.hasOwn(categoryKeys, value)) return;
   const category = value as NumberCategory;
   const defaults: Record<NumberCategory, CellNumberFormat | undefined> = {
-    general: undefined,
+    general: ordinaryPrimaryValueAxis.value ? { kind: "custom", code: "General" } : undefined,
     number: { kind: "number", fractionDigits: 2 },
     percent: { kind: "percent", fractionDigits: 2 },
     scientific: { kind: "scientific", fractionDigits: 2 },

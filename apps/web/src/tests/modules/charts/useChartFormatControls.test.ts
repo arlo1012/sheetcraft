@@ -553,3 +553,41 @@ test("font replacement and default undo restore exact script bindings and siblin
     f.revision.value++;
   }
 });
+
+test("primary number transitions each use one command and exact Undo/Redo including dormant formats", () => {
+  const f = fixture({ kind: "valueAxis" });
+  const baseline = { ...f.first.chart.format!.valueAxis!, min: 20, text: { bold: true } };
+  f.first.chart.format!.valueAxis = {
+    ...baseline,
+    linkedToSource: true,
+    numberFormat: { kind: "percent", fractionDigits: 1 },
+  };
+  const branches = [
+    {
+      ...baseline,
+      linkedToSource: false,
+      numberFormat: { kind: "percent" as const, fractionDigits: 2 },
+    },
+    { ...baseline, linkedToSource: true },
+    { ...baseline, linkedToSource: false },
+    {
+      ...baseline,
+      linkedToSource: false,
+      numberFormat: { kind: "custom" as const, code: "General" },
+    },
+    undefined,
+  ];
+  for (const [index, format] of branches.entries()) {
+    const before = structuredClone(f.ownerSheet.drawings);
+    expect(f.controls.snapshot.value!.apply({ kind: "valueAxis", format })).toBe(true);
+    const after = structuredClone(f.ownerSheet.drawings);
+    expect(f.current().chart.format?.valueAxis).toEqual(format);
+    expect(f.session.history.undoStack).toHaveLength(index + 1);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    f.revision.value++;
+    expect(f.ownerSheet.drawings).toEqual(before);
+    expect(redoWorkbookCommand(f.session)).toBe(true);
+    f.revision.value++;
+    expect(f.ownerSheet.drawings).toEqual(after);
+  }
+});
