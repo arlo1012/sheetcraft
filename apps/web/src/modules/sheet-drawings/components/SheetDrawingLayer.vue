@@ -2254,12 +2254,21 @@ function start(
     selectedRoots.value.length === 1 &&
     selectedRoots.value[0] === sourceOwner(drawing)?.id &&
     !selectedOwnedId.value;
-  event.preventDefault();
   event.stopPropagation();
   if (!direction && mode === "move" && !chooseDrawing(drawing, event)) {
+    event.preventDefault();
     emit("select");
     return;
   }
+  const nativeChartMove =
+    drawing.kind === "chart" &&
+    !direction &&
+    mode === "move" &&
+    selectedRoots.value.length <= 1 &&
+    !projectionById(drawing)?.groupLeaf;
+  // Chromium's chart renderer consumes compatibility mouse down/up. Cancelling
+  // pointerdown suppresses those events even when capture itself is deferred.
+  if (!nativeChartMove) event.preventDefault();
   emit("select");
   (event.currentTarget as HTMLElement)?.focus?.();
   if (!canChange(drawing)) return;
@@ -2443,6 +2452,9 @@ function start(
   };
   session = startPointerSession({
     event,
+    // Native chart clicks must reach the inner renderer. Capture by the outer
+    // drawing starts only after a real drag, measured in viewport CSS pixels.
+    ...(nativeChartMove ? { dragThreshold: 4 } : {}),
     // A page fragment may disappear during preview; capture belongs to the stable layer.
     captureTarget: projection ? layerElement.value : (event.currentTarget as HTMLElement),
     onMove: update,
@@ -3469,6 +3481,7 @@ watch(
       class="sheet-drawing-layer__object"
       :class="{
         'is-standard': fragment.standard,
+        'is-chart': fragment.drawing.kind === 'chart',
         'is-composed-group-leaf': !!groupPaintEntry(fragment.drawing),
       }"
       :data-sheet-drawing-id="fragment.drawing.id"
@@ -3835,6 +3848,9 @@ watch(
     outline: none;
     cursor: move;
     touch-action: none;
+    &.is-chart {
+      user-select: none;
+    }
     &.is-composed-group-leaf {
       pointer-events: none;
     }

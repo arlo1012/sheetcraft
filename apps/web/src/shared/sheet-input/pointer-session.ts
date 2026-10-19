@@ -8,6 +8,9 @@ export type GestureEvent = PointerEvent | MouseEvent;
 export type PointerSessionOptions = {
   event: GestureEvent;
   captureTarget?: HTMLElement | null;
+  /** Delay capture and drag callbacks until movement exceeds this CSS-pixel distance.
+   * An unactivated release cancels the gesture, leaving native click/dblclick intact. */
+  dragThreshold?: number;
   onMove: (event: GestureEvent) => void;
   onEnd: (event: GestureEvent) => void;
   onCancel: () => void;
@@ -24,12 +27,19 @@ class ActivePointerSession implements PointerSession {
   private ended = false;
   private readonly pointerId: number | undefined;
   private readonly usesPointerEvents: boolean;
+  private activated: boolean;
 
   constructor(private readonly options: PointerSessionOptions) {
+    if (
+      options.dragThreshold !== undefined &&
+      (!Number.isFinite(options.dragThreshold) || options.dragThreshold < 0)
+    )
+      throw new RangeError("Pointer drag threshold must be finite and nonnegative.");
+    this.activated = options.dragThreshold === undefined;
     this.pointerId = (options.event as PointerEvent).pointerId;
     this.usesPointerEvents = typeof this.pointerId === "number";
     if (this.usesPointerEvents) {
-      this.capturePointer();
+      if (this.activated) this.capturePointer();
       options.captureTarget?.addEventListener("lostpointercapture", this.onLostPointerCapture);
       window.addEventListener("pointermove", this.onPointerMove);
       window.addEventListener("pointerup", this.onPointerUp);
@@ -72,14 +82,38 @@ class ActivePointerSession implements PointerSession {
     }
   }
 
+  private activate(event: GestureEvent, capture: boolean): boolean {
+    if (
+      !this.activated &&
+      Math.hypot(
+        event.clientX - this.options.event.clientX,
+        event.clientY - this.options.event.clientY,
+      ) > this.options.dragThreshold!
+    ) {
+      this.activated = true;
+      if (capture && this.usesPointerEvents) this.capturePointer();
+    }
+    return this.activated && !this.ended;
+  }
+
+  private releasedDuringMove(event: GestureEvent): boolean {
+    // Deferred capture can miss a release outside the document. A later hover
+    // must not activate (or continue) a chart drag and submit stale geometry.
+    if (this.options.dragThreshold !== undefined && !(event.buttons & 1)) {
+      this.cancel();
+      return true;
+    }
+    return false;
+  }
+
   private onPointerMove = (event: PointerEvent): void => {
     if (!this.matchesPointer(event)) return;
-    this.options.onMove(event);
+    if (!this.releasedDuringMove(event) && this.activate(event, true)) this.options.onMove(event);
   };
 
   private onPointerUp = (event: PointerEvent): void => {
     if (!this.matchesPointer(event)) return;
-    this.finish("end", event);
+    this.finish(this.activate(event, false) ? "end" : "cancel", event);
   };
 
   private onPointerCancel = (event: PointerEvent): void => {
@@ -87,15 +121,16 @@ class ActivePointerSession implements PointerSession {
   };
 
   private onLostPointerCapture = (event: PointerEvent): void => {
-    if (this.matchesPointer(event)) this.finish("cancel");
+    if (event.target === this.options.captureTarget && this.matchesPointer(event))
+      this.finish("cancel");
   };
 
   private onMouseMove = (event: MouseEvent): void => {
-    this.options.onMove(event);
+    if (!this.releasedDuringMove(event) && this.activate(event, true)) this.options.onMove(event);
   };
 
   private onMouseUp = (event: MouseEvent): void => {
-    this.finish("end", event);
+    this.finish(this.activate(event, false) ? "end" : "cancel", event);
   };
 
   private onKeydown = (event: KeyboardEvent): void => {
@@ -119,7 +154,7 @@ class ActivePointerSession implements PointerSession {
     const target = this.options.captureTarget;
     if (this.usesPointerEvents) {
       target?.removeEventListener("lostpointercapture", this.onLostPointerCapture);
-      this.releasePointer();
+      if (this.activated) this.releasePointer();
       window.removeEventListener("pointermove", this.onPointerMove);
       window.removeEventListener("pointerup", this.onPointerUp);
       window.removeEventListener("pointercancel", this.onPointerCancel);

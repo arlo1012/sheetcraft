@@ -422,6 +422,11 @@ const props = withDefaults(
   },
 );
 
+// Keep chart data dependencies stable across selection/focus renders. The resolver
+// still reads the current workbook so replacement and sheet edits cannot go stale.
+function resolveChartSheet(sheetId: string): Sheet | undefined {
+  return props.workbook?.sheets.get(sheetId);
+}
 const emit = defineEmits<{
   updateDrawing: [drawing: SheetDrawing];
   deleteDrawing: [id: string];
@@ -4810,7 +4815,7 @@ defineExpose({
         :date-system="dateSystem"
         :sheet="sheet"
         :evaluator="sheetEvaluator"
-        :resolve-sheet="(sheetId) => workbook?.sheets.get(sheetId)"
+        :resolve-sheet="resolveChartSheet"
         :revision="workbookRevision"
         :layout="layout"
         :scale="scale"

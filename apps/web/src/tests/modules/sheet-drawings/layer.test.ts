@@ -42,7 +42,14 @@ function fixture(readOnly = false) {
   });
 }
 function pointer(type: string, x: number, y: number) {
-  const event = new MouseEvent(type, { bubbles: true, button: 0, clientX: x, clientY: y });
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    button: 0,
+    buttons: type === "pointerdown" || type === "pointermove" ? 1 : 0,
+    clientX: x,
+    clientY: y,
+  });
   Object.defineProperty(event, "pointerId", { value: 1 });
   return event;
 }
@@ -150,4 +157,139 @@ describe("drawing layer", () => {
     expect(wrapper.emitted("edit")).toBeUndefined();
     wrapper.unmount();
   });
+});
+
+test("chart clicks stay on the inner native target without drawing capture or history updates", async () => {
+  const wrapper = fixture();
+  const chart: SheetChartDrawing = {
+    ...drawing,
+    kind: "chart",
+    chart: {
+      type: "bar",
+      range: null,
+      title: "",
+      headerRow: true,
+      headerColumn: true,
+      seriesBy: "columns",
+      legend: false,
+      labels: false,
+      stacked: false,
+      showHidden: false,
+    },
+  };
+  await wrapper.setProps({ drawings: [chart] });
+  const object = wrapper.get('[data-sheet-drawing-id="drawing"]').element as HTMLElement;
+  const capture = vi.fn();
+  Object.defineProperty(object, "setPointerCapture", { value: capture });
+  const inner = document.createElement("div");
+  object.append(inner);
+  const clicked = vi.fn();
+  inner.addEventListener("click", clicked);
+  const doubleClicked = vi.fn((event: Event) => event.stopPropagation());
+  inner.addEventListener("dblclick", doubleClicked);
+  try {
+    const down = pointer("pointerdown", 90, 30);
+    inner.dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(false);
+    expect(capture).not.toHaveBeenCalled();
+    inner.dispatchEvent(pointer("pointerup", 90, 30));
+    await nextTick();
+    inner.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(clicked).toHaveBeenCalledOnce();
+    inner.dispatchEvent(pointer("pointerdown", 90, 30));
+    inner.dispatchEvent(pointer("pointerup", 90, 30));
+    inner.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 2 }));
+    inner.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, detail: 2 }));
+    expect(clicked).toHaveBeenCalledTimes(2);
+    expect(doubleClicked).toHaveBeenCalledOnce();
+    expect(capture).not.toHaveBeenCalled();
+    expect(wrapper.emitted("update")).toBeUndefined();
+  } finally {
+    window.dispatchEvent(pointer("pointercancel", 90, 30));
+    wrapper.unmount();
+  }
+});
+
+test.each([0.5, 1, 2])(
+  "chart drag activates beyond 4 screen CSS pixels at scale %s",
+  async (scale) => {
+    const wrapper = fixture();
+    const chart: SheetChartDrawing = {
+      ...drawing,
+      kind: "chart",
+      chart: {
+        type: "bar",
+        range: null,
+        title: "",
+        headerRow: true,
+        headerColumn: true,
+        seriesBy: "columns",
+        legend: false,
+        labels: false,
+        stacked: false,
+        showHidden: false,
+      },
+    };
+    await wrapper.setProps({ drawings: [chart], scale });
+    const object = wrapper.get('[data-sheet-drawing-id="drawing"]').element as HTMLElement;
+    const capture = vi.fn();
+    Object.defineProperty(object, "setPointerCapture", { value: capture });
+    const x = 90 * scale,
+      y = 30 * scale;
+    try {
+      object.dispatchEvent(pointer("pointerdown", x, y));
+      window.dispatchEvent(pointer("pointermove", x + 4, y));
+      await nextTick();
+      expect(capture).not.toHaveBeenCalled();
+      expect(wrapper.emitted("update")).toBeUndefined();
+      window.dispatchEvent(pointer("pointermove", x + 5, y));
+      expect(capture).toHaveBeenCalledExactlyOnceWith(1);
+      window.dispatchEvent(pointer("pointerup", x + 5, y));
+      await nextTick();
+      expect(wrapper.emitted("update")).toHaveLength(1);
+      expect(wrapper.emitted("update")![0]![0]).toMatchObject({
+        offsetX: 4 + 5 / scale,
+        offsetY: 6,
+      });
+    } finally {
+      window.dispatchEvent(pointer("pointercancel", x, y));
+      wrapper.unmount();
+    }
+  },
+);
+
+test("chart resize handles keep immediate capture and sub-threshold size edits", async () => {
+  const wrapper = fixture();
+  const chart: SheetChartDrawing = {
+    ...drawing,
+    kind: "chart",
+    chart: {
+      type: "bar",
+      range: null,
+      title: "",
+      headerRow: true,
+      headerColumn: true,
+      seriesBy: "columns",
+      legend: false,
+      labels: false,
+      stacked: false,
+      showHidden: false,
+    },
+  };
+  await wrapper.setProps({ drawings: [chart], selectedDrawingId: chart.id });
+  const handle = wrapper.get('[data-image-resize="e"]').element as HTMLElement;
+  const capture = vi.fn();
+  Object.defineProperty(handle, "setPointerCapture", { value: capture });
+  try {
+    handle.dispatchEvent(pointer("pointerdown", 184, 51));
+    expect(capture).toHaveBeenCalledExactlyOnceWith(1);
+    window.dispatchEvent(pointer("pointermove", 185, 51));
+    window.dispatchEvent(pointer("pointerup", 185, 51));
+    await nextTick();
+    expect(wrapper.emitted("update")).toHaveLength(1);
+    expect(wrapper.emitted("update")![0]![0]).toMatchObject({ width: 101 });
+  } finally {
+    window.dispatchEvent(pointer("pointercancel", 185, 51));
+    wrapper.unmount();
+  }
 });

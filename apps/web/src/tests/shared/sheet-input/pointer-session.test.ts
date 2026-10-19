@@ -151,3 +151,170 @@ describe("startPointerSession", () => {
     expect(cancel).toHaveBeenCalledOnce();
   });
 });
+
+function locatedPointer(
+  type: "pointerdown" | "pointermove" | "pointerup" | "pointercancel",
+  x: number,
+  y: number,
+  touch = false,
+) {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    buttons: type === "pointerdown" || type === "pointermove" ? 1 : 0,
+    clientX: x,
+    clientY: y,
+  }) as PointerEvent;
+  Object.defineProperties(event, {
+    pointerId: { value: 1 },
+    pointerType: { value: touch ? "touch" : "mouse" },
+  });
+  return event;
+}
+
+describe("deferred native-chart drag capture", () => {
+  test.each([false, true])(
+    "leaves click and sub-threshold jitter uncaptured (touch=%s)",
+    (touch) => {
+      const target = document.createElement("div");
+      const capture = vi.fn();
+      Object.defineProperty(target, "setPointerCapture", { value: capture });
+      const callbacks = { onMove: vi.fn(), onEnd: vi.fn(), onCancel: vi.fn() };
+      startPointerSession({
+        event: locatedPointer("pointerdown", 100, 100, touch),
+        captureTarget: target,
+        dragThreshold: 4,
+        ...callbacks,
+      });
+      window.dispatchEvent(locatedPointer("pointermove", 104, 100, touch));
+      window.dispatchEvent(locatedPointer("pointerup", 103, 100, touch));
+      expect(capture).not.toHaveBeenCalled();
+      expect(callbacks.onMove).not.toHaveBeenCalled();
+      expect(callbacks.onEnd).not.toHaveBeenCalled();
+      expect(callbacks.onCancel).toHaveBeenCalledOnce();
+    },
+  );
+  test.each([false, true])(
+    "captures once beyond screen-pixel threshold and commits (touch=%s)",
+    (touch) => {
+      const target = document.createElement("div");
+      const capture = vi.fn(),
+        release = vi.fn();
+      Object.defineProperties(target, {
+        setPointerCapture: { value: capture },
+        hasPointerCapture: { value: () => true },
+        releasePointerCapture: { value: release },
+      });
+      const callbacks = { onMove: vi.fn(), onEnd: vi.fn(), onCancel: vi.fn() };
+      startPointerSession({
+        event: locatedPointer("pointerdown", 100, 100, touch),
+        captureTarget: target,
+        dragThreshold: 4,
+        ...callbacks,
+      });
+      window.dispatchEvent(locatedPointer("pointermove", 103, 103, touch));
+      window.dispatchEvent(locatedPointer("pointermove", 110, 110, touch));
+      window.dispatchEvent(locatedPointer("pointerup", 110, 110, touch));
+      expect(capture).toHaveBeenCalledExactlyOnceWith(1);
+      expect(release).toHaveBeenCalledExactlyOnceWith(1);
+      expect(callbacks.onMove).toHaveBeenCalledTimes(2);
+      expect(callbacks.onEnd).toHaveBeenCalledOnce();
+      expect(callbacks.onCancel).not.toHaveBeenCalled();
+    },
+  );
+  test.each(["pointercancel", "lostpointercapture", "Escape", "blur"])(
+    "cancels activated drag on %s",
+    (reason) => {
+      const target = document.createElement("div");
+      const callbacks = { onMove: vi.fn(), onEnd: vi.fn(), onCancel: vi.fn() };
+      startPointerSession({
+        event: locatedPointer("pointerdown", 0, 0),
+        captureTarget: target,
+        dragThreshold: 4,
+        ...callbacks,
+      });
+      window.dispatchEvent(locatedPointer("pointermove", 10, 0));
+      if (reason === "lostpointercapture") {
+        const e = new Event(reason);
+        Object.defineProperty(e, "pointerId", { value: 1 });
+        target.dispatchEvent(e);
+      } else if (reason === "Escape")
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      else if (reason === "blur") window.dispatchEvent(new Event("blur"));
+      else window.dispatchEvent(locatedPointer("pointercancel", 10, 0));
+      window.dispatchEvent(locatedPointer("pointerup", 10, 0));
+      expect(callbacks.onCancel).toHaveBeenCalledOnce();
+      expect(callbacks.onEnd).not.toHaveBeenCalled();
+    },
+  );
+  test("legacy mouse fallback also distinguishes click from drag", () => {
+    const callbacks = { onMove: vi.fn(), onEnd: vi.fn(), onCancel: vi.fn() };
+    startPointerSession({
+      event: new MouseEvent("mousedown", { clientX: 10, clientY: 10 }),
+      dragThreshold: 4,
+      ...callbacks,
+    });
+    window.dispatchEvent(new MouseEvent("mousemove", { clientX: 13, clientY: 10, buttons: 1 }));
+    window.dispatchEvent(new MouseEvent("mouseup", { clientX: 13, clientY: 10 }));
+    expect(callbacks.onMove).not.toHaveBeenCalled();
+    expect(callbacks.onEnd).not.toHaveBeenCalled();
+    expect(callbacks.onCancel).toHaveBeenCalledOnce();
+  });
+});
+
+test.each([false, true])(
+  "deferred drag cancels a missed outside release (already active=%s)",
+  (active) => {
+    const callbacks = { onMove: vi.fn(), onEnd: vi.fn(), onCancel: vi.fn() };
+    startPointerSession({
+      event: locatedPointer("pointerdown", 0, 0),
+      dragThreshold: 4,
+      ...callbacks,
+    });
+    if (active) window.dispatchEvent(locatedPointer("pointermove", 5, 0));
+    const hover = new MouseEvent("pointermove", { clientX: 20, clientY: 0, buttons: 0 });
+    Object.defineProperty(hover, "pointerId", { value: 1 });
+    window.dispatchEvent(hover);
+    window.dispatchEvent(locatedPointer("pointerup", 20, 0));
+    expect(callbacks.onCancel).toHaveBeenCalledOnce();
+    expect(callbacks.onEnd).not.toHaveBeenCalled();
+    expect(callbacks.onMove).toHaveBeenCalledTimes(active ? 1 : 0);
+  },
+);
+test("deferred mouse fallback cancels hover after a missed release", () => {
+  const callbacks = { onMove: vi.fn(), onEnd: vi.fn(), onCancel: vi.fn() };
+  startPointerSession({
+    event: new MouseEvent("mousedown", { buttons: 1 }),
+    dragThreshold: 4,
+    ...callbacks,
+  });
+  window.dispatchEvent(new MouseEvent("mousemove", { clientX: 20, buttons: 0 }));
+  window.dispatchEvent(new MouseEvent("mouseup", { clientX: 20 }));
+  expect(callbacks.onCancel).toHaveBeenCalledOnce();
+  expect(callbacks.onEnd).not.toHaveBeenCalled();
+  expect(callbacks.onMove).not.toHaveBeenCalled();
+});
+test("touch capture transfer ignores a descendant lostcapture but honors its own", () => {
+  const target = document.createElement("div"),
+    child = document.createElement("div");
+  target.append(child);
+  const callbacks = { onMove: vi.fn(), onEnd: vi.fn(), onCancel: vi.fn() };
+  const lost = () => {
+    const e = new Event("lostpointercapture", { bubbles: true });
+    Object.defineProperty(e, "pointerId", { value: 1 });
+    return e;
+  };
+  Object.defineProperty(target, "setPointerCapture", { value: () => child.dispatchEvent(lost()) });
+  startPointerSession({
+    event: locatedPointer("pointerdown", 0, 0, true),
+    captureTarget: target,
+    dragThreshold: 4,
+    ...callbacks,
+  });
+  window.dispatchEvent(locatedPointer("pointermove", 5, 0, true));
+  expect(callbacks.onCancel).not.toHaveBeenCalled();
+  expect(callbacks.onMove).toHaveBeenCalledOnce();
+  target.dispatchEvent(lost());
+  expect(callbacks.onCancel).toHaveBeenCalledOnce();
+  window.dispatchEvent(locatedPointer("pointerup", 5, 0, true));
+  expect(callbacks.onEnd).not.toHaveBeenCalled();
+});
