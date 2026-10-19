@@ -1,3 +1,4 @@
+import { resolveChartSeriesColors } from "@sheetcraft/core/chart-presentation";
 import {
   createChartSourceFromRange,
   normalizeChartSource,
@@ -108,12 +109,31 @@ function sheetIdentity(sheet: Sheet | undefined): string | undefined {
 }
 
 /**
- * Exactly the data consumed by the five promotable renderers. Legacy records
+ * Exactly the data consumed by the promotable renderers. Legacy records
  * are rectangle rows, whereas explicit records are category-oriented vectors;
  * row-oriented/headerless/hidden-column records therefore need not be equal.
  * Other chart types that consume those records must never use this proof.
  */
 function visiblePresentation(chart: SheetChart, data: ChartData): unknown {
+  // Compare symbolic slots, not RGB: repeated/custom palette colors must not
+  // conceal a changed automatic position that would surface on a theme change.
+  const cartesian = ["column", "bar", "line", "area", "combo"].includes(chart.type);
+  const paints = data.series.map((entry, index) => {
+    const explicit = chart.format?.series?.find((format) => format.id === entry.id)?.color;
+    return {
+      name: entry.name,
+      color:
+        explicit !== undefined
+          ? `explicit:${explicit.toLowerCase()}`
+          : entry.colorIndex !== undefined || !cartesian
+            ? `palette:${entry.colorIndex ?? index}`
+            : undefined,
+    };
+  });
+  const colors = resolveChartSeriesColors(
+    paints,
+    data.series.map((_, index) => `palette:${index}`),
+  );
   return {
     categories: data.categories,
     series: data.series.map((entry, index) => {
@@ -122,10 +142,7 @@ function visiblePresentation(chart: SheetChart, data: ChartData): unknown {
         name: entry.name,
         values: entry.values,
         numberFormat: entry.numberFormat,
-        // Range survivors retain the pre-filter palette ordinal. An explicit
-        // paint override supersedes the palette; other paint/axis settings must
-        // still resolve to exactly the same bound series after promotion.
-        paletteIndex: format?.color === undefined ? (entry.colorIndex ?? index) : undefined,
+        paint: colors[index],
         format,
       };
     }),
@@ -254,13 +271,23 @@ export function planChartClipboardSourceForTarget(
     );
     const legacyData = getSheetChartData(sourceSheet, chart, evaluator, resolveSheet);
     const promotedData = getSheetChartData(sourceSheet, promoted, evaluator, resolveSheet);
+    // Effective rectangle filters give every surviving series its raw ordinal
+    // slot. Prove the same allocation for retained AND hidden definitions so an
+    // all-hidden chart cannot conceal a forged palette slot.
+    const legacyPaletteData =
+      legacyData.series.length === legacySourceData.series.length
+        ? legacySourceData
+        : {
+            ...legacySourceData,
+            series: legacySourceData.series.map((entry, colorIndex) => ({ ...entry, colorIndex })),
+          };
     if (
       [legacySourceData, promotedSourceData].some((data) =>
         data.diagnostics?.some(
           (entry) => entry.code === "broken-reference" || entry.code === "length-mismatch",
         ),
       ) ||
-      JSON.stringify(visiblePresentation(chart, legacySourceData)) !==
+      JSON.stringify(visiblePresentation(chart, legacyPaletteData)) !==
         JSON.stringify(visiblePresentation(promoted, promotedSourceData)) ||
       JSON.stringify(visiblePresentation(chart, legacyData)) !==
         JSON.stringify(visiblePresentation(promoted, promotedData))

@@ -424,3 +424,42 @@ describe("strict ordered chart source and authoritative derived data", () => {
     expect(f.read()).toEqual({ categories: [], series: [], records: [] });
   });
 });
+
+test.each(["rows", "columns"] as const)(
+  "%s promotion separates automatic paint slots from headerless numbering and IDs",
+  (seriesBy) => {
+    const f = fixture();
+    const chart = { ...elementChart(), seriesBy, headerRow: false, headerColumn: false };
+    chart.rectangleSeries = {
+      rows: seriesBy === "rows" ? [{ index: 0, id: "painted" }] : [],
+      columns: seriesBy === "columns" ? [{ index: 0, id: "painted" }] : [],
+    };
+    chart.format = { series: [{ id: "painted", color: "#abcdef" }] };
+    const source = createChartSourceFromRange(f.sheet.id, chart, f.sheet);
+    expect(source.series[0]!.id).toBe("painted");
+    expect(source.series[1]).toMatchObject({
+      colorIndex: 0,
+      name: { kind: "literal", text: "Series 2" },
+    });
+    const dormant = createChartSourceFromRange(
+      f.sheet.id,
+      {
+        ...chart,
+        seriesFilter: { hiddenSeriesIds: ["retired"] },
+      },
+      f.sheet,
+    );
+    expect(dormant).toEqual(source);
+    const filtered = createChartSourceFromRange(
+      f.sheet.id,
+      {
+        ...chart,
+        seriesFilter: { hiddenSeriesIds: ["painted"] },
+      },
+      f.sheet,
+    );
+    expect(filtered.series[1]!.colorIndex).toBe(1);
+    const radar = createChartSourceFromRange(f.sheet.id, { ...chart, type: "radar" }, f.sheet);
+    expect(radar.series[1]!.colorIndex).toBe(1);
+  },
+);

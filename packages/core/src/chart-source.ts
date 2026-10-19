@@ -256,6 +256,27 @@ export function createChartSourceFromRange(
   const bindings = new Map(
     (chart.rectangleSeries?.[chart.seriesBy] ?? []).map((entry) => [entry.index, entry.id]),
   );
+  // Display numbering is independent of paint allocation. Legacy Cartesian
+  // automatic paints skip explicit colors; filtered rectangles instead already
+  // carry pre-filter ordinal slots in getSheetChartData.
+  const hiddenIds = new Set(chart.seriesFilter?.hiddenSeriesIds ?? []);
+  const filtered = visible.some((index) => {
+    const bound = bindings.get(seriesStart + index);
+    return bound !== undefined && hiddenIds.has(bound);
+  });
+  const automatic = ["column", "bar", "line", "area", "combo"].includes(chart.type) && !filtered;
+  const paintSlots = new Map(palette);
+  if (automatic) {
+    let next = 0;
+    for (const index of [...visible, ...hidden]) {
+      const bound = bindings.get(seriesStart + index);
+      const explicit =
+        bound === undefined
+          ? undefined
+          : chart.format?.series?.find((entry) => entry.id === bound)?.color;
+      if (explicit === undefined) paintSlots.set(index, next++);
+    }
+  }
   let generatedSuffix = 1;
   const nextId = (fixed: number): string => {
     const existing = bindings.get(fixed);
@@ -281,7 +302,7 @@ export function createChartSourceFromRange(
       const fixed = seriesStart + index;
       return {
         id: nextId(fixed),
-        colorIndex: palette.get(index)!,
+        colorIndex: paintSlots.get(index)!,
         name: (rows ? chart.headerColumn : chart.headerRow)
           ? {
               kind: "cell",

@@ -748,16 +748,33 @@ function visibleOptions(value: ReturnType<typeof createChartOption>): unknown {
     lineStyle?: Record<string, unknown>;
     areaStyle?: Record<string, unknown>;
   };
+  // Encoded renderer keys deliberately change from physical bands to stable
+  // source IDs. Compare the labels users see while other tests assert IDs.
+  const legends = Array.isArray(value.legend) ? value.legend : value.legend ? [value.legend] : [];
+  const labels = new Map<string, string>();
+  for (const legend of legends) {
+    for (const entry of legend.data ?? []) {
+      const name = typeof entry === "string" ? entry : entry.name;
+      if (name !== undefined && typeof legend.formatter === "function")
+        labels.set(name, legend.formatter(name));
+    }
+  }
   const option = JSON.parse(
-    JSON.stringify(value, (key, entry: unknown) => (key === "id" ? undefined : entry)),
+    JSON.stringify(value, (key, entry: unknown) =>
+      key === "id"
+        ? undefined
+        : key === "name" && typeof entry === "string"
+          ? (labels.get(entry) ?? entry)
+          : entry,
+    ),
   ) as {
     color: string[];
     series: Array<PaintEntry & { type: string; data?: PaintEntry[] }>;
   };
-  // Legacy rectangles let ECharts apply the visible-ordinal palette implicitly.
-  // Promotion makes that same palette explicit; compare their effective paint.
+  // Cartesian legend projection has resolved the legacy automatic paint.
+  // Line/area fallbacks must use that paint rather than the series ordinal.
   const paint = (entry: PaintEntry, index: number, line: boolean, area: boolean) => {
-    const color = option.color[index % option.color.length];
+    const color = entry.itemStyle?.color ?? option.color[index % option.color.length];
     entry.itemStyle = { color, ...entry.itemStyle };
     if (line) entry.lineStyle = { color, ...entry.lineStyle };
     else delete entry.lineStyle; // ECharts bars do not consume lineStyle.
@@ -1040,7 +1057,7 @@ describe("Chart clipboard source-owned series filters", () => {
     }
   });
 
-  test.each(["broken", "mismatch", "budget", "changed-values"] as const)(
+  test.each(["broken", "mismatch", "budget", "changed-values", "changed-palette"] as const)(
     "all-hidden cannot conceal a promoted source that is $0",
     (defect) => {
       const f = filteredFixture();
@@ -1063,6 +1080,7 @@ describe("Chart clipboard source-owned series filters", () => {
           kind: "literal",
           values: Array.from({ length: 10001 }, () => 1),
         };
+      else if (defect === "changed-palette") source.series[2]!.colorIndex = 0;
       else source.series[0]!.values = { kind: "literal", values: [9, 8, 7] };
       const before = f.before();
       const planner = vi
@@ -1269,4 +1287,83 @@ test("cross-sheet Combo promotion preserves physical routes, filter and raw sour
     assertChartClipboardSourcePrepared(owner, forged, f.sourceSheet, f.targetSheet),
   ).toThrow();
   expect(f.before()).toEqual(before);
+});
+
+describe("Chart clipboard automatic palette promotion", () => {
+  test.each(["column", "bar", "line", "area", "combo"] as const)(
+    "%s retains automatic slot zero after two explicit paints across palette changes and reorder",
+    (type) => {
+      const f = fixture(type);
+      const chart = f.chartDrawing.chart;
+      chart.rectangleSeries = {
+        rows: [],
+        columns: [
+          { index: 1, id: "first" },
+          { index: 2, id: "second" },
+        ],
+      };
+      chart.format = {
+        series: [
+          { id: "first", color: "#aa0000" },
+          { id: "second", color: "#00aa00" },
+        ],
+      };
+      const before = f.before();
+      const result = f.plan();
+      expect(result.chart.source!.series[2]!.colorIndex).toBe(0);
+      expect(result.chart.source!.series.map((entry) => entry.id)).toEqual([
+        "first",
+        "second",
+        "series-1",
+      ]);
+      expect(result.chart.format).toEqual(chart.format);
+      expect(f.before()).toEqual(before);
+      for (const palette of [
+        ["#123456", "#654321"],
+        ["#abcdef", "#fedcba", "#101010"],
+      ]) {
+        chart.presentation = { palette };
+        result.chart.presentation = { palette };
+        expect(
+          visibleOptions(createChartOption(result.chart, f.read(f.targetSheet, result))),
+        ).toEqual(visibleOptions(createChartOption(chart, f.read(f.sourceSheet, f.chartDrawing))));
+      }
+      const automaticId = result.chart.source!.series[2]!.id;
+      result.chart.source!.series.reverse();
+      expect(f.read(f.targetSheet, result).series[0]).toMatchObject({
+        id: automaticId,
+        colorIndex: 0,
+      });
+    },
+  );
+
+  test("duplicate automatic display names fail closed without changing either chart", () => {
+    const f = fixture();
+    setCellValue(f.sourceSheet, { row: 0, column: 1 }, "same");
+    setCellValue(f.sourceSheet, { row: 0, column: 2 }, "same");
+    const before = f.before();
+    expect(f.plan(f.sourceSheet)).toEqual(f.chartDrawing);
+    expectReason(() => f.plan(), Reason.NonEquivalentSource);
+    expect(f.before()).toEqual(before);
+    expect(() =>
+      createChartOption(f.chartDrawing.chart, f.read(f.sourceSheet, f.chartDrawing)),
+    ).not.toThrow();
+  });
+
+  test("equal RGB palette entries cannot conceal a changed automatic slot", () => {
+    const f = fixture();
+    f.chartDrawing.chart.presentation = { palette: ["#111111", "#111111"] };
+    const source = createChartSourceFromRange(
+      f.sourceSheet.id,
+      f.chartDrawing.chart,
+      f.sourceSheet,
+    );
+    source.series[1]!.colorIndex = 0;
+    const planner = vi.spyOn(chartSourceApi, "createChartSourceFromRange").mockReturnValue(source);
+    try {
+      expectReason(() => f.plan(), Reason.NonEquivalentSource);
+    } finally {
+      planner.mockRestore();
+    }
+  });
 });
