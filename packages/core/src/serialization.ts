@@ -342,6 +342,8 @@ export type WorkbookSnapshotV88 = Omit<WorkbookSnapshotV87, "version"> & { versi
 export type WorkbookSnapshotV89 = Omit<WorkbookSnapshotV88, "version"> & { version: 89 };
 /** Per-script chart fonts and explicit complex-script theme slots. */
 export type WorkbookSnapshotV90 = Omit<WorkbookSnapshotV89, "version"> & { version: 90 };
+/** Independent chart axis title typography and rotation. */
+export type WorkbookSnapshotV91 = Omit<WorkbookSnapshotV90, "version"> & { version: 91 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -390,8 +392,9 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV87
   | WorkbookSnapshotV88
   | WorkbookSnapshotV89
-  | WorkbookSnapshotV90;
-type WorkbookWritePayload = Omit<WorkbookSnapshotV90, "version"> & {
+  | WorkbookSnapshotV90
+  | WorkbookSnapshotV91;
+type WorkbookWritePayload = Omit<WorkbookSnapshotV91, "version"> & {
   version: WorkbookSnapshot["version"];
 };
 export type SheetSnapshot = SheetSnapshotV7 & {
@@ -501,7 +504,8 @@ type SnapshotVersion =
   | 87
   | 88
   | 89
-  | 90;
+  | 90
+  | 91;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -545,6 +549,11 @@ function chartLayoutContainer(value: unknown, key: string): unknown {
 function hasRawField(value: unknown, key: string): boolean {
   return !!value && (typeof value === "object" || typeof value === "function") && key in value;
 }
+function chartAxisTitleFeaturePath(format: unknown): string | undefined {
+  for (const branch of ["categoryAxis", "valueAxis", "secondaryValueAxis"])
+    for (const key of ["titleText", "titleRotation"])
+      if (hasRawField(chartLayoutContainer(format, branch), key)) return `${branch}.${key}`;
+}
 function chartScriptFontFeaturePath(format: unknown): string | undefined {
   if (hasRawField(chartLayoutContainer(format, "title"), "scriptFonts")) return "title.scriptFonts";
   for (const branch of ["legend", "categoryAxis", "valueAxis", "secondaryValueAxis"])
@@ -552,6 +561,14 @@ function chartScriptFontFeaturePath(format: unknown): string | undefined {
       hasRawField(chartLayoutContainer(chartLayoutContainer(format, branch), "text"), "scriptFonts")
     )
       return `${branch}.text.scriptFonts`;
+  for (const branch of ["categoryAxis", "valueAxis", "secondaryValueAxis"])
+    if (
+      hasRawField(
+        chartLayoutContainer(chartLayoutContainer(format, branch), "titleText"),
+        "scriptFonts",
+      )
+    )
+      return `${branch}.titleText.scriptFonts`;
 }
 function hasThemeComplexScriptFonts(theme: unknown): boolean {
   const fonts = chartLayoutContainer(theme, "fonts");
@@ -606,6 +623,7 @@ function inspectShapeSnapshotFeatures(
   hasChartFormat: boolean;
   hasChartLegendFormat: boolean;
   hasChartScriptFonts: boolean;
+  hasChartAxisTitles: boolean;
   hasChartPresentation: boolean;
   hasChartLayout: boolean;
   hasChartRectangleSeries: boolean;
@@ -628,6 +646,7 @@ function inspectShapeSnapshotFeatures(
     hasChartFormat = false,
     hasChartLegendFormat = false,
     hasChartScriptFonts = false,
+    hasChartAxisTitles = false,
     hasChartPresentation = false,
     hasChartLayout = false,
     hasChartRectangleSeries = false,
@@ -655,6 +674,20 @@ function inspectShapeSnapshotFeatures(
           return fail(`${path}.chart`, "Chart payloads must be own data fields, not accessors.");
         const chart = asRecord(chartField.value, `${path}.chart`);
         const format = chartLayoutContainer(chart, "format");
+        const axisTitlePath = chartAxisTitleFeaturePath(format);
+        if (axisTitlePath) {
+          if (version !== undefined && version < 91)
+            return fail(
+              `${path}.chart.format.${axisTitlePath}`,
+              "Independent chart axis titles require snapshot version 91.",
+            );
+          if (drawingKind !== "chart")
+            return fail(
+              `${path}.chart.format.${axisTitlePath}`,
+              "Independent chart axis titles require an own chart drawing kind.",
+            );
+          hasChartAxisTitles = true;
+        }
         const scriptFontPath = chartScriptFontFeaturePath(format);
         if (scriptFontPath) {
           if (version !== undefined && version < 90)
@@ -991,6 +1024,7 @@ function inspectShapeSnapshotFeatures(
     hasChartFormat,
     hasChartLegendFormat,
     hasChartScriptFonts,
+    hasChartAxisTitles,
     hasChartPresentation,
     hasChartLayout,
     hasChartRectangleSeries,
@@ -2162,6 +2196,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
   let hasChartFormat = false;
   let hasChartLegendFormat = false;
   let hasChartScriptFonts = false;
+  let hasChartAxisTitles = false;
   let hasChartPresentation = false;
   let hasChartLayout = false;
   let hasChartRectangleSeries = false;
@@ -2192,6 +2227,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       hasChartFormat ||= scene.hasChartFormat;
       hasChartLegendFormat ||= scene.hasChartLegendFormat;
       hasChartScriptFonts ||= scene.hasChartScriptFonts;
+      hasChartAxisTitles ||= scene.hasChartAxisTitles;
       hasChartPresentation ||= scene.hasChartPresentation;
       hasChartLayout ||= scene.hasChartLayout;
       hasChartRectangleSeries ||= scene.hasChartRectangleSeries;
@@ -2611,6 +2647,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasChartLegendFormat) version = 88;
     if (hasDrawingExportEncoding) version = 89;
     if (hasChartScriptFonts) version = 90;
+    if (hasChartAxisTitles) version = 91;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -3049,6 +3086,14 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     )
   )
     snapshot.version = 90;
+  if (
+    sheets.some((sheet) =>
+      sheet.drawings?.some(
+        (drawing) => inspectShapeSnapshotFeatures(drawing, "$.drawings").hasChartAxisTitles,
+      ),
+    )
+  )
+    snapshot.version = 91;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -3146,7 +3191,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 87 &&
     record.version !== 88 &&
     record.version !== 89 &&
-    record.version !== 90
+    record.version !== 90 &&
+    record.version !== 91
   ) {
     throw new WorkbookDomainError(
       {

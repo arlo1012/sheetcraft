@@ -1,3 +1,4 @@
+import { chartAxisTitleExtent, chartAxisTitleWidthBudget } from "./chart-axis-title-layout";
 import {
   createChartTextPlan,
   chartRichStyles,
@@ -316,7 +317,16 @@ export function createChartDataTablePlan(
     const gap =
       MARGIN +
       (format?.categoryAxis?.title && format.categoryAxis.titleVisible !== false
-        ? 32 + (format.categoryAxis.text?.fontSize ?? 12)
+        ? 32 +
+          (format.categoryAxis.titleText !== undefined ||
+          format.categoryAxis.titleRotation !== undefined
+            ? chartAxisTitleExtent(
+                format.categoryAxis,
+                true,
+                dimensions,
+                chartAxisTitleWidthBudget(format.categoryAxis, true, dimensions),
+              ).height
+            : (format.categoryAxis.text?.fontSize ?? 12))
         : 0);
     const primitiveUpperBound =
       2 +

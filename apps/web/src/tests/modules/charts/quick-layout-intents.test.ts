@@ -158,3 +158,27 @@ test("Layout3 separated pair spacing differs from touching-series layouts", () =
   expect(layout3.format?.bar?.overlap).toBe(-25);
   expect(getChartQuickLayout(layout3)).toBe(3);
 });
+
+test("quick layout initializes only new titles and retains hidden title typography", () => {
+  const original = chart();
+  original.format = { categoryAxis: { text: { color: "#ff0000" } } };
+  const shown = applyChartQuickLayout(original, 7, "Axis Title");
+  expect(shown.format?.categoryAxis).toMatchObject({
+    title: "Axis Title",
+    titleVisible: true,
+    titleRotation: 0,
+    text: { color: "#ff0000" },
+    titleText: { fontSize: 40 / 3, bold: true },
+  });
+  expect(shown.format?.valueAxis).toMatchObject({ titleRotation: -90, titleText: { bold: true } });
+  const hidden = applyChartQuickLayout(shown, 1, "Axis Title");
+  expect(hidden.format?.categoryAxis).toMatchObject({
+    titleVisible: false,
+    title: "Axis Title",
+    titleRotation: 0,
+  });
+  expect(hidden.format?.categoryAxis?.titleText).toEqual(shown.format?.categoryAxis?.titleText);
+  const restored = applyChartQuickLayout(hidden, 7, "Different placeholder");
+  expect(restored.format?.categoryAxis?.titleText).toEqual(shown.format?.categoryAxis?.titleText);
+  expect(restored.format?.categoryAxis?.title).toBe("Axis Title");
+});

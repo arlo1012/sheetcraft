@@ -76,6 +76,9 @@ export function getChartFontFamilies(chart: SheetChart, theme?: WorkbookTheme): 
         f?.categoryAxis?.text,
         f?.valueAxis?.text,
         f?.secondaryValueAxis?.text,
+        f?.categoryAxis?.titleText,
+        f?.valueAxis?.titleText,
+        f?.secondaryValueAxis?.titleText,
       ].flatMap((text) => getChartTextFontFamilies(text, theme)),
     ),
   ];

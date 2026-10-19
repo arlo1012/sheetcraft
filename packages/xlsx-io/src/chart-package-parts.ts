@@ -393,6 +393,26 @@ function inspectStrictRoot(
 
       const ordinary =
         namespace === CHART_NS && child(local, "chartSpace").pivotSource === undefined;
+      // Only ordinary axis-title payloads may reach the local omission reader.
+      // Do not broaden chart-title, legend, pivot or other namespace admission.
+      const axisTitle =
+        ordinary && /^chartSpace\/chart\/plotArea\/(catAx|valAx)\/title(?:\/|$)/.test(path);
+      const localAxisArt = axisTitle && ns === ART_NS && ["br", "fld"].includes(localName!);
+      const localAxisLayout =
+        axisTitle &&
+        ns === CHART_NS &&
+        [
+          "manualLayout",
+          "layoutTarget",
+          "xMode",
+          "yMode",
+          "wMode",
+          "hMode",
+          "x",
+          "y",
+          "w",
+          "h",
+        ].includes(localName!);
       const empty =
         Object.keys(node).every((key) => key.startsWith("@_xmlns") || key === "#text") &&
         (node["#text"] === undefined || String(node["#text"]).trim() === "");
@@ -505,7 +525,10 @@ function inspectStrictRoot(
           pictureArtElements.has(localName!) &&
           !["xfrm", "off", "ext"].includes(localName!) &&
           ns !== ART_NS) ||
-        (namespace === CHART_NS && ns === ART_NS && !artElements.has(localName!)) ||
+        (namespace === CHART_NS &&
+          ns === ART_NS &&
+          !artElements.has(localName!) &&
+          !localAxisArt) ||
         (namespace === CHART_NS && artElements.has(localName!) && ns !== ART_NS) ||
         (namespace === CHART_NS && ns === C14_NS && !c14Elements.has(localName!)) ||
         (namespace === CHART_NS &&
@@ -515,7 +538,10 @@ function inspectStrictRoot(
         (namespace === CHART_NS &&
           ns === MC_NS &&
           !["AlternateContent", "Choice", "Fallback"].includes(localName!)) ||
-        (namespace === CHART_NS && ns === CHART_NS && !chartElements.has(localName!)) ||
+        (namespace === CHART_NS &&
+          ns === CHART_NS &&
+          !chartElements.has(localName!) &&
+          !localAxisLayout) ||
         (namespace === CHART_NS &&
           ["AlternateContent", "Choice", "Fallback"].includes(localName!) &&
           ns !== MC_NS) ||

@@ -284,6 +284,7 @@ function applyRecipe(chart: SheetChart, recipe: ChartStyleRecipe): void {
     italic: false,
   };
   format.plot = { fill: recipe.plotFill, stroke: recipe.plotStroke, strokeWidth: recipe.plotWidth };
+  // Style recipes own ticks and axis lines; independent title typography and rotation survive.
   for (const key of ["categoryAxis", "valueAxis", "secondaryValueAxis"] as const)
     format[key] = {
       ...format[key],

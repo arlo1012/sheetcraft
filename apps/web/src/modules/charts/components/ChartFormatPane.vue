@@ -50,6 +50,8 @@ import {
   chartFormatTargetKey,
   chartFormatTargetLabelKeys,
   compactChartAxis,
+  cloneChartTextFormat,
+  initializeChartAxisTitle,
   createChartFormatDraft,
   editChartFormatDraft,
   getChartFormatCapabilities,
@@ -96,7 +98,24 @@ const targets = computed(() =>
   getChartFormatTargets(chart.value, props.data, props.visibleData ?? props.data),
 );
 const targetKey = computed(() => chartFormatTargetKey(props.target));
-const ownerKey = computed(() => `${props.drawing.id}/${targetKey.value}`);
+const axisTextMode = ref<"ticks" | "title">("ticks");
+const axisTextLease = ref(0);
+const ownerKey = computed(
+  () =>
+    `${props.drawing.id}/${targetKey.value}${axisTextLease.value ? `/axis-text:${axisTextLease.value}` : ""}`,
+);
+function changeAxisTextMode(value: unknown): void {
+  if (!composing() && (value === "ticks" || value === "title") && value !== axisTextMode.value) {
+    axisTextMode.value = value;
+    axisTextLease.value++;
+  }
+}
+watch(
+  () => `${props.drawing.id}/${targetKey.value}`,
+  () => {
+    axisTextMode.value = "ticks";
+  },
+);
 const legendMode = ref<"legend" | "text">("legend");
 const legendTab = ref<"surface" | "layout">("layout");
 const legendPage = computed(
@@ -221,7 +240,9 @@ const textFormat = computed<ChartTextFormat>(() =>
     ? (chart.value.format?.legend?.text ?? {})
     : kind.value === "title"
       ? (chart.value.format?.title ?? {})
-      : (axis.value.text ?? {}),
+      : isAxis.value && axisTextMode.value === "title"
+        ? (axis.value.titleText ?? { fontSize: 12, bold: false, italic: false, ...axis.value.text })
+        : (axis.value.text ?? {}),
 );
 const surfaceFormat = computed<ChartSurfaceFormat>(() =>
   kind.value === "legend"
@@ -245,6 +266,7 @@ const numericFields: ChartFormatNumericField[] = [
   "majorUnit",
   "minorUnit",
   "labelAngle",
+  "titleRotation",
   "fontSize",
   "strokeWidth",
   "gapWidth",
@@ -258,6 +280,7 @@ type SharedNumericField =
   | "fontSize"
   | "strokeWidth"
   | "labelAngle"
+  | "titleRotation"
   | "gapWidth"
   | "overlap"
   | "decimals";
@@ -269,6 +292,7 @@ const sharedNumericFields: SharedNumericField[] = [
   "fontSize",
   "strokeWidth",
   "labelAngle",
+  "titleRotation",
   "gapWidth",
   "overlap",
   "decimals",
@@ -281,6 +305,7 @@ const maxControl = ref<InstanceType<typeof NumericField>>();
 const majorUnitControl = ref<InstanceType<typeof NumericField>>();
 const minorUnitControl = ref<InstanceType<typeof NumericField>>();
 const labelAngleControl = ref<InstanceType<typeof NumericField>>();
+const titleRotationControl = ref<InstanceType<typeof NumericField>>();
 const gapWidthControl = ref<InstanceType<typeof NumericField>>();
 const overlapControl = ref<InstanceType<typeof NumericField>>();
 const decimalsControl = ref<InstanceType<typeof NumericField>>();
@@ -404,6 +429,10 @@ const labelAngleNumericValue = computed<NumericValue>((previous) =>
   sharedNumericValue("labelAngle", previous),
 );
 const labelAngleCommit = computed(() => sharedNumericCommit("labelAngle"));
+const titleRotationNumericValue = computed<NumericValue>((previous) =>
+  sharedNumericValue("titleRotation", previous),
+);
+const titleRotationCommit = computed(() => sharedNumericCommit("titleRotation"));
 const gapWidthNumericValue = computed<NumericValue>((previous) =>
   sharedNumericValue("gapWidth", previous),
 );
@@ -465,7 +494,7 @@ function sharedNumericDraftChange(field: SharedNumericField, draft: NumericDraft
 function sharedNumericFocusBoundary(field: SharedNumericField): Element[] {
   return [
     ...(root.value?.querySelectorAll(
-      `[data-chart-format-reset="${field}"], [data-chart-format-reset="element"], [data-chart-format-reset="${field === "fontSize" ? "legendText" : "legendSurface"}"], [data-chart-format-navigation]`,
+      `[data-chart-format-reset="${field}"], [data-chart-format-reset="element"], [data-chart-format-reset="axisTitleText"], [data-chart-format-reset="${field === "fontSize" ? "legendText" : "legendSurface"}"], [data-chart-format-navigation]`,
     ) ?? []),
   ];
 }
@@ -483,6 +512,8 @@ function sharedNumericControl(field: SharedNumericField) {
       return fontSizeControl.value;
     case "strokeWidth":
       return strokeWidthControl.value;
+    case "titleRotation":
+      return titleRotationControl.value;
     case "labelAngle":
       return labelAngleControl.value;
     case "gapWidth":
@@ -504,6 +535,8 @@ function numericValue(field: ChartFormatNumericField | "decimals"): number | und
     case "majorUnit":
     case "minorUnit":
       return valueAxis.value[field];
+    case "titleRotation":
+      return axis.value.titleRotation;
     case "labelAngle":
       return categoryAxis.value.labelAngle;
     case "fontSize":
@@ -589,7 +622,7 @@ function resetDrafts(): void {
   pendingResetField = undefined;
   fieldError.value = undefined;
 }
-watch(() => `${props.drawing.id}/${targetKey.value}`, resetDrafts, { immediate: true });
+watch(ownerKey, resetDrafts, { immediate: true });
 watch(
   () => [chart.value, props.data] as const,
   () => {
@@ -710,7 +743,8 @@ function textIntent(next: ChartTextFormat | undefined): ChartFormatIntent | unde
   if (kind.value === "title") return { kind: "title", format: next };
   if (isAxis.value) {
     const nextAxis = { ...axis.value };
-    if (next) nextAxis.text = next;
+    if (axisTextMode.value === "title") nextAxis.titleText = cloneChartTextFormat(next ?? {});
+    else if (next) nextAxis.text = next;
     else delete nextAxis.text;
     return axisIntent(nextAxis);
   }
@@ -742,6 +776,10 @@ function numericIntent(
       if (isValueAxis.value)
         return axisIntent(setChartFormatField(valueAxis.value, field, value) ?? {});
       return undefined;
+    case "titleRotation":
+      return isAxis.value
+        ? axisIntent(setChartFormatField(axis.value, field, value) ?? {})
+        : undefined;
     case "labelAngle":
       return kind.value === "categoryAxis"
         ? { kind: "categoryAxis", format: setChartFormatField(categoryAxis.value, field, value) }
@@ -852,9 +890,14 @@ function setAxisBoolean(
   value: unknown,
 ): void {
   if ((field === "majorGridlines" || field === "minorGridlines") && !isValueAxis.value) return;
-  const format = { ...axis.value, [field]: !!value };
-  if (field === "titleVisible" && value && !format.title?.trim())
-    format.title = t("chart.axisTitlePlaceholder");
+  let format = { ...axis.value, [field]: !!value };
+  if (field === "titleVisible" && value && !format.title?.trim() && isAxis.value)
+    format = initializeChartAxisTitle(
+      format,
+      chart.value.type,
+      kind.value as "categoryAxis" | "valueAxis" | "secondaryValueAxis",
+      t("chart.axisTitlePlaceholder"),
+    );
   const intent = axisIntent(format);
   if (intent) submit(intent);
 }
@@ -879,7 +922,18 @@ function commitText(
     intent = { kind: "elements", patch: { title: draft.text } };
   if (field === "axisTitle" && isAxis.value)
     intent = axisIntent({
-      ...setChartFormatField(axis.value, "title", draft.text || undefined),
+      ...setChartFormatField(
+        draft.text.trim() && !axis.value.title?.trim()
+          ? initializeChartAxisTitle(
+              axis.value,
+              chart.value.type,
+              kind.value as "categoryAxis" | "valueAxis" | "secondaryValueAxis",
+              draft.text,
+            )
+          : axis.value,
+        "title",
+        draft.text || undefined,
+      ),
       titleVisible: !!draft.text.trim(),
     });
   if (field === "formatCode" && isValueAxis.value) {
@@ -1395,14 +1449,6 @@ function escapeDraft(event: KeyboardEvent): void {
           :onChange="captureAction((value: unknown) => setAxisBoolean('reverse', value))"
           >{{ t("chart.formatReverse") }}</TCheckbox
         >
-        <TCheckbox
-          data-format-pane-history-control="discrete"
-          :checked="axis.titleVisible ?? !!axis.title"
-          :disabled="disabled"
-          data-chart-format-field="titleVisible"
-          :onChange="captureAction((value: unknown) => setAxisBoolean('titleVisible', value))"
-          >{{ t("chart.formatShowAxisTitle") }}</TCheckbox
-        >
         <template v-if="isValueAxis">
           <TCheckbox
             data-format-pane-history-control="discrete"
@@ -1422,23 +1468,6 @@ function escapeDraft(event: KeyboardEvent): void {
             >{{ t("chart.formatMinorGridlines") }}</TCheckbox
           >
         </template>
-        <div class="chart-format-pane__field" data-chart-format-field="axisTitle">
-          <label :for="`${paneId}-axis-title`">{{ t("chart.formatAxisTitle") }}</label
-          ><TInput
-            :id="`${paneId}-axis-title`"
-            :value="drafts.axisTitle!.text"
-            size="small"
-            :maxlength="1000"
-            :disabled="disabled"
-            :aria-label="t('chart.formatAxisTitle')"
-            :status="drafts.axisTitle!.error ? 'error' : undefined"
-            :onChange="editAction('axisTitle')"
-            :onCompositionstart="compositionStartAction('axisTitle')"
-            :onCompositionend="compositionEndAction('axisTitle')"
-            :onEnter="textAction('axisTitle')"
-            :onBlur="textAction('axisTitle')"
-          />
-        </div>
         <div
           v-if="kind === 'categoryAxis'"
           class="chart-format-pane__field"
@@ -1476,6 +1505,72 @@ function escapeDraft(event: KeyboardEvent): void {
               :aria-label="t('chart.formatReset')"
               data-chart-format-reset="labelAngle"
               :onClick="captureAction(() => resetNumber('labelAngle'))"
+              ><RotateCcw :size="14" aria-hidden="true"
+            /></TButton>
+          </div>
+        </div>
+      </FormatSection>
+
+      <FormatSection v-if="isAxis" :title="t('chart.formatAxisTitle')" initially-open>
+        <TCheckbox
+          data-format-pane-history-control="discrete"
+          :checked="axis.titleVisible ?? !!axis.title"
+          :disabled="disabled"
+          data-chart-format-field="titleVisible"
+          :onChange="captureAction((value: unknown) => setAxisBoolean('titleVisible', value))"
+          >{{ t("chart.formatShowAxisTitle") }}</TCheckbox
+        >
+        <div class="chart-format-pane__field" data-chart-format-field="axisTitle">
+          <label :for="`${paneId}-axis-title`">{{ t("chart.formatAxisTitle") }}</label
+          ><TInput
+            :id="`${paneId}-axis-title`"
+            :value="drafts.axisTitle!.text"
+            size="small"
+            :maxlength="1000"
+            :disabled="disabled"
+            :aria-label="t('chart.formatAxisTitle')"
+            :status="drafts.axisTitle!.error ? 'error' : undefined"
+            :onChange="editAction('axisTitle')"
+            :onCompositionstart="compositionStartAction('axisTitle')"
+            :onCompositionend="compositionEndAction('axisTitle')"
+            :onEnter="textAction('axisTitle')"
+            :onBlur="textAction('axisTitle')"
+          />
+        </div>
+        <div class="chart-format-pane__field" data-chart-format-field="titleRotation">
+          <label :for="`${paneId}-title-rotation`">{{ t("chart.formatTitleRotation") }}</label>
+          <div class="chart-format-pane__number">
+            <NumericField
+              ref="titleRotationControl"
+              :id="`${paneId}-title-rotation`"
+              :owner-key="`${ownerKey}/titleRotation`"
+              :value="titleRotationNumericValue"
+              :spec="labelAngleSpec"
+              :label="t('chart.formatTitleRotation')"
+              :auto-text="t('chart.formatAuto')"
+              :disabled="disabled"
+              :invalid-message="t('chart.formatInvalidNumber')"
+              :rejected-message="t('chart.formatApplyFailed')"
+              :stale-message="t('chart.formatApplyFailed')"
+              :external-error="sharedNumericResetErrors.titleRotation"
+              :focus-boundary="() => sharedNumericFocusBoundary('titleRotation')"
+              :on-commit="titleRotationCommit"
+              presentation="inline-stepper"
+              :show-unit="false"
+              @draft-change="sharedNumericDraftChange('titleRotation', $event)"
+              @cancel="delete sharedNumericResetErrors.titleRotation"
+            /><TButton
+              variant="text"
+              shape="square"
+              size="small"
+              :disabled="
+                disabled ||
+                (titleRotationNumericValue.kind === 'auto' &&
+                  !sharedNumericDrafts.titleRotation?.dirty)
+              "
+              :aria-label="t('chart.formatReset')"
+              data-chart-format-reset="titleRotation"
+              :onClick="captureAction(() => resetNumber('titleRotation'))"
               ><RotateCcw :size="14" aria-hidden="true"
             /></TButton>
           </div>
@@ -1637,9 +1732,30 @@ function escapeDraft(event: KeyboardEvent): void {
       <FormatSection
         v-if="kind === 'title' || kind === 'legend' || isAxis"
         v-show="kind !== 'legend' || legendMode === 'text'"
-        :title="t(kind === 'legend' ? 'chart.legendTextOptions' : 'chart.formatText')"
+        :title="
+          t(
+            kind === 'legend'
+              ? 'chart.legendTextOptions'
+              : isAxis
+                ? axisTextMode === 'title'
+                  ? 'chart.formatAxisTitleText'
+                  : 'chart.formatAxisTickText'
+                : 'chart.formatText',
+          )
+        "
         initially-open
       >
+        <TRadioGroup
+          v-if="isAxis"
+          :value="axisTextMode"
+          variant="default-filled"
+          data-chart-format-navigation
+          :aria-label="t('chart.formatText')"
+          :onChange="captureAction(changeAxisTextMode)"
+        >
+          <TRadioButton value="ticks">{{ t("chart.formatAxisTickText") }}</TRadioButton>
+          <TRadioButton value="title">{{ t("chart.formatAxisTitleText") }}</TRadioButton>
+        </TRadioGroup>
         <div class="chart-format-pane__field">
           <span>{{ t("format.fontFamily") }}</span
           ><FontFormatField
@@ -1722,6 +1838,20 @@ function escapeDraft(event: KeyboardEvent): void {
           >
         </div>
         <p class="chart-format-pane__hint">{{ t("chart.formatFontHint") }}</p>
+        <TButton
+          v-if="isAxis && axisTextMode === 'title'"
+          variant="text"
+          size="small"
+          :disabled="disabled"
+          data-chart-format-reset="axisTitleText"
+          :onClick="
+            captureAction(() => {
+              const intent = textIntent({});
+              if (intent && submit(intent)) resetDrafts();
+            })
+          "
+          >{{ t("chart.formatResetAxisTitleText") }}</TButton
+        >
         <TButton
           v-if="kind === 'legend'"
           variant="text"

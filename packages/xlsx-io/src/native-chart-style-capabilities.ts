@@ -111,6 +111,8 @@ const axisKeys = [
   "labelAngle",
   "title",
   "titleVisible",
+  "titleText",
+  "titleRotation",
   "text",
   "line",
   "min",
@@ -122,6 +124,22 @@ const axisKeys = [
   "numberFormat",
   "linkedToSource",
 ];
+/** Explicit single-line content only; implicit application placeholders are not text. */
+export function isNativeAxisTitle(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length <= 1000 &&
+    !!value.trim() &&
+    [...value].every((character) => {
+      const scalar = character.codePointAt(0)!;
+      return (
+        (scalar >= 0x20 && scalar <= 0xd7ff) ||
+        (scalar >= 0xe000 && scalar <= 0xfffd) ||
+        (scalar >= 0x10000 && scalar <= 0x10ffff)
+      );
+    })
+  );
+}
 const presentationKeys = ["palette", "percentStacked", "lineMarkers", "background"];
 
 /** Shared fail-closed leaf admission, safe before any resource access or caller getters. */
@@ -249,9 +267,33 @@ export function unsupportedNativeChartStyles(chart: SheetChart): readonly string
         } else if (key === "categoryAxis" || key === "valueAxis") {
           try {
             const axis = record(value, axisKeys);
+            const visibleTitle = isNativeAxisTitle(axis.title) && axis.titleVisible !== false;
+            const latent = axis.titleText !== undefined || axis.titleRotation !== undefined;
             for (const [leaf, choice] of Object.entries(axis))
               if (leaf === "text") text(choice, `${path}.text`);
-              else if (key === "categoryAxis" && leaf === "labelAngle") {
+              else if (leaf === "title") {
+                if (!visibleTitle && !(choice === "" && axis.titleVisible !== true && !latent))
+                  issues.add(`${path}.title`);
+              } else if (leaf === "titleVisible") {
+                if (
+                  typeof choice !== "boolean" ||
+                  (choice && !visibleTitle) ||
+                  (!choice && ((axis.title !== undefined && axis.title !== "") || latent))
+                )
+                  issues.add(`${path}.titleVisible`);
+              } else if (leaf === "titleText") {
+                if (!visibleTitle) issues.add(`${path}.titleText`);
+                text(choice, `${path}.titleText`, true);
+              } else if (leaf === "titleRotation") {
+                if (
+                  !visibleTitle ||
+                  typeof choice !== "number" ||
+                  !Number.isFinite(choice) ||
+                  Math.abs(choice) > 90 ||
+                  Math.round(choice * 60000) / 60000 !== choice
+                )
+                  issues.add(`${path}.titleRotation`);
+              } else if (key === "categoryAxis" && leaf === "labelAngle") {
                 if (
                   typeof choice !== "number" ||
                   !Number.isFinite(choice) ||

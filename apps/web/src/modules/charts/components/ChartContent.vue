@@ -154,11 +154,13 @@ const scriptFontLimited = computed(() => {
   return (
     limited(f?.title, [paintChart.value.title]) ||
     limited(f?.legend?.text, names) ||
-    limited(f?.categoryAxis?.text, [...data.value.categories, f?.categoryAxis?.title ?? ""]) ||
-    limited(f?.valueAxis?.text, [f?.valueAxis?.title ?? "", ...numeric(f?.valueAxis)]) ||
-    limited(f?.secondaryValueAxis?.text, [
+    limited(f?.categoryAxis?.text, data.value.categories) ||
+    limited(f?.categoryAxis?.titleText ?? f?.categoryAxis?.text, [f?.categoryAxis?.title ?? ""]) ||
+    limited(f?.valueAxis?.text, numeric(f?.valueAxis)) ||
+    limited(f?.valueAxis?.titleText ?? f?.valueAxis?.text, [f?.valueAxis?.title ?? ""]) ||
+    limited(f?.secondaryValueAxis?.text, numeric(f?.secondaryValueAxis)) ||
+    limited(f?.secondaryValueAxis?.titleText ?? f?.secondaryValueAxis?.text, [
       f?.secondaryValueAxis?.title ?? "",
-      ...numeric(f?.secondaryValueAxis),
     ])
   );
 });

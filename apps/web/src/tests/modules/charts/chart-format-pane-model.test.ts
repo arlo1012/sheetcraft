@@ -2,6 +2,8 @@ import { describe, expect, test, vi } from "vitest";
 import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
 import {
   chartFormatTargetKey,
+  compactChartAxis,
+  initializeChartAxisTitle,
   chartFormatTargetLabelKeys,
   commitChartFormatNumberDraft,
   createChartFormatDraft,
@@ -337,4 +339,45 @@ test("single-family selection replaces script bindings atomically, default clear
     bold: true,
   });
   expect(current.scriptFonts.latin.kind).toBe("theme");
+});
+
+describe("axis title typography model", () => {
+  test("independent empty text survives compaction and nested script choices are detached", () => {
+    expect(compactChartAxis({ titleText: {}, text: {} })).toEqual({ titleText: {} });
+    const original = {
+      titleText: {
+        scriptFonts: {
+          latin: { kind: "theme" as const, role: "minor" as const, slot: "latin" as const },
+        },
+      },
+    };
+    const next = getChartFormatIntentSettings(undefined, { kind: "valueAxis", format: original });
+    expect(next?.valueAxis?.titleText).toEqual(original.titleText);
+    expect(next?.valueAxis?.titleText?.scriptFonts?.latin).not.toBe(
+      original.titleText.scriptFonts.latin,
+    );
+  });
+  test("new titles use physical direction while preserving dormant independent settings", () => {
+    expect(initializeChartAxisTitle({}, "column", "categoryAxis", "Categories")).toMatchObject({
+      titleRotation: 0,
+      titleText: { fontSize: 40 / 3, bold: true },
+    });
+    expect(initializeChartAxisTitle({}, "bar", "categoryAxis", "Categories").titleRotation).toBe(
+      -90,
+    );
+    expect(initializeChartAxisTitle({}, "bar", "valueAxis", "Values").titleRotation).toBe(0);
+    expect(
+      initializeChartAxisTitle(
+        { titleText: {}, titleRotation: 45 },
+        "column",
+        "valueAxis",
+        "Values",
+      ),
+    ).toMatchObject({ titleText: {}, titleRotation: 45 });
+  });
+  test("rotation draft bounds are independent from the tick angle", () => {
+    expect(parseChartFormatNumber("-90", "titleRotation")).toEqual({ valid: true, value: -90 });
+    expect(parseChartFormatNumber("90.1", "titleRotation")).toEqual({ valid: false });
+    expect(parseChartFormatNumber("", "titleRotation")).toEqual({ valid: true, value: undefined });
+  });
 });

@@ -329,3 +329,22 @@ describe("strict pure chart design intents", () => {
       expect(() => normalizeChartInsertIntent(invalid)).toThrow();
   });
 });
+
+test("type and style changes retain independent semantic-axis title styles and angles", () => {
+  const original = chart();
+  original.format = {
+    categoryAxis: { title: "Regions", titleText: {}, titleRotation: 0 },
+    valueAxis: {
+      title: "Revenue",
+      titleText: { fontSize: 40 / 3, bold: true },
+      titleRotation: -90,
+    },
+  };
+  const converted = changeChartType(original, "bar");
+  expect(converted.format).toEqual(original.format);
+  const styled = applyChartDesignIntent(converted, { kind: "style", style: "dark" });
+  expect(styled.format?.categoryAxis?.titleText).toEqual({});
+  expect(styled.format?.categoryAxis?.titleRotation).toBe(0);
+  expect(styled.format?.valueAxis?.titleText).toEqual(original.format.valueAxis?.titleText);
+  expect(styled.format?.valueAxis?.titleRotation).toBe(-90);
+});

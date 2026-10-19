@@ -1,3 +1,4 @@
+import { readNativeAxisTitle } from "./native-chart-axis-titles.js";
 import type {
   ChartFormatSettings,
   ChartValueAxisFormat,
@@ -148,7 +149,7 @@ export function nativeChartLegendSurface(surface?: ChartSurfaceFormat): string {
   return `<c:spPr>${paint(surface.fill)}${line}</c:spPr>`;
 }
 
-type TextLeaf = "fontSize" | "bold" | "color";
+type TextLeaf = "fontSize" | "bold" | "color" | "italic";
 const leaves: readonly TextLeaf[] = ["fontSize", "bold", "color"];
 const fontSlots = ["latin", "eastAsia", "complexScript"] as const;
 type FontChoice = NonNullable<ChartTextFormat["scriptFonts"]>["latin"];
@@ -225,6 +226,10 @@ function properties(
       ? value === "1" || value === "true"
       : null;
   }
+  if (node["@_i"] !== undefined) {
+    const value = attr(node, "i");
+    out.italic = ["0", "1", "false", "true"].includes(value) ? ["1", "true"].includes(value) : null;
+  }
   if (
     ["solidFill", "noFill", "gradFill", "pattFill", "grpFill"].some(
       (key) => node[key] !== undefined,
@@ -293,6 +298,7 @@ function uniformText(
   warn: (path: string) => void,
   themeColor?: string,
   themeFonts?: NativeChartFontTheme,
+  includeItalic = false,
 ): ChartTextFormat | undefined {
   const choices: TextChoices[] = [];
   if (body) {
@@ -313,7 +319,7 @@ function uniformText(
   }
   if (!choices.length) choices.push(base);
   const out: ChartTextFormat = {};
-  for (const leaf of leaves) {
+  for (const leaf of includeItalic ? [...leaves, "italic" as const] : leaves) {
     const values = choices.map((choice) => choice[leaf]);
     if (values.some((value) => value === null) || values.some((value) => value !== values[0])) {
       warn(`${path}.${leaf}`);
@@ -323,6 +329,7 @@ function uniformText(
     if (value === undefined) continue;
     if (leaf === "fontSize" && typeof value === "number") out.fontSize = value;
     if (leaf === "bold" && typeof value === "boolean") out.bold = value;
+    if (leaf === "italic" && typeof value === "boolean") out.italic = value;
     if (leaf === "color" && typeof value === "string") {
       out.color = value;
       // Core stores explicit RGB, not a live theme reference. Disclose that loss.
@@ -352,7 +359,8 @@ function uniformText(
   )
     out.fontFamily = (fonts[0] as { kind: "family"; family: string }).family;
   else if (Object.keys(scriptFonts).length) out.scriptFonts = scriptFonts;
-  if (invalidFont || !Object.keys(scriptFonts).length) warn(`${path}.fontFamily`);
+  if (invalidFont || (!includeItalic && !Object.keys(scriptFonts).length))
+    warn(`${path}.fontFamily`);
   return Object.keys(out).length ? out : undefined;
 }
 
@@ -595,6 +603,23 @@ export function readNativeChartStyles(
       themeFonts,
     );
     if (text) format[field] = { text };
+    const title = readNativeAxisTitle(
+      axis,
+      `format.${field}`,
+      (path) => report.add("feature-omitted", "warning", `${chartPart}.${path}`),
+      warn,
+      (rich, txPr) =>
+        uniformText(
+          rich,
+          { ...rootDefaults, ...bodyDefaults(txPr, themeColor, themeFonts) },
+          `format.${field}.titleText`,
+          warn,
+          themeColor,
+          themeFonts,
+          true,
+        ),
+    );
+    if (Object.keys(title).length) format[field] = { ...format[field], ...title };
     if (field === "valueAxis") {
       const number = readValueAxisNumberFormat(axis, warn);
       if (Object.keys(number).length) format.valueAxis = { ...format.valueAxis, ...number };

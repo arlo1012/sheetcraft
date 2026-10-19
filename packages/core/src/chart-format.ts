@@ -35,6 +35,10 @@ export type ChartCategoryAxisFormat = {
   title?: string;
   /** False hides the title without discarding its text; omission retains visibility. */
   titleVisible?: boolean;
+  /** Presence, including {}, gives the title independent typography; omission shares text. */
+  titleText?: ChartTextFormat;
+  /** Clockwise screen-plane degrees; omission retains automatic title direction. */
+  titleRotation?: number;
   text?: ChartTextFormat;
   line?: ChartAxisLineFormat;
 };
@@ -50,6 +54,10 @@ export type ChartValueAxisFormat = {
   title?: string;
   /** False hides the title without discarding its text; omission retains visibility. */
   titleVisible?: boolean;
+  /** Presence, including {}, gives the title independent typography; omission shares text. */
+  titleText?: ChartTextFormat;
+  /** Clockwise screen-plane degrees; omission retains automatic title direction. */
+  titleRotation?: number;
   text?: ChartTextFormat;
   line?: ChartAxisLineFormat;
   numberFormat?: CellNumberFormat;
@@ -243,6 +251,8 @@ function categoryAxis(value: unknown): ChartCategoryAxisFormat {
     "labelAngle",
     "title",
     "titleVisible",
+    "titleText",
+    "titleRotation",
     "text",
     "line",
   ]);
@@ -253,6 +263,9 @@ function categoryAxis(value: unknown): ChartCategoryAxisFormat {
     result.labelAngle = number(source.labelAngle, -90, 90, "label angle");
   if (Object.hasOwn(source, "title")) result.title = title(source.title);
   if (Object.hasOwn(source, "titleVisible")) result.titleVisible = boolean(source.titleVisible);
+  if (Object.hasOwn(source, "titleText")) result.titleText = text(source.titleText);
+  if (Object.hasOwn(source, "titleRotation"))
+    result.titleRotation = number(source.titleRotation, -90, 90, "title rotation");
   if (Object.hasOwn(source, "text")) result.text = text(source.text);
   if (Object.hasOwn(source, "line")) result.line = axisLine(source.line);
   return result;
@@ -313,6 +326,8 @@ function valueAxis(value: unknown): ChartValueAxisFormat {
     "reverse",
     "title",
     "titleVisible",
+    "titleText",
+    "titleRotation",
     "text",
     "line",
     "numberFormat",
@@ -362,6 +377,9 @@ function valueAxis(value: unknown): ChartValueAxisFormat {
   if (Object.hasOwn(source, "reverse")) result.reverse = boolean(source.reverse);
   if (Object.hasOwn(source, "title")) result.title = title(source.title);
   if (Object.hasOwn(source, "titleVisible")) result.titleVisible = boolean(source.titleVisible);
+  if (Object.hasOwn(source, "titleText")) result.titleText = text(source.titleText);
+  if (Object.hasOwn(source, "titleRotation"))
+    result.titleRotation = number(source.titleRotation, -90, 90, "title rotation");
   if (Object.hasOwn(source, "text")) result.text = text(source.text);
   if (Object.hasOwn(source, "line")) result.line = axisLine(source.line);
   if (Object.hasOwn(source, "numberFormat"))

@@ -1,3 +1,4 @@
+import { initializeChartAxisTitle } from "./chart-format-pane";
 import { normalizeSheetChart, type SheetChart } from "@sheetcraft/core/sheet-charts";
 
 export type ChartQuickLayoutId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
@@ -186,17 +187,24 @@ export function applyChartQuickLayout(
     ...next.format,
     categoryAxis: {
       ...next.format?.categoryAxis,
-      show: true,
-      titleVisible: choice.categoryTitle,
       ...(choice.categoryTitle && !next.format?.categoryAxis?.title?.trim()
-        ? { title: axisTitle }
+        ? initializeChartAxisTitle(
+            next.format?.categoryAxis ?? {},
+            next.type,
+            "categoryAxis",
+            axisTitle,
+          )
         : {}),
+      titleVisible: choice.categoryTitle,
+      show: true,
     },
     valueAxis: {
       ...next.format?.valueAxis,
-      show: choice.valueAxis,
+      ...(choice.valueTitle && !next.format?.valueAxis?.title?.trim()
+        ? initializeChartAxisTitle(next.format?.valueAxis ?? {}, next.type, "valueAxis", axisTitle)
+        : {}),
       titleVisible: choice.valueTitle,
-      ...(choice.valueTitle && !next.format?.valueAxis?.title?.trim() ? { title: axisTitle } : {}),
+      show: choice.valueAxis,
       majorGridlines: choice.grid !== "none",
       minorGridlines: choice.grid === "majorMinor",
     },

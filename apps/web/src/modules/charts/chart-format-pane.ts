@@ -58,6 +58,7 @@ export type ChartFormatNumericField =
   | "majorUnit"
   | "minorUnit"
   | "labelAngle"
+  | "titleRotation"
   | "fontSize"
   | "strokeWidth"
   | "gapWidth"
@@ -276,11 +277,52 @@ export function getChartFormatIntentSettings(
 function cloneAxis<T extends ChartCategoryAxisFormat | ChartValueAxisFormat>(axis: T): T {
   return {
     ...axis,
-    ...(axis.text ? { text: { ...axis.text } } : {}),
+    ...(axis.text ? { text: cloneChartTextFormat(axis.text) } : {}),
+    ...(axis.titleText ? { titleText: cloneChartTextFormat(axis.titleText) } : {}),
     ...(axis.line ? { line: { ...axis.line } } : {}),
     ...("numberFormat" in axis && axis.numberFormat
       ? { numberFormat: { ...axis.numberFormat } }
       : {}),
+  };
+}
+
+/** Preserve script choices when a shared legacy title becomes independently editable. */
+export function cloneChartTextFormat(text: ChartTextFormat): ChartTextFormat {
+  return {
+    ...text,
+    ...(text.scriptFonts
+      ? {
+          scriptFonts: Object.fromEntries(
+            Object.entries(text.scriptFonts).map(([key, value]) => [key, { ...value }]),
+          ),
+        }
+      : {}),
+  };
+}
+
+/** Initialize only new title content; dormant independent choices survive re-enabling. */
+export function initializeChartAxisTitle<T extends ChartCategoryAxisFormat | ChartValueAxisFormat>(
+  axis: T,
+  type: SheetChart["type"],
+  kind: "categoryAxis" | "valueAxis" | "secondaryValueAxis",
+  title: string,
+): T & { title: string; titleText: ChartTextFormat; titleRotation: number } {
+  return {
+    ...axis,
+    title,
+    titleText: cloneChartTextFormat(
+      axis.titleText ?? {
+        fontSize: 40 / 3,
+        bold: true,
+        italic: false,
+        scriptFonts: {
+          latin: { kind: "theme", role: "minor", slot: "latin" },
+          eastAsia: { kind: "theme", role: "minor", slot: "eastAsia" },
+          complexScript: { kind: "theme", role: "minor", slot: "complexScript" },
+        },
+      },
+    ),
+    titleRotation: axis.titleRotation ?? ((kind === "categoryAxis") === (type !== "bar") ? 0 : -90),
   };
 }
 
@@ -311,7 +353,7 @@ export function parseChartFormatNumber(
   if (
     (field === "fontSize" && (value < 1 || value > 256)) ||
     (field === "strokeWidth" && (value < 0 || value > 32)) ||
-    (field === "labelAngle" && (value < -90 || value > 90)) ||
+    ((field === "labelAngle" || field === "titleRotation") && (value < -90 || value > 90)) ||
     (field === "gapWidth" && (value < 0 || value > 500)) ||
     (field === "overlap" && (value < -100 || value > 100)) ||
     ((field === "majorUnit" || field === "minorUnit") && value <= 0)

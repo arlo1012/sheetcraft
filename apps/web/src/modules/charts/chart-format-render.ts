@@ -101,7 +101,10 @@ function valueAxis(
           nameGap: 42,
         }
       : {}),
-    nameTextStyle: { ...base.nameTextStyle, ...textStyle(settings?.text) },
+    nameTextStyle: { ...base.nameTextStyle, ...textStyle(settings?.titleText ?? settings?.text) },
+    ...(settings?.titleRotation !== undefined
+      ? { nameRotate: settings.titleRotation === 0 ? 0 : -settings.titleRotation }
+      : {}),
     axisLabel: {
       ...base.axisLabel,
       ...textStyle(settings?.text),
@@ -389,7 +392,13 @@ export function applyChartCommonFormat(
             nameGap: 32,
           }
         : {}),
-      nameTextStyle: { ...category.nameTextStyle, ...textStyle(settings.text) },
+      nameTextStyle: {
+        ...category.nameTextStyle,
+        ...textStyle(settings.titleText ?? settings.text),
+      },
+      ...(settings.titleRotation !== undefined
+        ? { nameRotate: settings.titleRotation === 0 ? 0 : -settings.titleRotation }
+        : {}),
       axisLabel: {
         ...category.axisLabel,
         ...textStyle(settings.text),
@@ -549,32 +558,46 @@ export function applyChartScriptFontFormat(
     // Native rich truncation can split graphemes. Width is handled before encoding.
     overflow: "none" as const,
   });
-  const axis = <T extends AxisOption>(entry: T, settings?: ChartTextFormat): T => {
-    if (!settings?.scriptFonts) return entry;
+  const axis = <T extends AxisOption>(
+    entry: T,
+    settings?: { text?: ChartTextFormat; titleText?: ChartTextFormat },
+  ): T => {
+    const ticks = settings?.text;
+    const title = settings?.titleText ?? ticks;
     const formatter = entry.axisLabel?.formatter;
     return {
       ...entry,
-      ...(entry.name ? { name: paint(entry.name, settings, entry.nameTextStyle) } : {}),
-      nameTextStyle: { ...entry.nameTextStyle, ...rich(settings, entry.nameTextStyle) },
-      axisLabel: {
-        ...entry.axisLabel,
-        ...rich(settings, entry.axisLabel),
-        formatter: (value: string | number, index: number, extra?: unknown) => {
-          const text =
-            typeof formatter === "function"
-              ? (formatter as (value: string | number, index: number, extra?: unknown) => string)(
-                  value,
-                  index,
-                  extra,
-                )
-              : typeof formatter === "string"
-                ? formatter.replaceAll("{value}", String(value))
-                : entry.type === "value" && typeof value === "number"
-                  ? echartsFormat.addCommas(value)
-                  : String(value);
-          return paint(text, settings, entry.axisLabel);
-        },
-      },
+      ...(title?.scriptFonts
+        ? {
+            ...(entry.name ? { name: paint(entry.name, title, entry.nameTextStyle) } : {}),
+            nameTextStyle: { ...entry.nameTextStyle, ...rich(title, entry.nameTextStyle) },
+          }
+        : {}),
+      ...(ticks?.scriptFonts
+        ? {
+            axisLabel: {
+              ...entry.axisLabel,
+              ...rich(ticks, entry.axisLabel),
+              formatter: (value: string | number, index: number, extra?: unknown) => {
+                const text =
+                  typeof formatter === "function"
+                    ? (
+                        formatter as (
+                          value: string | number,
+                          index: number,
+                          extra?: unknown,
+                        ) => string
+                      )(value, index, extra)
+                    : typeof formatter === "string"
+                      ? formatter.replaceAll("{value}", String(value))
+                      : entry.type === "value" && typeof value === "number"
+                        ? echartsFormat.addCommas(value)
+                        : String(value);
+                return paint(text, ticks, entry.axisLabel);
+              },
+            },
+          }
+        : {}),
     };
   };
   const axes = (entries: EChartsOption["xAxis"] | EChartsOption["yAxis"], horizontal: boolean) => {
@@ -583,10 +606,10 @@ export function applyChartScriptFontFormat(
       axis(
         entry,
         entry.type === "category"
-          ? f.categoryAxis?.text
+          ? f.categoryAxis
           : index > 0 && horizontal === (chart.type === "bar")
-            ? f.secondaryValueAxis?.text
-            : f.valueAxis?.text,
+            ? f.secondaryValueAxis
+            : f.valueAxis,
       );
     return Array.isArray(entries) ? entries.map(apply) : apply(entries, 0);
   };

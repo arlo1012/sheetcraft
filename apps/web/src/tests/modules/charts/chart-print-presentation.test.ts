@@ -872,3 +872,43 @@ test("script fonts use independent leased faces in native title, legend, axes an
     result.dispose();
   }
 });
+
+test("independent axis titles print with their own leased fonts and weight", () => {
+  const result = renderChartPrintPresentation(
+    drawing({
+      format: {
+        categoryAxis: {
+          title: "Quarter季度",
+          titleRotation: 0,
+          text: { fontFamily: "Original tick face", bold: false },
+          titleText: {
+            fontSize: 14,
+            bold: true,
+            scriptFonts: {
+              latin: { kind: "family", family: "Original title face" },
+              eastAsia: { kind: "family", family: "Original title CJK" },
+            },
+          },
+        },
+      },
+    }),
+    data,
+    { ...options, resolveFontFamily: (family) => family.replace("Original", "Leased") },
+  );
+  try {
+    const texts = contexts
+      .get(result.canvas)!
+      .copies[0]!.paints.filter((p) => p.operation === "text");
+    expect(
+      texts.some((p) => p.text === "Quarter" && p.font.includes("bold 14px Leased title face")),
+    ).toBe(true);
+    expect(
+      texts.some((p) => p.text === "季度" && p.font.includes("bold 14px Leased title CJK")),
+    ).toBe(true);
+    expect(texts.find((p) => p.text === "Alpha")?.font).toContain("Leased tick face");
+    expect(texts.find((p) => p.text === "Alpha")?.font).not.toContain("bold");
+    expect(texts.some((p) => p.font.includes("Original"))).toBe(false);
+  } finally {
+    result.dispose();
+  }
+});

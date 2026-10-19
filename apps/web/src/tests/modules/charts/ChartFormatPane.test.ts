@@ -603,11 +603,13 @@ describe("chart format right pane", () => {
   test("shared sections start open and retain mounted drafts while collapsed", async () => {
     const { wrapper } = fixture();
     const sections = wrapper.findAllComponents(FormatSection);
-    expect(sections).toHaveLength(5);
+    expect(sections).toHaveLength(6);
     expect(sections.every((section) => section.props("initiallyOpen"))).toBe(true);
     const field = input(wrapper, "min");
     await field.setValue("-");
-    const section = sections[1]!;
+    const section = sections.find((entry) =>
+      entry.find('[data-chart-format-field="min"]').exists(),
+    )!;
     await section.get("button").trigger("click");
     expect(section.get("button").attributes("aria-expanded")).toBe("false");
     expect(input(wrapper, "min").element).toBe(field.element);
@@ -749,7 +751,7 @@ describe("shared chart style numbers", () => {
       "aria-valuemax": "32",
       "aria-valuetext": "1.5 px",
     });
-    expect(wrapper.findAllComponents(NumericField)).toHaveLength(6);
+    expect(wrapper.findAllComponents(NumericField)).toHaveLength(7);
     await wrapper.get('button[aria-label="Font size (px) +"]').trigger("click");
     expect(apply).toHaveBeenLastCalledWith({
       kind: "valueAxis",
@@ -1404,5 +1406,110 @@ test("script/theme selection is honest and single-family/default edits remove al
   expect(apply).toHaveBeenLastCalledWith({
     kind: "title",
     format: { scriptFonts, bold: true, fontSize: 18 },
+  });
+});
+
+describe("independent axis title controls", () => {
+  function titleMode(wrapper: VueWrapper, mode: "ticks" | "title") {
+    wrapper
+      .findAllComponents(RadioGroup)
+      .find((group) => group.props("value") === "ticks" || group.props("value") === "title")!
+      .vm.$emit("change", mode);
+    return flushPromises();
+  }
+  test("first title edit clones legacy text while keeping ticks and rejecting old numeric leases", async () => {
+    const legacy = { fontSize: 16, color: "#123456", italic: true };
+    const { wrapper, apply } = fixture(
+      { kind: "valueAxis" },
+      {
+        drawing: drawing({ format: { valueAxis: { title: "Revenue", text: legacy } } }),
+      },
+    );
+    await input(wrapper, "fontSize").setValue("28");
+    const oldCommit = wrapper
+      .get('[data-chart-format-field="fontSize"]')
+      .getComponent(NumericField)
+      .props("onCommit");
+    await titleMode(wrapper, "title");
+    expect(input(wrapper, "fontSize").element.value).toBe("16");
+    expect(
+      oldCommit(
+        { kind: "value", value: 28 },
+        { ownerKey: "chart-one/valueAxis/fontSize", sessionId: "stale-ticks", source: "enter" },
+      ).accepted,
+    ).toBe(false);
+    expect(apply).not.toHaveBeenCalled();
+    checkbox(wrapper, "Bold").vm.$emit("change", true);
+    await flushPromises();
+    expect(apply).toHaveBeenLastCalledWith({
+      kind: "valueAxis",
+      format: {
+        title: "Revenue",
+        text: legacy,
+        titleText: { ...legacy, bold: true },
+      },
+    });
+    await titleMode(wrapper, "ticks");
+    expect(
+      oldCommit(
+        { kind: "value", value: 28 },
+        { ownerKey: "chart-one/valueAxis/fontSize", sessionId: "stale-ticks", source: "enter" },
+      ).accepted,
+    ).toBe(false);
+  });
+  test("independent empty style resets without returning to shared tick formatting", async () => {
+    const axis = { title: "Revenue", text: { fontSize: 22, bold: true }, titleText: {} };
+    const { wrapper, apply } = fixture(
+      { kind: "valueAxis" },
+      {
+        drawing: drawing({ format: { valueAxis: axis } }),
+      },
+    );
+    await titleMode(wrapper, "title");
+    expect(input(wrapper, "fontSize").element.value).toBe("");
+    expect(checkbox(wrapper, "Bold").props("checked")).toBe(false);
+    await wrapper.get('[data-chart-format-reset="axisTitleText"]').trigger("click");
+    expect(apply).toHaveBeenLastCalledWith({ kind: "valueAxis", format: axis });
+    await wrapper.get('[data-chart-format-reset="element"]').trigger("click");
+    expect(apply).toHaveBeenLastCalledWith({ kind: "valueAxis", format: undefined });
+  });
+  test("new titles initialize independently and rotation changes never alter tick angle", async () => {
+    const { wrapper, apply } = fixture(
+      { kind: "categoryAxis" },
+      {
+        drawing: drawing({ type: "bar", format: { categoryAxis: { labelAngle: 25 } } }),
+      },
+    );
+    const title = input(wrapper, "axisTitle");
+    await title.setValue("区域 & revenue");
+    await title.trigger("keydown", { key: "Enter" });
+    const intent = apply.mock.lastCall![0];
+    expect(intent).toMatchObject({
+      kind: "categoryAxis",
+      format: {
+        title: "区域 & revenue",
+        titleVisible: true,
+        labelAngle: 25,
+        titleText: { fontSize: 40 / 3, bold: true, italic: false },
+        titleRotation: -90,
+      },
+    });
+    if (intent.kind !== "categoryAxis") throw new Error("Expected category axis");
+    await wrapper.setProps({
+      drawing: drawing({ type: "bar", format: { categoryAxis: intent.format } }),
+    });
+    await input(wrapper, "titleRotation").setValue("0");
+    await input(wrapper, "titleRotation").trigger("keydown", { key: "Enter" });
+    expect(apply.mock.lastCall![0]).toMatchObject({ format: { labelAngle: 25, titleRotation: 0 } });
+    checkbox(wrapper, "Show axis title").vm.$emit("change", false);
+    await flushPromises();
+    expect(apply.mock.lastCall![0]).toMatchObject({
+      format: {
+        title: "区域 & revenue",
+        titleVisible: false,
+        titleText: { bold: true },
+        titleRotation: -90,
+      },
+    });
   });
 });
