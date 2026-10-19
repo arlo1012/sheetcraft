@@ -291,7 +291,7 @@ describe("native chart print presentation", () => {
       expect(
         native.legend[0]!.data.map((entry) => native.legend[0]!.formatter(entry.name)),
       ).toEqual(["Last", "Same", "Same"]);
-      expect(native.series.map((entry) => entry.id)).toEqual(["first", "second", "third"]);
+      expect(native.series.map((entry) => entry.id)).toEqual(["third", "second", "first"]);
       for (const color of ["#2563eb", "#16a34a", "#f59e0b"])
         expect(paints.some((paint) => paint.operation === "fill" && paint.fill === color)).toBe(
           true,

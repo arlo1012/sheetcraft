@@ -1,3 +1,4 @@
+import { applyChartSeriesRenderOrder } from "./chart-series-render-order";
 import { reserveChartAxisTitles } from "./chart-axis-title-layout";
 import type { ChartFontContext } from "./chart-script-fonts";
 import { createChartElementLayout, getChartLegendLayout } from "./chart-element-layout";
@@ -499,14 +500,17 @@ export function createChartOption(
       ...legendLayout.option,
       textStyle: { ...formatted.legend.textStyle, ...legendLayout.option.textStyle },
     };
-  return applySeriesLegendIdentity(
-    applyChartScriptFontFormat(
-      reserveChartAxisTitles(formatted, chart, dimensions),
+  return applyChartSeriesRenderOrder(
+    applySeriesLegendIdentity(
+      applyChartScriptFontFormat(
+        reserveChartAxisTitles(formatted, chart, dimensions),
+        chart,
+        dimensions?.theme,
+        dimensions?.resolveFontFamily,
+      ),
       chart,
-      dimensions?.theme,
-      dimensions?.resolveFontFamily,
+      renderedData,
     ),
     chart,
-    renderedData,
   );
 }

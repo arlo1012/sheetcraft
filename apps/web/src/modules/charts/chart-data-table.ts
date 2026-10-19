@@ -1,3 +1,4 @@
+import { chartSeriesSlotIndex } from "./chart-series-render-order";
 import { chartAxisTitleExtent, chartAxisTitleWidthBudget } from "./chart-axis-title-layout";
 import {
   createChartTextPlan,
@@ -290,7 +291,7 @@ export function createChartDataTablePlan(
             ? "markerLine"
             : "line";
       return {
-        seriesIndex,
+        seriesIndex: chartSeriesSlotIndex(chart, data.series.length, seriesIndex),
         ...(series.id !== undefined ? { id: series.id } : {}),
         key,
         strokeWidth: settings?.strokeWidth ?? 2,

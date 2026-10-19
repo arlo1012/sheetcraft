@@ -103,14 +103,14 @@ describe("Cartesian legend render identities", () => {
       expect(labels(option)).toEqual(["Pears", "Apples"]);
       expect(
         series(option).map((s) => ({ id: s.id, data: s.type === "bar" ? s.data : [] })),
-      ).toEqual(data.series.map((s) => ({ id: s.id, data: s.values })));
-      expect(paints(option)).toEqual(["#2563eb", "#16a34a"]);
+      ).toEqual([...data.series].reverse().map((s) => ({ id: s.id, data: s.values })));
+      expect(paints(option)).toEqual(["#16a34a", "#2563eb"]);
       render(option, (instance, model) => {
         const names = model
           .getComponent("legend")
           .getData()
           .map((s) => s.get("name"));
-        expect(names).toEqual(series(option).map(key).reverse());
+        expect(names).toEqual(series(option).map(key));
         const svg = instance.renderToSVGString();
         expect(svg).toContain("Pears");
         expect(svg).toContain("Apples");
@@ -157,7 +157,7 @@ describe("Cartesian legend render identities", () => {
     expect(labels(option)).toEqual([...names].reverse().map((s) => s.replace(/[\r\n]+/g, " ")));
     render(option, (instance, model) => {
       expect(model.getComponent("legend").getData()).toHaveLength(2);
-      const [first, second] = model.getSeries();
+      const [second, first] = model.getSeries();
       expect(first!.id).toBe("apple");
       expect(second!.id).toBe("pear");
       instance.dispatchAction({ type: "legendToggleSelect", name: second!.name });
@@ -171,7 +171,7 @@ describe("Cartesian legend render identities", () => {
       expect(second!.getData().getItemGraphicEl(0).currentStates).toContain("emphasis");
       expect(
         getChartFormatClickTarget(
-          { componentType: "series", seriesId: second!.id, seriesIndex: 1 },
+          { componentType: "series", seriesId: second!.id, seriesIndex: 0 },
           activeChart,
           source,
         ),
@@ -189,13 +189,13 @@ describe("Cartesian legend render identities", () => {
       { ...chart, seriesFilter: { hiddenSeriesIds: ["apple"] } },
       { ...data, series: [data.series[1]!] },
     );
-    expect(series(filtered).map(key)).toEqual([key(series(first)[1]!)]);
+    expect(series(filtered).map(key)).toEqual([key(series(first)[0]!)]);
     expect(labels(filtered)).toEqual(["Pears"]);
     expect(paints(filtered)).toEqual(["#16a34a"]);
     const ranges = { ...data, series: data.series.map(({ id: _id, ...s }) => s) };
     expect(
       series(createChartOption(chart, { ...ranges, series: [ranges.series[1]!] })).map(key),
-    ).toEqual([key(series(createChartOption(chart, ranges))[1]!)]);
+    ).toEqual([key(series(createChartOption(chart, ranges))[0]!)]);
   });
   test("combo equal labels retain independent plain-line icon and color", () => {
     const source = { ...comboData, series: comboData.series.map((s) => ({ ...s, name: "same" })) };

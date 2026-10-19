@@ -1,3 +1,4 @@
+import { chartSeriesSlotIndex } from "./chart-series-render-order";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
 import {
@@ -40,7 +41,7 @@ export function getChartFormatClickTarget(
       typeof visibleIndex === "number" &&
       Number.isInteger(visibleIndex)
     ) {
-      const index = visibleIndex;
+      const index = chartSeriesSlotIndex(chart, data.series.length, visibleIndex);
       const band = index >= 0 ? data.series[index]?.rangeBand : undefined;
       if (band)
         target = targets.find(

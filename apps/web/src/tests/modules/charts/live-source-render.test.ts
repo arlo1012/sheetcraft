@@ -144,14 +144,15 @@ describe("live ordered series SVG rendering", () => {
         { name: "extra", color: "#f59e0b" },
       ];
       render(next, f.read(next), (instance) => {
-        expect(renderedColors(instance, type === "radar")).toEqual(expected);
+        expect(renderedColors(instance, type === "radar")).toEqual(
+          type === "bar" ? [...expected].reverse() : expected,
+        );
       });
       render(reordered, f.read(reordered), (instance) => {
-        expect(renderedColors(instance, type === "radar")).toEqual([
-          expected[0],
-          expected[2],
-          expected[1],
-        ]);
+        const ordered = [expected[0], expected[2], expected[1]];
+        expect(renderedColors(instance, type === "radar")).toEqual(
+          type === "bar" ? ordered.reverse() : ordered,
+        );
         const svg = instance.renderToSVGString();
         const order = type === "bar" ? ["pear", "extra", "apple"] : ["apple", "extra", "pear"];
         expect(svg.indexOf(`>${order[0]}<`)).toBeLessThan(svg.indexOf(`>${order[1]}<`));
