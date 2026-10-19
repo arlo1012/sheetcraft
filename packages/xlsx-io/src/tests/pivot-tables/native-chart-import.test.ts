@@ -60,20 +60,30 @@ async function wpsSavedVariant(extension = wpsSavedChartProperties) {
 }
 
 describe("bounded native linked clustered-column PivotChart import", () => {
-  test("imports the observed WPS save-only properties leaf and absolute one-cell frame", async () => {
+  test("imports the observed WPS properties leaf without replacing its one-cell anchor", async () => {
     const { entries, fixture } = await wpsSavedVariant();
+    if (fixture.chart.kind !== "chart") throw new Error("Missing fixture chart.");
     const result = await decodeXlsx(zipSync(entries));
     const { drawing, data } = importedChart(result.workbook, fixture.output.name);
     expect(drawing.chart.pivotTableId).toBe(fixture.pivot.id);
     expect(data.categories).toEqual(["east", "north", "south"]);
     expect(data.series[0]!.values).toEqual([60, 100, 120]);
+    // WPS's nonzero xfrm offset is a cached physical origin. A one-cell chart
+    // still moves with the unchanged from marker, unlike fixed/two-cell objects.
+    expect(drawing).toMatchObject({
+      anchor: fixture.chart.anchor,
+      offsetX: fixture.chart.offsetX,
+      offsetY: fixture.chart.offsetY,
+      width: fixture.chart.width,
+      height: fixture.chart.height,
+    });
     expect(
       result.report.issues.some(
         (issue) =>
           issue.code === "dimension-approximated" &&
           issue.locations.includes("xl/drawings/drawing1.xml"),
       ),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       importedChart(
         (await decodeXlsx((await encodeXlsx(result.workbook)).bytes)).workbook,

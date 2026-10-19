@@ -69,7 +69,7 @@ export function nativeDrawingAnchor(
   };
 }
 
-/** Project supported producer anchors; physical WPS frame placement is approximate. */
+/** Preserve one-cell markers; existing two-cell physical-frame projection is approximate. */
 export function readNativeChartGeometry(
   sheet: Sheet,
   kind: "oneCellAnchor" | "twoCellAnchor",
@@ -100,14 +100,23 @@ export function readNativeChartGeometry(
   if (width < 1 || height < 1) throw new Error("Invalid chart geometry.");
   let start = from;
   const off = child(transform, "off");
-  const absoluteFrame =
-    kind === "twoCellAnchor" ||
-    (wpsChartProperties && (attr(off, "x") !== "0" || attr(off, "y") !== "0"));
+  const absoluteFrame = kind === "twoCellAnchor";
+  const wpsOneCellFrame =
+    kind === "oneCellAnchor" &&
+    wpsChartProperties &&
+    (attr(off, "x") !== "0" || attr(off, "y") !== "0");
+  if (wpsOneCellFrame) {
+    // WPS saveback caches a physical origin here but retains the authoritative
+    // one-cell marker. Validate the cache without remapping it through our
+    // different font-derived column metrics and changing the anchored cell.
+    integer(attr(off, "x"), 1000000 * EMU_PER_PIXEL);
+    integer(attr(off, "y"), 1000000 * EMU_PER_PIXEL);
+  }
   if (kind === "twoCellAnchor") {
     const to = marker(child(anchor, "to"));
     if (to.row < from.row || to.column < from.column) throw new Error("Reversed chart anchor.");
   } else if (
-    (!absoluteFrame && (attr(off, "x") !== "0" || attr(off, "y") !== "0")) ||
+    (!wpsOneCellFrame && (attr(off, "x") !== "0" || attr(off, "y") !== "0")) ||
     attr(frameExtent, "cx") !== attr(extent, "cx") ||
     attr(frameExtent, "cy") !== attr(extent, "cy")
   ) {
@@ -117,8 +126,6 @@ export function readNativeChartGeometry(
     // WPS's markers and its physical frame disagree under Core's width
     // and default-row baseline. Preserve frame physical dimensions/origin and
     // disclose approximation rather than asserting exact marker round-trip.
-    // A saved one-cell absolute frame is admitted only with the strictly
-    // validated WPS chart-properties leaf observed in the real saved variant.
     start = {
       row: 0,
       column: 0,
