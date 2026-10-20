@@ -106,6 +106,9 @@ describe("desktop chart type dialog", () => {
   test("shows only thirteen real types and keeps selection separate from advanced editing", async () => {
     const { wrapper } = fixture();
     await flushPromises();
+    const dialog = button("[data-chart-confirm]").closest('[role="dialog"]');
+    expect(dialog?.getAttribute("aria-modal")).toBe("true");
+    expect(dialog?.getAttribute("aria-label")).toBe("Insert Chart");
     expect(document.querySelectorAll("[data-chart-type]")).toHaveLength(13);
     expect(wrapper.findComponent(ChartSubtypeControls).props("presentation")).toBe("dialog");
     expect(wrapper.findComponent(OptionList).exists()).toBe(true);
@@ -178,6 +181,9 @@ describe("desktop chart type dialog", () => {
   test("existing mode announces change type and keeps saved title and interpretation", async () => {
     const { wrapper, drawing } = fixture("change-type");
     await flushPromises();
+    const dialog = button("[data-chart-confirm]").closest('[role="dialog"]');
+    expect(dialog?.getAttribute("aria-modal")).toBe("true");
+    expect(dialog?.getAttribute("aria-label")).toBe("Change chart type");
     expect(document.querySelector(".t-dialog__header")?.textContent).toContain("Change chart type");
     await click('[data-chart-type="bar"]');
     await click("[data-chart-confirm]");

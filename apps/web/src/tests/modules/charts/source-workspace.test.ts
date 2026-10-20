@@ -12,7 +12,7 @@ import {
   createSetSheetDrawingsCommand,
   createSetSheetProtectionCommand,
 } from "@sheetcraft/core/commands";
-import { getSheetChartData, type SheetChart } from "@sheetcraft/core/sheet-charts";
+import { getSheetChartData, type ChartType, type SheetChart } from "@sheetcraft/core/sheet-charts";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import { serializeWorkbook } from "@sheetcraft/core/serialization";
 import {
@@ -200,7 +200,7 @@ async function openSource(wrapper: VueWrapper) {
 }
 async function footer(
   root: "source" | "series" | "categories" | "picker" | "editor",
-  label: "OK" | "Cancel",
+  label: "OK" | "Cancel" | "Back to chart preview",
 ) {
   const selector =
     root === "picker"
@@ -214,6 +214,7 @@ async function footer(
     .findAll(".t-dialog__footer button")
     .find((item) => item.text() === label);
   expect(button, `Missing ${root} ${label} footer`).toBeDefined();
+  if (root === "editor") await button!.trigger("pointerdown");
   await button!.trigger("click");
   await flushPromises();
 }
@@ -389,7 +390,7 @@ describe("Select Data through real Workspace", () => {
     expect(serializeWorkbook(f.workbook)).toEqual(before);
   });
 
-  test("native Change Type popup keeps the custom-source owner selected, then Line OK preserves sources and Undo", async () => {
+  test("native Change Type navigation keeps the custom-source owner selected, then Line OK preserves sources and Undo", async () => {
     const configured = createChartSourceFromRange("other", drawing().chart);
     configured.series.reverse();
     const f = await fixture({ source: configured }),
@@ -405,28 +406,18 @@ describe("Select Data through real Workspace", () => {
     await flushPromises();
     expect(f.wrapper.findComponent(ChartSourceDialog).exists()).toBe(false);
     const editor = f.wrapper.getComponent(ChartEditorDialog);
-    const type = editor
-      .findAllComponents(Select)
-      .find((item) => item.attributes("aria-label") === "Chart type")!;
-    expect(type).toBeDefined();
-    await type.get(".t-input__inner").trigger("keydown", { key: "ArrowDown", code: "ArrowDown" });
-    await expect
-      .poll(() =>
-        new DOMWrapper(document.body).findAll(".t-select-option").map((item) => item.text()),
-      )
-      .toContain("Line");
-    const option = new DOMWrapper(document.body)
-      .findAll(".t-select-option")
-      .find((item) => item.text() === "Line")!;
+    const option = editor.get<HTMLButtonElement>('[data-chart-type="line"]');
+    expect(option.attributes("role")).toBe("option");
+    expect(option.element.disabled).toBe(false);
     expect(
       f.wrapper.getComponent(SheetDrawingLayer).props("selectedDrawingId"),
-      "before native type option",
+      "before native type navigation",
     ).toBe("chart-one");
     expect(f.wrapper.getComponent(SpreadsheetRibbon).props("hasChart")).toBe(true);
     await option.trigger("pointerdown");
     expect(
       f.wrapper.getComponent(SheetDrawingLayer).props("selectedDrawingId"),
-      "after native type option pointerdown",
+      "after native type navigation pointerdown",
     ).toBe("chart-one");
     expect(f.wrapper.getComponent(SpreadsheetRibbon).props("hasChart")).toBe(true);
     await option.trigger("click");
@@ -1016,26 +1007,57 @@ async function openComboEditor(wrapper: VueWrapper) {
   await flushPromises();
   return wrapper.getComponent(ChartEditorDialog);
 }
-async function chooseComboOption(root: Pick<VueWrapper, "get">, selector: string, label: string) {
-  const optionSelector =
-    selector === "[data-chart-editor-type]"
-      ? ".chart-editor-options-popup .t-select-option"
-      : ".t-select-option";
-  await root
-    .get(selector)
+type EditorDialogAccess = Awaited<ReturnType<typeof openComboEditor>>;
+async function chooseChartType(editor: EditorDialogAccess, type: ChartType) {
+  const option = editor.get<HTMLButtonElement>(`[data-chart-type="${type}"]`);
+  expect(option.attributes("role")).toBe("option");
+  expect(option.element.disabled).toBe(false);
+  await option.trigger("pointerdown");
+  await option.trigger("click");
+  await flushPromises();
+  expect(option.attributes("aria-selected")).toBe("true");
+}
+async function openEditorSource(editor: EditorDialogAccess) {
+  await editor.get("[data-chart-select-data]").trigger("click");
+  await flushPromises();
+  expect(editor.find(".chart-selector__source-editor").exists()).toBe(true);
+  expect(editor.findComponent(ChartContentProbe).exists()).toBe(false);
+  expect(
+    editor
+      .findAll<HTMLButtonElement>("[data-chart-type]")
+      .every((option) => option.element.disabled),
+  ).toBe(true);
+}
+async function chooseComboSeriesType(
+  wrapper: VueWrapper,
+  editor: EditorDialogAccess,
+  target: string,
+  label: string,
+) {
+  // Only the per-series choice is still a native Select. Chart categories use
+  // navigation buttons, and Combo controls live in the Select Data substep.
+  await editor
+    .get(`[data-chart-combo-type="${target}"]`)
     .get(".t-input__inner")
     .trigger("keydown", { key: "ArrowDown", code: "ArrowDown" });
   await expect
     .poll(() =>
-      new DOMWrapper(document.body).findAll(optionSelector).some((entry) => entry.text() === label),
+      new DOMWrapper(document.body)
+        .findAll(".t-select-option")
+        .some((entry) => entry.text() === label),
     )
     .toBe(true);
   const option = new DOMWrapper(document.body)
-    .findAll(optionSelector)
+    .findAll(".t-select-option")
     .find((entry) => entry.text() === label)!;
+  expect(wrapper.getComponent(SheetDrawingLayer).props("selectedDrawingId")).toBe("chart-one");
+  expect(wrapper.getComponent(SpreadsheetRibbon).props("hasChart")).toBe(true);
   await option.trigger("pointerdown");
+  expect(wrapper.getComponent(SheetDrawingLayer).props("selectedDrawingId")).toBe("chart-one");
+  expect(wrapper.getComponent(SpreadsheetRibbon).props("hasChart")).toBe(true);
   await option.trigger("click");
   await flushPromises();
+  expect(wrapper.getComponent(SheetDrawingLayer).props("selectedDrawingId")).toBe("chart-one");
 }
 
 describe("bounded Combo through real Workspace initialization and native controls", () => {
@@ -1043,8 +1065,8 @@ describe("bounded Combo through real Workspace initialization and native control
     const f = await fixture(),
       before = serializeWorkbook(f.workbook),
       editor = await openComboEditor(f.wrapper);
-    await chooseComboOption(editor, "[data-chart-editor-type]", "Column–Line Combo");
-    await chooseComboOption(editor, "[data-chart-editor-type]", "Pie");
+    await chooseChartType(editor, "combo");
+    await chooseChartType(editor, "pie");
     await footer("editor", "OK");
     expect(f.wrapper.findComponent(ChartEditorDialog).exists()).toBe(false);
     const saved = chart(f.sheet).chart;
@@ -1060,13 +1082,11 @@ describe("bounded Combo through real Workspace initialization and native control
   test("a final stacked markerless Line variant does not acquire hidden Combo marker choices", async () => {
     const f = await fixture(),
       editor = await openComboEditor(f.wrapper);
-    await chooseComboOption(editor, "[data-chart-editor-type]", "Column–Line Combo");
-    await chooseComboOption(
-      editor,
-      '[data-chart-combo-type="band:columns:2"]',
-      "Line with Markers",
-    );
-    await chooseComboOption(editor, "[data-chart-editor-type]", "Line");
+    await chooseChartType(editor, "combo");
+    await openEditorSource(editor);
+    await chooseComboSeriesType(f.wrapper, editor, "band:columns:2", "Line with Markers");
+    await footer("editor", "Back to chart preview");
+    await chooseChartType(editor, "line");
     await editor.get('[data-chart-variant="percentStacked"]').trigger("click");
     await footer("editor", "OK");
     expect(f.wrapper.findComponent(ChartEditorDialog).exists()).toBe(false);
@@ -1083,7 +1103,7 @@ describe("bounded Combo through real Workspace initialization and native control
     const f = await fixture(),
       before = serializeWorkbook(f.workbook),
       editor = await openComboEditor(f.wrapper);
-    await chooseComboOption(editor, "[data-chart-editor-type]", "Column–Line Combo");
+    await chooseChartType(editor, "combo");
     const probe = editor.getComponent(ChartContentProbe),
       preview = probe.props("drawing") as SheetChartDrawing;
     expect(preview.chart.type).toBe("combo");
@@ -1109,6 +1129,66 @@ describe("bounded Combo through real Workspace initialization and native control
     await footer("editor", "Cancel");
     expect(serializeWorkbook(f.workbook)).toEqual(before);
   });
+  test("repeated Combo navigation and source-step Cancel restore the draft; Back keeps edits local until outer Cancel", async () => {
+    const f = await fixture(),
+      before = serializeWorkbook(f.workbook),
+      editor = await openComboEditor(f.wrapper);
+    await chooseChartType(editor, "combo");
+    const recipe = editor.getComponent(ChartContentProbe).props("comboSeriesChanges");
+    const range = editor.get<HTMLInputElement>(".chart-selector__source-controls input").element
+      .value;
+    await chooseChartType(editor, "combo");
+    expect(editor.getComponent(ChartContentProbe).props("comboSeriesChanges")).toEqual(recipe);
+    await openEditorSource(editor);
+    await chooseComboSeriesType(f.wrapper, editor, "band:columns:2", "Line with Markers");
+    editor
+      .get<HTMLInputElement>('[data-chart-combo-secondary="band:columns:2"] input[type=checkbox]')
+      .element.click();
+    await editor.get(".chart-selector__source-editor input").setValue("='Source Data'!$A$1:$C$3");
+    await footer("editor", "Cancel");
+    expect(f.wrapper.findComponent(ChartEditorDialog).exists()).toBe(true);
+    expect(f.wrapper.getComponent(SheetDrawingLayer).props("selectedDrawingId")).toBe("chart-one");
+    expect(f.wrapper.getComponent(SpreadsheetRibbon).props("hasChart")).toBe(true);
+    expect(editor.find(".chart-selector__source-editor").exists()).toBe(false);
+    expect(editor.getComponent(ChartContentProbe).props("comboSeriesChanges")).toEqual(recipe);
+    expect(
+      editor.get<HTMLInputElement>(".chart-selector__source-controls input").element.value,
+    ).toBe(range);
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    expect(f.controller.session.history.undoStack).toHaveLength(0);
+
+    await openEditorSource(editor);
+    await chooseComboSeriesType(f.wrapper, editor, "band:columns:2", "Line with Markers");
+    editor
+      .get<HTMLInputElement>('[data-chart-combo-secondary="band:columns:2"] input[type=checkbox]')
+      .element.click();
+    await footer("editor", "Back to chart preview");
+    expect(f.wrapper.getComponent(SheetDrawingLayer).props("selectedDrawingId")).toBe("chart-one");
+    expect(f.wrapper.getComponent(SpreadsheetRibbon).props("hasChart")).toBe(true);
+    const changes = editor.getComponent(ChartContentProbe).props("comboSeriesChanges");
+    expect(changes).toContainEqual({
+      rangeBand: { seriesBy: "columns", index: 2 },
+      drawType: "line",
+      axis: "secondary",
+      markers: true,
+    });
+    await chooseChartType(editor, "pie");
+    await chooseChartType(editor, "combo");
+    await chooseChartType(editor, "combo");
+    expect(editor.getComponent(ChartContentProbe).props("comboSeriesChanges")).toEqual(changes);
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    expect(f.controller.session.history.undoStack).toHaveLength(0);
+    await footer("editor", "Cancel");
+    expect(f.wrapper.findComponent(ChartEditorDialog).exists()).toBe(false);
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    expect(f.controller.session.history.undoStack).toHaveLength(0);
+    expect(f.wrapper.getComponent(SheetDrawingLayer).props("selectedDrawingId")).toBe("chart-one");
+    await pickCells(f.wrapper, { row: 0, column: 0 });
+    expect(f.wrapper.getComponent(SheetDrawingLayer).props("selectedDrawingId")).toBeNull();
+    expect(f.wrapper.getComponent(SpreadsheetRibbon).props("hasChart")).toBe(false);
+    expect(serializeWorkbook(f.workbook)).toEqual(before);
+    expect(f.controller.session.history.undoStack).toHaveLength(0);
+  });
   test("OK/reopen marker and secondary Cancel/OK use exact owner and one Undo per edit", async () => {
     const f = await fixture(),
       before = serializeWorkbook(f.workbook),
@@ -1116,35 +1196,33 @@ describe("bounded Combo through real Workspace initialization and native control
         .find((sheet) => sheet.id === "source")!
         .drawings!.find((drawing) => drawing.id === "chart-two")!;
     let editor = await openComboEditor(f.wrapper);
-    await chooseComboOption(editor, "[data-chart-editor-type]", "Column–Line Combo");
+    await chooseChartType(editor, "combo");
     await footer("editor", "OK");
     expect(chart(f.sheet).chart.type).toBe("combo");
     expect(chart(f.sheet).chart.source).toBeUndefined();
     const first = serializeWorkbook(f.workbook);
     expect(f.controller.session.history.undoStack).toHaveLength(1);
     editor = await openComboEditor(f.wrapper);
-    await chooseComboOption(
-      editor,
-      '[data-chart-combo-type="band:columns:2"]',
-      "Line with Markers",
-    );
+    await openEditorSource(editor);
+    await chooseComboSeriesType(f.wrapper, editor, "band:columns:2", "Line with Markers");
     editor
       .get<HTMLInputElement>('[data-chart-combo-secondary="band:columns:2"] input[type=checkbox]')
       .element.click();
     await flushPromises();
+    expect(serializeWorkbook(f.workbook)).toEqual(first);
+    await footer("editor", "Back to chart preview");
     expect(serializeWorkbook(f.workbook)).toEqual(first);
     await footer("editor", "Cancel");
     expect(serializeWorkbook(f.workbook)).toEqual(first);
     editor = await openComboEditor(f.wrapper);
-    await chooseComboOption(
-      editor,
-      '[data-chart-combo-type="band:columns:2"]',
-      "Line with Markers",
-    );
+    await openEditorSource(editor);
+    await chooseComboSeriesType(f.wrapper, editor, "band:columns:2", "Line with Markers");
     editor
       .get<HTMLInputElement>('[data-chart-combo-secondary="band:columns:2"] input[type=checkbox]')
       .element.click();
     await flushPromises();
+    await footer("editor", "Back to chart preview");
+    expect(serializeWorkbook(f.workbook)).toEqual(first);
     await footer("editor", "OK");
     const final = serializeWorkbook(f.workbook);
     expect(
@@ -1167,7 +1245,7 @@ describe("bounded Combo through real Workspace initialization and native control
     const hidden = source.series[0]!.id;
     const f = await fixture({ source, seriesFilter: { hiddenSeriesIds: [hidden] } }),
       editor = await openComboEditor(f.wrapper);
-    await chooseComboOption(editor, "[data-chart-editor-type]", "Column–Line Combo");
+    await chooseChartType(editor, "combo");
     const choices = editor
       .getComponent(ChartContentProbe)
       .props("comboSeriesChanges") as ChartComboSeriesChange[];
@@ -1235,10 +1313,18 @@ describe("main chart picker captured selection", () => {
     expect(f.controller.session.history.undoStack).toHaveLength(0);
   });
 
-  test("main picker never restores a stale chart after switching sheets", async () => {
+  test("main picker and type confirmation never restore or edit a stale chart after switching sheets", async () => {
     const f = await fixture();
     const before = serializeWorkbook(f.workbook);
     const editor = await openComboEditor(f.wrapper);
+    const oldTypeConfirm = editor.vm.$.vnode.props?.onConfirm as (
+      drawing: SheetChartDrawing,
+      source: string,
+    ) => void;
+    const staleDraft: SheetChartDrawing = {
+      ...chart(f.sheet),
+      chart: { ...chart(f.sheet).chart, type: "line" },
+    };
     await editor.get("[data-select-formula-reference]").trigger("click");
     await flushPromises();
     const picker = f.wrapper.getComponent(RangeReferencePicker);
@@ -1246,6 +1332,7 @@ describe("main chart picker captured selection", () => {
     await pickCells(f.wrapper, { row: 0, column: 0 }, { row: 2, column: 2 });
     await tab(f.wrapper, "Other Sheet");
     oldConfirm();
+    oldTypeConfirm(staleDraft, "='Source Data'!$A$1:$C$3");
     await flushPromises();
     expect(f.controller.activeSheet.value.id).toBe("other");
     expect(f.wrapper.findComponent(ChartEditorDialog).exists()).toBe(false);

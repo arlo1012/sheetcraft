@@ -105,6 +105,7 @@ function changeAxis(key: string, checked: unknown): void {
                   : row.settings.drawType
               "
               :options="typeOptions"
+              :popup-props="{ overlayClassName: 'chart-editor-options-popup' }"
               :disabled="disabled"
               :aria-label="t('chart.comboSeriesType', { name: series[rowIndex]?.name ?? '' })"
               @change="changeType(row.key, $event)"

@@ -1,0 +1,641 @@
+{
+  "version": 79,
+  "calculation": {
+    "mode": "automatic",
+    "iterative": false,
+    "maxIterations": 100,
+    "maxChange": 0.001
+  },
+  "theme": {
+    "id": "office",
+    "name": "Office",
+    "accentColors": ["#4f81bd", "#c0504d", "#9bbb59", "#8064a2", "#4bacc6", "#f79646"],
+    "headingFont": "Inter",
+    "bodyFont": "Inter",
+    "colors": {
+      "name": "Office",
+      "dark1": "#000000",
+      "light1": "#ffffff",
+      "dark2": "#1f1f1f",
+      "light2": "#eeeeee",
+      "hyperlink": "#0563c1",
+      "followedHyperlink": "#954f72"
+    },
+    "fonts": {
+      "name": "Office",
+      "headingEastAsia": "宋体",
+      "bodyEastAsia": "宋体"
+    },
+    "effects": {
+      "id": "office",
+      "name": "Office",
+      "shadow": "soft",
+      "reflection": false,
+      "bevel": false,
+      "outlineWidth": 1,
+      "gradient": false
+    },
+    "customColors": [],
+    "customFonts": []
+  },
+  "dateSystem": "1900",
+  "id": "chart-type-gui-book",
+  "activeSheetId": "owner",
+  "sheets": [
+    {
+      "drawings": [
+        {
+          "id": "target-chart",
+          "kind": "chart",
+          "chart": {
+            "type": "column",
+            "range": {
+              "start": {
+                "row": 0,
+                "column": 0
+              },
+              "end": {
+                "row": 3,
+                "column": 2
+              }
+            },
+            "title": "Same ID on source sheet",
+            "headerRow": true,
+            "headerColumn": true,
+            "seriesBy": "columns",
+            "legend": true,
+            "labels": false,
+            "stacked": false,
+            "showHidden": false
+          },
+          "name": "Source sentinel",
+          "text": "",
+          "shape": "rectangle",
+          "fill": "#ffffff",
+          "stroke": "#d1d5db",
+          "strokeWidth": 1,
+          "color": "#111827",
+          "fontSize": 14,
+          "bold": false,
+          "italic": false,
+          "rotation": 0,
+          "anchor": {
+            "row": 5,
+            "column": 0
+          },
+          "offsetX": 8,
+          "offsetY": 9,
+          "width": 480,
+          "height": 300
+        }
+      ],
+      "id": "source",
+      "name": "Source Data",
+      "properties": {
+        "pinned": false,
+        "hidden": false,
+        "protected": false
+      },
+      "cells": [
+        {
+          "address": {
+            "row": 0,
+            "column": 0
+          },
+          "content": {
+            "kind": "literal",
+            "value": "region"
+          }
+        },
+        {
+          "address": {
+            "row": 0,
+            "column": 1
+          },
+          "content": {
+            "kind": "literal",
+            "value": "apple"
+          }
+        },
+        {
+          "address": {
+            "row": 0,
+            "column": 2
+          },
+          "content": {
+            "kind": "literal",
+            "value": "pear"
+          }
+        },
+        {
+          "address": {
+            "row": 1,
+            "column": 0
+          },
+          "content": {
+            "kind": "literal",
+            "value": "east"
+          }
+        },
+        {
+          "address": {
+            "row": 1,
+            "column": 1
+          },
+          "content": {
+            "kind": "literal",
+            "value": 60
+          }
+        },
+        {
+          "address": {
+            "row": 1,
+            "column": 2
+          },
+          "content": {
+            "kind": "literal",
+            "value": 70
+          }
+        },
+        {
+          "address": {
+            "row": 2,
+            "column": 0
+          },
+          "content": {
+            "kind": "literal",
+            "value": "north"
+          }
+        },
+        {
+          "address": {
+            "row": 2,
+            "column": 1
+          },
+          "content": {
+            "kind": "literal",
+            "value": 100
+          }
+        },
+        {
+          "address": {
+            "row": 2,
+            "column": 2
+          },
+          "content": {
+            "kind": "literal",
+            "value": 80
+          }
+        },
+        {
+          "address": {
+            "row": 3,
+            "column": 0
+          },
+          "content": {
+            "kind": "literal",
+            "value": "south"
+          }
+        },
+        {
+          "address": {
+            "row": 3,
+            "column": 1
+          },
+          "content": {
+            "kind": "literal",
+            "value": 120
+          }
+        },
+        {
+          "address": {
+            "row": 3,
+            "column": 2
+          },
+          "content": {
+            "kind": "literal",
+            "value": 90
+          }
+        }
+      ],
+      "rowHeights": [],
+      "columnWidths": [],
+      "hiddenRows": [],
+      "hiddenColumns": [],
+      "defaultColumnWidth": 96,
+      "freezePanes": {
+        "rows": 0,
+        "columns": 0
+      },
+      "filter": null,
+      "mergedCells": [],
+      "dataValidations": [],
+      "outlineGroups": [],
+      "subtotalMetadata": [],
+      "duplicateRules": [],
+      "conditionalFormats": [],
+      "tables": [],
+      "pageSetup": {
+        "paperSize": "a4",
+        "orientation": "portrait",
+        "margins": {
+          "top": 19.05,
+          "bottom": 19.05,
+          "left": 17.78,
+          "right": 17.78,
+          "header": 7.62,
+          "footer": 7.62
+        },
+        "scale": 100,
+        "fitToPage": null,
+        "firstPageNumber": null,
+        "printQuality": 600,
+        "printOptions": {
+          "horizontalCentered": false,
+          "verticalCentered": false,
+          "gridLines": false,
+          "blackAndWhite": false,
+          "headings": false,
+          "cellComments": "none",
+          "errors": "displayed"
+        },
+        "printTitles": {
+          "rows": null,
+          "columns": null,
+          "bottomRows": null
+        },
+        "printArea": null,
+        "rowBreaks": [],
+        "columnBreaks": [],
+        "header": {
+          "left": "",
+          "center": "",
+          "right": ""
+        },
+        "footer": {
+          "left": "",
+          "center": "",
+          "right": ""
+        },
+        "headerFooter": {
+          "differentFirst": false,
+          "differentOddEven": false,
+          "scaleWithDocument": true,
+          "alignWithMargins": true,
+          "firstHeader": {
+            "left": "",
+            "center": "",
+            "right": ""
+          },
+          "firstFooter": {
+            "left": "",
+            "center": "",
+            "right": ""
+          },
+          "evenHeader": {
+            "left": "",
+            "center": "",
+            "right": ""
+          },
+          "evenFooter": {
+            "left": "",
+            "center": "",
+            "right": ""
+          }
+        },
+        "pageOrder": "downThenOver"
+      },
+      "pageDecoration": {},
+      "floatingImages": []
+    },
+    {
+      "drawings": [
+        {
+          "id": "target-chart",
+          "kind": "chart",
+          "chart": {
+            "source": {
+              "kind": "series",
+              "categories": {
+                "kind": "range",
+                "sheetId": "source",
+                "range": {
+                  "start": {
+                    "row": 1,
+                    "column": 0
+                  },
+                  "end": {
+                    "row": 3,
+                    "column": 0
+                  }
+                }
+              },
+              "series": [
+                {
+                  "id": "series-1",
+                  "colorIndex": 0,
+                  "name": {
+                    "kind": "cell",
+                    "sheetId": "source",
+                    "cell": {
+                      "row": 0,
+                      "column": 1
+                    }
+                  },
+                  "values": {
+                    "kind": "range",
+                    "sheetId": "source",
+                    "range": {
+                      "start": {
+                        "row": 1,
+                        "column": 1
+                      },
+                      "end": {
+                        "row": 3,
+                        "column": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "id": "series-2",
+                  "colorIndex": 1,
+                  "name": {
+                    "kind": "cell",
+                    "sheetId": "source",
+                    "cell": {
+                      "row": 0,
+                      "column": 2
+                    }
+                  },
+                  "values": {
+                    "kind": "range",
+                    "sheetId": "source",
+                    "range": {
+                      "start": {
+                        "row": 1,
+                        "column": 2
+                      },
+                      "end": {
+                        "row": 3,
+                        "column": 2
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "type": "column",
+            "range": null,
+            "title": "Owner target",
+            "headerRow": true,
+            "headerColumn": true,
+            "seriesBy": "columns",
+            "legend": true,
+            "labels": false,
+            "stacked": false,
+            "showHidden": false
+          },
+          "name": "Owner target",
+          "text": "",
+          "shape": "rectangle",
+          "fill": "#ffffff",
+          "stroke": "#d1d5db",
+          "strokeWidth": 1,
+          "color": "#111827",
+          "fontSize": 14,
+          "bold": false,
+          "italic": false,
+          "rotation": 0,
+          "anchor": {
+            "row": 5,
+            "column": 0
+          },
+          "offsetX": 8,
+          "offsetY": 9,
+          "width": 480,
+          "height": 300
+        },
+        {
+          "id": "sentinel-chart",
+          "kind": "chart",
+          "chart": {
+            "source": {
+              "kind": "series",
+              "categories": {
+                "kind": "range",
+                "sheetId": "source",
+                "range": {
+                  "start": {
+                    "row": 1,
+                    "column": 0
+                  },
+                  "end": {
+                    "row": 3,
+                    "column": 0
+                  }
+                }
+              },
+              "series": [
+                {
+                  "id": "series-1",
+                  "colorIndex": 0,
+                  "name": {
+                    "kind": "cell",
+                    "sheetId": "source",
+                    "cell": {
+                      "row": 0,
+                      "column": 1
+                    }
+                  },
+                  "values": {
+                    "kind": "range",
+                    "sheetId": "source",
+                    "range": {
+                      "start": {
+                        "row": 1,
+                        "column": 1
+                      },
+                      "end": {
+                        "row": 3,
+                        "column": 1
+                      }
+                    }
+                  }
+                },
+                {
+                  "id": "series-2",
+                  "colorIndex": 1,
+                  "name": {
+                    "kind": "cell",
+                    "sheetId": "source",
+                    "cell": {
+                      "row": 0,
+                      "column": 2
+                    }
+                  },
+                  "values": {
+                    "kind": "range",
+                    "sheetId": "source",
+                    "range": {
+                      "start": {
+                        "row": 1,
+                        "column": 2
+                      },
+                      "end": {
+                        "row": 3,
+                        "column": 2
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "type": "line",
+            "range": null,
+            "title": "Untouched sentinel",
+            "headerRow": true,
+            "headerColumn": true,
+            "seriesBy": "columns",
+            "legend": true,
+            "labels": false,
+            "stacked": false,
+            "showHidden": false
+          },
+          "name": "Owner sentinel",
+          "text": "",
+          "shape": "rectangle",
+          "fill": "#ffffff",
+          "stroke": "#d1d5db",
+          "strokeWidth": 1,
+          "color": "#111827",
+          "fontSize": 14,
+          "bold": false,
+          "italic": false,
+          "rotation": 0,
+          "anchor": {
+            "row": 5,
+            "column": 6
+          },
+          "offsetX": 8,
+          "offsetY": 9,
+          "width": 480,
+          "height": 300
+        }
+      ],
+      "id": "owner",
+      "name": "Chart Owner",
+      "properties": {
+        "pinned": false,
+        "hidden": false,
+        "protected": false
+      },
+      "cells": [
+        {
+          "address": {
+            "row": 0,
+            "column": 0
+          },
+          "content": {
+            "kind": "literal",
+            "value": "Synthetic chart owner sheet"
+          }
+        }
+      ],
+      "rowHeights": [],
+      "columnWidths": [],
+      "hiddenRows": [],
+      "hiddenColumns": [],
+      "defaultColumnWidth": 96,
+      "freezePanes": {
+        "rows": 0,
+        "columns": 0
+      },
+      "filter": null,
+      "mergedCells": [],
+      "dataValidations": [],
+      "outlineGroups": [],
+      "subtotalMetadata": [],
+      "duplicateRules": [],
+      "conditionalFormats": [],
+      "tables": [],
+      "pageSetup": {
+        "paperSize": "a4",
+        "orientation": "portrait",
+        "margins": {
+          "top": 19.05,
+          "bottom": 19.05,
+          "left": 17.78,
+          "right": 17.78,
+          "header": 7.62,
+          "footer": 7.62
+        },
+        "scale": 100,
+        "fitToPage": null,
+        "firstPageNumber": null,
+        "printQuality": 600,
+        "printOptions": {
+          "horizontalCentered": false,
+          "verticalCentered": false,
+          "gridLines": false,
+          "blackAndWhite": false,
+          "headings": false,
+          "cellComments": "none",
+          "errors": "displayed"
+        },
+        "printTitles": {
+          "rows": null,
+          "columns": null,
+          "bottomRows": null
+        },
+        "printArea": null,
+        "rowBreaks": [],
+        "columnBreaks": [],
+        "header": {
+          "left": "",
+          "center": "",
+          "right": ""
+        },
+        "footer": {
+          "left": "",
+          "center": "",
+          "right": ""
+        },
+        "headerFooter": {
+          "differentFirst": false,
+          "differentOddEven": false,
+          "scaleWithDocument": true,
+          "alignWithMargins": true,
+          "firstHeader": {
+            "left": "",
+            "center": "",
+            "right": ""
+          },
+          "firstFooter": {
+            "left": "",
+            "center": "",
+            "right": ""
+          },
+          "evenHeader": {
+            "left": "",
+            "center": "",
+            "right": ""
+          },
+          "evenFooter": {
+            "left": "",
+            "center": "",
+            "right": ""
+          }
+        },
+        "pageOrder": "downThenOver"
+      },
+      "pageDecoration": {},
+      "floatingImages": []
+    }
+  ],
+  "definedNames": [],
+  "tableStyles": [],
+  "pivotTableStyles": [],
+  "cellStyles": [],
+  "watermarkPresets": []
+}

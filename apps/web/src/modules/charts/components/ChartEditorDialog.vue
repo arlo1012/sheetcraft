@@ -372,6 +372,9 @@ function onDialogKeydown(event: KeyboardEvent): void {
 </script>
 <template>
   <Dialog
+    role="dialog"
+    aria-modal="true"
+    :aria-label="t(mode === 'change-type' ? 'chart.changeType' : 'chart.insertDialog')"
     :visible="!suspended"
     :header="t(mode === 'change-type' ? 'chart.changeType' : 'chart.insertDialog')"
     width="min(880px, calc(100vw - 32px))"

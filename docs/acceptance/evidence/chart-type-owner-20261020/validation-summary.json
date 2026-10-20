@@ -1,0 +1,196 @@
+{
+  "date": "2026-10-20",
+  "baseCommit": "12a01c13893b0af6643753937fad55aaa528f72c",
+  "scope": "Chart Type / Combo current controls and owner selection; two bounded production ownership fixes",
+  "baseline": {
+    "sourceWorkspacePassed": 23,
+    "sourceWorkspaceFailed": 6,
+    "aggregatePassed": 1452,
+    "aggregateFailed": 42,
+    "aggregateFiles": 57
+  },
+  "finalCoverage": {
+    "scope": "57 unique chart test files, with the source-workspace file run in two disjoint process batches",
+    "sourceWorkspace": {
+      "passed": 30,
+      "failed": 0,
+      "newCases": 1,
+      "batches": [8, 22],
+      "overlap": 0,
+      "allCollectedCasesExecuted": true
+    },
+    "dialogCompanion": {
+      "passed": 7,
+      "failed": 0
+    },
+    "aggregate": {
+      "uniqueFiles": 57,
+      "passed": 1459,
+      "failed": 36,
+      "skippedAcrossCoverageUnion": 0,
+      "failedFiles": 10
+    },
+    "comparison": {
+      "previousPassed": 1452,
+      "previousFailed": 42,
+      "resolved": [
+        "src/tests/modules/charts/source-workspace.test.ts > Select Data through real Workspace > native Change Type popup keeps the custom-source owner selected, then Line OK preserves sources and Undo",
+        "src/tests/modules/charts/source-workspace.test.ts > bounded Combo through real Workspace initialization and native controls > Combo recipe then final Pie commits without hidden Combo edits or promoting the range",
+        "src/tests/modules/charts/source-workspace.test.ts > bounded Combo through real Workspace initialization and native controls > OK/reopen marker and secondary Cancel/OK use exact owner and one Undo per edit",
+        "src/tests/modules/charts/source-workspace.test.ts > bounded Combo through real Workspace initialization and native controls > a final stacked markerless Line variant does not acquire hidden Combo marker choices",
+        "src/tests/modules/charts/source-workspace.test.ts > bounded Combo through real Workspace initialization and native controls > a hidden first raw source remains recipe column; visible next series is plain line",
+        "src/tests/modules/charts/source-workspace.test.ts > bounded Combo through real Workspace initialization and native controls > native Combo recipe previews without identity/source/history writes and Cancel keeps exact workbook"
+      ],
+      "retainedFailures": [
+        "src/tests/modules/charts/chart-elements.test.ts > chart element options > an absent or empty settings object retains the original option geometry",
+        "src/tests/modules/charts/chart-presentation-text.test.ts > recipe text defaults on opaque presentation backgrounds > dark title-only color edits leave actual non-title SVG text and tooltip defaults unchanged",
+        "src/tests/modules/charts/chart-presentation-text.test.ts > recipe text defaults on opaque presentation backgrounds > office title-only color edits leave actual non-title SVG text and tooltip defaults unchanged",
+        "src/tests/modules/charts/design-controls.test.ts > chart type dialog design draft > changing type and choosing standard remove only inapplicable flags while preserving appearance",
+        "src/tests/modules/charts/design-controls.test.ts > chart type dialog design draft > disabled editor and live-source applicability remain authoritative",
+        "src/tests/modules/charts/design-controls.test.ts > chart type dialog design draft > subtype mutates only the local draft while saved appearance survives; Cancel has no mutation",
+        "src/tests/modules/charts/detached-chart.test.ts > detached pivot charts > cached source controls stay locked until explicit linking, which only changes the draft",
+        "src/tests/modules/charts/element-controls.test.ts > chart type draft and context element ownership > disabled type confirmation cannot emit or alter saved elements",
+        "src/tests/modules/charts/element-controls.test.ts > chart type draft and context element ownership > type confirmation preserves independently cloned dormant element settings",
+        "src/tests/modules/charts/elements-workspace.test.ts > chart elements real Workspace context > pending toolbar title then 'edit' uses the exact replacement owner and one history command",
+        "src/tests/modules/charts/existing-pivot-actions.test.ts > existing report PivotChart actions > bounds the chart anchor beside the output and prevents reentrant duplicate confirmation",
+        "src/tests/modules/charts/existing-pivot-workspace.test.ts > existing-pivot Insert PivotChart workspace integration > cancel and Edit Pivot reveal fields without changing source, output, sheets, or history",
+        "src/tests/modules/charts/existing-pivot-workspace.test.ts > existing-pivot Insert PivotChart workspace integration > rapid reopening remounts the draft and ignores every previous dialog callback",
+        "src/tests/modules/charts/existing-pivot-workspace.test.ts > existing-pivot Insert PivotChart workspace integration > uses editObjects=true independently of pivotTables=false",
+        "src/tests/modules/charts/existing-pivot-workspace.test.ts > existing-pivot Insert PivotChart workspace integration > uses editObjects=true independently of pivotTables=true",
+        "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > columns promotion keeps labels readable when their header stripe is hidden",
+        "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for doughnut",
+        "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for pie",
+        "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for river",
+        "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for sankey",
+        "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for scatter",
+        "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for treemap",
+        "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for wordCloud",
+        "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > rows promotion keeps labels readable when their header stripe is hidden",
+        "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > linked type changes keep the report link and preview range despite stale locked source text",
+        "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > linked=false keeps source orientation fixed while show-hidden remains editable",
+        "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > linked=true keeps source orientation fixed while show-hidden remains editable",
+        "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > ordinary dialog emits explicit 'columns'/false/false without changing the input",
+        "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > ordinary dialog emits explicit 'columns'/false/true without changing the input",
+        "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > ordinary dialog emits explicit 'columns'/true/false without changing the input",
+        "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > ordinary dialog emits explicit 'columns'/true/true without changing the input",
+        "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > ordinary dialog emits explicit 'rows'/false/false without changing the input",
+        "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > ordinary dialog emits explicit 'rows'/false/true without changing the input",
+        "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > ordinary dialog emits explicit 'rows'/true/false without changing the input",
+        "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > ordinary dialog emits explicit 'rows'/true/true without changing the input",
+        "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > ordinary header captions follow row orientation without changing independent flags"
+      ],
+      "newFailures": []
+    },
+    "otherChartRecovery": {
+      "initialPassed": 1424,
+      "initialFailed": 36,
+      "initialPending": 5,
+      "retryPassed": 5,
+      "pendingCases": [
+        "src/tests/modules/charts/elements-workspace.test.ts > quick layouts real Workspace context > actual layout click applies one reversible patch and retains frame/raw sources",
+        "src/tests/modules/charts/elements-workspace.test.ts > quick layouts real Workspace context > hover paints only the captured original owner; Escape restores without history",
+        "src/tests/modules/charts/elements-workspace.test.ts > quick layouts real Workspace context > old gallery callbacks cannot target a newly selected chart or revive its preview",
+        "src/tests/modules/charts/elements-workspace.test.ts > quick layouts real Workspace context > pending title and layout share one command; unfinished composition cannot commit",
+        "src/tests/modules/charts/elements-workspace.test.ts > real table field and layout5 use the same complete native preflight and one reversible owner command"
+      ]
+    },
+    "executionLimit": "Three monolithic source-workspace attempts exited unexpectedly near completion, including one with the test browser tab closed. Those attempts are not passes; cause was not proven. All source assertions completed successfully only in disjoint bounded batches. Five pending elements-workspace cases from the broad attempt also required a separate passing retry."
+  },
+  "failureQualification": {
+    "retainedHistoricalFailures": 14,
+    "additionalPreviouslyObservedFailuresNotIndependentlyBaselined": 22,
+    "newFailedAssertionsAgainstPriorAggregate": 0,
+    "wholeRepositoryGreen": false
+  },
+  "guardMutation": {
+    "isolated": true,
+    "productCheckoutUnmodified": true,
+    "sourceSha256": "17417bf8105fb57e9626ab52608b4afed7d05c1abf0d66af7cf77558350bd3da",
+    "dialogSha256": "1b61b863fc08424feb0654ee3d594456e044744b32da232582bb01540abcec8e",
+    "results": [
+      {
+        "name": "control",
+        "exitCode": 0,
+        "passed": 15,
+        "failed": 0,
+        "unselected": 22,
+        "failedCases": []
+      },
+      {
+        "name": "remove-popup-ownership",
+        "exitCode": 1,
+        "passed": 12,
+        "failed": 3,
+        "unselected": 22,
+        "failedCases": [
+          "bounded Combo through real Workspace initialization and native controls a final stacked markerless Line variant does not acquire hidden Combo marker choices",
+          "bounded Combo through real Workspace initialization and native controls repeated Combo navigation and source-step Cancel restore the draft; Back keeps edits local until outer Cancel",
+          "bounded Combo through real Workspace initialization and native controls OK/reopen marker and secondary Cancel/OK use exact owner and one Undo per edit"
+        ]
+      },
+      {
+        "name": "remove-dialog-ownership",
+        "exitCode": 1,
+        "passed": 11,
+        "failed": 4,
+        "unselected": 22,
+        "failedCases": [
+          "desktop chart type dialog shows only thirteen real types and keeps selection separate from advanced editing",
+          "desktop chart type dialog existing mode announces change type and keeps saved title and interpretation",
+          "Select Data through real Workspace native Change Type navigation keeps the custom-source owner selected, then Line OK preserves sources and Undo",
+          "bounded Combo through real Workspace initialization and native controls repeated Combo navigation and source-step Cancel restore the draft; Back keeps edits local until outer Cancel"
+        ]
+      }
+    ]
+  },
+  "staticChecks": {
+    "scopedLint": 0,
+    "scopedFormat": 0,
+    "webUiContract": 0,
+    "webUiContractCases": 6,
+    "broadWebLint": 1,
+    "broadWebLintWarningFile": "apps/web/src/tests/modules/conditional-formatting/manager-table.test.ts",
+    "broadWebLintLines": [315, 331, 342],
+    "broadWebLintFileUnchangedSha256": "5f9c91c55f4b0c25bb12824968539f93158d6badbe95b9bdca5b7962da16498c",
+    "webTypecheckAndBuild": "passed on final footer-inclusive source",
+    "webTypecheckAndBuildExit": 0,
+    "warnings": "Existing large-chunk and ineffective-dynamic-import warnings remain."
+  },
+  "browser": {
+    "environment": "dot cloud Chromium, rebuilt production preview on port 7200",
+    "input": "public serialized synthetic fixture imported through File > Import JSON; exports through File > Export JSON; no application-state injection",
+    "preFix": "Separately reproduced popup and native-footer loss of selected drawing / Chart Tools. Commits still worked; no data-loss claim.",
+    "finalFooterInclusiveBuild": {
+      "dialogRoleModalAndLocalizedName": true,
+      "popupMarkerPresent": true,
+      "sourceCancelRollsBackAndRetainsOwner": true,
+      "backRetainsLocalEditsAndOwner": true,
+      "outerCancelRetainsOwner": true,
+      "changedOkRetainsOwner": true,
+      "genuineGridClickClearsOwner": true,
+      "exactFinalCommitUndoRedoChecks": 3
+    },
+    "earlierPopupOnlyBuild": {
+      "repeatedCategoryAndComboClicks": true,
+      "comboRecipeReset": true,
+      "pieLineAndMarkerNavigation": true,
+      "explicitSourcesSameIdOwnerSiblingGeometryPreserved": true,
+      "limitation": "This stage exposed the independent footer selection defect; rollback/export equality alone was not selection retention.",
+      "exportAssertions": 15,
+      "wholeWorkbookEqualityChecks": 6,
+      "scopedPreservationAndValueChecks": 9
+    },
+    "screenshotsPublished": false,
+    "wpsExcelLibreOfficeTested": false,
+    "combinedExportAssertions": {
+      "passed": 18,
+      "wholeWorkbookEqualityChecks": 9,
+      "scopedPreservationAndValueChecks": 9
+    }
+  },
+  "independentReview": {
+    "blockingFindings": 0,
+    "scope": "Four changed source and test files. Original persistence/history assertions retained. Existing popup ownership convention reused. Scoped dialog semantics, not comprehensive accessibility audit."
+  },
+  "nextScopeNotImplemented": "Three design-controls.test.ts failures using removed [data-chart-confirm] helper; reconcile actual footer and retain all existing assertions."
+}
