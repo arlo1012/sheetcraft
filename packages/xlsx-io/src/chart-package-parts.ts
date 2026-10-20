@@ -233,6 +233,7 @@ function inspectStrictRoot(
     "formatCode",
   ]);
   const artElements = new Set([
+    "sp3d",
     "prstDash",
     "solidFill",
     "schemeClr",
@@ -458,6 +459,21 @@ function inspectStrictRoot(
                 "chartSpace/chart/legend/txPr/p/pPr/defRPr",
                 "chartSpace/chart/legend/legendEntry/txPr/p/pPr/defRPr",
               ].includes(path))))
+      )
+        reject();
+      // WPS's ordinary line-width UI emits this empty contour leaf. Admit
+      // only its observed location/shape; sibling width equality is proved below.
+      if (
+        localName === "sp3d" &&
+        (namespace !== CHART_NS ||
+          ns !== ART_NS ||
+          !ordinary ||
+          ancestors.join("/") !== "chartSpace/chart/plotArea/lineChart/ser/spPr" ||
+          !/^[1-9]\d*$/.test(String(node["@_contourW"] ?? "")) ||
+          Object.keys(node).some(
+            (key) => key !== "@_contourW" && key !== "#text" && !key.startsWith("@_xmlns"),
+          ) ||
+          (node["#text"] !== undefined && String(node["#text"]).trim() !== ""))
       )
         reject();
       // Observed WPS post-save straight lines add this inert solid-dash leaf
@@ -1156,6 +1172,17 @@ export async function collectNativeChartParts(
           const marker = single(seriesNode, "marker");
           // The observed marker stroke belongs to one shape, never competing spPr payloads.
           if (marker.spPr !== undefined) single(marker, "spPr");
+          if (nodes(seriesNode.spPr).some((shape) => shape.sp3d !== undefined)) {
+            const shape = single(seriesNode, "spPr");
+            const contour = single(shape, "sp3d");
+            const width = attr(single(shape, "ln"), "w");
+            if (
+              attr(contour, "contourW") !== width ||
+              !Number.isSafeInteger(Number(width)) ||
+              Number(width) > 32 * 9525
+            )
+              reject();
+          }
         }
         if (
           attr(single(seriesNode, "idx"), "val") !== String(index) ||

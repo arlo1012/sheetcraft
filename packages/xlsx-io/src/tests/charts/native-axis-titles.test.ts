@@ -74,12 +74,24 @@ for (const type of ["column", "bar", "line"] as const) {
       expect(xml).toContain("  季度 &amp; &lt;channel&gt;  ");
       expect(xml).toMatch(/<c:axPos val="[bl]"\/><c:title>/);
       expect(xml).toContain("<c:majorGridlines/><c:title>");
+      // Explicit native line defaults are now recovered as stable per-series
+      // styles; axis-title properties must still roundtrip exactly alongside them.
+      const expectedFormat =
+        type === "line"
+          ? {
+              ...f.drawing.chart.format,
+              series: [
+                { id: "range-series-1", strokeWidth: 3, markers: true },
+                { id: "range-series-2", strokeWidth: 3, markers: true },
+              ],
+            }
+          : f.drawing.chart.format;
       const first = await decodeXlsx(encoded.bytes);
-      expect(imported(first).format).toEqual(f.drawing.chart.format);
+      expect(imported(first).format).toEqual(expectedFormat);
       const second = await decodeXlsx(
         (await encodeXlsx(deserializeWorkbook(serializeWorkbook(first.workbook)))).bytes,
       );
-      expect(imported(second).format).toEqual(f.drawing.chart.format);
+      expect(imported(second).format).toEqual(expectedFormat);
       expect(
         locations(first).some((p) => p.includes(".titleText") || p.includes(".titleRotation")),
       ).toBe(false);

@@ -260,18 +260,29 @@ export function readXlsxColumnCharts(
       const chartBase = elements ? { ...base, elements } : base;
       if (nodes(bar.dLbls).length > 1 || nodes(native.legend).length > 1)
         throw new Error("Ambiguous chart presentation.");
-      for (const item of series) {
+      for (const [seriesIndex, item] of series.entries()) {
         if (line) {
           const marker = single(item, "marker");
           only(marker, ["symbol", "size", "spPr"]);
-          const size = Number(attr(single(marker, "size"), "val"));
-          if (
-            attr(single(marker, "symbol"), "val") !== "circle" ||
-            !Number.isSafeInteger(size) ||
-            size < 2 ||
-            size > 72 ||
-            chartBoolean(item, "smooth", false)
-          )
+          const symbol = attr(single(marker, "symbol"), "val");
+          const size = symbol === "none" ? undefined : Number(attr(single(marker, "size"), "val"));
+          if (!["circle", "none"].includes(symbol)) {
+            report.add(
+              "style-omitted",
+              "warning",
+              `${part.chartPart}.format.series[${seriesIndex}].markers`,
+            );
+            throw new Error("Unsupported native marker shape.");
+          }
+          if (symbol === "circle" && (!Number.isSafeInteger(size) || size! < 2 || size! > 72)) {
+            report.add(
+              "style-omitted",
+              "warning",
+              `${part.chartPart}.format.series[${seriesIndex}].markerSize`,
+            );
+            throw new Error("Invalid native marker size.");
+          }
+          if (chartBoolean(item, "smooth", false))
             throw new Error("Unsupported straight marker line.");
         }
       }

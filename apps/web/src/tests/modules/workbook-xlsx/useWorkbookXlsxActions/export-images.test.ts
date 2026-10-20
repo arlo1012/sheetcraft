@@ -1,3 +1,4 @@
+import { decodeXlsx } from "@sheetcraft/xlsx-io";
 import { readFileSync } from "node:fs";
 import { framedPicture } from "../../sheet-images/framed-picture-fixture";
 import { effectScope, ref } from "vue";
@@ -117,6 +118,34 @@ function chartDrawing(): SheetChartDrawing {
 }
 
 describe("XLSX export image preparation", () => {
+  test.each([2, 3])(
+    "actual imported WPS line width %s passes UI export preflight",
+    async (width) => {
+      const input = readFileSync(
+        "../../packages/xlsx-io/src/tests/charts/fixtures/wps-native-line-series-styles.xlsx",
+      );
+      const imported = await decodeXlsx(new Uint8Array(input));
+      const drawing = [...imported.workbook.sheets.values()][0]!.drawings!.find(
+        (entry) => entry.kind === "chart",
+      )!;
+      if (drawing.kind !== "chart") throw new Error("Missing chart");
+      drawing.chart.format!.series![0]!.strokeWidth = width;
+      const f = mountActions();
+      const sheet = getActiveSheet(f.workbook);
+      setCellContent(sheet, { row: 0, column: 0 }, null);
+      sheet.drawings = [drawing];
+      const before = serializeWorkbook(f.workbook);
+      await f.actions.exportXlsx();
+      expect(f.flushPendingEdits).toHaveBeenCalledOnce();
+      expect(f.workerFactory).toHaveBeenCalledOnce();
+      expect(f.postMessage).toHaveBeenCalledOnce();
+      expect(f.download).toHaveBeenCalledOnce();
+      expect(f.actions.feedback.value?.error).not.toBe(true);
+      expect(serializeWorkbook(f.workbook)).toEqual(before);
+      f.scope.stop();
+    },
+  );
+
   test.each(["column", "bar", "line"] as const)(
     "native-capable %s element choices reach worker export and download",
     async (type) => {

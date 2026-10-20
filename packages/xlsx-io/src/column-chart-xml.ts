@@ -95,10 +95,19 @@ export function columnChartXml(
           value === null ? [] : [`<c:pt idx="${point}"><c:v>${value}</c:v></c:pt>`],
         )
         .join("");
+      const settings =
+        line && series.id !== undefined
+          ? drawing.chart.format?.series?.find((entry) => entry.id === series.id)
+          : undefined;
+      const lineWidth = Math.round((settings?.strokeWidth ?? 3) * 9525);
       const paint = colors?.[index]
         ? `<a:srgbClr val="${nativeChartRgb(colors[index])!}"/>`
         : `<a:schemeClr val="accent${(index % 6) + 1}"/>`;
-      return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/><c:tx><c:strRef><c:f>${xml(nameReference)}</c:f><c:strCache>${stringCache([name])}</c:strCache></c:strRef></c:tx>${line ? `<c:spPr><a:ln w="28575" cap="rnd"><a:solidFill>${paint}</a:solidFill><a:round/></a:ln></c:spPr><c:marker><c:symbol val="circle"/><c:size val="5"/>${colors?.[index] ? `<c:spPr><a:solidFill>${paint}</a:solidFill><a:ln><a:solidFill>${paint}</a:solidFill></a:ln></c:spPr>` : ""}</c:marker>` : `<c:spPr><a:solidFill>${paint}</a:solidFill><a:ln><a:noFill/></a:ln></c:spPr><c:invertIfNegative val="0"/>`}${category}<c:val><c:numRef><c:f>${xml(columnChartReference(sheetName, source.valueRanges[index]!))}</c:f><c:numCache><c:formatCode>${xml(numberFormat)}</c:formatCode><c:ptCount val="${source.data.categories.length}"/>${points}</c:numCache></c:numRef></c:val>${line ? `<c:smooth val="0"/>` : ""}</c:ser>`;
+      const marker =
+        settings?.markers === false
+          ? `<c:marker><c:symbol val="none"/></c:marker>`
+          : `<c:marker><c:symbol val="circle"/><c:size val="5"/>${colors?.[index] ? `<c:spPr><a:solidFill>${paint}</a:solidFill><a:ln><a:solidFill>${paint}</a:solidFill></a:ln></c:spPr>` : ""}</c:marker>`;
+      return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/><c:tx><c:strRef><c:f>${xml(nameReference)}</c:f><c:strCache>${stringCache([name])}</c:strCache></c:strRef></c:tx>${line ? `<c:spPr><a:ln w="${lineWidth}" cap="rnd"><a:solidFill>${paint}</a:solidFill><a:round/></a:ln></c:spPr>${marker}` : `<c:spPr><a:solidFill>${paint}</a:solidFill><a:ln><a:noFill/></a:ln></c:spPr><c:invertIfNegative val="0"/>`}${category}<c:val><c:numRef><c:f>${xml(columnChartReference(sheetName, source.valueRanges[index]!))}</c:f><c:numCache><c:formatCode>${xml(numberFormat)}</c:formatCode><c:ptCount val="${source.data.categories.length}"/>${points}</c:numCache></c:numRef></c:val>${line ? `<c:smooth val="0"/>` : ""}</c:ser>`;
     })
     .join("");
   const titleStyle =

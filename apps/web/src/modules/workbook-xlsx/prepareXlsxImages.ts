@@ -4,6 +4,7 @@ import {
   assertNativePictureSourceOrientation,
 } from "@sheetcraft/xlsx-io/picture-capabilities";
 import {
+  supportsNativeLineSeriesStyles,
   unsupportedNativeChartElements,
   unsupportedNativeChartStyles,
 } from "@sheetcraft/xlsx-io/chart-capabilities";
@@ -147,7 +148,11 @@ export function assertXlsxPictureGeometrySupport(workbook: Workbook): void {
           },
         );
       }
-      if (drawing.kind === "chart" && "rectangleSeries" in drawing.chart) {
+      if (
+        drawing.kind === "chart" &&
+        "rectangleSeries" in drawing.chart &&
+        !supportsNativeLineSeriesStyles(drawing.chart)
+      ) {
         const location = `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.rectangleSeries`;
         throw new XlsxWorkerFailure(
           "Range series identities are not yet supported by XLSX export.",

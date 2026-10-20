@@ -94,11 +94,23 @@ describe("ordinary native straight marker lines", () => {
       expect(xml).toContain('<c:dispBlanksAs val="gap"/>');
       const first = (await decodeXlsx(out.bytes)).workbook;
       const current = imported(first);
-      expect(current.drawing.chart).toEqual(f.drawing.chart);
-      expect(current.data).toEqual(expected);
+      const { rectangleSeries, format, ...retained } = current.drawing.chart;
+      expect(retained).toEqual(f.drawing.chart);
+      expect(format?.series).toHaveLength(expected.series.length);
+      expect(
+        format?.series?.every((entry) => entry.strokeWidth === 3 && entry.markers === true),
+      ).toBe(true);
+      expect(rectangleSeries?.[option.seriesBy].map((entry) => entry.id)).toEqual(
+        format?.series?.map((entry) => entry.id),
+      );
+      const withoutIds = (data: typeof expected) => ({
+        ...data,
+        series: data.series.map(({ id: _id, ...entry }) => entry),
+      });
+      expect(withoutIds(current.data)).toEqual(expected);
       const snapshot = deserializeWorkbook(serializeWorkbook(first));
       const second = (await decodeXlsx((await encodeXlsx(snapshot)).bytes)).workbook;
-      expect(imported(second).data).toEqual(expected);
+      expect(withoutIds(imported(second).data)).toEqual(expected);
       const last = imported(second);
       setCellContent(last.sheet, { row: 2, column: 1 }, { kind: "literal", value: 111 });
       const changed = getSheetChartData(
@@ -124,7 +136,8 @@ describe("ordinary native straight marker lines", () => {
     setCellContent(f.sheet, { row: 2, column: 2 }, null);
     (f.sheet.hiddenRows ??= new Set()).add(2);
     const result = imported((await decodeXlsx((await encodeXlsx(f.workbook)).bytes)).workbook);
-    expect(result.drawing.chart).toEqual(f.drawing.chart);
+    const { rectangleSeries: _bindings, format: _style, ...retained } = result.drawing.chart;
+    expect(retained).toEqual(f.drawing.chart);
     expect(result.data.categories[0]).toBe("");
     expect(result.data.series[0]).toMatchObject({ name: "", values: [0, -5, 120] });
     expect(result.data.series[1]!.values).toEqual([70, null, 90]);
@@ -187,7 +200,6 @@ describe("ordinary native straight marker lines", () => {
     "smooth",
     "series-smooth",
     "no-markers",
-    "marker-none",
     "marker-square",
     "marker-size",
     "zero-gap",

@@ -1,3 +1,4 @@
+import { normalizeChartRectangleSeries } from "@sheetcraft/core/chart-range-series";
 import type { CellNumberFormat } from "@sheetcraft/core/style";
 import { toExcelNumberFormat } from "./number-format.js";
 import type { SheetChart } from "@sheetcraft/core/sheet-charts";
@@ -142,6 +143,92 @@ export function isNativeAxisTitle(value: unknown): value is string {
 }
 const presentationKeys = ["palette", "percentStacked", "lineMarkers", "background"];
 
+/** Only active, explicitly styled ordinary line bands can be encoded natively.
+ * Dormant/header/opposite-direction identities have no native representation.
+ * Descriptor-safe because this also runs before the workbook export boundary.
+ */
+export function supportsNativeLineSeriesStyles(chart: SheetChart): boolean {
+  try {
+    if (
+      own(chart, "type") !== "line" ||
+      own(chart, "stacked") !== false ||
+      ["pivotTableId", "dataCache", "source", "seriesFilter"].some((key) => key in chart)
+    )
+      return false;
+    const rawRange = record(own(chart, "range"), ["start", "end"]);
+    const start = record(rawRange.start, ["row", "column"]);
+    const end = record(rawRange.end, ["row", "column"]);
+    if (
+      Object.keys(rawRange).length !== 2 ||
+      Object.keys(start).length !== 2 ||
+      Object.keys(end).length !== 2 ||
+      ![start.row, start.column, end.row, end.column].every(
+        (value) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0,
+      )
+    )
+      return false;
+    const range = {
+      start: { row: start.row as number, column: start.column as number },
+      end: { row: end.row as number, column: end.column as number },
+    };
+    const by = own(chart, "seriesBy");
+    if (by !== "rows" && by !== "columns") return false;
+    const header = own(chart, by === "rows" ? "headerRow" : "headerColumn");
+    if (typeof header !== "boolean") return false;
+    const bindings = normalizeChartRectangleSeries(own(chart, "rectangleSeries"), range);
+    if (bindings[by === "rows" ? "columns" : "rows"].length) return false;
+    const first = range.start[by === "rows" ? "row" : "column"] + Number(header);
+    const last = range.end[by === "rows" ? "row" : "column"];
+    if (
+      last < first ||
+      last - first >= 16 ||
+      !bindings[by].length ||
+      bindings[by].some((entry) => entry.index < first)
+    )
+      return false;
+    const format = record(own(chart, "format"), formatKeys);
+    const rawEntries = format.series;
+    if (
+      !Array.isArray(rawEntries) ||
+      Object.getPrototypeOf(rawEntries) !== Array.prototype ||
+      rawEntries.length > 16 ||
+      Reflect.ownKeys(rawEntries).length !== rawEntries.length + 1
+    )
+      return false;
+    const entries = Array.from({ length: rawEntries.length }, (_, index) =>
+      own(rawEntries, String(index)),
+    );
+    const ids = new Set<string>();
+    for (const value of entries) {
+      const entry = record(value, ["id", "strokeWidth", "markers"]);
+      if (
+        Object.keys(entry).some((key) => !["id", "strokeWidth", "markers"].includes(key)) ||
+        typeof entry.id !== "string" ||
+        ids.has(entry.id) ||
+        !bindings[by].some((binding) => binding.id === entry.id) ||
+        !("strokeWidth" in entry || "markers" in entry)
+      )
+        return false;
+      if (
+        "strokeWidth" in entry &&
+        !(
+          typeof entry.strokeWidth === "number" &&
+          Number.isFinite(entry.strokeWidth) &&
+          entry.strokeWidth > 0 &&
+          entry.strokeWidth <= 32 &&
+          Math.abs(entry.strokeWidth * 9525 - Math.round(entry.strokeWidth * 9525)) < 1e-8
+        )
+      )
+        return false;
+      if ("markers" in entry && typeof entry.markers !== "boolean") return false;
+      ids.add(entry.id);
+    }
+    return entries.length === bindings[by].length;
+  } catch {
+    return false;
+  }
+}
+
 /** Shared fail-closed leaf admission, safe before any resource access or caller getters. */
 export function unsupportedNativeChartStyles(chart: SheetChart): readonly string[] {
   const issues = new Set<string>();
@@ -182,10 +269,9 @@ export function unsupportedNativeChartStyles(chart: SheetChart): readonly string
   try {
     ordinary =
       ["column", "bar", "line"].includes(own(chart, "type") as string) &&
-      !["pivotTableId", "dataCache", "source", "rectangleSeries", "seriesFilter"].some(
-        (key) => key in chart,
-      ) &&
-      own(chart, "stacked") === false;
+      !["pivotTableId", "dataCache", "source", "seriesFilter"].some((key) => key in chart) &&
+      own(chart, "stacked") === false &&
+      (!("rectangleSeries" in chart) || supportsNativeLineSeriesStyles(chart));
     const range = record(own(chart, "range"), ["start", "end"]);
     const start = record(range.start, ["row", "column"]),
       end = record(range.end, ["row", "column"]);
@@ -264,6 +350,8 @@ export function unsupportedNativeChartStyles(chart: SheetChart): readonly string
           } catch {
             issues.add(path);
           }
+        } else if (key === "series") {
+          if (!supportsNativeLineSeriesStyles(chart)) issues.add(path);
         } else if (key === "categoryAxis" || key === "valueAxis") {
           try {
             const axis = record(value, axisKeys);

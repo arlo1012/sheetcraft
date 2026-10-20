@@ -15,6 +15,7 @@ test("the lightweight capability entry initializes without codec, ZIP or XML", a
   const entry = await import("../../chart-capabilities.js");
   expect(Object.keys(entry)).toEqual([
     "unsupportedNativeChartElements",
+    "supportsNativeLineSeriesStyles",
     "unsupportedNativeChartStyles",
   ]);
   const f = nativeColumnFixture();

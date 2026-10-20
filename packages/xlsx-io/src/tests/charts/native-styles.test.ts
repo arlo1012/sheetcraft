@@ -30,6 +30,10 @@ function explicit() {
   };
   return fixture;
 }
+const nativeLineSeries = [
+  { id: "range-series-1", strokeWidth: 3, markers: true },
+  { id: "range-series-2", strokeWidth: 3, markers: true },
+];
 for (const type of ["column", "bar", "line"] as const)
   describe(`${type} native shared styles`, () => {
     test("preserves explicit RGB and uniform text through snapshot/live source edit", async () => {
@@ -43,10 +47,19 @@ for (const type of ["column", "bar", "line"] as const)
       expect(xml(out.bytes)).not.toContain("schemeClr");
       const first = await decodeXlsx(out.bytes),
         a = imported(first);
-      expect(a.chart.format).toEqual(f.drawing.chart.format);
+      expect(a.chart.format).toEqual({
+        ...f.drawing.chart.format,
+        ...(type === "line" ? { series: nativeLineSeries } : {}),
+      });
       expect(a.chart.presentation).toEqual(f.drawing.chart.presentation);
-      expect(a.chart.rectangleSeries).toBeUndefined();
-      expect(a.chart.format?.series).toBeUndefined();
+      if (type === "line")
+        expect(a.chart.rectangleSeries?.columns).toEqual(
+          nativeLineSeries.map(({ id }, index) => ({ id, index: index + 1 })),
+        );
+      else {
+        expect(a.chart.rectangleSeries).toBeUndefined();
+        expect(a.chart.format?.series).toBeUndefined();
+      }
       const snapshot = deserializeWorkbook(serializeWorkbook(first.workbook));
       const sheet = [...snapshot.sheets.values()][0]!;
       setCellContent(sheet, { row: 1, column: 1 }, { kind: "literal", value: 90 });
@@ -234,6 +247,7 @@ test("actual WPS RGB producer preserves three editable styles and B2=90", async 
     expect(drawing.chart.presentation).toEqual({ palette: ["#2468ac", "#d15a28"] });
     expect(drawing.chart.format).toEqual({
       ...explicit().drawing.chart.format,
+      ...(drawing.chart.type === "line" ? { series: nativeLineSeries } : {}),
       legend: {
         text: {
           fontSize: 1000 / 75,
@@ -253,8 +267,14 @@ test("actual WPS RGB producer preserves three editable styles and B2=90", async 
         expect.stringMatching(/format\.legend\.text\.color\.themeMaterialization$/),
       ]),
     );
-    expect(drawing.chart.rectangleSeries).toBeUndefined();
-    expect(drawing.chart.format?.series).toBeUndefined();
+    if (drawing.chart.type === "line")
+      expect(drawing.chart.rectangleSeries?.columns).toEqual(
+        nativeLineSeries.map(({ id }, index) => ({ id, index: index + 1 })),
+      );
+    else {
+      expect(drawing.chart.rectangleSeries).toBeUndefined();
+      expect(drawing.chart.format?.series).toBeUndefined();
+    }
   }
   const { getSheetChartData } = await import("@sheetcraft/core/sheet-charts");
   const { createWorkbookEvaluator } = await import("@sheetcraft/core/workbook");

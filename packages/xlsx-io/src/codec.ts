@@ -2,7 +2,10 @@ import { canReuseFixedDrawingExportEncoding } from "@sheetcraft/core/picture-fra
 import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import { readXlsxTextBoxes } from "./textbox-reader.js";
 import { assertSupportedNativeTextBox } from "./textbox-capabilities.js";
-import { unsupportedNativeChartStyles } from "./native-chart-style-capabilities.js";
+import {
+  unsupportedNativeChartStyles,
+  supportsNativeLineSeriesStyles,
+} from "./native-chart-style-capabilities.js";
 import { reportUnsupportedNativeChartElements } from "./native-chart-elements.js";
 import { hasShapeObjectFrame, type SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
@@ -1210,7 +1213,11 @@ export async function encodeWithNativeXlsx(
           `${sheet.name}.drawings[${JSON.stringify(drawing.id)}].chart.seriesFilter`,
         );
       }
-      if (drawing.kind === "chart" && "rectangleSeries" in drawing.chart) {
+      if (
+        drawing.kind === "chart" &&
+        "rectangleSeries" in drawing.chart &&
+        !supportsNativeLineSeriesStyles(drawing.chart)
+      ) {
         detailedChartFormat = true;
         report.add(
           "feature-omitted",

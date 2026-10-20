@@ -1,3 +1,5 @@
+import { ensureChartRangeSeriesIdentity } from "@sheetcraft/core/chart-range-series";
+import type { ChartSeriesFormat } from "@sheetcraft/core/chart-format";
 import { readNativeAxisTitle } from "./native-chart-axis-titles.js";
 import type {
   ChartFormatSettings,
@@ -542,6 +544,81 @@ function readValueAxisNumberFormat(
 }
 
 /** Restore only independently representable leaves; report unresolved fonts/colors precisely. */
+/** Recover only model-owned width and filled-circle/none visibility. Other
+ * geometry remains a precise style loss, never an invented model setting. */
+function readNativeLineSeriesStyles(
+  chart: SheetChart,
+  series: readonly XmlNode[],
+  warn: (path: string) => void,
+): void {
+  if (chart.type !== "line" || !chart.range) return;
+  for (const [index, item] of series.entries()) {
+    const path = `format.series[${index}]`;
+    const settings: Omit<ChartSeriesFormat, "id"> = {};
+    try {
+      const marker = single(item, "marker");
+      const symbol = attr(single(marker, "symbol"), "val");
+      // Explicit absence does not depend on recoverable line or marker paint.
+      if (symbol === "none") {
+        settings.markers = false;
+        if (marker.spPr !== undefined || marker.size !== undefined) warn(`${path}.markerGeometry`);
+      }
+      const shape = single(item, "spPr");
+      const line = single(shape, "ln");
+      const width = Number(attr(line, "w"));
+      if (Object.hasOwn(line, "@_w")) {
+        if (
+          Number.isSafeInteger(width) &&
+          width > 0 &&
+          width <= 32 * 9525 &&
+          line.noFill === undefined
+        )
+          settings.strokeWidth = width / 9525;
+        else warn(`${path}.strokeWidth`);
+      }
+      if (
+        Object.keys(line).some(
+          (key) =>
+            !["@_w", "@_cap", "solidFill", "round", "prstDash"].includes(key) &&
+            !key.startsWith("@_xmlns"),
+        ) ||
+        (line["@_cap"] !== undefined && line["@_cap"] !== "rnd")
+      )
+        warn(`${path}.strokeStyle`);
+      // Core cannot encode native end caps/joins; the Web renderer has its own
+      // defaults even when native round geometry is an ordinary valid value.
+      if (line["@_cap"] !== undefined || line.round !== undefined || shape.sp3d !== undefined)
+        warn(`${path}.strokeGeometry`);
+      if (symbol === "circle") {
+        const markerShape = optional(marker, "spPr");
+        const color = rgbFill(line);
+        if (color && markerShape && rgbFill(markerShape) === color) settings.markers = true;
+        else warn(`${path}.markerPaint`);
+        // Native marker size is in points. Core currently has no size field;
+        // do not silently claim the renderer's fixed symbol size is equivalent.
+        warn(`${path}.markerSize`);
+        if (markerShape?.ln !== undefined) warn(`${path}.markerStroke`);
+      } else if (symbol !== "none") warn(`${path}.markers`);
+    } catch {
+      warn(path);
+    }
+    if (!Object.keys(settings).length) continue;
+    const axis = chart.seriesBy === "rows" ? "row" : "column";
+    const first =
+      chart.range.start[axis] +
+      Number(chart.seriesBy === "rows" ? chart.headerRow : chart.headerColumn);
+    const bound = ensureChartRangeSeriesIdentity(chart, {
+      seriesBy: chart.seriesBy,
+      index: first + index,
+    });
+    Object.assign(chart, bound.chart);
+    chart.format = {
+      ...chart.format,
+      series: [...(chart.format?.series ?? []), { id: bound.id, ...settings }],
+    };
+  }
+}
+
 export function readNativeChartStyles(
   chartSpace: XmlNode,
   native: XmlNode,
@@ -683,5 +760,6 @@ export function readNativeChartStyles(
   } catch {
     warn("presentation.palette");
   }
+  readNativeLineSeriesStyles(chart, series, warn);
   for (const path of warned) report.add("style-omitted", "warning", `${chartPart}.${path}`);
 }
