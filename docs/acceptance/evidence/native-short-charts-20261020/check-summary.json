@@ -1,0 +1,53 @@
+{
+  "date": "2026-10-20",
+  "baseCommit": "e4046a5db5d65a78bfc4b97a2816fa16a90cf5e9",
+  "boundedWebAggregate": {
+    "files": 11,
+    "passed": 386,
+    "failed": 0,
+    "maxWorkers": 2,
+    "finalLog": "final-web-bounded-aggregate.log"
+  },
+  "finalFullTypecheck": {
+    "exitCode": 0,
+    "heapMiB": 4096,
+    "log": "final-typecheck.log"
+  },
+  "finalProductionBuild": {
+    "exitCode": 0,
+    "heapMiB": 4096,
+    "log": "final-build.log",
+    "warnings": ["Existing large chunks", "Existing ineffective dynamic imports"]
+  },
+  "scopedLint": {
+    "exitCode": 0,
+    "files": 4
+  },
+  "independentSourceAndTestReview": "Passed; no blocking findings. Reviewed hashes equal source-hashes.json.",
+  "resourceLimits": {
+    "unboundedChartAggregateExit": 137,
+    "fullSuitePassClaimed": false
+  },
+  "baseline": {
+    "reference": "f055089d42ec9e99399686b260596795e033798b",
+    "bothCurrentAndBaseline": {
+      "files": 4,
+      "passed": 75,
+      "failed": 15
+    },
+    "sameFailureGroups": true
+  },
+  "actualApplications": [
+    "Cloud Chromium production UI import, reload, resize, undo/redo, resize again, native export",
+    "Real WPS 100% open of both product exports and actual browser export; product exports saved/read back"
+  ],
+  "notClaimed": [
+    "WPS automatic-axis parity",
+    "General manual layout support",
+    "New explicit bounds/majorUnit native XLSX support",
+    "Full repository test suite green",
+    "Excel verification",
+    "CI green",
+    "PR, merge or deployment"
+  ]
+}

@@ -5,6 +5,7 @@ import { createChartOption } from "../../../modules/charts/chart-option";
 import { getChartFontFamilies } from "../../../modules/charts/chart-script-fonts";
 import { createChartDataTablePlan } from "../../../modules/charts/chart-data-table";
 import { init } from "../../../modules/charts/chart-runtime";
+import { reserveChartAxisTitles } from "../../../modules/charts/chart-axis-title-layout";
 
 const chart: SheetChart = {
   type: "column",
@@ -246,4 +247,109 @@ describe("independent axis title paint", () => {
       }
     },
   );
+});
+
+test("short title admission keeps legacy geometry and rejects titles consuming most of a small plot", () => {
+  const source: SheetChart = {
+    ...chart,
+    type: "line",
+    title: "Short native chart",
+    format: {
+      categoryAxis: { title: "Quarter", titleText: { fontSize: 16 }, titleRotation: 0 },
+      valueAxis: { title: "Revenue", titleText: { fontSize: 16 }, titleRotation: -90 },
+    },
+  };
+  for (const surface of [
+    { width: 320, height: 200 },
+    { width: 640, height: 400 },
+  ])
+    expect(createChartOption(source, data, surface).grid).toEqual({
+      top: 45,
+      left: 75.2,
+      right: 22,
+      bottom: 62.2,
+    });
+  expect(() =>
+    createChartOption(
+      {
+        ...source,
+        format: { categoryAxis: { title: "Large", titleText: { fontSize: 64 }, titleRotation: 0 } },
+      },
+      data,
+      { width: 320, height: 200 },
+    ),
+  ).toThrow(/adaptive plot budget/);
+  expect(() => createChartOption(source, data, { width: 80, height: 80 })).toThrow(
+    /adaptive plot budget/,
+  );
+});
+
+test("adaptive admission preserves caller grid offsets and top/right axis placement", () => {
+  const option: EChartsOption = {
+    grid: { left: "20%", right: "10%", top: 10, bottom: "10%", containLabel: true },
+    xAxis: { type: "category", position: "top", name: "Quarter", nameRotate: 0 },
+    yAxis: { type: "value", position: "right", name: "Revenue", nameRotate: 90 },
+  };
+  const before = structuredClone(option);
+  const reserved = reserveChartAxisTitles(
+    option,
+    {
+      ...chart,
+      format: {
+        categoryAxis: { title: "Quarter", titleText: { fontSize: 16 }, titleRotation: 0 },
+        valueAxis: { title: "Revenue", titleText: { fontSize: 16 }, titleRotation: -90 },
+      },
+    },
+    { width: 320, height: 200 },
+  );
+  expect(reserved.grid).toEqual({
+    left: "20%",
+    right: 59.2,
+    top: 37.2,
+    bottom: "10%",
+    containLabel: true,
+  });
+  expect(reserved.xAxis).toMatchObject({ position: "top", nameRotate: 0 });
+  expect(reserved.yAxis).toMatchObject({ position: "right", nameRotate: 90 });
+  expect(option).toEqual(before);
+});
+
+test("compact parallel titles use the real midpoint budget instead of truncating a fitting face", () => {
+  // Wide glyphs reproduce the browser-metric case that narrower SSR fallback
+  // glyphs hid in the mixed-language native fixture.
+  const title = "M".repeat(18);
+  const source: SheetChart = {
+    ...chart,
+    type: "line",
+    title: "Compact",
+    format: {
+      categoryAxis: { title, titleText: { fontSize: 16, bold: true }, titleRotation: 0 },
+      valueAxis: { title: "Revenue", titleText: { fontSize: 16 }, titleRotation: -90 },
+    },
+  };
+  const surface = { width: 320, height: 200 };
+  const option = createChartOption(source, data, surface);
+  expect(axis(option, "xAxis").nameTruncate?.maxWidth).toBeCloseTo(258.8);
+  expect(
+    axis(createChartOption(source, data, { width: 640, height: 400 }), "xAxis").nameTruncate
+      ?.maxWidth,
+  ).toBe(384);
+  const instance = init(null, undefined, { renderer: "svg", ssr: true, ...surface });
+  try {
+    instance.setOption(option);
+    const element = instance
+      .getZr()
+      .storage.getDisplayList(true)
+      .find((entry) => entry.type === "tspan" && entry.style.text === title);
+    expect(element).toBeDefined();
+    const rect = element!.getBoundingRect().clone();
+    const transform = element!.getComputedTransform();
+    if (transform) rect.applyTransform(transform);
+    expect(rect.x).toBeGreaterThanOrEqual(0);
+    expect(rect.x + rect.width).toBeLessThanOrEqual(surface.width);
+    expect(rect.y).toBeGreaterThanOrEqual(0);
+    expect(rect.y + rect.height).toBeLessThanOrEqual(surface.height);
+  } finally {
+    instance.dispose();
+  }
 });

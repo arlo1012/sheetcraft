@@ -932,3 +932,59 @@ test("ordinary line print keeps explicit point sizes in CSS pixels without densi
     result.dispose();
   }
 });
+
+test.each([320, 640])(
+  "short %spx line print preserves independent title fonts at CSS height 200",
+  (width) => {
+    const source = drawing({
+      type: "line",
+      format: {
+        categoryAxis: {
+          title: "Quarter",
+          titleRotation: 0,
+          titleText: { fontFamily: "Original title face", fontSize: 16, bold: true },
+        },
+        valueAxis: {
+          title: "Revenue",
+          titleRotation: -90,
+          titleText: { fontFamily: "Original value face", fontSize: 16, bold: true, italic: true },
+          min: 0,
+          max: 10,
+          majorUnit: 2,
+        },
+      },
+    });
+    source.width = width;
+    source.height = 200;
+    const before = structuredClone(source);
+    const result = renderChartPrintPresentation(source, data, {
+      ...options,
+      width,
+      height: 200,
+      resolveFontFamily: (family) => family.replace("Original", "Leased"),
+    });
+    try {
+      expect([result.canvas.width, result.canvas.height]).toEqual([width * 2, 400]);
+      expect(nativeOptions.at(-1)).toMatchObject({
+        grid: [{ top: 45, left: 75.2, right: 22, bottom: 62.2 }],
+        xAxis: [{ name: "Quarter", nameRotate: 0 }],
+        yAxis: [{ name: "Revenue", nameRotate: 90, min: 0, max: 10, interval: 2 }],
+      });
+      const texts = contexts
+        .get(result.canvas)!
+        .copies[0]!.paints.filter((p) => p.operation === "text");
+      expect(
+        texts.some((p) => p.text === "Quarter" && p.font.includes("bold 16px Leased title face")),
+      ).toBe(true);
+      expect(
+        texts.some(
+          (p) => p.text === "Revenue" && p.font.includes("italic bold 16px Leased value face"),
+        ),
+      ).toBe(true);
+      expect(source).toEqual(before);
+      expect(instances[0]!.isDisposed()).toBe(true);
+    } finally {
+      result.dispose();
+    }
+  },
+);

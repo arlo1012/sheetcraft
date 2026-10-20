@@ -1,0 +1,6 @@
+{
+  "apps/web/src/modules/charts/chart-axis-title-layout.ts": "fb7ee797a2ee167ec635c4a6cdd1cf3b0b372f0f8eb21f4a3e207fbff3892629",
+  "apps/web/src/tests/modules/charts/chart-axis-titles-render.test.ts": "b9a4a8c9247be3f42041d6acfb33b4dafe9af39a35eecddbe2dc0a81b7ba8ecf",
+  "apps/web/src/tests/modules/charts/native-short-axis-titles.test.ts": "8188f31c3128e03066fee7b08f923b6c53226cf632861e0e817a7634fa5bea21",
+  "apps/web/src/tests/modules/charts/chart-print-presentation.test.ts": "fb7cb2f333cc422ed1b0f1468ac8d1766d6dd4b8d0d8c66ac927ce8585b942fd"
+}

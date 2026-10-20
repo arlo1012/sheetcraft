@@ -1,0 +1,39 @@
+{
+  "sameFailureGroups": true,
+  "currentFailureGroups": [
+    "src/tests/modules/charts/chart-presentation-render.test.ts > chart-wide presentation consumers > strict validation rejects presentation accessors/unknown fields and non-finite source values before geometry",
+    "src/tests/modules/charts/chart-presentation-text.test.ts > recipe text defaults on opaque presentation backgrounds > dark title-only color edits leave actual non-title SVG text and tooltip defaults unchanged",
+    "src/tests/modules/charts/chart-presentation-text.test.ts > recipe text defaults on opaque presentation backgrounds > office title-only color edits leave actual non-title SVG text and tooltip defaults unchanged",
+    "src/tests/modules/charts/design-controls.test.ts > chart type dialog design draft > subtype mutates only the local draft while saved appearance survives; Cancel has no mutation",
+    "src/tests/modules/charts/design-controls.test.ts > chart type dialog design draft > changing type and choosing standard remove only inapplicable flags while preserving appearance",
+    "src/tests/modules/charts/design-controls.test.ts > chart type dialog design draft > disabled editor and live-source applicability remain authoritative",
+    "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for pie",
+    "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for doughnut",
+    "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for scatter",
+    "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for treemap",
+    "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for sankey",
+    "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for river",
+    "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for wordCloud",
+    "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > columns promotion keeps labels readable when their header stripe is hidden",
+    "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > rows promotion keeps labels readable when their header stripe is hidden"
+  ],
+  "baselineFailureGroups": [
+    "src/tests/modules/charts/chart-presentation-render.test.ts > chart-wide presentation consumers > strict validation rejects presentation accessors/unknown fields and non-finite source values before geometry",
+    "src/tests/modules/charts/chart-presentation-text.test.ts > recipe text defaults on opaque presentation backgrounds > dark title-only color edits leave actual non-title SVG text and tooltip defaults unchanged",
+    "src/tests/modules/charts/chart-presentation-text.test.ts > recipe text defaults on opaque presentation backgrounds > office title-only color edits leave actual non-title SVG text and tooltip defaults unchanged",
+    "src/tests/modules/charts/design-controls.test.ts > chart type dialog design draft > subtype mutates only the local draft while saved appearance survives; Cancel has no mutation",
+    "src/tests/modules/charts/design-controls.test.ts > chart type dialog design draft > changing type and choosing standard remove only inapplicable flags while preserving appearance",
+    "src/tests/modules/charts/design-controls.test.ts > chart type dialog design draft > disabled editor and live-source applicability remain authoritative",
+    "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for pie",
+    "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for doughnut",
+    "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for scatter",
+    "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for treemap",
+    "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for sankey",
+    "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for river",
+    "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for wordCloud",
+    "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > columns promotion keeps labels readable when their header stripe is hidden",
+    "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > rows promotion keeps labels readable when their header stripe is hidden"
+  ],
+  "summaryBoth": "75 passed, 15 failed across4 files",
+  "broadRun": "Full charts aggregate was killed137; do not claim full suite pass."
+}

@@ -1,0 +1,36 @@
+{
+  "date": "2026-10-20",
+  "surface": "Dot cloud Chromium, actual Sheetcraft production preview, not SSR",
+  "fixture": "../native-auto-axis-20261020/auto-axis-small.xlsx",
+  "zoomPercent": 100,
+  "initialDimensions": [320, 200],
+  "initialProblemAfterAdmissionFix": "Browser glyph width 193.84375px exceeded the existing 192px title budget; the title was ellipsized, though narrower SSR fallback glyphs had fitted.",
+  "finalTitleText": "Quarter 季度 & <channel>",
+  "finalTitleStyle": "font-size: 16px; font-family: Arial; font-weight: bold;",
+  "finalTitleLocalBounds": {
+    "left": 89.67813110351562,
+    "right": 283.5218811035156,
+    "top": 169.3000183105469,
+    "bottom": 186.3000183105469
+  },
+  "finalValueTitleText": "Revenue 收入",
+  "finalValueTitleStyle": "font-size: 16px; font-family: Arial; font-style: italic; font-weight: bold;",
+  "finalValueTitleLocalBounds": {
+    "left": 9.77068328857422,
+    "right": 26.77068328857422,
+    "top": 39.8218688964844,
+    "bottom": 142.9781188964844
+  },
+  "uiActionsVerified": [
+    "Imported XLSX via File menu and reviewed compatibility confirmation.",
+    "Reload restored the saved native 320x200 chart with complete titles.",
+    "Dragged right resize handle from 320 to 640 pixels; height stayed 200; complete titles remained visible.",
+    "Ctrl+Z restored 320x200 with complete titles.",
+    "Ctrl+Y restored 640x200 with complete titles.",
+    "Dragged right resize handle back to 320 pixels; complete titles remained visible.",
+    "Exported XLSX via File menu after the existing one-item compatibility warning.",
+    "Opened browser-resized-small-export.xlsx in real WPS at 100%: complete native chart and both titles; no repair dialog."
+  ],
+  "axisParity": "Not established: Web automatic ticks remain 0..120 step20; WPS uses 0..150 step50 at these dimensions.",
+  "screenshotPolicy": "Screenshots were inspected during verification but are intentionally excluded from the published source and backup."
+}

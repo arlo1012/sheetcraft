@@ -76,6 +76,7 @@ export function reserveChartAxisTitles(
     height = dimensions?.height ?? 300;
   const additions = { left: 0, right: 0, top: 0, bottom: 0 };
   type Axis = XAXisComponentOption | YAXisComponentOption;
+  const titles: { axis: Axis; horizontal: boolean; settings: AxisTitle }[] = [];
   const axes = (entries: EChartsOption["xAxis"] | EChartsOption["yAxis"], horizontal: boolean) => {
     if (!entries) return entries;
     const apply = (axis: Axis, index: number): Axis => {
@@ -114,11 +115,13 @@ export function reserveChartAxisTitles(
           additions[side],
           (horizontal ? extent.height : extent.width) + 8,
         );
-      return {
+      const result: Axis = {
         ...axis,
         nameTruncate: { ...axis.nameTruncate, maxWidth, ellipsis: "…" },
         nameTextStyle: { ...axis.nameTextStyle, width: maxWidth, overflow: "truncate" },
       };
+      titles.push({ axis: result, horizontal, settings });
+      return result;
     };
     return Array.isArray(entries) ? entries.map(apply) : apply(entries, 0);
   };
@@ -143,14 +146,51 @@ export function reserveChartAxisTitles(
       : typeof value === "string" && value.endsWith("%")
         ? (Number.parseFloat(value) * span) / 100
         : 0;
+  // A small native drawing can have a perfectly usable plot below 96px before
+  // titles are reserved. Keep at least half of that original plot span, capped
+  // at the ordinary 96px budget, rather than imposing a new minimum chart size.
+  // Only admission adapts: never shrink the document's fonts, move its existing
+  // strips, or change the data-table planner's separate readability budget.
+  const minimumPlot = (span: number, start: unknown, end: unknown) =>
+    Math.max(1, Math.min(96, (span - pixels(start, span) - pixels(end, span)) / 2));
+  const plotWidth = width - pixels(grid.left, width) - pixels(grid.right, width);
+  const plotHeight = height - pixels(grid.top, height) - pixels(grid.bottom, height);
   if (
     Object.values(additions).some((value) => value > 0) &&
-    (width - pixels(grid.left, width) - pixels(grid.right, width) < 96 ||
-      height - pixels(grid.top, height) - pixels(grid.bottom, height) < 96)
+    (plotWidth < minimumPlot(width, option.grid.left, option.grid.right) ||
+      plotHeight < minimumPlot(height, option.grid.top, option.grid.bottom))
   )
     throw new RangeError(
-      "Axis titles leave less than a 96×96px plot; enlarge the chart or reduce title size.",
+      "Axis titles exceed the adaptive plot budget (up to 96×96px); enlarge the chart or reduce title size.",
     );
+  // On newly admitted compact plots a parallel title can use the real space
+  // around its plot midpoint, not an arbitrary fraction of the canvas. This is
+  // important with browser font metrics: a full title can fit the drawing while
+  // exceeding the old 60%-width cap. Perpendicular footprints stay unchanged.
+  // containLabel grids are subsequently moved by the engine; keep their existing
+  // width budget rather than guessing that later midpoint.
+  if (
+    (plotWidth < 96 || plotHeight < 96) &&
+    grid.containLabel !== true &&
+    grid.outerBounds === undefined &&
+    grid.outerBoundsMode === undefined
+  ) {
+    for (const { axis, horizontal, settings } of titles) {
+      if (axis.nameLocation !== "middle" && axis.nameLocation !== "center") continue;
+      if (axis.nameTextStyle?.align !== undefined && axis.nameTextStyle.align !== "center")
+        continue;
+      const radians = ((settings.titleRotation ?? (horizontal ? 0 : -90)) * Math.PI) / 180;
+      const parallel = horizontal ? Math.abs(Math.sin(radians)) : Math.abs(Math.cos(radians));
+      if (parallel > 1e-10) continue;
+      const span = horizontal ? width : height;
+      const start = pixels(horizontal ? grid.left : grid.top, span);
+      const end = pixels(horizontal ? grid.right : grid.bottom, span);
+      const center = (span + start - end) / 2;
+      const maxWidth = Math.max(1, 2 * Math.min(center, span - center) - 8);
+      axis.nameTruncate = { ...axis.nameTruncate, maxWidth };
+      axis.nameTextStyle = { ...axis.nameTextStyle, width: maxWidth };
+    }
+  }
   return {
     ...option,
     grid,

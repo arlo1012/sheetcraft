@@ -1,0 +1,556 @@
+{
+  "method": "The two product exports were opened and saved as copies in real WPS, then originals and saved copies were decoded and rendered. The actual browser export was independently reopened in WPS (not saved again), then decoded and rendered.",
+  "results": [
+    {
+      "filename": "native-small-product-export.xlsx",
+      "sha256": "f6e246ea36c4d1f40a5a871bfad2f92f5cfdc1b696d8248d6e4f3401b29147bf",
+      "width": 320,
+      "height": 200,
+      "titles": [
+        {
+          "text": "Quarter \u5b63\u5ea6 & <channel>",
+          "bounds": {
+            "x": 93.88,
+            "y": 169.8,
+            "width": 185.44000000000005,
+            "height": 16
+          },
+          "contained": true
+        },
+        {
+          "text": "Revenue \u6536\u5165",
+          "bounds": {
+            "x": 10.059999999999977,
+            "y": 41.00000000000001,
+            "width": 16.000000000000007,
+            "height": 100.80000000000001
+          },
+          "contained": true
+        }
+      ],
+      "grid": {
+        "top": 45,
+        "left": 75.2,
+        "right": 22,
+        "bottom": 62.2
+      },
+      "format": {
+        "title": {
+          "fontFamily": "Arial",
+          "fontSize": 15,
+          "color": "#000000",
+          "bold": false
+        },
+        "categoryAxis": {
+          "labelAngle": 0,
+          "title": "Quarter \u5b63\u5ea6 & <channel>",
+          "titleText": {
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "color": "#7c3aed",
+            "bold": true,
+            "italic": false
+          },
+          "titleRotation": 0,
+          "text": {
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "color": "#334155",
+            "bold": false
+          }
+        },
+        "valueAxis": {
+          "title": "Revenue \u6536\u5165",
+          "titleText": {
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "color": "#b45309",
+            "bold": true,
+            "italic": true
+          },
+          "titleRotation": -90,
+          "text": {
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "color": "#334155",
+            "bold": false
+          },
+          "numberFormat": {
+            "kind": "number",
+            "fractionDigits": 1,
+            "useGrouping": false
+          },
+          "linkedToSource": false
+        },
+        "series": [
+          {
+            "id": "range-series-1",
+            "strokeWidth": 2,
+            "markers": true,
+            "markerSizePt": 9
+          },
+          {
+            "id": "range-series-2",
+            "strokeWidth": 4,
+            "markers": false
+          }
+        ]
+      },
+      "issues": [
+        {
+          "code": "style-omitted",
+          "severity": "warning",
+          "count": 4,
+          "locations": [
+            "xl/charts/chart1.xml.format.series[0].strokeGeometry",
+            "xl/charts/chart1.xml.format.series[0].markerStroke",
+            "xl/charts/chart1.xml.format.series[1].strokeGeometry",
+            "xl/charts/chart1.xml"
+          ]
+        }
+      ]
+    },
+    {
+      "filename": "native-small-product-export-wps-saved.xlsx",
+      "sha256": "a63a2b1ee03b0e2dec8834b807ee3d6fc56e711b642d9f9ce68904c4688770d7",
+      "width": 320,
+      "height": 200,
+      "titles": [
+        {
+          "text": "Quarter \u5b63\u5ea6 & <channel>",
+          "bounds": {
+            "x": 93.88,
+            "y": 169.8,
+            "width": 185.44000000000005,
+            "height": 16
+          },
+          "contained": true
+        },
+        {
+          "text": "Revenue \u6536\u5165",
+          "bounds": {
+            "x": 10.059999999999977,
+            "y": 41.00000000000001,
+            "width": 16.000000000000007,
+            "height": 100.80000000000001
+          },
+          "contained": true
+        }
+      ],
+      "grid": {
+        "top": 45,
+        "left": 75.2,
+        "right": 22,
+        "bottom": 62.2
+      },
+      "format": {
+        "title": {
+          "fontFamily": "Arial",
+          "fontSize": 15,
+          "color": "#000000",
+          "bold": false
+        },
+        "categoryAxis": {
+          "labelAngle": 0,
+          "title": "Quarter \u5b63\u5ea6 & <channel>",
+          "titleText": {
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "color": "#7c3aed",
+            "bold": true,
+            "italic": false
+          },
+          "titleRotation": 0,
+          "text": {
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "color": "#334155",
+            "bold": false
+          }
+        },
+        "valueAxis": {
+          "title": "Revenue \u6536\u5165",
+          "titleText": {
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "color": "#b45309",
+            "bold": true,
+            "italic": true
+          },
+          "titleRotation": -90,
+          "text": {
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "color": "#334155",
+            "bold": false
+          },
+          "numberFormat": {
+            "kind": "number",
+            "fractionDigits": 1,
+            "useGrouping": false
+          },
+          "linkedToSource": false
+        },
+        "series": [
+          {
+            "id": "range-series-1",
+            "strokeWidth": 2,
+            "markers": true,
+            "markerSizePt": 9
+          },
+          {
+            "id": "range-series-2",
+            "strokeWidth": 4,
+            "markers": false
+          }
+        ]
+      },
+      "issues": [
+        {
+          "code": "style-omitted",
+          "severity": "warning",
+          "count": 7,
+          "locations": [
+            "xl/charts/chart1.xml.format.categoryAxis.titleText.kern",
+            "xl/charts/chart1.xml.format.categoryAxis.text.bodyPr",
+            "xl/charts/chart1.xml.format.valueAxis.titleText.kern",
+            "xl/charts/chart1.xml.format.series[0].strokeGeometry",
+            "xl/charts/chart1.xml.format.series[0].markerStroke",
+            "xl/charts/chart1.xml.format.series[1].strokeGeometry",
+            "xl/charts/chart1.xml"
+          ]
+        }
+      ]
+    },
+    {
+      "filename": "native-short-product-export.xlsx",
+      "sha256": "7f072b7f278f83dcf9319433cf868762caa03d937e493b7988fa072c3a8e5ea3",
+      "width": 640,
+      "height": 200,
+      "titles": [
+        {
+          "text": "Quarter \u5b63\u5ea6 & <channel>",
+          "bounds": {
+            "x": 253.87999999999994,
+            "y": 169.8,
+            "width": 185.44000000000005,
+            "height": 16
+          },
+          "contained": true
+        },
+        {
+          "text": "Revenue \u6536\u5165",
+          "bounds": {
+            "x": 10.059999999999977,
+            "y": 41.00000000000001,
+            "width": 16.000000000000007,
+            "height": 100.80000000000001
+          },
+          "contained": true
+        }
+      ],
+      "grid": {
+        "top": 45,
+        "left": 75.2,
+        "right": 22,
+        "bottom": 62.2
+      },
+      "format": {
+        "title": {
+          "fontFamily": "Arial",
+          "fontSize": 15,
+          "color": "#000000",
+          "bold": false
+        },
+        "categoryAxis": {
+          "labelAngle": 0,
+          "title": "Quarter \u5b63\u5ea6 & <channel>",
+          "titleText": {
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "color": "#7c3aed",
+            "bold": true,
+            "italic": false
+          },
+          "titleRotation": 0,
+          "text": {
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "color": "#334155",
+            "bold": false
+          }
+        },
+        "valueAxis": {
+          "title": "Revenue \u6536\u5165",
+          "titleText": {
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "color": "#b45309",
+            "bold": true,
+            "italic": true
+          },
+          "titleRotation": -90,
+          "text": {
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "color": "#334155",
+            "bold": false
+          },
+          "numberFormat": {
+            "kind": "number",
+            "fractionDigits": 1,
+            "useGrouping": false
+          },
+          "linkedToSource": false
+        },
+        "series": [
+          {
+            "id": "range-series-1",
+            "strokeWidth": 2,
+            "markers": true,
+            "markerSizePt": 9
+          },
+          {
+            "id": "range-series-2",
+            "strokeWidth": 4,
+            "markers": false
+          }
+        ]
+      },
+      "issues": [
+        {
+          "code": "style-omitted",
+          "severity": "warning",
+          "count": 4,
+          "locations": [
+            "xl/charts/chart1.xml.format.series[0].strokeGeometry",
+            "xl/charts/chart1.xml.format.series[0].markerStroke",
+            "xl/charts/chart1.xml.format.series[1].strokeGeometry",
+            "xl/charts/chart1.xml"
+          ]
+        }
+      ]
+    },
+    {
+      "filename": "native-short-product-export-wps-saved.xlsx",
+      "sha256": "956bf9ba3fb31aee71286c7d52ae449ad97907b819844d89f4d29f5adfd43dcc",
+      "width": 640,
+      "height": 200,
+      "titles": [
+        {
+          "text": "Quarter \u5b63\u5ea6 & <channel>",
+          "bounds": {
+            "x": 253.87999999999994,
+            "y": 169.8,
+            "width": 185.44000000000005,
+            "height": 16
+          },
+          "contained": true
+        },
+        {
+          "text": "Revenue \u6536\u5165",
+          "bounds": {
+            "x": 10.059999999999977,
+            "y": 41.00000000000001,
+            "width": 16.000000000000007,
+            "height": 100.80000000000001
+          },
+          "contained": true
+        }
+      ],
+      "grid": {
+        "top": 45,
+        "left": 75.2,
+        "right": 22,
+        "bottom": 62.2
+      },
+      "format": {
+        "title": {
+          "fontFamily": "Arial",
+          "fontSize": 15,
+          "color": "#000000",
+          "bold": false
+        },
+        "categoryAxis": {
+          "labelAngle": 0,
+          "title": "Quarter \u5b63\u5ea6 & <channel>",
+          "titleText": {
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "color": "#7c3aed",
+            "bold": true,
+            "italic": false
+          },
+          "titleRotation": 0,
+          "text": {
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "color": "#334155",
+            "bold": false
+          }
+        },
+        "valueAxis": {
+          "title": "Revenue \u6536\u5165",
+          "titleText": {
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "color": "#b45309",
+            "bold": true,
+            "italic": true
+          },
+          "titleRotation": -90,
+          "text": {
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "color": "#334155",
+            "bold": false
+          },
+          "numberFormat": {
+            "kind": "number",
+            "fractionDigits": 1,
+            "useGrouping": false
+          },
+          "linkedToSource": false
+        },
+        "series": [
+          {
+            "id": "range-series-1",
+            "strokeWidth": 2,
+            "markers": true,
+            "markerSizePt": 9
+          },
+          {
+            "id": "range-series-2",
+            "strokeWidth": 4,
+            "markers": false
+          }
+        ]
+      },
+      "issues": [
+        {
+          "code": "style-omitted",
+          "severity": "warning",
+          "count": 7,
+          "locations": [
+            "xl/charts/chart1.xml.format.categoryAxis.titleText.kern",
+            "xl/charts/chart1.xml.format.categoryAxis.text.bodyPr",
+            "xl/charts/chart1.xml.format.valueAxis.titleText.kern",
+            "xl/charts/chart1.xml.format.series[0].strokeGeometry",
+            "xl/charts/chart1.xml.format.series[0].markerStroke",
+            "xl/charts/chart1.xml.format.series[1].strokeGeometry",
+            "xl/charts/chart1.xml"
+          ]
+        }
+      ]
+    },
+    {
+      "filename": "browser-resized-small-export.xlsx",
+      "sha256": "6fe2e7237f78bae50a4f3b22f1a783edc4232536d53765853fd9cf4ebb04958c",
+      "width": 320,
+      "height": 200,
+      "titles": [
+        {
+          "text": "Quarter \u5b63\u5ea6 & <channel>",
+          "bounds": {
+            "x": 93.88,
+            "y": 169.8,
+            "width": 185.44000000000005,
+            "height": 16
+          },
+          "contained": true
+        },
+        {
+          "text": "Revenue \u6536\u5165",
+          "bounds": {
+            "x": 10.059999999999977,
+            "y": 41.00000000000001,
+            "width": 16.000000000000007,
+            "height": 100.80000000000001
+          },
+          "contained": true
+        }
+      ],
+      "grid": {
+        "top": 45,
+        "left": 75.2,
+        "right": 22,
+        "bottom": 62.2
+      },
+      "format": {
+        "title": {
+          "fontFamily": "Arial",
+          "fontSize": 15,
+          "color": "#000000",
+          "bold": false
+        },
+        "categoryAxis": {
+          "labelAngle": 0,
+          "title": "Quarter \u5b63\u5ea6 & <channel>",
+          "titleText": {
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "color": "#7c3aed",
+            "bold": true,
+            "italic": false
+          },
+          "titleRotation": 0,
+          "text": {
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "color": "#334155",
+            "bold": false
+          }
+        },
+        "valueAxis": {
+          "title": "Revenue \u6536\u5165",
+          "titleText": {
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "color": "#b45309",
+            "bold": true,
+            "italic": true
+          },
+          "titleRotation": -90,
+          "text": {
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "color": "#334155",
+            "bold": false
+          },
+          "numberFormat": {
+            "kind": "number",
+            "fractionDigits": 1,
+            "useGrouping": false
+          },
+          "linkedToSource": false
+        },
+        "series": [
+          {
+            "id": "range-series-1",
+            "strokeWidth": 2,
+            "markers": true,
+            "markerSizePt": 9
+          },
+          {
+            "id": "range-series-2",
+            "strokeWidth": 4,
+            "markers": false
+          }
+        ]
+      },
+      "issues": [
+        {
+          "code": "style-omitted",
+          "severity": "warning",
+          "count": 4,
+          "locations": [
+            "xl/charts/chart1.xml.format.series[0].strokeGeometry",
+            "xl/charts/chart1.xml.format.series[0].markerStroke",
+            "xl/charts/chart1.xml.format.series[1].strokeGeometry",
+            "xl/charts/chart1.xml"
+          ]
+        }
+      ]
+    }
+  ]
+}

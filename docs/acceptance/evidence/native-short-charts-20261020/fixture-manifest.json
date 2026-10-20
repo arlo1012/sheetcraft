@@ -1,0 +1,30 @@
+{
+  "files": [
+    {
+      "file": "browser-resized-small-export.xlsx",
+      "bytes": 6101,
+      "sha256": "6fe2e7237f78bae50a4f3b22f1a783edc4232536d53765853fd9cf4ebb04958c"
+    },
+    {
+      "file": "native-short-product-export-wps-saved.xlsx",
+      "bytes": 11864,
+      "sha256": "956bf9ba3fb31aee71286c7d52ae449ad97907b819844d89f4d29f5adfd43dcc"
+    },
+    {
+      "file": "native-short-product-export.xlsx",
+      "bytes": 6103,
+      "sha256": "7f072b7f278f83dcf9319433cf868762caa03d937e493b7988fa072c3a8e5ea3"
+    },
+    {
+      "file": "native-small-product-export-wps-saved.xlsx",
+      "bytes": 11868,
+      "sha256": "a63a2b1ee03b0e2dec8834b807ee3d6fc56e711b642d9f9ce68904c4688770d7"
+    },
+    {
+      "file": "native-small-product-export.xlsx",
+      "bytes": 6101,
+      "sha256": "f6e246ea36c4d1f40a5a871bfad2f92f5cfdc1b696d8248d6e4f3401b29147bf"
+    }
+  ],
+  "content": "Synthetic chart fixtures only; no user documents, credentials or screenshots."
+}

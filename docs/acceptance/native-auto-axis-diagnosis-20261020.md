@@ -16,19 +16,19 @@ not a claim that WPS authored their initial bytes.
 Apple baseline values are 60, 100, 120; pear values are 70, 80, 90. Min / max / major
 below are observed axis labels, not stored explicit settings.
 
-| Case | Native size (px) | WPS min / max / major |
-| --- | --- | --- |
-| base120 | 640 × 400 | 0 / 140 / 20 |
-| max119 (last apple = 119) | 640 × 400 | 0 / 140 / 20 |
-| max121 (last apple = 121) | 640 × 400 | 0 / 140 / 20 |
-| scale01 (all values × 0.1) | 640 × 400 | 0 / 14 / 2 |
-| scale10 (all values × 10) | 640 × 400 | 0 / 1400 / 200 |
-| narrow (apple 118,119,120; pear 118.5,119.2,119.5) | 640 × 400 | 117 / 120.5 / 0.5 |
-| small | 320 × 200 | 0 / 150 / 50 |
-| short | 640 × 200 | 0 / 150 / 50 |
-| tall | 640 × 600 | 0 / 140 / 20 |
-| large | 960 × 600 | 0 / 140 / 20 |
-| nomarkers (both series none) | 640 × 400 | 0 / 140 / 20 |
+| Case                                               | Native size (px) | WPS min / max / major |
+| -------------------------------------------------- | ---------------- | --------------------- |
+| base120                                            | 640 × 400        | 0 / 140 / 20          |
+| max119 (last apple = 119)                          | 640 × 400        | 0 / 140 / 20          |
+| max121 (last apple = 121)                          | 640 × 400        | 0 / 140 / 20          |
+| scale01 (all values × 0.1)                         | 640 × 400        | 0 / 14 / 2            |
+| scale10 (all values × 10)                          | 640 × 400        | 0 / 1400 / 200        |
+| narrow (apple 118,119,120; pear 118.5,119.2,119.5) | 640 × 400        | 117 / 120.5 / 0.5     |
+| small                                              | 320 × 200        | 0 / 150 / 50          |
+| short                                              | 640 × 200        | 0 / 150 / 50          |
+| tall                                               | 640 × 600        | 0 / 140 / 20          |
+| large                                              | 960 × 600        | 0 / 140 / 20          |
+| nomarkers (both series none)                       | 640 × 400        | 0 / 140 / 20          |
 
 The same width at heights 200, 400 and 600 isolates a height dependency in these
 samples. Width changes at a fixed tested height did not change these axes. Tall

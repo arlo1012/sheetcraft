@@ -65,8 +65,12 @@ const expectedTicks = (observation: Observation) =>
   );
 const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const unescapeXml = (text: string) =>
-  text.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+  text
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
 
 function render(option: any, width: number, height: number) {
   const engine = init(null, undefined, { renderer: "svg", ssr: true, width, height });
@@ -74,7 +78,8 @@ function render(option: any, width: number, height: number) {
     engine.setOption(option);
     const svg = engine.renderToSVGString();
     const textNodes = Array.from(svg.matchAll(/<text\b[^>]*>([\s\S]*?)<\/text>/g), (match) =>
-      unescapeXml(match[1]!.replace(/<[^>]+>/g, "")));
+      unescapeXml(match[1]!.replace(/<[^>]+>/g, "")),
+    );
     const numericText = textNodes.filter((text) => /^-?\d[\d,]*(?:\.\d+)?$/.test(text));
     const axis = (engine as any).getModel().getComponent("yAxis", 0).axis;
     const tickValues = axis.scale.getTicks().map((tick: { value: number }) => tick.value);
@@ -138,7 +143,11 @@ for (const filename of names) {
     for (const drawing of sheet.drawings ?? []) {
       if (drawing.kind !== "chart") continue;
       const { width, height } = drawing;
-      const data = getSheetChartData(sheet, drawing.chart, createWorkbookEvaluator(workbook, sheet.id));
+      const data = getSheetChartData(
+        sheet,
+        drawing.chart,
+        createWorkbookEvaluator(workbook, sheet.id),
+      );
       let option;
       try {
         option = createChartOption(drawing.chart, data, { width, height, theme: workbook.theme });
@@ -204,7 +213,8 @@ for (const filename of names) {
         expectedWpsTicks: expected,
         currentMatchesWpsTicks: expected ? equal(result.tickValues, expected) : null,
         splitNumberOnlyProbeRange: "integers 1..20; no other option changed",
-        splitNumberOnlyMatches: splitNumberProbes.filter((probe) => probe.matchesWpsTicks)
+        splitNumberOnlyMatches: splitNumberProbes
+          .filter((probe) => probe.matchesWpsTicks)
           .map((probe) => probe.splitNumber),
         splitNumberProbes,
       });
@@ -228,13 +238,16 @@ const squareChartXml = originalChartXml.replace(
   '<c:symbol val="circle"/>',
   '<c:symbol val="square"/>',
 );
-if (squareChartXml === originalChartXml) throw new Error("Square probe did not change its one leaf.");
+if (squareChartXml === originalChartXml)
+  throw new Error("Square probe did not change its one leaf.");
 squareParts["xl/charts/chart1.xml"] = strToU8(squareChartXml);
 const squareRead = await decodeXlsx(zipSync(squareParts));
 const squareMarkerAudit = {
-  method: "In-memory synthetic clone of base120; first c:symbol circle changed to square. Original file unchanged. Not a WPS-produced square fixture.",
+  method:
+    "In-memory synthetic clone of base120; first c:symbol circle changed to square. Original file unchanged. Not a WPS-produced square fixture.",
   importedChartCount: [...squareRead.workbook.sheets.values()].reduce(
-    (count, sheet) => count + (sheet.drawings ?? []).filter((drawing) => drawing.kind === "chart").length,
+    (count, sheet) =>
+      count + (sheet.drawings ?? []).filter((drawing) => drawing.kind === "chart").length,
     0,
   ),
   importIssues: squareRead.report.issues,
@@ -276,27 +289,36 @@ const summary = {
     "WPS's zero-inclusion threshold, headroom rule, automatic interval rule and exact layout dependence remain unestablished by this matrix. No formula or product fix is proposed.",
   ],
   echartsSourceEvidence: {
-    niceExtent: "node_modules/.bun/echarts@6.1.0/node_modules/echarts/lib/coord/axisNiceTicks.js:80-84 rounds automatic maximum with ceil(max / autoInterval) * autoInterval.",
-    includeZero: "node_modules/.bun/echarts@6.1.0/node_modules/echarts/lib/coord/scaleRawExtentInfo.js:153-158 includes zero for an unfixed positive value-axis minimum when needIncludeZero is true.",
-    splitNumber: "node_modules/.bun/echarts@6.1.0/node_modules/echarts/lib/coord/axisNiceTicks.js:95-103 uses splitNumber to choose interval, not as a separate headroom policy.",
+    niceExtent:
+      "node_modules/.bun/echarts@6.1.0/node_modules/echarts/lib/coord/axisNiceTicks.js:80-84 rounds automatic maximum with ceil(max / autoInterval) * autoInterval.",
+    includeZero:
+      "node_modules/.bun/echarts@6.1.0/node_modules/echarts/lib/coord/scaleRawExtentInfo.js:153-158 includes zero for an unfixed positive value-axis minimum when needIncludeZero is true.",
+    splitNumber:
+      "node_modules/.bun/echarts@6.1.0/node_modules/echarts/lib/coord/axisNiceTicks.js:95-103 uses splitNumber to choose interval, not as a separate headroom policy.",
   },
   squareMarkerAudit,
   results,
 };
 const jsonPath = resolve(evidence, "current-svg-matrix.json");
 await writeFile(jsonPath, `${JSON.stringify(summary, null, 2)}\n`);
-console.log(JSON.stringify({
-  jsonPath,
-  files: results.map((file) => ({
-    filename: file.filename,
-    importedChartCount: file.importedChartCount,
-    charts: file.charts.map((chart) => ({
-      dimensions: [chart.width, chart.height],
-      actual: chart.current?.tickValues ?? null,
-      renderingError: chart.renderingError ?? null,
-      expected: chart.expectedWpsTicks,
-      splitNumberOnlyMatches: chart.splitNumberOnlyMatches,
-      svgPath: chart.svgPath,
-    })),
-  })),
-}, null, 2));
+console.log(
+  JSON.stringify(
+    {
+      jsonPath,
+      files: results.map((file) => ({
+        filename: file.filename,
+        importedChartCount: file.importedChartCount,
+        charts: file.charts.map((chart) => ({
+          dimensions: [chart.width, chart.height],
+          actual: chart.current?.tickValues ?? null,
+          renderingError: chart.renderingError ?? null,
+          expected: chart.expectedWpsTicks,
+          splitNumberOnlyMatches: chart.splitNumberOnlyMatches,
+          svgPath: chart.svgPath,
+        })),
+      })),
+    },
+    null,
+    2,
+  ),
+);

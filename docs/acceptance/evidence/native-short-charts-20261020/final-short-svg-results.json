@@ -1,0 +1,86 @@
+[
+  {
+    "filename": "auto-axis-small.xlsx",
+    "dimensions": [320, 200],
+    "gridRect": {
+      "x": 75.2,
+      "y": 45,
+      "width": 222.8,
+      "height": 92.80000000000001,
+      "margin": [0, 0, 0, 0]
+    },
+    "text": [
+      "Revenue \u6536\u5165",
+      "Quarter \u5b63\u5ea6 & <channel>",
+      "0.0",
+      "20.0",
+      "40.0",
+      "60.0",
+      "80.0",
+      "100.0",
+      "120.0",
+      "east",
+      "north",
+      "south",
+      "Auto axis: small"
+    ],
+    "axisTicks": [0, 20, 40, 60, 80, 100, 120],
+    "WpsTicks": [0, 50, 100, 150]
+  },
+  {
+    "filename": "auto-axis-short.xlsx",
+    "dimensions": [640, 200],
+    "gridRect": {
+      "x": 75.2,
+      "y": 45,
+      "width": 542.8,
+      "height": 92.80000000000001,
+      "margin": [0, 0, 0, 0]
+    },
+    "text": [
+      "Revenue \u6536\u5165",
+      "Quarter \u5b63\u5ea6 & <channel>",
+      "0.0",
+      "20.0",
+      "40.0",
+      "60.0",
+      "80.0",
+      "100.0",
+      "120.0",
+      "east",
+      "north",
+      "south",
+      "Auto axis: short"
+    ],
+    "axisTicks": [0, 20, 40, 60, 80, 100, 120],
+    "WpsTicks": [0, 50, 100, 150]
+  },
+  {
+    "filename": "auto-axis-short-wps-saved.xlsx",
+    "dimensions": [640, 200],
+    "gridRect": {
+      "x": 75.2,
+      "y": 45,
+      "width": 542.8,
+      "height": 92.80000000000001,
+      "margin": [0, 0, 0, 0]
+    },
+    "text": [
+      "Revenue \u6536\u5165",
+      "Quarter \u5b63\u5ea6 & <channel>",
+      "0.0",
+      "20.0",
+      "40.0",
+      "60.0",
+      "80.0",
+      "100.0",
+      "120.0",
+      "east",
+      "north",
+      "south",
+      "Auto axis: short"
+    ],
+    "axisTicks": [0, 20, 40, 60, 80, 100, 120],
+    "WpsTicks": [0, 50, 100, 150]
+  }
+]
