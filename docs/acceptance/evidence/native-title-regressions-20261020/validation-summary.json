@@ -1,0 +1,58 @@
+{
+  "scope": "Test-only; no runtime, reader, writer, Core, UI, marker or automatic-axis changes.",
+  "baseCommit": "b054a99acb29bff88f0b1ce2d5d2d09c80179df4",
+  "baseline": {
+    "selectedTests": 3,
+    "passed": 1,
+    "failed": 2,
+    "failureSite": "native-column-options.test.ts:177 changed XML assertion",
+    "failedCases": ["wrong-index", "expression"],
+    "cause": "Literal &quot;1&quot; replacement did not match the current generated title Series 1."
+  },
+  "focused": {
+    "files": 2,
+    "passed": 52,
+    "failed": 0,
+    "paths": ["native-column-options.test.ts", "generated-series-names.test.ts"]
+  },
+  "nativeAggregate": {
+    "files": 27,
+    "passed": 804,
+    "failed": 0,
+    "skipped": 2,
+    "priorPassing": 802,
+    "newTests": 0,
+    "newSkips": 0
+  },
+  "mutationSensitivity": {
+    "isolatedCopy": true,
+    "productCheckoutUnmodified": true,
+    "change": "Unknown headerless title source fallback: undefined to currentName",
+    "cacheValidationRetained": true,
+    "failedCases": ["wrong-index", "expression"],
+    "failureSite": "native-column-options.test.ts:197 zero drawings assertion",
+    "expectedDrawings": 0,
+    "actualDrawings": 1,
+    "absentNameStillRejected": true,
+    "filteredUnselectedTests": 45,
+    "note": "Expected mutation-test failures prove both repaired tests catch a permissive generated-title source guard. Initial isolated dependency setup failures were resolved and are not counted as test runs."
+  },
+  "checks": {
+    "xlsxTestTypecheck": "passed",
+    "completeProductionBuild": "passed",
+    "xlsxLint": "passed",
+    "scopedFormatting": "passed",
+    "independentReview": "passed; no blocking findings"
+  },
+  "limits": [
+    "Existing production chunk-size and ineffective-dynamic-import warnings remain.",
+    "No complete repository test-suite claim; unrelated Core/Web baseline failures were not rerun.",
+    "No Excel, WPS or browser GUI check needed or claimed for unchanged runtime.",
+    "Remote CI is checked after publication; local results do not establish CI success."
+  ],
+  "sha256": {
+    "packages/xlsx-io/src/column-chart-reader.ts": "2043c271a485b519ee5afce25781cfe5422ae8212af8cd443f3c10365b841066",
+    "packages/xlsx-io/src/column-chart-xml.ts": "fb3b6f5028ead9405bd20416d543e45ab689e0f3b611fe03143cc58ea8362aee",
+    "packages/xlsx-io/src/tests/charts/native-column-options.test.ts": "c7b021996327c98f3f3484a8aada89a8c504a16f798b773ee9fb575e3d9c8819"
+  }
+}

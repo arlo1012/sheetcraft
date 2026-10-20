@@ -165,20 +165,41 @@ describe("native column source options", () => {
     async (mode) => {
       const f = nativeColumnFixture();
       f.drawing.chart.headerRow = false;
-      const entries = unzipSync((await encodeXlsx(f.workbook)).bytes);
+      const encoded = await encodeXlsx(f.workbook);
+      const baseline = await decodeXlsx(encoded.bytes);
+      expect(imported(baseline.workbook).drawing.chart).toEqual(f.drawing.chart);
+      expect(baseline.report.issues.some((item) => item.code === "feature-omitted")).toBe(false);
+      const entries = unzipSync(encoded.bytes);
       const xml = strFromU8(entries["xl/charts/chart1.xml"]!);
-      const changed =
+      const firstSeries = xml.match(/<c:ser>[\s\S]*?<\/c:ser>/)![0];
+      const title = firstSeries.match(/<c:tx>[\s\S]*?<\/c:tx>/)![0];
+      const source = title.match(/<c:f>([\s\S]*?)<\/c:f>/)![1];
+      // Scope the mutation to the first series' title reference, not the
+      // historical spelling of Core's generated name or another XML field.
+      const changedSource = mode === "expression" ? `CONCAT(${source})` : "&quot;9&quot;";
+      const changedTitle =
         mode === "absent-name"
-          ? xml.replace(/(<c:ser>[\s\S]*?)<c:tx>[\s\S]*?<\/c:tx>/, "$1")
-          : xml.replace(
-              "&quot;1&quot;",
-              mode === "wrong-index" ? "&quot;9&quot;" : "CONCAT(&quot;1&quot;)",
-            );
+          ? ""
+          : title.replace(/<c:f>[\s\S]*?<\/c:f>/, `<c:f>${changedSource}</c:f>`);
+      expect(changedTitle).not.toBe(title);
+      if (mode !== "absent-name") {
+        expect(changedTitle).toContain(`<c:f>${changedSource}</c:f>`);
+        expect(changedTitle.replace(/<c:f>[\s\S]*?<\/c:f>/, "<c:f/>")).toBe(
+          title.replace(/<c:f>[\s\S]*?<\/c:f>/, "<c:f/>"),
+        );
+      }
+      const changedSeries = firstSeries.replace(title, changedTitle);
+      const changed = xml.replace(firstSeries, changedSeries);
       expect(changed).not.toBe(xml);
+      expect(changed.replace(changedSeries, firstSeries)).toBe(xml);
       entries["xl/charts/chart1.xml"] = strToU8(changed);
       const decoded = await decodeXlsx(zipSync(entries));
       expect([...decoded.workbook.sheets.values()][0]!.drawings ?? []).toHaveLength(0);
-      expect(decoded.report.issues.some((item) => item.code === "feature-omitted")).toBe(true);
+      expect(
+        decoded.report.issues
+          .filter((item) => item.code === "feature-omitted")
+          .flatMap((item) => item.locations),
+      ).toContain("xl/charts/chart1.xml");
     },
   );
   test.each([
