@@ -1,0 +1,192 @@
+{
+  "scope": "Test-only presentation guard regression maintenance; no production code or user-visible message changes.",
+  "baseCommit": "a024772867ca7a0369f33e5ae3ff4415bd8ee8a3",
+  "baselineFocused": {
+    "passed": 36,
+    "failed": 1,
+    "reason": "createChartOption enters Core normalization before Web helper; expected /Percentage/ mismatched Percent stacking."
+  },
+  "focused": {
+    "files": 1,
+    "passed": 60,
+    "failed": 0,
+    "skipped": 0,
+    "oldCombinedCases": 1,
+    "newIndependentCases": 24,
+    "otherTestsUnchanged": 36
+  },
+  "chartDirectoryAggregate": {
+    "command": "bun run --filter @sheetcraft/web test src/tests/modules/charts --maxWorkers=1",
+    "nodeOptions": "--max-old-space-size=4096",
+    "files": 57,
+    "failedFiles": 11,
+    "passed": 1452,
+    "failed": 42,
+    "skipped": 0,
+    "durationSeconds": 324.91,
+    "exitCode": 1,
+    "historicalFailuresRetained": [
+      "src/tests/modules/charts/chart-presentation-text.test.ts > recipe text defaults on opaque presentation backgrounds > dark title-only color edits leave actual non-title SVG text and tooltip defaults unchanged",
+      "src/tests/modules/charts/chart-presentation-text.test.ts > recipe text defaults on opaque presentation backgrounds > office title-only color edits leave actual non-title SVG text and tooltip defaults unchanged",
+      "src/tests/modules/charts/design-controls.test.ts > chart type dialog design draft > changing type and choosing standard remove only inapplicable flags while preserving appearance",
+      "src/tests/modules/charts/design-controls.test.ts > chart type dialog design draft > disabled editor and live-source applicability remain authoritative",
+      "src/tests/modules/charts/design-controls.test.ts > chart type dialog design draft > subtype mutates only the local draft while saved appearance survives; Cancel has no mutation",
+      "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > columns promotion keeps labels readable when their header stripe is hidden",
+      "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for doughnut",
+      "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for pie",
+      "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for river",
+      "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for sankey",
+      "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for scatter",
+      "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for treemap",
+      "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > explicitly rejects an ordered categorical source for wordCloud",
+      "src/tests/modules/charts/live-source-render.test.ts > live ordered series SVG rendering > rows promotion keeps labels readable when their header stripe is hidden"
+    ],
+    "historicalFailureResolved": [
+      "src/tests/modules/charts/chart-presentation-render.test.ts > chart-wide presentation consumers > strict validation rejects presentation accessors/unknown fields and non-finite source values before geometry"
+    ],
+    "additionalObservedFailures": [
+      "src/tests/modules/charts/chart-elements.test.ts > chart element options > an absent or empty settings object retains the original option geometry",
+      "src/tests/modules/charts/detached-chart.test.ts > detached pivot charts > cached source controls stay locked until explicit linking, which only changes the draft",
+      "src/tests/modules/charts/element-controls.test.ts > chart type draft and context element ownership > disabled type confirmation cannot emit or alter saved elements",
+      "src/tests/modules/charts/element-controls.test.ts > chart type draft and context element ownership > type confirmation preserves independently cloned dormant element settings",
+      "src/tests/modules/charts/elements-workspace.test.ts > chart elements real Workspace context > pending toolbar title then 'edit' uses the exact replacement owner and one history command",
+      "src/tests/modules/charts/existing-pivot-actions.test.ts > existing report PivotChart actions > bounds the chart anchor beside the output and prevents reentrant duplicate confirmation",
+      "src/tests/modules/charts/existing-pivot-workspace.test.ts > existing-pivot Insert PivotChart workspace integration > cancel and Edit Pivot reveal fields without changing source, output, sheets, or history",
+      "src/tests/modules/charts/existing-pivot-workspace.test.ts > existing-pivot Insert PivotChart workspace integration > rapid reopening remounts the draft and ignores every previous dialog callback",
+      "src/tests/modules/charts/existing-pivot-workspace.test.ts > existing-pivot Insert PivotChart workspace integration > uses editObjects=true independently of pivotTables=false",
+      "src/tests/modules/charts/existing-pivot-workspace.test.ts > existing-pivot Insert PivotChart workspace integration > uses editObjects=true independently of pivotTables=true",
+      "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > linked type changes keep the report link and preview range despite stale locked source text",
+      "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > linked=false keeps source orientation fixed while show-hidden remains editable",
+      "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > linked=true keeps source orientation fixed while show-hidden remains editable",
+      "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > ordinary dialog emits explicit 'columns'/false/false without changing the input",
+      "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > ordinary dialog emits explicit 'columns'/false/true without changing the input",
+      "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > ordinary dialog emits explicit 'columns'/true/false without changing the input",
+      "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > ordinary dialog emits explicit 'columns'/true/true without changing the input",
+      "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > ordinary dialog emits explicit 'rows'/false/false without changing the input",
+      "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > ordinary dialog emits explicit 'rows'/false/true without changing the input",
+      "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > ordinary dialog emits explicit 'rows'/true/false without changing the input",
+      "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > ordinary dialog emits explicit 'rows'/true/true without changing the input",
+      "src/tests/modules/charts/pivot-chart.test.ts > pivot charts > ordinary header captions follow row orientation without changing independent flags",
+      "src/tests/modules/charts/source-workspace.test.ts > Select Data through real Workspace > native Change Type popup keeps the custom-source owner selected, then Line OK preserves sources and Undo",
+      "src/tests/modules/charts/source-workspace.test.ts > bounded Combo through real Workspace initialization and native controls > Combo recipe then final Pie commits without hidden Combo edits or promoting the range",
+      "src/tests/modules/charts/source-workspace.test.ts > bounded Combo through real Workspace initialization and native controls > OK/reopen marker and secondary Cancel/OK use exact owner and one Undo per edit",
+      "src/tests/modules/charts/source-workspace.test.ts > bounded Combo through real Workspace initialization and native controls > a final stacked markerless Line variant does not acquire hidden Combo marker choices",
+      "src/tests/modules/charts/source-workspace.test.ts > bounded Combo through real Workspace initialization and native controls > a hidden first raw source remains recipe column; visible next series is plain line",
+      "src/tests/modules/charts/source-workspace.test.ts > bounded Combo through real Workspace initialization and native controls > native Combo recipe previews without identity/source/history writes and Cancel keeps exact workbook"
+    ],
+    "additionalFailuresPreviouslyBaselined": false
+  },
+  "mutationSensitivity": {
+    "isolatedCopy": true,
+    "productCheckoutUnmodified": true,
+    "fullFocusedSuitePerVariant": 60,
+    "results": [
+      {
+        "name": "control",
+        "exitCode": 0,
+        "passed": 60,
+        "failed": 0,
+        "expectedFailed": 0,
+        "failedCases": []
+      },
+      {
+        "name": "core-percent",
+        "exitCode": 1,
+        "passed": 58,
+        "failed": 2,
+        "expectedFailed": 2,
+        "failedCases": [
+          "chart-wide presentation consumers presentation validation at 'chart options through Core normalizat\u2026' rejects percent stacking for 'unsupported pie type'",
+          "chart-wide presentation consumers presentation validation at 'chart options through Core normalizat\u2026' rejects percent stacking for 'unstacked column'"
+        ]
+      },
+      {
+        "name": "web-percent",
+        "exitCode": 1,
+        "passed": 58,
+        "failed": 2,
+        "expectedFailed": 2,
+        "failedCases": [
+          "chart-wide presentation consumers presentation validation at 'direct Web presentation helper' rejects percent stacking for 'unsupported pie type'",
+          "chart-wide presentation consumers presentation validation at 'direct Web presentation helper' rejects percent stacking for 'unstacked column'"
+        ]
+      },
+      {
+        "name": "core-markers",
+        "exitCode": 1,
+        "passed": 59,
+        "failed": 1,
+        "expectedFailed": 1,
+        "failedCases": [
+          "chart-wide presentation consumers presentation validation at 'chart options through Core normalizat\u2026' rejects global line markers on a column chart"
+        ]
+      },
+      {
+        "name": "web-markers",
+        "exitCode": 1,
+        "passed": 59,
+        "failed": 1,
+        "expectedFailed": 1,
+        "failedCases": [
+          "chart-wide presentation consumers presentation validation at 'direct Web presentation helper' rejects global line markers on a column chart"
+        ]
+      },
+      {
+        "name": "source-data-validation",
+        "exitCode": 1,
+        "passed": 54,
+        "failed": 6,
+        "expectedFailed": 6,
+        "failedCases": [
+          "chart-wide presentation consumers chart options reject non-finite source value Infinity before percentage geometry",
+          "chart-wide presentation consumers chart options reject non-finite source value -Infinity before percentage geometry",
+          "chart-wide presentation consumers chart options reject non-finite source value NaN before percentage geometry",
+          "chart-wide presentation consumers wordcloud layout rejects non-finite source value Infinity before geometry",
+          "chart-wide presentation consumers wordcloud layout rejects non-finite source value -Infinity before geometry",
+          "chart-wide presentation consumers wordcloud layout rejects non-finite source value NaN before geometry"
+        ]
+      }
+    ],
+    "coreMutations": "The later Web guard still rejects, exposing an incorrect boundary via the different diagnostic.",
+    "webMutations": "Removed Web guards or data validation accept the invalid input and fail the intended rejection assertions.",
+    "setupNote": "Initial isolated dependency-resolution setup failures executed zero tests; repaired workspace dependency links before the recorded control and mutations."
+  },
+  "checks": {
+    "webTypecheck": "passed",
+    "broadWebLint": "failed: 3 no-unsafe-optional-chaining warnings in unchanged src/tests/modules/conditional-formatting/manager-table.test.ts:315,331,342; exit 1. File bytes match the previous published backup.",
+    "webBuild": "passed; existing large-chunk and ineffective-dynamic-import warnings retained",
+    "scopedLint": "passed",
+    "scopedFormatting": "passed",
+    "webUiContract": "passed when invoked separately after broad lint short-circuited",
+    "independentReview": "passed; 8 formerly masked cases independently pass, 52 unselected (not new skips)."
+  },
+  "limits": [
+    "Not a complete-repository or CI-green claim.",
+    "42 chart-directory failures and three unrelated lint warnings remain unsuppressed.",
+    "No new test skips.",
+    "Core range-series colorIndex semantic issue untouched.",
+    "No browser, Excel or WPS GUI run needed or claimed.",
+    "No PR, merge or deployment."
+  ],
+  "productionSha256": {
+    "apps/web/src/modules/charts/chart-presentation-render.ts": "1f2979f66f0748b62ee881e84c486d351e3cafc5e050bee3eaeb530dbb19a36e",
+    "packages/core/src/sheet-charts.ts": "9f1c3fb0bb9a6d989b11326d62bcb2983e92104dea14821e4a1438f6e294fa1d",
+    "packages/core/dist/sheet-charts.js": "1b937f6342bc16b9c99a6c56b8e2e3d6c4cdd12a25845a3a28cc7eb8be39dee0"
+  },
+  "nextCandidate": {
+    "priority": "User-visible Change Type/Combo interaction verification",
+    "testPath": "apps/web/src/tests/modules/charts/source-workspace.test.ts",
+    "failureCount": 6,
+    "failureSites": [
+      "411: old Select lookup is undefined",
+      "1025: missing [data-chart-editor-type] selector"
+    ],
+    "sourcePaths": [
+      "apps/web/src/modules/charts/components/ChartEditorDialog.vue",
+      "apps/web/src/modules/charts/components/ChartTypeNavigation.vue",
+      "apps/web/src/modules/charts/components/ChartSubtypeControls.vue"
+    ],
+    "nextStep": "Reconcile test harness with current controls; then verify owner identity, source preservation, Cancel, hidden-series behavior and one Undo per edit before classifying any production defect.",
+    "started": false
+  }
+}

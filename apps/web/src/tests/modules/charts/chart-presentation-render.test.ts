@@ -422,41 +422,118 @@ describe("chart-wide presentation consumers", () => {
     }
   });
 
-  test("strict validation rejects presentation accessors/unknown fields and non-finite source values before geometry", () => {
-    let calls = 0;
-    const accessor = { ...chart };
-    Object.defineProperty(accessor, "presentation", {
-      get() {
-        calls++;
-        return {};
-      },
-    });
-    expect(() => getChartRenderPresentation(accessor)).toThrow(/own data/);
-    expect(calls).toBe(0);
-    for (const presentation of [
-      { background: "transparent" },
-      { palette: [] },
-      { background: "#abcd" },
-      { percentStacked: false },
-      { unknown: true },
-    ])
-      expect(() =>
-        createChartOption({ ...chart, presentation } as SheetChart, data([[1]])),
-      ).toThrow();
-    expect(() => createChartOption({ ...chart, type: "pie" }, data([[1]]))).toThrow(/Percentage/);
-    expect(() =>
-      createChartOption({ ...chart, presentation: { lineMarkers: false } }, data([[1]])),
-    ).toThrow(/line/);
-    for (const value of [Infinity, NaN])
-      expect(() => createChartOption(chart, data([[value]]))).toThrow(/chart data/);
-    expect(() =>
-      createWordCloudLayout(
-        { ...chart, type: "wordCloud", presentation: { palette: ["#123"] } },
-        data([[Infinity]]),
-        { width: 200, height: 100 },
-      ),
-    ).toThrow(/chart data/);
-  });
+  describe.each([
+    {
+      boundary: "chart options through Core normalization",
+      render: (candidate: SheetChart) => createChartOption(candidate, data([[1]])),
+      accessorError: "Chart presentation must be an own data field, not an accessor.",
+      percentError: "Percent stacking requires a stacked column, bar, line or area chart.",
+      markerError: "Line markers require a line chart.",
+    },
+    {
+      boundary: "direct Web presentation helper",
+      render: getChartRenderPresentation,
+      accessorError: "Chart presentation requires an own data field.",
+      percentError: "Percentage presentation requires a stacked column, bar, line or area chart.",
+      markerError: "Global line markers require a line chart.",
+    },
+  ])(
+    "presentation validation at $boundary",
+    ({ render, accessorError, percentError, markerError }) => {
+      test("rejects presentation accessors without invoking their getter", () => {
+        expect(render(chart)).toBeDefined();
+        let calls = 0;
+        const accessor = { ...chart };
+        Object.defineProperty(accessor, "presentation", {
+          get() {
+            calls++;
+            return {};
+          },
+        });
+        expect(() => render(accessor)).toThrow(new TypeError(accessorError));
+        expect(calls).toBe(0);
+      });
+
+      test.each([
+        {
+          name: "transparent background",
+          invalid: { background: "transparent" },
+          valid: { background: "#123" },
+          error: new RangeError("Chart presentation color must be opaque hex RGB."),
+        },
+        {
+          name: "empty palette",
+          invalid: { palette: [] },
+          valid: { palette: ["#123"] },
+          error: new RangeError("Chart palette requires 1–16 colors."),
+        },
+        {
+          name: "alpha background",
+          invalid: { background: "#abcd" },
+          valid: { background: "#aabbcc" },
+          error: new RangeError("Chart presentation color must be opaque hex RGB."),
+        },
+        {
+          name: "explicit percent reset",
+          invalid: { percentStacked: false },
+          valid: { percentStacked: true },
+          error: new TypeError("Chart percent stacking must be true; omit it to reset."),
+        },
+        {
+          name: "unknown presentation field",
+          invalid: { unknown: true },
+          valid: {},
+          error: new TypeError("Unknown chart presentation setting."),
+        },
+      ])("rejects $name independently", ({ invalid, valid, error }) => {
+        expect(render({ ...chart, presentation: valid } as SheetChart)).toBeDefined();
+        expect(() => render({ ...chart, presentation: invalid } as SheetChart)).toThrow(error);
+      });
+
+      test.each([
+        { name: "unsupported pie type", candidate: { ...chart, type: "pie" as const } },
+        { name: "unstacked column", candidate: { ...chart, stacked: false } },
+      ])("rejects percent stacking for $name", ({ candidate }) => {
+        expect(render(chart)).toBeDefined();
+        expect(() => render(candidate)).toThrow(new RangeError(percentError));
+      });
+
+      test("rejects global line markers on a column chart", () => {
+        const candidate: SheetChart = { ...chart, presentation: { lineMarkers: false } };
+        expect(render({ ...candidate, type: "line" })).toBeDefined();
+        expect(() => render(candidate)).toThrow(new RangeError(markerError));
+      });
+    },
+  );
+
+  test.each([Infinity, -Infinity, NaN])(
+    "chart options reject non-finite source value %s before percentage geometry",
+    (value) => {
+      expect(bar(createChartOption(chart, data([[1]]))).data).toEqual([1]);
+      expect(() => createChartOption(chart, data([[value]]))).toThrow(
+        new RangeError("Invalid cached chart data."),
+      );
+    },
+  );
+
+  test.each([Infinity, -Infinity, NaN])(
+    "wordcloud layout rejects non-finite source value %s before geometry",
+    (value) => {
+      const candidate: SheetChart = {
+        ...chart,
+        type: "wordCloud",
+        stacked: false,
+        presentation: { palette: ["#123"] },
+      };
+      const dimensions = { width: 200, height: 100 };
+      expect(createWordCloudLayout(candidate, data([[1]]), dimensions).words).toMatchObject([
+        { text: "Category 0", value: 1, color: "#123" },
+      ]);
+      expect(() => createWordCloudLayout(candidate, data([[value]]), dimensions)).toThrow(
+        new RangeError("Invalid cached chart data."),
+      );
+    },
+  );
 
   test("real ECharts model and SVG consume ratio geometry and raw labels", () => {
     const source = freeze({
