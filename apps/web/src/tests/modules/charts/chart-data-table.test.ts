@@ -390,3 +390,25 @@ test("point marker size leaves normalized data-table key layout and resource bud
   expect(required(sized)).toEqual(required(baseline));
   expect(countChartDataTableText(sized, data)).toBe(countChartDataTableText(baseline, data));
 });
+
+test("square data-table key changes geometry only, not cells, layout, text or primitive budgets", () => {
+  const source: SheetChart = {
+    ...chart,
+    type: "line",
+    format: { series: [{ id: "apple", markers: true, markerSizePt: 9 }] },
+  };
+  const baseline = required(source);
+  const shaped = required({
+    ...source,
+    format: { series: [{ id: "apple", markers: true, markerSizePt: 9, markerSymbol: "square" }] },
+  });
+  expect(shaped.rows[0]?.markerSymbol).toBe("square");
+  const { markerSymbol: _, ...row } = shaped.rows[0]!;
+  expect({ ...shaped, rows: [row, ...shaped.rows.slice(1)] }).toEqual(baseline);
+  const hidden = required({
+    ...source,
+    format: { series: [{ id: "apple", markers: false, markerSizePt: 9, markerSymbol: "square" }] },
+  });
+  expect(hidden.rows[0]?.key).toBe("line");
+  expect(hidden.rows[0]).not.toHaveProperty("markerSymbol");
+});

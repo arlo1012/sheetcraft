@@ -106,7 +106,7 @@ export function columnChartXml(
       const marker =
         settings?.markers === false
           ? `<c:marker><c:symbol val="none"/></c:marker>`
-          : `<c:marker><c:symbol val="circle"/><c:size val="${settings?.markerSizePt ?? 5}"/>${colors?.[index] ? `<c:spPr><a:solidFill>${paint}</a:solidFill><a:ln><a:solidFill>${paint}</a:solidFill></a:ln></c:spPr>` : ""}</c:marker>`;
+          : `<c:marker><c:symbol val="${settings?.markerSymbol ?? "circle"}"/><c:size val="${settings?.markerSizePt ?? 5}"/>${colors?.[index] ? `<c:spPr><a:solidFill>${paint}</a:solidFill><a:ln><a:solidFill>${paint}</a:solidFill></a:ln></c:spPr>` : ""}</c:marker>`;
       return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/><c:tx><c:strRef><c:f>${xml(nameReference)}</c:f><c:strCache>${stringCache([name])}</c:strCache></c:strRef></c:tx>${line ? `<c:spPr><a:ln w="${lineWidth}" cap="rnd"><a:solidFill>${paint}</a:solidFill><a:round/></a:ln></c:spPr>${marker}` : `<c:spPr><a:solidFill>${paint}</a:solidFill><a:ln><a:noFill/></a:ln></c:spPr><c:invertIfNegative val="0"/>`}${category}<c:val><c:numRef><c:f>${xml(columnChartReference(sheetName, source.valueRanges[index]!))}</c:f><c:numCache><c:formatCode>${xml(numberFormat)}</c:formatCode><c:ptCount val="${source.data.categories.length}"/>${points}</c:numCache></c:numRef></c:val>${line ? `<c:smooth val="0"/>` : ""}</c:ser>`;
     })
     .join("");

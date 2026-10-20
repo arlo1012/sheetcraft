@@ -218,6 +218,11 @@ export const chartsEnUS = {
   "chart.formatSeriesColor": "Series color",
   "chart.formatSmooth": "Smooth lines",
   "chart.formatMarkers": "Show markers",
+  "chart.formatMarkerSymbol": "Marker shape",
+  "chart.formatMarkerCircle": "Circle",
+  "chart.formatMarkerSquare": "Square",
+  "chart.formatMarkerSymbolHidden":
+    "Show markers to edit their shape. The saved shape is retained while hidden; Reset clears it.",
   "chart.formatMarkerSize": "Marker size (pt)",
   "chart.formatMarkerSizeHidden":
     "Show markers to edit their size. The saved size is retained while hidden.",

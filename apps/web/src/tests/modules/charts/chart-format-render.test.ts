@@ -785,3 +785,170 @@ describe("ordinary line marker point sizes", () => {
     },
   );
 });
+
+describe("ordinary line circle/square marker geometry", () => {
+  test("stable IDs retain circle/square geometry and equal point diameters through reorder/filter", () => {
+    const format: ChartFormatSettings = {
+      series: [
+        { id: "a", color: "#aa0000", markers: true, markerSizePt: 9, markerSymbol: "square" },
+        { id: "b", color: "#0000bb", markers: true, markerSizePt: 9, markerSymbol: "circle" },
+        { id: "dormant", markerSymbol: "square" },
+      ],
+    };
+    for (const entries of [data.series, [...data.series].reverse(), [data.series[1]!]]) {
+      const option = createChartOption(
+        sourceChart(data.series, { type: "line", format }),
+        frozenData(entries),
+        dimensions,
+      );
+      for (const entry of series(option)) {
+        expect(entry).toMatchObject({
+          symbol: entry.id === "a" ? "rect" : "circle",
+          symbolSize: 12,
+        });
+      }
+      render(option, (instance, svg) => {
+        for (const entry of entries) {
+          const fill = entry.id === "a" ? "#aa0000" : "#0000bb";
+          const paths = [...svg.querySelectorAll(`path[fill="${fill}"]`)];
+          expect(paths).toHaveLength(2);
+          for (const path of paths) {
+            const d = path.getAttribute("d");
+            if (entry.id === "a") {
+              expect(d).toMatch(/[LlHhVv]/);
+              expect(d).not.toMatch(/[AaCcQq]/);
+            } else expect(d).toMatch(/[Aa]/);
+          }
+          const symbols = instance
+            .getZr()
+            .storage.getDisplayList(true)
+            .filter((item) => item.style.fill === fill);
+          for (const symbol of symbols) {
+            const bounds = symbol.getBoundingRect().clone();
+            bounds.applyTransform(symbol.getComputedTransform()!);
+            expect(bounds.width).toBeCloseTo(12);
+            expect(bounds.height).toBeCloseTo(12);
+          }
+        }
+      });
+    }
+  });
+
+  test("absent shape leaves legacy defaults untouched; shape-only edits never synthesize a size", () => {
+    const source = sourceChart(data.series, { type: "line" });
+    for (const entry of series(createChartOption(source, data, dimensions))) {
+      expect(entry).not.toHaveProperty("symbol");
+      expect(entry).not.toHaveProperty("symbolSize");
+    }
+    for (const markerSymbol of ["circle", "square"] as const) {
+      const option = createChartOption(
+        {
+          ...source,
+          format: { series: [{ id: "a", markerSymbol }] },
+        },
+        data,
+        dimensions,
+      );
+      expect(series(option)[0]).toMatchObject({
+        symbol: markerSymbol === "square" ? "rect" : "circle",
+        showSymbol: true,
+      });
+      expect(series(option)[0]).not.toHaveProperty("symbolSize");
+      expect(series(option)[1]).not.toHaveProperty("symbol");
+    }
+  });
+
+  test.each([false, undefined])(
+    "hidden per-series or subtype markers never paint saved square shape (%s)",
+    (markers) => {
+      const option = createChartOption(
+        sourceChart(data.series, {
+          type: "line",
+          presentation: { lineMarkers: false },
+          format: {
+            series: [
+              {
+                id: "a",
+                color: "#aa0000",
+                markerSymbol: "square",
+                markerSizePt: 9,
+                ...(markers === undefined ? {} : { markers }),
+              },
+            ],
+          },
+        }),
+        data,
+        dimensions,
+      );
+      expect(series(option)[0]).toMatchObject({
+        symbol: "none",
+        showSymbol: false,
+        symbolSize: 12,
+      });
+      render(option, (_instance, svg) =>
+        expect(svg.querySelectorAll('[fill="#aa0000"]')).toHaveLength(0),
+      );
+    },
+  );
+
+  test("explicit visibility overrides a markerless subtype without losing the saved square", () => {
+    const option = createChartOption(
+      sourceChart(data.series, {
+        type: "line",
+        presentation: { lineMarkers: false },
+        format: { series: [{ id: "a", markers: true, markerSymbol: "square", markerSizePt: 9 }] },
+      }),
+      data,
+      dimensions,
+    );
+    expect(series(option)[0]).toMatchObject({ symbol: "rect", showSymbol: true, symbolSize: 12 });
+  });
+
+  test("native legend uses square keys but does not grow with the point diameter", () => {
+    const nativeKey = (markerSizePt: number) => {
+      const option = createChartOption(
+        sourceChart(data.series, {
+          type: "line",
+          legend: true,
+          format: {
+            series: [
+              { id: "a", color: "#aa0000", markers: true, markerSymbol: "square", markerSizePt },
+            ],
+          },
+        }),
+        data,
+        dimensions,
+      );
+      let legendPath = "";
+      render(option, (_instance, svg) => {
+        const paths = [...svg.querySelectorAll('path[fill="#aa0000"]')];
+        expect(paths).toHaveLength(3);
+        // Native line legends add one normalized key after the plotted symbols.
+        const key = paths.at(-1)!;
+        legendPath = key.getAttribute("d")!;
+        expect(legendPath).toMatch(/[LlHhVv]/);
+        expect(legendPath).not.toMatch(/[AaCcQq]/);
+      });
+      return legendPath;
+    };
+    expect(nativeKey(72)).toBe(nativeKey(9));
+  });
+
+  test.each(["column", "bar", "area", "radar", "combo"] as const)(
+    "retains but does not render square geometry for %s",
+    (type) => {
+      const source = sourceChart(data.series, { type, format: {} });
+      const baseline = createChartOption(source, data, dimensions);
+      const shaped = createChartOption(
+        {
+          ...source,
+          format: { series: [{ id: "a", markerSymbol: "square" }] },
+        },
+        data,
+        dimensions,
+      );
+      // Formatter closures are created per option; compare their unchanged data projection.
+      expect(JSON.stringify(series(shaped))).toBe(JSON.stringify(series(baseline)));
+    },
+  );
+});

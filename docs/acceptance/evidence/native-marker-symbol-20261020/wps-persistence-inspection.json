@@ -1,0 +1,92 @@
+[
+  {
+    "file": "wps-symbol-circle6.xlsx",
+    "bytes": 11845,
+    "sha256": "e7ff160b5dac2bd6022491654306dd3d656bba72470c7d2b9f138e8277ed10b9",
+    "familyMarker": {
+      "val": "1"
+    },
+    "series": [
+      {
+        "symbol": "circle",
+        "size": "6"
+      },
+      {
+        "symbol": "none",
+        "size": null
+      }
+    ]
+  },
+  {
+    "file": "wps-symbol-circle9-source.xlsx",
+    "bytes": 11884,
+    "sha256": "69d4a9b42b554a3f213e812c1020d5ff758cdc2e8a2e7e6474eb67dde8433772",
+    "familyMarker": {
+      "val": "1"
+    },
+    "series": [
+      {
+        "symbol": "circle",
+        "size": "9"
+      },
+      {
+        "symbol": "none",
+        "size": null
+      }
+    ]
+  },
+  {
+    "file": "wps-symbol-none.xlsx",
+    "bytes": 11839,
+    "sha256": "09832f696f44214ddbf81bc64382364d5f96570281b2f513ec11a7c58bffb2a2",
+    "familyMarker": {
+      "val": "0"
+    },
+    "series": [
+      {
+        "symbol": "none",
+        "size": null
+      },
+      {
+        "symbol": "none",
+        "size": null
+      }
+    ]
+  },
+  {
+    "file": "wps-symbol-reenabled6.xlsx",
+    "bytes": 11837,
+    "sha256": "aea4d715ed9be3a33e9d2e96f14c11044d6535bb0957c1d790a0993293c697ba",
+    "familyMarker": {
+      "val": "1"
+    },
+    "series": [
+      {
+        "symbol": "square",
+        "size": "6"
+      },
+      {
+        "symbol": "none",
+        "size": null
+      }
+    ]
+  },
+  {
+    "file": "wps-symbol-square9.xlsx",
+    "bytes": 11871,
+    "sha256": "e18cd807d8401994de8187442012fa3c9fb27bce0ab5f52dbbddc2605762fa19",
+    "familyMarker": {
+      "val": "1"
+    },
+    "series": [
+      {
+        "symbol": "square",
+        "size": "9"
+      },
+      {
+        "symbol": "none",
+        "size": null
+      }
+    ]
+  }
+]

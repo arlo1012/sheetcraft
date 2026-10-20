@@ -595,3 +595,67 @@ describe("marker size intent contract", () => {
     ).toThrow();
   });
 });
+
+describe("marker shape intent contract", () => {
+  const target = { kind: "series", seriesId: "apples" } as const;
+  test("shape edits and reset preserve size, visibility, line attributes and other series", () => {
+    const original = { ...chart(), type: "line" as const };
+    const baseline = {
+      color: "#123456",
+      markerSizePt: 9,
+      markers: false,
+      smooth: true,
+      strokeWidth: 3,
+    };
+    let current: SheetChart = original;
+    for (const markerSymbol of ["circle", "square", undefined] as const) {
+      current = applyChartFormatIntent(current, target, {
+        kind: "series",
+        seriesId: "apples",
+        format: { ...baseline, ...(markerSymbol === undefined ? {} : { markerSymbol }) },
+      });
+      expect(current.format?.series?.[0]).toEqual({
+        id: "apples",
+        ...baseline,
+        ...(markerSymbol === undefined ? {} : { markerSymbol }),
+      });
+      expect(current.format?.series?.slice(1)).toEqual(original.format?.series?.slice(1));
+      expect(current.source).toEqual(original.source);
+    }
+    expect(current.format?.series?.[0]).not.toHaveProperty("markerSymbol");
+  });
+  test.each([undefined, null, "none", "auto", "rect", "diamond", "", 1, true])(
+    "rejects explicit invalid shape %s",
+    (markerSymbol) => {
+      expect(() =>
+        applyChartFormatIntent(chart(), target, {
+          kind: "series",
+          seriesId: "apples",
+          format: { markerSymbol },
+        } as ChartFormatIntent),
+      ).toThrow();
+    },
+  );
+  test("rejects accessors without evaluating them, aliases and foreign target IDs", () => {
+    const read = vi.fn(() => "square");
+    const format = Object.defineProperty({}, "markerSymbol", { enumerable: true, get: read });
+    expect(() =>
+      applyChartFormatIntent(chart(), target, { kind: "series", seriesId: "apples", format }),
+    ).toThrow();
+    expect(read).not.toHaveBeenCalled();
+    expect(() =>
+      applyChartFormatIntent(chart(), target, {
+        kind: "series",
+        seriesId: "apples",
+        format: { markerShape: "square" },
+      } as unknown as ChartFormatIntent),
+    ).toThrow();
+    expect(() =>
+      applyChartFormatIntent(chart(), target, {
+        kind: "series",
+        seriesId: "pears",
+        format: { markerSymbol: "square" },
+      }),
+    ).toThrow();
+  });
+});

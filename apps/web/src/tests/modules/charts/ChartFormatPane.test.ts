@@ -1689,3 +1689,139 @@ describe("per-series marker size", () => {
     },
   );
 });
+
+describe("per-series marker shape", () => {
+  const target = { kind: "series", seriesId: "apples" } as const;
+  const line = (markerSymbol?: "circle" | "square", markers = true) =>
+    drawing({
+      type: "line",
+      format: {
+        series: [
+          {
+            id: "apples",
+            color: "#123456",
+            strokeWidth: 3,
+            smooth: true,
+            markerSizePt: 9,
+            markers,
+            ...(markerSymbol === undefined ? {} : { markerSymbol }),
+          },
+        ],
+      },
+    });
+  const shape = (wrapper: VueWrapper) => select(wrapper, "Marker shape");
+  const change = (wrapper: VueWrapper) =>
+    shape(wrapper).props("onChange") as (value: unknown) => void;
+  const baseline = {
+    color: "#123456",
+    strokeWidth: 3,
+    smooth: true,
+    markerSizePt: 9,
+    markers: true,
+  };
+
+  test("Auto stays sparse; circle, square and Auto preserve the same 9 pt and line attributes", async () => {
+    const { wrapper, apply } = fixture(target, { drawing: line() });
+    expect(shape(wrapper).props("value")).toBe("");
+    expect(shape(wrapper).props("options")).toEqual([
+      { value: "", label: "Auto" },
+      { value: "circle", label: "Circle" },
+      { value: "square", label: "Square" },
+    ]);
+    expect(
+      wrapper.get('[data-chart-format-reset="markerSymbol"]').attributes("disabled"),
+    ).toBeDefined();
+    expect(apply).not.toHaveBeenCalled();
+    for (const markerSymbol of ["circle", "square", ""] as const) {
+      shape(wrapper).vm.$emit("change", markerSymbol);
+      await flushPromises();
+      expect(apply).toHaveBeenLastCalledWith({
+        kind: "series",
+        seriesId: "apples",
+        format: { ...baseline, ...(markerSymbol ? { markerSymbol } : {}) },
+      });
+      await wrapper.setProps({ drawing: line(markerSymbol || undefined) });
+      expect(shape(wrapper).props("value")).toBe(markerSymbol);
+      expect(input(wrapper, "markerSizePt").element.value).toBe("9");
+    }
+    expect(apply).toHaveBeenCalledTimes(3);
+    for (const invalid of ["none", "diamond", undefined, null, true]) change(wrapper)(invalid);
+    expect(apply).toHaveBeenCalledTimes(3);
+  });
+
+  test("hidden shapes retain their value, reject edits and allow leaf reset without revealing markers", async () => {
+    const { wrapper, apply } = fixture(target, { drawing: line("square") });
+    checkbox(wrapper, "Show markers").vm.$emit("change", false);
+    await flushPromises();
+    expect(apply).toHaveBeenLastCalledWith({
+      kind: "series",
+      seriesId: "apples",
+      format: { ...baseline, markers: false, markerSymbol: "square" },
+    });
+    await wrapper.setProps({ drawing: line("square", false) });
+    expect(shape(wrapper).props("value")).toBe("square");
+    expect(shape(wrapper).props("disabled")).toBe(true);
+    expect(wrapper.text()).toContain("saved shape is retained while hidden");
+    change(wrapper)("circle");
+    expect(apply).toHaveBeenCalledTimes(1);
+    apply.mockReturnValue(false);
+    await wrapper.get('[data-chart-format-reset="markerSymbol"]').trigger("click");
+    expect(shape(wrapper).props("value")).toBe("square");
+    expect(wrapper.get('[role="alert"]').text()).toContain("was not applied");
+    apply.mockReturnValue(true);
+    await wrapper.get('[data-chart-format-reset="markerSymbol"]').trigger("click");
+    expect(apply).toHaveBeenLastCalledWith({
+      kind: "series",
+      seriesId: "apples",
+      format: { ...baseline, markers: false },
+    });
+    await wrapper.setProps({ drawing: line(undefined, false) });
+    expect(shape(wrapper).props("value")).toBe("");
+    expect(shape(wrapper).props("disabled")).toBe(true);
+  });
+
+  test("disabled, IME, stale callback, changed owner and unmount cannot submit shape edits", async () => {
+    const { wrapper, apply } = fixture(target, { drawing: line("circle") });
+    const oldChange = change(wrapper);
+    await wrapper.setProps({ disabled: true });
+    oldChange("square");
+    expect(apply).not.toHaveBeenCalled();
+    await wrapper.setProps({ disabled: false });
+    await input(wrapper, "markerSizePt").trigger("compositionstart");
+    change(wrapper)("square");
+    expect(apply).not.toHaveBeenCalled();
+    await input(wrapper, "markerSizePt").trigger("compositionend");
+    const replacement = vi.fn((_intent: ChartFormatIntent) => true);
+    await wrapper.setProps({ apply: replacement });
+    oldChange("square");
+    expect(replacement).not.toHaveBeenCalled();
+    const currentChange = change(wrapper);
+    await wrapper.setProps({ target: { kind: "series", seriesId: "pears" } });
+    currentChange("square");
+    expect(replacement).not.toHaveBeenCalled();
+    const otherChange = change(wrapper);
+    await wrapper.setProps({ drawing: { ...line("square"), id: "chart-two" } });
+    otherChange("circle");
+    expect(replacement).not.toHaveBeenCalled();
+    const closedChange = change(wrapper);
+    wrapper.unmount();
+    wrappers.splice(wrappers.indexOf(wrapper), 1);
+    closedChange("square");
+    expect(replacement).not.toHaveBeenCalled();
+  });
+
+  test.each(["column", "bar", "area", "radar", "combo"] as const)(
+    "retains but does not offer marker shape for %s",
+    async (type) => {
+      const { wrapper, apply } = fixture(target, { drawing: line("square") });
+      const oldChange = change(wrapper);
+      await wrapper.setProps({
+        drawing: { ...line("square"), chart: { ...line("square").chart, type } },
+      });
+      expect(wrapper.find('[data-chart-format-field="markerSymbol"]').exists()).toBe(false);
+      oldChange("circle");
+      expect(apply).not.toHaveBeenCalled();
+      expect(wrapper.props("drawing").chart.format?.series?.[0]?.markerSymbol).toBe("square");
+    },
+  );
+});

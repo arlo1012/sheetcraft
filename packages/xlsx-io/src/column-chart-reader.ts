@@ -264,8 +264,16 @@ export function readXlsxColumnCharts(
         if (line) {
           const marker = single(item, "marker");
           only(marker, ["symbol", "size", "spPr"]);
-          const symbol = attr(single(marker, "symbol"), "val");
-          if (!["circle", "none"].includes(symbol)) {
+          const symbols = nodes(marker.symbol);
+          const symbolNode = symbols[0];
+          const symbol = symbolNode ? attr(symbolNode, "val") : "";
+          if (
+            symbols.length !== 1 ||
+            Array.isArray(marker.symbol) ||
+            !symbolNode ||
+            Object.keys(symbolNode).some((key) => key !== "@_val" && !key.startsWith("@_xmlns")) ||
+            !["circle", "square", "none"].includes(symbol)
+          ) {
             report.add(
               "style-omitted",
               "warning",
@@ -277,7 +285,7 @@ export function readXlsxColumnCharts(
           const size = sizes[0];
           const rawSize = size ? attr(size, "val") : "";
           if (
-            symbol === "circle" &&
+            (symbol === "circle" || symbol === "square") &&
             (sizes.length !== 1 ||
               Array.isArray(marker.size) ||
               !size ||

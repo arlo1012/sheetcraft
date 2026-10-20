@@ -544,7 +544,7 @@ function readValueAxisNumberFormat(
 }
 
 /** Restore only independently representable leaves; report unresolved fonts/colors precisely. */
-/** Recover only model-owned width, circle size and filled-circle/none visibility. Other
+/** Recover only model-owned width, size and circle/square/none markers. Other
  * geometry remains a precise style loss, never an invented model setting. */
 function readNativeLineSeriesStyles(
   chart: SheetChart,
@@ -562,10 +562,13 @@ function readNativeLineSeriesStyles(
       if (symbol === "none") {
         settings.markers = false;
         if (marker.spPr !== undefined || marker.size !== undefined) warn(`${path}.markerGeometry`);
-      } else if (symbol === "circle") {
+      } else if (symbol === "circle" || symbol === "square") {
         // The reader has already proved this is one integer size in 2..72 pt.
-        // Size does not depend on whether the separate paint/outline is representable.
+        // Shape/size do not depend on whether the separate paint/outline is representable.
         settings.markerSizePt = Number(attr(single(marker, "size"), "val"));
+        // Circle is the historical default. Do not promote every existing native
+        // line workbook to a new snapshot version merely by reading that default.
+        if (symbol === "square") settings.markerSymbol = "square";
       }
       const shape = single(item, "spPr");
       const line = single(shape, "ln");
@@ -593,7 +596,7 @@ function readNativeLineSeriesStyles(
       // defaults even when native round geometry is an ordinary valid value.
       if (line["@_cap"] !== undefined || line.round !== undefined || shape.sp3d !== undefined)
         warn(`${path}.strokeGeometry`);
-      if (symbol === "circle") {
+      if (symbol === "circle" || symbol === "square") {
         const markerShape = optional(marker, "spPr");
         const color = rgbFill(line);
         if (color && markerShape && rgbFill(markerShape) === color) settings.markers = true;

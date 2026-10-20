@@ -933,6 +933,50 @@ test("ordinary line print keeps explicit point sizes in CSS pixels without densi
   }
 });
 
+test.each(["circle", "square"] as const)(
+  "native Canvas print paints actual %s markers at 9 pt without density rescaling",
+  (markerSymbol) => {
+    const result = renderChartPrintPresentation(
+      drawing({
+        type: "line",
+        legend: false,
+        format: {
+          series: [{ id: "sales", color: "#2468ac", markerSymbol, markerSizePt: 9, markers: true }],
+        },
+      }),
+      data,
+      options,
+    );
+    try {
+      expect(nativeOptions.at(-1)).toMatchObject({
+        series: [
+          {
+            id: "sales",
+            symbol: markerSymbol === "square" ? "rect" : "circle",
+            showSymbol: true,
+            symbolSize: 12,
+          },
+        ],
+      });
+      const markers = contexts
+        .get(result.canvas)!
+        .copies[0]!.paints.filter(
+          (paint) => paint.operation === "fill" && paint.fill === "#2468ac",
+        );
+      expect(markers).toHaveLength(data.series[0]!.values.length);
+      for (const marker of markers) {
+        if (markerSymbol === "square") {
+          expect(marker.path?.some((part) => part.startsWith("rect:"))).toBe(true);
+          expect(marker.path?.some((part) => part.startsWith("arc:"))).toBe(false);
+        } else expect(marker.path?.some((part) => part.startsWith("arc:"))).toBe(true);
+      }
+      expect([result.canvas.width, result.canvas.height]).toEqual([960, 600]);
+    } finally {
+      result.dispose();
+    }
+  },
+);
+
 test.each([320, 640])(
   "short %spx line print preserves independent title fonts at CSS height 200",
   (width) => {

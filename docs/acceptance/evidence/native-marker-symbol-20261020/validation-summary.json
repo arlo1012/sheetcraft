@@ -1,0 +1,28 @@
+{
+  "core": {
+    "passes": 424,
+    "failures": 1,
+    "testFiles": 35,
+    "knownFailure": "chart-range-series.test.ts: explicit promotion reuses active bound IDs, preserves styles and avoids dormant generated-ID collisions; expected colorIndex [0,1], observed [0,0]",
+    "baseline": "Previously reproduced from c440759, documented in native-marker-size-20261020.md"
+  },
+  "native": {
+    "passes": 769,
+    "failures": 2,
+    "skipped": 2,
+    "testFiles": 26,
+    "knownFailures": [
+      "native-column-options.test.ts: does not invent generated labels from wrong-index native title",
+      "native-column-options.test.ts: does not invent generated labels from expression native title"
+    ],
+    "baseline": "Previously reproduced and retained from marker-size milestone; no failed assertions changed in this slice"
+  },
+  "webPreviousBaseline": "15 known failures across4 files, independently reproduced at f055089; evidence remains in native-short-charts-20261020/baseline-failure-comparison.json",
+  "notFullSuiteGreen": true,
+  "webCurrent": {
+    "passes": 75,
+    "failures": 15,
+    "testFiles": 4,
+    "sameFailureGroups": true
+  }
+}

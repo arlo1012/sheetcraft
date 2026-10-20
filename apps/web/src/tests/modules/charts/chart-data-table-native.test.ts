@@ -114,6 +114,64 @@ afterEach(() => {
 });
 
 describe("installed ECharts SVG data table scene", () => {
+  test.each(["svg", "canvas"] as const)(
+    "line square keys use normalized rect geometry in %s without applying dormant Combo shapes",
+    (renderer) => {
+      const source: SheetChart = {
+        ...chart,
+        type: "line",
+        source: {
+          kind: "series",
+          categories: { kind: "generated" },
+          series: data.series.map((entry, index) => ({
+            id: entry.id!,
+            colorIndex: index,
+            name: { kind: "literal", text: entry.name },
+            values: {
+              kind: "literal",
+              values: entry.values.map((value) => {
+                if (value === null) throw new Error("Expected a numeric source fixture.");
+                return value;
+              }),
+            },
+          })),
+        },
+        format: {
+          series: [
+            { id: "apple", markers: true, markerSymbol: "square", markerSizePt: 72 },
+            { id: "pear", markers: true, markerSymbol: "circle", markerSizePt: 2 },
+          ],
+        },
+      };
+      const { instance } = render(source, data, dimensions, undefined, renderer);
+      const primitives = tableElements(instance);
+      expect(
+        primitives.filter((entry) => entry.type === "rect" && entry.shape?.width === 6),
+      ).toMatchObject([{ shape: { width: 6, height: 6 } }]);
+      expect(primitives.filter((entry) => entry.type === "circle")).toHaveLength(1);
+      const combo = render(
+        {
+          ...source,
+          type: "combo",
+          format: {
+            series: [{ id: "apple", drawType: "line", markers: true, markerSymbol: "square" }],
+          },
+        },
+        data,
+        dimensions,
+        undefined,
+        renderer,
+      );
+      expect(
+        tableElements(combo.instance).filter(
+          (entry) => entry.type === "rect" && entry.shape?.width === 6,
+        ),
+      ).toHaveLength(0);
+      expect(tableElements(combo.instance).filter((entry) => entry.type === "circle")).toHaveLength(
+        1,
+      );
+    },
+  );
   test("E05 baseline has real native grid/text/key primitives and each complete value aligned to native categories", () => {
     const original = structuredClone(data),
       originalChart = structuredClone(chart);

@@ -63,6 +63,7 @@ export type ChartDataTablePlan = Readonly<{
     seriesIndex: number;
     id?: string;
     key: "column" | "line" | "markerLine";
+    markerSymbol?: "square";
     strokeWidth: number;
     label: TableText;
     cells: readonly Readonly<{ value: number | null; label: TableText }>[];
@@ -294,6 +295,9 @@ export function createChartDataTablePlan(
         seriesIndex: chartSeriesSlotIndex(chart, data.series.length, seriesIndex),
         ...(series.id !== undefined ? { id: series.id } : {}),
         key,
+        ...(chart.type === "line" && key === "markerLine" && settings?.markerSymbol === "square"
+          ? { markerSymbol: "square" as const }
+          : {}),
         strokeWidth: settings?.strokeWidth ?? 2,
         label: text(series.name),
         cells: series.values.map((value) => {
@@ -703,12 +707,21 @@ export function applyChartDataTableGraphics(
             style: { stroke: paints[rowIndex], lineWidth: row.strokeWidth },
           });
           if (row.key === "markerLine")
-            children.push({
-              type: "circle",
-              silent: true,
-              shape: { cx: tableLeft + PAD + 5, cy: y, r: 3 },
-              style: { fill: paints[rowIndex] },
-            });
+            children.push(
+              row.markerSymbol === "square"
+                ? {
+                    type: "rect",
+                    silent: true,
+                    shape: { x: tableLeft + PAD + 2, y: y - 3, width: 6, height: 6 },
+                    style: { fill: paints[rowIndex] },
+                  }
+                : {
+                    type: "circle",
+                    silent: true,
+                    shape: { cx: tableLeft + PAD + 5, cy: y, r: 3 },
+                    style: { fill: paints[rowIndex] },
+                  },
+            );
         }
       run(row.label, tableLeft + PAD + keyWidth, y, plan.labelGutter - PAD * 2 - keyWidth, "left");
       display.forEach((category, index) =>

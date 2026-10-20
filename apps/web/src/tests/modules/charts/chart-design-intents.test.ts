@@ -371,3 +371,32 @@ test("marker sizes survive subtype, style and chart family changes as independen
   }
   expect(original).toEqual(before);
 });
+
+test("circle/square overrides survive subtype, style and family changes independently of visibility and size", () => {
+  const original = chart("line");
+  Object.assign(original.format!.series![0]!, { markerSizePt: 9, markerSymbol: "square" });
+  Object.assign(original.format!.series![1]!, { markerSizePt: 5, markerSymbol: "circle" });
+  const before = structuredClone(original);
+  const outcomes = [
+    ...lineVariants.map((variant) =>
+      applyChartDesignIntent(original, { kind: "variant", variant }),
+    ),
+    ...styles.map((style) => applyChartDesignIntent(original, { kind: "style", style })),
+    ...(["column", "bar", "area", "radar", "combo"] as const).map((type) =>
+      changeChartType(original, type),
+    ),
+  ];
+  for (const result of outcomes) {
+    expect(
+      result.format?.series?.map(({ id, markerSymbol, markerSizePt }) => ({
+        id,
+        markerSymbol,
+        markerSizePt,
+      })),
+    ).toEqual([
+      { id: "active", markerSymbol: "square", markerSizePt: 9 },
+      { id: "dormant", markerSymbol: "circle", markerSizePt: 5 },
+    ]);
+  }
+  expect(original).toEqual(before);
+});

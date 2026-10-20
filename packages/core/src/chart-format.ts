@@ -75,6 +75,8 @@ export type ChartSeriesFormat = {
   markers?: boolean;
   /** Explicit point diameter (2–72pt); retained while markers or the series are hidden. */
   markerSizePt?: number;
+  /** Explicit supported point shape; retained while markers or the series are hidden. */
+  markerSymbol?: "circle" | "square";
 };
 export type ChartLegendFormat = { text?: ChartTextFormat; surface?: ChartSurfaceFormat };
 export type ChartBarFormat = { gapWidth?: number; overlap?: number };
@@ -403,6 +405,7 @@ function series(value: unknown): ChartSeriesFormat[] {
       "smooth",
       "markers",
       "markerSizePt",
+      "markerSymbol",
     ]);
     if (
       typeof source.id !== "string" ||
@@ -433,6 +436,11 @@ function series(value: unknown): ChartSeriesFormat[] {
       if (!Number.isSafeInteger(size))
         throw new RangeError("Chart marker size must be an integer number of points.");
       result.markerSizePt = size;
+    }
+    if (Object.hasOwn(source, "markerSymbol")) {
+      if (source.markerSymbol !== "circle" && source.markerSymbol !== "square")
+        throw new RangeError("Invalid chart marker symbol.");
+      result.markerSymbol = source.markerSymbol;
     }
     return result;
   });

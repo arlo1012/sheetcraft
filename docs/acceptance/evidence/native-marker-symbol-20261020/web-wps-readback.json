@@ -1,0 +1,427 @@
+[
+  {
+    "filename": "web-square9.xlsx",
+    "sha256": "a64f53bc305b18076b45793326fb79a572e170b3d1a4986fcb0ce9310fe45904",
+    "version": 93,
+    "normalizedSnapshotStable": true,
+    "chartSnapshotStable": true,
+    "svgHasFiniteGeometry": true,
+    "anchor": {
+      "row": 6,
+      "column": 3
+    },
+    "offsetX": 8,
+    "offsetY": 8,
+    "width": 640,
+    "height": 400,
+    "format": {
+      "title": {
+        "fontFamily": "Arial",
+        "fontSize": 15,
+        "color": "#000000",
+        "bold": false
+      },
+      "categoryAxis": {
+        "labelAngle": 0,
+        "title": "Quarter 季度 & <channel>",
+        "titleText": {
+          "fontFamily": "Arial",
+          "fontSize": 16,
+          "color": "#7c3aed",
+          "bold": true,
+          "italic": false
+        },
+        "titleRotation": 0,
+        "text": {
+          "fontFamily": "Arial",
+          "fontSize": 12,
+          "color": "#334155",
+          "bold": false
+        }
+      },
+      "valueAxis": {
+        "title": "Revenue 收入",
+        "titleText": {
+          "fontFamily": "Arial",
+          "fontSize": 16,
+          "color": "#b45309",
+          "bold": true,
+          "italic": true
+        },
+        "titleRotation": -90,
+        "text": {
+          "fontFamily": "Arial",
+          "fontSize": 12,
+          "color": "#334155",
+          "bold": false
+        },
+        "numberFormat": {
+          "kind": "number",
+          "fractionDigits": 1,
+          "useGrouping": false
+        },
+        "linkedToSource": false
+      },
+      "series": [
+        {
+          "id": "range-series-1",
+          "strokeWidth": 2,
+          "markers": true,
+          "markerSizePt": 9,
+          "markerSymbol": "square"
+        },
+        {
+          "id": "range-series-2",
+          "strokeWidth": 4,
+          "markers": false
+        }
+      ]
+    },
+    "series": [
+      {
+        "name": "sheetcraft-series:[\"id\",\"range-series-1\"]",
+        "symbol": "rect",
+        "symbolSize": 12,
+        "showSymbol": true,
+        "lineStyle": {
+          "width": 2
+        }
+      },
+      {
+        "name": "sheetcraft-series:[\"id\",\"range-series-2\"]",
+        "symbol": "none",
+        "showSymbol": false,
+        "lineStyle": {
+          "width": 4
+        }
+      }
+    ],
+    "symbols": [
+      {
+        "type": "path",
+        "bounds": {
+          "x": 159.6666717529297,
+          "y": 185.39999389648438,
+          "width": 12,
+          "height": 12
+        }
+      },
+      {
+        "type": "path",
+        "bounds": {
+          "x": 340.6000061035156,
+          "y": 87.80000305175781,
+          "width": 12,
+          "height": 12
+        }
+      },
+      {
+        "type": "path",
+        "bounds": {
+          "x": 521.5333251953125,
+          "y": 39,
+          "width": 12,
+          "height": 12
+        }
+      }
+    ],
+    "roundtripFormat": {
+      "title": {
+        "fontFamily": "Arial",
+        "fontSize": 15,
+        "color": "#000000",
+        "bold": false
+      },
+      "categoryAxis": {
+        "labelAngle": 0,
+        "title": "Quarter 季度 & <channel>",
+        "titleText": {
+          "fontFamily": "Arial",
+          "fontSize": 16,
+          "color": "#7c3aed",
+          "bold": true,
+          "italic": false
+        },
+        "titleRotation": 0,
+        "text": {
+          "fontFamily": "Arial",
+          "fontSize": 12,
+          "color": "#334155",
+          "bold": false
+        }
+      },
+      "valueAxis": {
+        "title": "Revenue 收入",
+        "titleText": {
+          "fontFamily": "Arial",
+          "fontSize": 16,
+          "color": "#b45309",
+          "bold": true,
+          "italic": true
+        },
+        "titleRotation": -90,
+        "text": {
+          "fontFamily": "Arial",
+          "fontSize": 12,
+          "color": "#334155",
+          "bold": false
+        },
+        "numberFormat": {
+          "kind": "number",
+          "fractionDigits": 1,
+          "useGrouping": false
+        },
+        "linkedToSource": false
+      },
+      "series": [
+        {
+          "id": "range-series-1",
+          "strokeWidth": 2,
+          "markers": true,
+          "markerSizePt": 9,
+          "markerSymbol": "square"
+        },
+        {
+          "id": "range-series-2",
+          "strokeWidth": 4,
+          "markers": false
+        }
+      ]
+    },
+    "importIssues": [
+      {
+        "code": "style-omitted",
+        "severity": "warning",
+        "count": 4,
+        "locations": [
+          "xl/charts/chart1.xml.format.series[0].strokeGeometry",
+          "xl/charts/chart1.xml.format.series[0].markerStroke",
+          "xl/charts/chart1.xml.format.series[1].strokeGeometry",
+          "xl/charts/chart1.xml"
+        ]
+      }
+    ],
+    "exportIssues": [
+      {
+        "code": "style-omitted",
+        "severity": "warning",
+        "count": 1,
+        "locations": ["Data.drawings[\"xlsx-column-chart-0-0\"].chart"]
+      }
+    ]
+  },
+  {
+    "filename": "web-square9-wps-saved.xlsx",
+    "sha256": "e853a9803811c5a23bc53c81418f187bbf515813e0df2f592a983ef35dcc89ee",
+    "version": 93,
+    "normalizedSnapshotStable": true,
+    "chartSnapshotStable": true,
+    "svgHasFiniteGeometry": true,
+    "anchor": {
+      "row": 6,
+      "column": 3
+    },
+    "offsetX": 8,
+    "offsetY": 8,
+    "width": 640,
+    "height": 400,
+    "format": {
+      "title": {
+        "fontFamily": "Arial",
+        "fontSize": 15,
+        "color": "#000000",
+        "bold": false
+      },
+      "categoryAxis": {
+        "labelAngle": 0,
+        "title": "Quarter 季度 & <channel>",
+        "titleText": {
+          "fontFamily": "Arial",
+          "fontSize": 16,
+          "color": "#7c3aed",
+          "bold": true,
+          "italic": false
+        },
+        "titleRotation": 0,
+        "text": {
+          "fontFamily": "Arial",
+          "fontSize": 12,
+          "color": "#334155",
+          "bold": false
+        }
+      },
+      "valueAxis": {
+        "title": "Revenue 收入",
+        "titleText": {
+          "fontFamily": "Arial",
+          "fontSize": 16,
+          "color": "#b45309",
+          "bold": true,
+          "italic": true
+        },
+        "titleRotation": -90,
+        "text": {
+          "fontFamily": "Arial",
+          "fontSize": 12,
+          "color": "#334155",
+          "bold": false
+        },
+        "numberFormat": {
+          "kind": "number",
+          "fractionDigits": 1,
+          "useGrouping": false
+        },
+        "linkedToSource": false
+      },
+      "series": [
+        {
+          "id": "range-series-1",
+          "strokeWidth": 2,
+          "markers": true,
+          "markerSizePt": 9,
+          "markerSymbol": "square"
+        },
+        {
+          "id": "range-series-2",
+          "strokeWidth": 4,
+          "markers": false
+        }
+      ]
+    },
+    "series": [
+      {
+        "name": "sheetcraft-series:[\"id\",\"range-series-1\"]",
+        "symbol": "rect",
+        "symbolSize": 12,
+        "showSymbol": true,
+        "lineStyle": {
+          "width": 2
+        }
+      },
+      {
+        "name": "sheetcraft-series:[\"id\",\"range-series-2\"]",
+        "symbol": "none",
+        "showSymbol": false,
+        "lineStyle": {
+          "width": 4
+        }
+      }
+    ],
+    "symbols": [
+      {
+        "type": "path",
+        "bounds": {
+          "x": 159.6666717529297,
+          "y": 185.39999389648438,
+          "width": 12,
+          "height": 12
+        }
+      },
+      {
+        "type": "path",
+        "bounds": {
+          "x": 340.6000061035156,
+          "y": 87.80000305175781,
+          "width": 12,
+          "height": 12
+        }
+      },
+      {
+        "type": "path",
+        "bounds": {
+          "x": 521.5333251953125,
+          "y": 39,
+          "width": 12,
+          "height": 12
+        }
+      }
+    ],
+    "roundtripFormat": {
+      "title": {
+        "fontFamily": "Arial",
+        "fontSize": 15,
+        "color": "#000000",
+        "bold": false
+      },
+      "categoryAxis": {
+        "labelAngle": 0,
+        "title": "Quarter 季度 & <channel>",
+        "titleText": {
+          "fontFamily": "Arial",
+          "fontSize": 16,
+          "color": "#7c3aed",
+          "bold": true,
+          "italic": false
+        },
+        "titleRotation": 0,
+        "text": {
+          "fontFamily": "Arial",
+          "fontSize": 12,
+          "color": "#334155",
+          "bold": false
+        }
+      },
+      "valueAxis": {
+        "title": "Revenue 收入",
+        "titleText": {
+          "fontFamily": "Arial",
+          "fontSize": 16,
+          "color": "#b45309",
+          "bold": true,
+          "italic": true
+        },
+        "titleRotation": -90,
+        "text": {
+          "fontFamily": "Arial",
+          "fontSize": 12,
+          "color": "#334155",
+          "bold": false
+        },
+        "numberFormat": {
+          "kind": "number",
+          "fractionDigits": 1,
+          "useGrouping": false
+        },
+        "linkedToSource": false
+      },
+      "series": [
+        {
+          "id": "range-series-1",
+          "strokeWidth": 2,
+          "markers": true,
+          "markerSizePt": 9,
+          "markerSymbol": "square"
+        },
+        {
+          "id": "range-series-2",
+          "strokeWidth": 4,
+          "markers": false
+        }
+      ]
+    },
+    "importIssues": [
+      {
+        "code": "style-omitted",
+        "severity": "warning",
+        "count": 7,
+        "locations": [
+          "xl/charts/chart1.xml.format.categoryAxis.titleText.kern",
+          "xl/charts/chart1.xml.format.categoryAxis.text.bodyPr",
+          "xl/charts/chart1.xml.format.valueAxis.titleText.kern",
+          "xl/charts/chart1.xml.format.series[0].strokeGeometry",
+          "xl/charts/chart1.xml.format.series[0].markerStroke",
+          "xl/charts/chart1.xml.format.series[1].strokeGeometry",
+          "xl/charts/chart1.xml"
+        ]
+      }
+    ],
+    "exportIssues": [
+      {
+        "code": "style-omitted",
+        "severity": "warning",
+        "count": 1,
+        "locations": ["Data.drawings[\"xlsx-column-chart-0-0\"].chart"]
+      }
+    ]
+  }
+]

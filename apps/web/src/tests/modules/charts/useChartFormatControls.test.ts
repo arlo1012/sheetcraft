@@ -628,3 +628,52 @@ test("marker size commit, hide and leaf reset each preserve identity, exact hist
     expect(f.ownerSheet.drawings).toEqual(after);
   }
 });
+
+test("circle to square keeps 9 pt; shape, visibility and reset each use one exact undoable command", () => {
+  const f = fixture({ kind: "series", seriesId: "apples" });
+  f.first.chart.type = "line";
+  const originalSeries = structuredClone(f.first.chart.format!.series!);
+  const baseline = {
+    color: "#56789a",
+    smooth: true,
+    strokeWidth: 3,
+    markers: true,
+    markerSizePt: 9,
+  };
+  const formats = [
+    { ...baseline, markerSymbol: "circle" as const },
+    { ...baseline, markerSymbol: "square" as const },
+    { ...baseline, markerSymbol: "square" as const, markers: false },
+    { ...baseline, markers: false },
+    undefined,
+  ];
+  for (const [index, format] of formats.entries()) {
+    const before = structuredClone(f.ownerSheet.drawings);
+    const owner = f.controls.snapshot.value!;
+    expect(owner.apply({ kind: "series", seriesId: "apples", format })).toBe(true);
+    const after = structuredClone(f.ownerSheet.drawings);
+    const expected = format === undefined ? undefined : { id: "apples", ...format };
+    expect(f.current().chart.format?.series?.find((entry) => entry.id === "apples")).toEqual(
+      expected,
+    );
+    expect(f.current().chart.format?.series?.filter((entry) => entry.id !== "apples")).toEqual(
+      originalSeries.slice(1),
+    );
+    expect(f.current().chart.source).toEqual(f.first.chart.source);
+    expect(f.session.history.undoStack).toHaveLength(index + 1);
+    const loaded = getActiveSheet(deserializeWorkbook(serializeWorkbook(f.workbook.value)))
+      .drawings?.[0];
+    expect(loaded?.kind === "chart" && loaded.chart.format?.series).toEqual(
+      f.current().chart.format?.series,
+    );
+    expect(
+      owner.apply({ kind: "series", seriesId: "apples", format: { markerSymbol: "circle" } }),
+    ).toBe(false);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    f.revision.value++;
+    expect(f.ownerSheet.drawings).toEqual(before);
+    expect(redoWorkbookCommand(f.session)).toBe(true);
+    f.revision.value++;
+    expect(f.ownerSheet.drawings).toEqual(after);
+  }
+});

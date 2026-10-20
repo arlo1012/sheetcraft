@@ -99,6 +99,7 @@ export function applyChartFormatIntent(
         "smooth",
         "markers",
         "markerSizePt",
+        "markerSymbol",
         "drawType",
       ]);
     if (!id) {

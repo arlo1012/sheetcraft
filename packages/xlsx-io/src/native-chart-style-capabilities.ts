@@ -213,15 +213,20 @@ export function supportsNativeLineSeriesStyles(chart: SheetChart): boolean {
       return false;
     const ids = new Set<string>();
     for (const value of entries) {
-      const entry = record(value, ["id", "strokeWidth", "markers", "markerSizePt"]);
+      const entry = record(value, ["id", "strokeWidth", "markers", "markerSizePt", "markerSymbol"]);
       if (
         Object.keys(entry).some(
-          (key) => !["id", "strokeWidth", "markers", "markerSizePt"].includes(key),
+          (key) => !["id", "strokeWidth", "markers", "markerSizePt", "markerSymbol"].includes(key),
         ) ||
         typeof entry.id !== "string" ||
         ids.has(entry.id) ||
         !bindings[by].some((binding) => binding.id === entry.id) ||
-        !("strokeWidth" in entry || "markers" in entry || "markerSizePt" in entry)
+        !(
+          "strokeWidth" in entry ||
+          "markers" in entry ||
+          "markerSizePt" in entry ||
+          "markerSymbol" in entry
+        )
       )
         return false;
       if (
@@ -245,6 +250,16 @@ export function supportsNativeLineSeriesStyles(chart: SheetChart): boolean {
           entry.markerSizePt <= 72 &&
           // WPS removes c:size when markers are hidden. Keep the latent Core
           // value, but never export a representation that would discard it.
+          (entry.markers ?? presentation?.lineMarkers ?? true) === true
+        )
+      )
+        return false;
+      if (
+        "markerSymbol" in entry &&
+        !(
+          (entry.markerSymbol === "circle" || entry.markerSymbol === "square") &&
+          // Native none has no latent shape. Preserve hidden Core data rather
+          // than silently replace it with the visible marker default on import.
           (entry.markers ?? presentation?.lineMarkers ?? true) === true
         )
       )

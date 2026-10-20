@@ -38,17 +38,26 @@ describe("Combo consumers keep captured routing and actual applicable controls",
     expect(targets).toContainEqual({ kind: "series", seriesId: "pear" });
   });
   test("appearance replacement/reset preserves saved routing, axis and marker identity", () => {
-    const chart = comboChart(),
-      before = structuredClone(chart),
+    const chart = comboChart();
+    Object.assign(chart.format!.series![0]!, { markerSymbol: "square", markerSizePt: 9 });
+    const before = structuredClone(chart),
       target = { kind: "series" as const, seriesId: "pear" };
     const recolored = applyChartFormatIntent(chart, target, {
       kind: "series",
       seriesId: "pear",
-      format: { color: "#ff0000", axis: "secondary", markers: false },
+      format: {
+        color: "#ff0000",
+        axis: "secondary",
+        markers: false,
+        markerSymbol: "square",
+        markerSizePt: 9,
+      },
     });
     expect(recolored.format?.series?.find((entry) => entry.id === "pear")).toMatchObject({
       drawType: "line",
       color: "#ff0000",
+      markerSymbol: "square",
+      markerSizePt: 9,
     });
     const reset = applyChartFormatIntent(chart, target, {
       kind: "series",

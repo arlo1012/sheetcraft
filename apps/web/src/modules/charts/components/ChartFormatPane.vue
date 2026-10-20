@@ -1044,6 +1044,15 @@ function setSeries<K extends keyof Omit<ChartSeriesFormat, "id">>(
     format: setChartFormatField(series.value, field, value),
   });
 }
+function setMarkerSymbol(value: unknown): void {
+  if (
+    !capabilities.value.seriesMarkerSymbol ||
+    (value !== "" && value !== "circle" && value !== "square") ||
+    (value !== "" && !seriesMarkersVisible.value)
+  )
+    return;
+  setSeries("markerSymbol", value === "" ? undefined : value);
+}
 function numberIntent(format: CellNumberFormat | undefined): ChartFormatIntent | undefined {
   if (!isValueAxis.value) return undefined;
   const next = { ...valueAxis.value };
@@ -1231,6 +1240,11 @@ function setLegendNonOverlapping(value: unknown): void {
 const seriesAxisOptions = computed(() => [
   { value: "primary", label: t("chart.formatPrimaryAxis") },
   { value: "secondary", label: t("chart.formatSecondaryAxis") },
+]);
+const markerSymbolOptions = computed(() => [
+  { value: "", label: t("chart.formatAuto") },
+  { value: "circle", label: t("chart.formatMarkerCircle") },
+  { value: "square", label: t("chart.formatMarkerSquare") },
 ]);
 const errorKeys: Record<ChartFormatDraftError, MessageKey> = {
   number: "chart.formatInvalidNumber",
@@ -2210,6 +2224,40 @@ function escapeDraft(event: KeyboardEvent): void {
           :onChange="captureAction((value: unknown) => setSeries('markers', !!value))"
           >{{ t("chart.formatMarkers") }}</TCheckbox
         >
+        <div
+          v-if="capabilities.seriesMarkerSymbol"
+          class="chart-format-pane__field"
+          data-chart-format-field="markerSymbol"
+        >
+          <label :for="`${paneId}-marker-symbol`">{{ t("chart.formatMarkerSymbol") }}</label>
+          <div class="chart-format-pane__number">
+            <TSelect
+              :id="`${paneId}-marker-symbol`"
+              :popup-props="popupProps"
+              :value="series.markerSymbol ?? ''"
+              :options="markerSymbolOptions"
+              size="small"
+              :disabled="disabled || !seriesMarkersVisible"
+              :aria-label="t('chart.formatMarkerSymbol')"
+              :onChange="captureAction(setMarkerSymbol)"
+            /><TButton
+              variant="text"
+              shape="square"
+              size="small"
+              :disabled="disabled || series.markerSymbol === undefined"
+              :aria-label="t('chart.formatReset')"
+              data-chart-format-reset="markerSymbol"
+              :onClick="captureAction(() => setMarkerSymbol(''))"
+              ><RotateCcw :size="14" aria-hidden="true"
+            /></TButton>
+          </div>
+        </div>
+        <p
+          v-if="capabilities.seriesMarkerSymbol && !seriesMarkersVisible"
+          class="chart-format-pane__hint"
+        >
+          {{ t("chart.formatMarkerSymbolHidden") }}
+        </p>
         <div
           v-if="capabilities.seriesMarkerSize"
           class="chart-format-pane__field"

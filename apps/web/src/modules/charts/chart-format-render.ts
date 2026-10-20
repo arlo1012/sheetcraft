@@ -483,6 +483,18 @@ export function applyChartCommonFormat(
           ...(!combo && settings?.markers !== undefined
             ? { showSymbol: settings.markers, symbol: settings.markers ? "circle" : "none" }
             : {}),
+          // Shape is independent of size and visibility. Keep legacy implicit symbols
+          // unchanged, and never turn hidden markers back on by applying a saved shape.
+          ...(chart.type === "line" && settings?.markerSymbol !== undefined
+            ? {
+                symbol:
+                  (settings.markers ?? chart.presentation?.lineMarkers ?? true)
+                    ? settings.markerSymbol === "square"
+                      ? "rect"
+                      : "circle"
+                    : "none",
+              }
+            : {}),
           // Marker sizes are points in the document, but ECharts uses CSS pixels.
           // Other chart families retain this leaf without rendering it.
           ...(chart.type === "line" && settings?.markerSizePt !== undefined

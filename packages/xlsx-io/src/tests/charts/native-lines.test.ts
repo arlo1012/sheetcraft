@@ -200,7 +200,7 @@ describe("ordinary native straight marker lines", () => {
     "smooth",
     "series-smooth",
     "no-markers",
-    "marker-square",
+    "marker-triangle",
     "marker-size",
     "zero-gap",
     "blank-cache-zero",
@@ -220,11 +220,8 @@ describe("ordinary native straight marker lines", () => {
       );
     if (mode === "series-smooth") xml = xml.replace('<c:smooth val="0"/>', '<c:smooth val="1"/>');
     if (mode === "no-markers") xml = xml.replace('<c:marker val="1"/>', '<c:marker val="0"/>');
-    if (mode === "marker-none" || mode === "marker-square")
-      xml = xml.replace(
-        '<c:symbol val="circle"/>',
-        `<c:symbol val="${mode === "marker-none" ? "none" : "square"}"/>`,
-      );
+    if (mode === "marker-triangle")
+      xml = xml.replace('<c:symbol val="circle"/>', '<c:symbol val="triangle"/>');
     if (mode === "marker-size") xml = xml.replace('<c:size val="5"/>', '<c:size val="1"/>');
     if (mode === "zero-gap")
       xml = xml.replace('<c:dispBlanksAs val="gap"/>', '<c:dispBlanksAs val="zero"/>');

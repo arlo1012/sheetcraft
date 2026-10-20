@@ -52,6 +52,34 @@ function fixture() {
 }
 
 describe("ordinary range series formatting", () => {
+  test("shape edits bind the physical range series without source promotion and preserve size through reset", () => {
+    const f = fixture();
+    const chart: SheetChart = { ...f.chart, type: "line" };
+    const shaped = applyChartFormatIntent(chart, f.target, {
+      kind: "series",
+      seriesId: f.target.seriesId,
+      format: { markerSymbol: "square", markerSizePt: 9, markers: true },
+    });
+    const id = resolveChartFormatSeriesId(shaped, f.target);
+    expect(id).toBeTruthy();
+    expect(id).not.toBe(f.target.seriesId);
+    expect(shaped.rectangleSeries?.columns).toHaveLength(1);
+    expect(shaped.source).toBeUndefined();
+    expect(shaped.range).toEqual(chart.range);
+    const option = createChartOption(shaped, f.read(shaped), { width: 480, height: 300 });
+    expect(option).toMatchObject({
+      series: [{ type: "line" }, { id, type: "line", symbol: "rect", symbolSize: 12 }],
+    });
+    const reset = applyChartFormatIntent(shaped, f.target, {
+      kind: "series",
+      seriesId: f.target.seriesId,
+      format: { markerSizePt: 9, markers: true },
+    });
+    expect(resolveChartFormatSeriesId(reset, f.target)).toBe(id);
+    expect(reset.format?.series).toEqual([{ id, markerSizePt: 9, markers: true }]);
+    expect(chart.rectangleSeries).toBeUndefined();
+    expect(chart.format).toBeUndefined();
+  });
   test("reading targets creates no document identity and native series-index events resolve the physical band", () => {
     const f = fixture(),
       before = serializeWorkbook(f.workbook),

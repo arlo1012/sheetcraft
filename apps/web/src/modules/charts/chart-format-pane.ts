@@ -186,6 +186,7 @@ export function getChartFormatCapabilities(
     seriesSmooth: lines,
     seriesMarkers: lines || comboLine || chart.type === "radar",
     seriesMarkerSize: chart.type === "line",
+    seriesMarkerSymbol: chart.type === "line",
   };
 }
 
