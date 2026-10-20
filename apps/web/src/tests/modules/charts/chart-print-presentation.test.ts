@@ -1,9 +1,19 @@
+import { readFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { decodeXlsx } from "@sheetcraft/xlsx-io";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import { getSheetChartData, type ChartData } from "@sheetcraft/core/sheet-charts";
-import { createSheetEvaluator, createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
+import {
+  createSheetEvaluator,
+  createWorkbook,
+  createWorkbookEvaluator,
+  getActiveSheet,
+} from "@sheetcraft/core/workbook";
 import { applyChartFormatIntent } from "../../../modules/charts/chart-format-intents";
 import { getChartFormatTargets } from "../../../modules/charts/chart-format-pane";
+import { createChartDataTablePlan } from "../../../modules/charts/chart-data-table";
 import { getInstanceByDom } from "echarts/core";
 import * as chartRuntime from "../../../modules/charts/chart-runtime";
 import { comboChart, comboData } from "./combo-fixture";
@@ -928,6 +938,92 @@ test("ordinary line print keeps explicit point sizes in CSS pixels without densi
     });
     expect([result.canvas.width, result.canvas.height]).toEqual([960, 600]);
     expect(instances[0]!.isDisposed()).toBe(true);
+  } finally {
+    result.dispose();
+  }
+});
+
+test("actual WPS all-hidden markers print both lines and plain legend/data-table keys", async () => {
+  const input = await readFile(
+    resolve(
+      dirname(fileURLToPath(import.meta.url)),
+      "../../../../../../packages/xlsx-io/src/tests/charts/fixtures/wps-native-marker-symbol-none.xlsx",
+    ),
+  );
+  const { workbook } = await decodeXlsx(new Uint8Array(input));
+  const sheet = [...workbook.sheets.values()][0]!;
+  const imported = sheet.drawings?.find((entry) => entry.kind === "chart");
+  if (!imported || imported.kind !== "chart") throw new Error("Missing ordinary line");
+  const source = getSheetChartData(
+    sheet,
+    imported.chart,
+    createWorkbookEvaluator(workbook, sheet.id),
+  );
+  const item: SheetChartDrawing = {
+    ...imported,
+    chart: {
+      ...imported.chart,
+      legend: true,
+      elements: { ...imported.chart.elements, dataTable: "withLegendKeys" },
+    },
+  };
+  const before = structuredClone(item);
+  const printOptions = { ...options, width: 640, height: 480 };
+  const plan = createChartDataTablePlan(item.chart, source, printOptions);
+  expect(plan?.rows).toMatchObject([
+    { id: source.series[0]!.id, key: "line", strokeWidth: 2, label: { text: "apple" } },
+    { id: source.series[1]!.id, key: "line", strokeWidth: 4, label: { text: "pear" } },
+  ]);
+  expect(plan?.rows.every((row) => row.markerSymbol === undefined)).toBe(true);
+
+  const result = renderChartPrintPresentation(item, source, printOptions);
+  try {
+    expect(nativeOptions.at(-1)).toMatchObject({
+      series: [
+        {
+          id: source.series[0]!.id,
+          type: "line",
+          lineStyle: { width: 2 },
+          symbol: "none",
+          showSymbol: false,
+        },
+        {
+          id: source.series[1]!.id,
+          type: "line",
+          lineStyle: { width: 4 },
+          symbol: "none",
+          showSymbol: false,
+        },
+      ],
+    });
+    const paints = contexts.get(result.canvas)!.copies[0]!.paints;
+    for (const color of ["#2563eb", "#16a34a"]) {
+      expect(
+        paints.some(
+          (paint) =>
+            paint.operation === "stroke" &&
+            paint.fill === color &&
+            (paint.path?.filter((part) => part.startsWith("line:")).length ?? 0) >= 2,
+        ),
+      ).toBe(true);
+      // CanvasPainter may call fill on the open legend line path. It encloses
+      // no area; reject actual point geometry rather than that harmless call.
+      for (const paint of paints.filter(
+        (entry) => entry.operation === "fill" && entry.fill === color,
+      )) {
+        expect(paint.path).toEqual([
+          expect.stringMatching(/^move:/),
+          expect.stringMatching(/^line:/),
+        ]);
+      }
+    }
+    const labels = paints.filter((paint) => paint.operation === "text").map((paint) => paint.text);
+    for (const label of ["apple", "pear"])
+      expect(labels.filter((text) => text === label).length).toBeGreaterThanOrEqual(2);
+    expect(labels.some((text) => text?.includes("sheetcraft-series:"))).toBe(false);
+    expect([result.canvas.width, result.canvas.height]).toEqual([1280, 960]);
+    expect(instances[0]!.isDisposed()).toBe(true);
+    expect(item).toEqual(before);
   } finally {
     result.dispose();
   }

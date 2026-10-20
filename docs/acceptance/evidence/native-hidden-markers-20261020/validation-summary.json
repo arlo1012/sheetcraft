@@ -1,0 +1,42 @@
+{
+  "nativeFocused": {
+    "files": 4,
+    "passed": 226
+  },
+  "nativeAggregate": {
+    "files": 27,
+    "passed": 802,
+    "failed": 2,
+    "skipped": 2,
+    "baselineFailures": [
+      "native-column-options: wrong-index native title",
+      "native-column-options: expression native title"
+    ]
+  },
+  "coreAggregate": {
+    "files": 35,
+    "passed": 424,
+    "failed": 1,
+    "baselineFailure": "chart-range-series: explicit promotion colorIndex expected [0,1], observed [0,0]"
+  },
+  "webFocused": {
+    "files": 2,
+    "passed": 39
+  },
+  "webAggregate": {
+    "files": 15,
+    "passed": 469,
+    "failed": 1,
+    "baselineFailureGroups": [
+      "src/tests/modules/charts/chart-presentation-render.test.ts > chart-wide presentation consumers > strict validation rejects presentation accessors/unknown fields and non-finite source values before geometry"
+    ],
+    "allFailuresPreviouslyDocumented": true,
+    "priorBaseline": "../native-marker-symbol-20261020/baseline-failure-comparison.json"
+  },
+  "typecheck": "passed",
+  "build": "passed",
+  "scopedFormatting": "passed",
+  "scopedLint": "passed",
+  "notFullSuiteGreen": true,
+  "independentReview": "approved; no blocking findings; both reader and legend changes reviewed"
+}

@@ -1,0 +1,606 @@
+{
+  "files": [
+    {
+      "filename": "wps-all-hidden-resaved.xlsx",
+      "sha256": "30ac65599f6d84e1328a1d45325f433c615023b883d106fa46f2da50a1c3e4b9",
+      "version": 91,
+      "chartSnapshotStable": true,
+      "nativeChartRoundtripStable": true,
+      "svgHasFiniteGeometry": true,
+      "visiblePointCount": 0,
+      "familyMarker": "0",
+      "seriesMarkerXml": [
+        "<c:marker><c:symbol val=\"none\"/></c:marker>",
+        "<c:marker><c:symbol val=\"none\"/></c:marker>"
+      ],
+      "width": 640,
+      "height": 400,
+      "format": {
+        "title": {
+          "fontFamily": "Arial",
+          "fontSize": 15,
+          "color": "#000000",
+          "bold": false
+        },
+        "categoryAxis": {
+          "labelAngle": 0,
+          "title": "Quarter 季度 & <channel>",
+          "titleText": {
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "color": "#7c3aed",
+            "bold": true,
+            "italic": false
+          },
+          "titleRotation": 0,
+          "text": {
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "color": "#334155",
+            "bold": false
+          }
+        },
+        "valueAxis": {
+          "title": "Revenue 收入",
+          "titleText": {
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "color": "#b45309",
+            "bold": true,
+            "italic": true
+          },
+          "titleRotation": -90,
+          "text": {
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "color": "#334155",
+            "bold": false
+          },
+          "numberFormat": {
+            "kind": "number",
+            "fractionDigits": 1,
+            "useGrouping": false
+          },
+          "linkedToSource": false
+        },
+        "series": [
+          {
+            "id": "range-series-1",
+            "strokeWidth": 2,
+            "markers": false
+          },
+          {
+            "id": "range-series-2",
+            "strokeWidth": 4,
+            "markers": false
+          }
+        ]
+      },
+      "series": [
+        {
+          "symbol": "none",
+          "showSymbol": false,
+          "lineStyle": {
+            "width": 2
+          }
+        },
+        {
+          "symbol": "none",
+          "showSymbol": false,
+          "lineStyle": {
+            "width": 4
+          }
+        }
+      ],
+      "importIssues": [
+        {
+          "code": "style-omitted",
+          "severity": "warning",
+          "count": 6,
+          "locations": [
+            "xl/charts/chart1.xml.format.categoryAxis.titleText.kern",
+            "xl/charts/chart1.xml.format.categoryAxis.text.bodyPr",
+            "xl/charts/chart1.xml.format.valueAxis.titleText.kern",
+            "xl/charts/chart1.xml.format.series[0].strokeGeometry",
+            "xl/charts/chart1.xml.format.series[1].strokeGeometry",
+            "xl/charts/chart1.xml"
+          ]
+        }
+      ],
+      "exportIssues": [
+        {
+          "code": "style-omitted",
+          "severity": "warning",
+          "count": 1,
+          "locations": ["Data.drawings[\"xlsx-column-chart-0-0\"].chart"]
+        }
+      ]
+    },
+    {
+      "filename": "mixed-family0-source.xlsx",
+      "sha256": "2fca9382e6d58446708cc6111f31ec44a41f25a66daf7f1c211ff38aa234a1f8",
+      "version": 93,
+      "chartSnapshotStable": true,
+      "nativeChartRoundtripStable": true,
+      "svgHasFiniteGeometry": true,
+      "visiblePointCount": 3,
+      "familyMarker": "0",
+      "seriesMarkerXml": [
+        "<c:marker><c:symbol val=\"square\"/><c:size val=\"9\"/><c:spPr><a:solidFill><a:srgbClr val=\"2563EB\"/></a:solidFill><a:ln w=\"12700\"><a:solidFill><a:srgbClr val=\"2563EB\"/></a:solidFill><a:prstDash val=\"solid\"/><a:round/></a:ln></c:spPr></c:marker>",
+        "<c:marker><c:symbol val=\"none\"/></c:marker>"
+      ],
+      "width": 640,
+      "height": 400,
+      "format": {
+        "title": {
+          "fontFamily": "Arial",
+          "fontSize": 15,
+          "color": "#000000",
+          "bold": false
+        },
+        "categoryAxis": {
+          "labelAngle": 0,
+          "title": "Quarter 季度 & <channel>",
+          "titleText": {
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "color": "#7c3aed",
+            "bold": true,
+            "italic": false
+          },
+          "titleRotation": 0,
+          "text": {
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "color": "#334155",
+            "bold": false
+          }
+        },
+        "valueAxis": {
+          "title": "Revenue 收入",
+          "titleText": {
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "color": "#b45309",
+            "bold": true,
+            "italic": true
+          },
+          "titleRotation": -90,
+          "text": {
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "color": "#334155",
+            "bold": false
+          },
+          "numberFormat": {
+            "kind": "number",
+            "fractionDigits": 1,
+            "useGrouping": false
+          },
+          "linkedToSource": false
+        },
+        "series": [
+          {
+            "id": "range-series-1",
+            "strokeWidth": 2,
+            "markers": true,
+            "markerSizePt": 9,
+            "markerSymbol": "square"
+          },
+          {
+            "id": "range-series-2",
+            "strokeWidth": 4,
+            "markers": false
+          }
+        ]
+      },
+      "series": [
+        {
+          "symbol": "rect",
+          "showSymbol": true,
+          "symbolSize": 12,
+          "lineStyle": {
+            "width": 2
+          }
+        },
+        {
+          "symbol": "none",
+          "showSymbol": false,
+          "lineStyle": {
+            "width": 4
+          }
+        }
+      ],
+      "importIssues": [
+        {
+          "code": "feature-omitted",
+          "severity": "warning",
+          "count": 5,
+          "locations": ["_rels/", "xl/", "xl/charts/", "xl/drawings/", "xl/drawings/_rels/"]
+        },
+        {
+          "code": "style-omitted",
+          "severity": "warning",
+          "count": 7,
+          "locations": [
+            "xl/charts/chart1.xml.format.categoryAxis.titleText.kern",
+            "xl/charts/chart1.xml.format.categoryAxis.text.bodyPr",
+            "xl/charts/chart1.xml.format.valueAxis.titleText.kern",
+            "xl/charts/chart1.xml.format.series[0].strokeGeometry",
+            "xl/charts/chart1.xml.format.series[0].markerStroke",
+            "xl/charts/chart1.xml.format.series[1].strokeGeometry",
+            "xl/charts/chart1.xml"
+          ]
+        }
+      ],
+      "exportIssues": [
+        {
+          "code": "style-omitted",
+          "severity": "warning",
+          "count": 1,
+          "locations": ["Data.drawings[\"xlsx-column-chart-0-0\"].chart"]
+        }
+      ]
+    },
+    {
+      "filename": "mixed-family0-wps-saved.xlsx",
+      "sha256": "c382e1beedbe77ebf5af3d80f9dc5f5da08aa9a9c18536781bc9ac008a7746d9",
+      "version": 93,
+      "chartSnapshotStable": true,
+      "nativeChartRoundtripStable": true,
+      "svgHasFiniteGeometry": true,
+      "visiblePointCount": 3,
+      "familyMarker": "1",
+      "seriesMarkerXml": [
+        "<c:marker><c:symbol val=\"square\"/><c:size val=\"9\"/><c:spPr><a:solidFill><a:srgbClr val=\"2563EB\"/></a:solidFill><a:ln w=\"12700\"><a:solidFill><a:srgbClr val=\"2563EB\"/></a:solidFill><a:prstDash val=\"solid\"/><a:round/></a:ln></c:spPr></c:marker>",
+        "<c:marker><c:symbol val=\"none\"/></c:marker>"
+      ],
+      "width": 640,
+      "height": 400,
+      "format": {
+        "title": {
+          "fontFamily": "Arial",
+          "fontSize": 15,
+          "color": "#000000",
+          "bold": false
+        },
+        "categoryAxis": {
+          "labelAngle": 0,
+          "title": "Quarter 季度 & <channel>",
+          "titleText": {
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "color": "#7c3aed",
+            "bold": true,
+            "italic": false
+          },
+          "titleRotation": 0,
+          "text": {
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "color": "#334155",
+            "bold": false
+          }
+        },
+        "valueAxis": {
+          "title": "Revenue 收入",
+          "titleText": {
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "color": "#b45309",
+            "bold": true,
+            "italic": true
+          },
+          "titleRotation": -90,
+          "text": {
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "color": "#334155",
+            "bold": false
+          },
+          "numberFormat": {
+            "kind": "number",
+            "fractionDigits": 1,
+            "useGrouping": false
+          },
+          "linkedToSource": false
+        },
+        "series": [
+          {
+            "id": "range-series-1",
+            "strokeWidth": 2,
+            "markers": true,
+            "markerSizePt": 9,
+            "markerSymbol": "square"
+          },
+          {
+            "id": "range-series-2",
+            "strokeWidth": 4,
+            "markers": false
+          }
+        ]
+      },
+      "series": [
+        {
+          "symbol": "rect",
+          "showSymbol": true,
+          "symbolSize": 12,
+          "lineStyle": {
+            "width": 2
+          }
+        },
+        {
+          "symbol": "none",
+          "showSymbol": false,
+          "lineStyle": {
+            "width": 4
+          }
+        }
+      ],
+      "importIssues": [
+        {
+          "code": "style-omitted",
+          "severity": "warning",
+          "count": 7,
+          "locations": [
+            "xl/charts/chart1.xml.format.categoryAxis.titleText.kern",
+            "xl/charts/chart1.xml.format.categoryAxis.text.bodyPr",
+            "xl/charts/chart1.xml.format.valueAxis.titleText.kern",
+            "xl/charts/chart1.xml.format.series[0].strokeGeometry",
+            "xl/charts/chart1.xml.format.series[0].markerStroke",
+            "xl/charts/chart1.xml.format.series[1].strokeGeometry",
+            "xl/charts/chart1.xml"
+          ]
+        }
+      ],
+      "exportIssues": [
+        {
+          "code": "style-omitted",
+          "severity": "warning",
+          "count": 1,
+          "locations": ["Data.drawings[\"xlsx-column-chart-0-0\"].chart"]
+        }
+      ]
+    },
+    {
+      "filename": "web-all-hidden.xlsx",
+      "sha256": "5da84c66663d682be17e23e2bbfa92cf2d8910e158c25a83cfa7042c5045e8cd",
+      "version": 91,
+      "chartSnapshotStable": true,
+      "nativeChartRoundtripStable": true,
+      "svgHasFiniteGeometry": true,
+      "visiblePointCount": 0,
+      "familyMarker": "1",
+      "seriesMarkerXml": [
+        "<c:marker><c:symbol val=\"none\"/></c:marker>",
+        "<c:marker><c:symbol val=\"none\"/></c:marker>"
+      ],
+      "width": 640,
+      "height": 400,
+      "format": {
+        "title": {
+          "fontFamily": "Arial",
+          "fontSize": 15,
+          "color": "#000000",
+          "bold": false
+        },
+        "categoryAxis": {
+          "labelAngle": 0,
+          "title": "Quarter 季度 & <channel>",
+          "titleText": {
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "color": "#7c3aed",
+            "bold": true,
+            "italic": false
+          },
+          "titleRotation": 0,
+          "text": {
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "color": "#334155",
+            "bold": false
+          }
+        },
+        "valueAxis": {
+          "title": "Revenue 收入",
+          "titleText": {
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "color": "#b45309",
+            "bold": true,
+            "italic": true
+          },
+          "titleRotation": -90,
+          "text": {
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "color": "#334155",
+            "bold": false
+          },
+          "numberFormat": {
+            "kind": "number",
+            "fractionDigits": 1,
+            "useGrouping": false
+          },
+          "linkedToSource": false
+        },
+        "series": [
+          {
+            "id": "range-series-1",
+            "strokeWidth": 2,
+            "markers": false
+          },
+          {
+            "id": "range-series-2",
+            "strokeWidth": 4,
+            "markers": false
+          }
+        ]
+      },
+      "series": [
+        {
+          "symbol": "none",
+          "showSymbol": false,
+          "lineStyle": {
+            "width": 2
+          }
+        },
+        {
+          "symbol": "none",
+          "showSymbol": false,
+          "lineStyle": {
+            "width": 4
+          }
+        }
+      ],
+      "importIssues": [
+        {
+          "code": "style-omitted",
+          "severity": "warning",
+          "count": 3,
+          "locations": [
+            "xl/charts/chart1.xml.format.series[0].strokeGeometry",
+            "xl/charts/chart1.xml.format.series[1].strokeGeometry",
+            "xl/charts/chart1.xml"
+          ]
+        }
+      ],
+      "exportIssues": [
+        {
+          "code": "style-omitted",
+          "severity": "warning",
+          "count": 1,
+          "locations": ["Data.drawings[\"xlsx-column-chart-0-0\"].chart"]
+        }
+      ]
+    },
+    {
+      "filename": "web-all-hidden-wps-saved.xlsx",
+      "sha256": "1d927c1600add9305a222c4486d84602ff1a2aeeb0e5dc09beae2e1f11168502",
+      "version": 91,
+      "chartSnapshotStable": true,
+      "nativeChartRoundtripStable": true,
+      "svgHasFiniteGeometry": true,
+      "visiblePointCount": 0,
+      "familyMarker": "0",
+      "seriesMarkerXml": [
+        "<c:marker><c:symbol val=\"none\"/></c:marker>",
+        "<c:marker><c:symbol val=\"none\"/></c:marker>"
+      ],
+      "width": 640,
+      "height": 400,
+      "format": {
+        "title": {
+          "fontFamily": "Arial",
+          "fontSize": 15,
+          "color": "#000000",
+          "bold": false
+        },
+        "categoryAxis": {
+          "labelAngle": 0,
+          "title": "Quarter 季度 & <channel>",
+          "titleText": {
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "color": "#7c3aed",
+            "bold": true,
+            "italic": false
+          },
+          "titleRotation": 0,
+          "text": {
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "color": "#334155",
+            "bold": false
+          }
+        },
+        "valueAxis": {
+          "title": "Revenue 收入",
+          "titleText": {
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "color": "#b45309",
+            "bold": true,
+            "italic": true
+          },
+          "titleRotation": -90,
+          "text": {
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "color": "#334155",
+            "bold": false
+          },
+          "numberFormat": {
+            "kind": "number",
+            "fractionDigits": 1,
+            "useGrouping": false
+          },
+          "linkedToSource": false
+        },
+        "series": [
+          {
+            "id": "range-series-1",
+            "strokeWidth": 2,
+            "markers": false
+          },
+          {
+            "id": "range-series-2",
+            "strokeWidth": 4,
+            "markers": false
+          }
+        ]
+      },
+      "series": [
+        {
+          "symbol": "none",
+          "showSymbol": false,
+          "lineStyle": {
+            "width": 2
+          }
+        },
+        {
+          "symbol": "none",
+          "showSymbol": false,
+          "lineStyle": {
+            "width": 4
+          }
+        }
+      ],
+      "importIssues": [
+        {
+          "code": "style-omitted",
+          "severity": "warning",
+          "count": 6,
+          "locations": [
+            "xl/charts/chart1.xml.format.categoryAxis.titleText.kern",
+            "xl/charts/chart1.xml.format.categoryAxis.text.bodyPr",
+            "xl/charts/chart1.xml.format.valueAxis.titleText.kern",
+            "xl/charts/chart1.xml.format.series[0].strokeGeometry",
+            "xl/charts/chart1.xml.format.series[1].strokeGeometry",
+            "xl/charts/chart1.xml"
+          ]
+        }
+      ],
+      "exportIssues": [
+        {
+          "code": "style-omitted",
+          "severity": "warning",
+          "count": 1,
+          "locations": ["Data.drawings[\"xlsx-column-chart-0-0\"].chart"]
+        }
+      ]
+    }
+  ],
+  "json": {
+    "version": 91,
+    "sha256": "0d3af57219273dfcb06b5a4369892382eba6c68e99026db4d85f25e7270095aa",
+    "allSeriesHiddenWithoutInventedGeometry": true
+  },
+  "gui": {
+    "pointCountsAfterShowHideUndoUndo": [3, 0, 3, 0],
+    "jsonReimportPointCount": 0,
+    "importWarningCount": 6,
+    "wpsRepairPrompt": false
+  }
+}

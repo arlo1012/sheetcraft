@@ -348,17 +348,17 @@ describe("unsupported native marker geometry", () => {
     expect(locations(read)).toContain(`${part}.format.series[0].markerGeometry`);
   });
 
-  test("family marker=0 stays outside the native import contract", async () => {
+  test("family marker=0 preserves proven all-hidden series", async () => {
     const read = await editXml((xml) =>
       xml
         .replace(/<c:marker>[\s\S]*?<\/c:marker>/g, '<c:marker><c:symbol val="none"/></c:marker>')
         .replace('<c:marker val="1"/>', '<c:marker val="0"/>'),
     );
-    expect([...read.workbook.sheets.values()][0]!.drawings ?? []).toHaveLength(0);
-    expect(read.report.issues.some((issue) => issue.code === "feature-omitted")).toBe(true);
+    expect(imported(read).styles.every((entry) => entry?.markers === false)).toBe(true);
+    expect(read.report.issues.some((issue) => issue.code === "feature-omitted")).toBe(false);
   });
 
-  test("actual WPS square-to-none removes shape and size and retains the all-hidden boundary", async () => {
+  test("actual WPS square-to-none preserves absence without inventing latent shape or size", async () => {
     const bytes = new Uint8Array(
       await readFile(new URL("./fixtures/wps-native-marker-symbol-none.xlsx", import.meta.url)),
     );
@@ -369,8 +369,12 @@ describe("unsupported native marker geometry", () => {
     ]);
     expect(native).toContain('<c:marker val="0"/>');
     const read = await decodeXlsx(bytes);
-    expect([...read.workbook.sheets.values()][0]!.drawings ?? []).toHaveLength(0);
-    expect(read.report.issues.some((issue) => issue.code === "feature-omitted")).toBe(true);
+    expect(imported(read).styles.every((entry) => entry?.markers === false)).toBe(true);
+    expect(imported(read).styles.every((entry) => entry?.markerSymbol === undefined)).toBe(true);
+    expect(imported(read).styles.every((entry) => entry?.markerSizePt === undefined)).toBe(true);
+    expect(read.report.issues.some((issue) => issue.code === "feature-omitted")).toBe(false);
+    const again = await decodeXlsx((await encodeXlsx(read.workbook)).bytes);
+    expect(imported(again).chart).toEqual(imported(read).chart);
   });
 
   test("per-point square markers stay outside the series-symbol contract", async () => {

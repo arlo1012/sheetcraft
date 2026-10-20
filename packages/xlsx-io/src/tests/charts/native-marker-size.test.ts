@@ -138,7 +138,7 @@ describe("native ordinary circular marker size in points", () => {
     ["wps-native-marker-size9.xlsx", 9, true],
     ["wps-native-marker-size-none.xlsx", undefined, false],
   ] as const)(
-    "actual WPS save %s retains its proven size and import boundary",
+    "actual WPS save %s retains its proven size and visibility",
     async (filename, size, markers) => {
       const bytes = new Uint8Array(
         await readFile(new URL(`./fixtures/${filename}`, import.meta.url)),
@@ -149,11 +149,8 @@ describe("native ordinary circular marker size in points", () => {
       const read = await decodeXlsx(bytes);
       if (!markers) {
         // Both series are hidden in this file, so WPS also writes family marker=0.
-        // The pre-existing native all-hidden-family boundary is not widened here.
         expect(native).toContain('<c:marker val="0"/>');
-        expect([...read.workbook.sheets.values()][0]!.drawings ?? []).toHaveLength(0);
-        expect(read.report.issues.some((issue) => issue.code === "feature-omitted")).toBe(true);
-        return;
+        expect(imported(read).styles.every((entry) => entry?.markers === false)).toBe(true);
       }
       expect(imported(read).styles[0]?.markerSizePt).toBe(size);
       expect(imported(read).styles[0]?.markers).toBe(markers);

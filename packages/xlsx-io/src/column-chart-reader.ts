@@ -211,8 +211,20 @@ export function readXlsxColumnCharts(
       const line = plot.lineChart !== undefined;
       const bar = single(plot, line ? "lineChart" : "barChart");
       const horizontal = !line && attr(single(bar, "barDir"), "val") === "bar";
-      if (line && (!chartBoolean(bar, "marker", false) || chartBoolean(bar, "smooth", false)))
-        throw new Error("Unsupported line markers or smoothing.");
+      if (line) {
+        const marker = single(bar, "marker");
+        if (
+          Array.isArray(bar.marker) ||
+          Object.keys(marker).some((key) => key !== "@_val" && !key.startsWith("@_xmlns"))
+        )
+          throw new Error("Invalid line marker flag.");
+        // WPS writes false for all-hidden lines, but explicit per-series
+        // circle/square overrides remain visible even under false. Require a
+        // valid explicit family flag and prove every series below instead of
+        // treating this flag as a hide-all setting or inventing missing symbols.
+        chartBoolean(bar, "marker", false);
+        if (chartBoolean(bar, "smooth", false)) throw new Error("Unsupported line smoothing.");
+      }
       if (
         line &&
         (native.dispBlanksAs === undefined || attr(single(native, "dispBlanksAs"), "val") !== "gap")

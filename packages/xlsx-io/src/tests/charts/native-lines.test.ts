@@ -199,7 +199,7 @@ describe("ordinary native straight marker lines", () => {
   test.each([
     "smooth",
     "series-smooth",
-    "no-markers",
+    "invalid-marker-flag",
     "marker-triangle",
     "marker-size",
     "zero-gap",
@@ -219,7 +219,8 @@ describe("ordinary native straight marker lines", () => {
         '<c:marker val="1"/><c:smooth val="1"/>',
       );
     if (mode === "series-smooth") xml = xml.replace('<c:smooth val="0"/>', '<c:smooth val="1"/>');
-    if (mode === "no-markers") xml = xml.replace('<c:marker val="1"/>', '<c:marker val="0"/>');
+    if (mode === "invalid-marker-flag")
+      xml = xml.replace('<c:marker val="1"/>', '<c:marker val="2"/>');
     if (mode === "marker-triangle")
       xml = xml.replace('<c:symbol val="circle"/>', '<c:symbol val="triangle"/>');
     if (mode === "marker-size") xml = xml.replace('<c:size val="5"/>', '<c:size val="1"/>');

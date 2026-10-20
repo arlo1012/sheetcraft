@@ -1,0 +1,13 @@
+{
+  "chartCount": 0,
+  "report": {
+    "issues": [
+      {
+        "code": "feature-omitted",
+        "severity": "warning",
+        "count": 1,
+        "locations": ["xl/charts/chart1.xml"]
+      }
+    ]
+  }
+}
