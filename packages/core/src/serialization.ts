@@ -344,6 +344,8 @@ export type WorkbookSnapshotV89 = Omit<WorkbookSnapshotV88, "version"> & { versi
 export type WorkbookSnapshotV90 = Omit<WorkbookSnapshotV89, "version"> & { version: 90 };
 /** Independent chart axis title typography and rotation. */
 export type WorkbookSnapshotV91 = Omit<WorkbookSnapshotV90, "version"> & { version: 91 };
+/** Explicit per-series marker diameters in points, including dormant choices. */
+export type WorkbookSnapshotV92 = Omit<WorkbookSnapshotV91, "version"> & { version: 92 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -393,8 +395,9 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV88
   | WorkbookSnapshotV89
   | WorkbookSnapshotV90
-  | WorkbookSnapshotV91;
-type WorkbookWritePayload = Omit<WorkbookSnapshotV91, "version"> & {
+  | WorkbookSnapshotV91
+  | WorkbookSnapshotV92;
+type WorkbookWritePayload = Omit<WorkbookSnapshotV92, "version"> & {
   version: WorkbookSnapshot["version"];
 };
 export type SheetSnapshot = SheetSnapshotV7 & {
@@ -505,7 +508,8 @@ type SnapshotVersion =
   | 88
   | 89
   | 90
-  | 91;
+  | 91
+  | 92;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -553,6 +557,16 @@ function chartAxisTitleFeaturePath(format: unknown): string | undefined {
   for (const branch of ["categoryAxis", "valueAxis", "secondaryValueAxis"])
     for (const key of ["titleText", "titleRotation"])
       if (hasRawField(chartLayoutContainer(format, branch), key)) return `${branch}.${key}`;
+}
+/** Inspect raw series leaves without invoking a container, entry or size accessor. */
+function chartMarkerSizeFeaturePath(format: unknown): string | undefined {
+  const series = chartLayoutContainer(format, "series");
+  if (!series || (typeof series !== "object" && typeof series !== "function")) return;
+  for (const key of Reflect.ownKeys(series)) {
+    if (typeof key !== "string" || !/^(0|[1-9]\d*)$/.test(key)) continue;
+    if (hasRawField(chartLayoutContainer(series, key), "markerSizePt"))
+      return `series[${key}].markerSizePt`;
+  }
 }
 function chartScriptFontFeaturePath(format: unknown): string | undefined {
   if (hasRawField(chartLayoutContainer(format, "title"), "scriptFonts")) return "title.scriptFonts";
@@ -624,6 +638,7 @@ function inspectShapeSnapshotFeatures(
   hasChartLegendFormat: boolean;
   hasChartScriptFonts: boolean;
   hasChartAxisTitles: boolean;
+  hasChartMarkerSize: boolean;
   hasChartPresentation: boolean;
   hasChartLayout: boolean;
   hasChartRectangleSeries: boolean;
@@ -647,6 +662,7 @@ function inspectShapeSnapshotFeatures(
     hasChartLegendFormat = false,
     hasChartScriptFonts = false,
     hasChartAxisTitles = false,
+    hasChartMarkerSize = false,
     hasChartPresentation = false,
     hasChartLayout = false,
     hasChartRectangleSeries = false,
@@ -674,6 +690,20 @@ function inspectShapeSnapshotFeatures(
           return fail(`${path}.chart`, "Chart payloads must be own data fields, not accessors.");
         const chart = asRecord(chartField.value, `${path}.chart`);
         const format = chartLayoutContainer(chart, "format");
+        const markerSizePath = chartMarkerSizeFeaturePath(format);
+        if (markerSizePath) {
+          if (version !== undefined && version < 92)
+            return fail(
+              `${path}.chart.format.${markerSizePath}`,
+              "Explicit chart marker sizes require snapshot version 92.",
+            );
+          if (drawingKind !== "chart")
+            return fail(
+              `${path}.chart.format.${markerSizePath}`,
+              "Explicit chart marker sizes require an own chart drawing kind.",
+            );
+          hasChartMarkerSize = true;
+        }
         const axisTitlePath = chartAxisTitleFeaturePath(format);
         if (axisTitlePath) {
           if (version !== undefined && version < 91)
@@ -1025,6 +1055,7 @@ function inspectShapeSnapshotFeatures(
     hasChartLegendFormat,
     hasChartScriptFonts,
     hasChartAxisTitles,
+    hasChartMarkerSize,
     hasChartPresentation,
     hasChartLayout,
     hasChartRectangleSeries,
@@ -2197,6 +2228,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
   let hasChartLegendFormat = false;
   let hasChartScriptFonts = false;
   let hasChartAxisTitles = false;
+  let hasChartMarkerSize = false;
   let hasChartPresentation = false;
   let hasChartLayout = false;
   let hasChartRectangleSeries = false;
@@ -2228,6 +2260,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       hasChartLegendFormat ||= scene.hasChartLegendFormat;
       hasChartScriptFonts ||= scene.hasChartScriptFonts;
       hasChartAxisTitles ||= scene.hasChartAxisTitles;
+      hasChartMarkerSize ||= scene.hasChartMarkerSize;
       hasChartPresentation ||= scene.hasChartPresentation;
       hasChartLayout ||= scene.hasChartLayout;
       hasChartRectangleSeries ||= scene.hasChartRectangleSeries;
@@ -2648,6 +2681,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasDrawingExportEncoding) version = 89;
     if (hasChartScriptFonts) version = 90;
     if (hasChartAxisTitles) version = 91;
+    if (hasChartMarkerSize) version = 92;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -3094,6 +3128,14 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     )
   )
     snapshot.version = 91;
+  if (
+    sheets.some((sheet) =>
+      sheet.drawings?.some(
+        (drawing) => inspectShapeSnapshotFeatures(drawing, "$.drawings").hasChartMarkerSize,
+      ),
+    )
+  )
+    snapshot.version = 92;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -3192,7 +3234,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 88 &&
     record.version !== 89 &&
     record.version !== 90 &&
-    record.version !== 91
+    record.version !== 91 &&
+    record.version !== 92
   ) {
     throw new WorkbookDomainError(
       {

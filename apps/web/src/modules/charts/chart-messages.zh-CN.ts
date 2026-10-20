@@ -199,6 +199,8 @@ export const chartsZhCN = {
   "chart.formatSeriesColor": "系列颜色",
   "chart.formatSmooth": "平滑线",
   "chart.formatMarkers": "显示数据标记",
+  "chart.formatMarkerSize": "标记大小 (pt)",
+  "chart.formatMarkerSizeHidden": "显示数据标记后可编辑大小；隐藏时仍保留已保存的大小。",
   "chart.formatBarLayout": "柱条布局 · 全图",
   "chart.formatGapWidth": "间隙宽度 (%)",
   "chart.formatOverlap": "系列重叠 (%)",

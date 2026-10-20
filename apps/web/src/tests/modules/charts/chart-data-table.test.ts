@@ -366,3 +366,27 @@ test("count-only print capture never measures before fonts are prepared and matc
   expect(canvas).not.toHaveBeenCalled();
   expect(countChartDataTableText({ ...chart, elements: { dataTable: "none" } }, data)).toBe(0);
 });
+
+test("point marker size leaves normalized data-table key layout and resource budgets unchanged", () => {
+  const baseline: SheetChart = {
+    ...chart,
+    type: "line",
+    format: {
+      series: [
+        { id: "apple", markers: true },
+        { id: "pear", markers: false },
+      ],
+    },
+  };
+  const sized: SheetChart = {
+    ...baseline,
+    format: {
+      series: [
+        { id: "apple", markers: true, markerSizePt: 72 },
+        { id: "pear", markers: false, markerSizePt: 2 },
+      ],
+    },
+  };
+  expect(required(sized)).toEqual(required(baseline));
+  expect(countChartDataTableText(sized, data)).toBe(countChartDataTableText(baseline, data));
+});

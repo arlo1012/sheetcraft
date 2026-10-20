@@ -2,6 +2,7 @@ import { normalizeChartRectangleSeries } from "@sheetcraft/core/chart-range-seri
 import type { CellNumberFormat } from "@sheetcraft/core/style";
 import { toExcelNumberFormat } from "./number-format.js";
 import type { SheetChart } from "@sheetcraft/core/sheet-charts";
+import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "@sheetcraft/core/workbook";
 
 /** One concrete family name, never a CSS fallback list or a theme font token. */
 export function isNativeChartFontFamily(value: unknown): value is string {
@@ -164,7 +165,11 @@ export function supportsNativeLineSeriesStyles(chart: SheetChart): boolean {
       Object.keys(end).length !== 2 ||
       ![start.row, start.column, end.row, end.column].every(
         (value) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0,
-      )
+      ) ||
+      (start.row as number) > (end.row as number) ||
+      (start.column as number) > (end.column as number) ||
+      (end.row as number) >= MAX_SHEET_ROWS ||
+      (end.column as number) >= MAX_SHEET_COLUMNS
     )
       return false;
     const range = {
@@ -198,15 +203,25 @@ export function supportsNativeLineSeriesStyles(chart: SheetChart): boolean {
     const entries = Array.from({ length: rawEntries.length }, (_, index) =>
       own(rawEntries, String(index)),
     );
+    const presentation =
+      "presentation" in chart ? record(own(chart, "presentation"), presentationKeys) : undefined;
+    if (
+      presentation &&
+      "lineMarkers" in presentation &&
+      typeof presentation.lineMarkers !== "boolean"
+    )
+      return false;
     const ids = new Set<string>();
     for (const value of entries) {
-      const entry = record(value, ["id", "strokeWidth", "markers"]);
+      const entry = record(value, ["id", "strokeWidth", "markers", "markerSizePt"]);
       if (
-        Object.keys(entry).some((key) => !["id", "strokeWidth", "markers"].includes(key)) ||
+        Object.keys(entry).some(
+          (key) => !["id", "strokeWidth", "markers", "markerSizePt"].includes(key),
+        ) ||
         typeof entry.id !== "string" ||
         ids.has(entry.id) ||
         !bindings[by].some((binding) => binding.id === entry.id) ||
-        !("strokeWidth" in entry || "markers" in entry)
+        !("strokeWidth" in entry || "markers" in entry || "markerSizePt" in entry)
       )
         return false;
       if (
@@ -221,6 +236,19 @@ export function supportsNativeLineSeriesStyles(chart: SheetChart): boolean {
       )
         return false;
       if ("markers" in entry && typeof entry.markers !== "boolean") return false;
+      if (
+        "markerSizePt" in entry &&
+        !(
+          typeof entry.markerSizePt === "number" &&
+          Number.isSafeInteger(entry.markerSizePt) &&
+          entry.markerSizePt >= 2 &&
+          entry.markerSizePt <= 72 &&
+          // WPS removes c:size when markers are hidden. Keep the latent Core
+          // value, but never export a representation that would discard it.
+          (entry.markers ?? presentation?.lineMarkers ?? true) === true
+        )
+      )
+        return false;
       ids.add(entry.id);
     }
     return entries.length === bindings[by].length;

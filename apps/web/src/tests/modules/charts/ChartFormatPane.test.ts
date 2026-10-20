@@ -1513,3 +1513,179 @@ describe("independent axis title controls", () => {
     });
   });
 });
+
+describe("per-series marker size", () => {
+  const target = { kind: "series", seriesId: "apples" } as const;
+  const line = (size?: number, markers = true) =>
+    drawing({
+      type: "line",
+      format: {
+        series: [
+          {
+            id: "apples",
+            color: "#123456",
+            markers,
+            ...(size === undefined ? {} : { markerSizePt: size }),
+          },
+        ],
+      },
+    });
+  const control = (wrapper: VueWrapper) =>
+    wrapper.get('[data-chart-format-field="markerSizePt"]').getComponent(NumericField);
+
+  test("uses whole points and one-step commits on the captured series, without a fabricated auto size", async () => {
+    const { wrapper, apply } = fixture(target, { drawing: line() });
+    const field = input(wrapper, "markerSizePt");
+    expect(control(wrapper).props("presentation")).toBe("inline-stepper");
+    expect(field.element.value).toBe("");
+    expect(field.attributes("placeholder")).toBe("Auto");
+    expect(
+      wrapper.get('button[aria-label="Marker size (pt) +"]').attributes("disabled"),
+    ).toBeDefined();
+    for (const value of ["1", "73", "5.5", "1e", "NaN"]) {
+      await field.setValue(value);
+      await field.trigger("keydown", { key: "Enter" });
+      expect(field.element.value).toBe(value);
+      expect(apply).not.toHaveBeenCalled();
+    }
+    await field.setValue("5");
+    await field.trigger("keydown", { key: "Enter" });
+    expect(apply).toHaveBeenCalledExactlyOnceWith({
+      kind: "series",
+      seriesId: "apples",
+      format: { color: "#123456", markers: true, markerSizePt: 5 },
+    });
+    await field.trigger("blur");
+    expect(apply).toHaveBeenCalledTimes(1);
+    await wrapper.setProps({ drawing: line(5) });
+    expect(field.attributes("aria-valuetext")).toBe("5 pt");
+    await wrapper.get('button[aria-label="Marker size (pt) +"]').trigger("click");
+    expect(apply).toHaveBeenLastCalledWith({
+      kind: "series",
+      seriesId: "apples",
+      format: { color: "#123456", markers: true, markerSizePt: 6 },
+    });
+    await wrapper.setProps({ drawing: line(72) });
+    expect(
+      wrapper.get('button[aria-label="Marker size (pt) +"]').attributes("disabled"),
+    ).toBeDefined();
+    await wrapper.setProps({ drawing: line(2) });
+    expect(
+      wrapper.get('button[aria-label="Marker size (pt) −"]').attributes("disabled"),
+    ).toBeDefined();
+  });
+
+  test("hidden markers retain the explicit value, disable editing, and allow a leaf-only reset", async () => {
+    const { wrapper, apply } = fixture(target, { drawing: line(9) });
+    checkbox(wrapper, "Show markers").vm.$emit("change", false);
+    await flushPromises();
+    expect(apply).toHaveBeenCalledExactlyOnceWith({
+      kind: "series",
+      seriesId: "apples",
+      format: { color: "#123456", markers: false, markerSizePt: 9 },
+    });
+    await wrapper.setProps({ drawing: line(9, false) });
+    const field = input(wrapper, "markerSizePt");
+    expect(field.element.value).toBe("9");
+    expect(field.element.disabled).toBe(true);
+    expect(wrapper.text()).toContain("saved size is retained while hidden");
+    const hiddenCommit = control(wrapper).props("onCommit");
+    expect(
+      hiddenCommit(
+        { kind: "value", value: 12 },
+        { ownerKey: "chart-one/series:apples/markerSizePt", sessionId: "hidden", source: "enter" },
+      ).accepted,
+    ).toBe(false);
+    expect(apply).toHaveBeenCalledTimes(1);
+    await wrapper.get('[data-chart-format-reset="markerSizePt"]').trigger("click");
+    expect(apply).toHaveBeenLastCalledWith({
+      kind: "series",
+      seriesId: "apples",
+      format: { color: "#123456", markers: false },
+    });
+    expect(field.element.value).toBe("");
+  });
+
+  test("callback and target changes reject stale size leases; Escape starts a fresh draft", async () => {
+    const { wrapper, apply } = fixture(target, { drawing: line(5) });
+    const field = input(wrapper, "markerSizePt");
+    await field.setValue("9");
+    const oldCommit = control(wrapper).props("onCommit");
+    const replacement = vi.fn((_intent: ChartFormatIntent) => true);
+    await wrapper.setProps({ apply: replacement });
+    await field.trigger("keydown", { key: "Enter" });
+    expect(field.element.value).toBe("9");
+    expect(
+      oldCommit(
+        { kind: "value", value: 9 },
+        { ownerKey: "chart-one/series:apples/markerSizePt", sessionId: "old", source: "enter" },
+      ).accepted,
+    ).toBe(false);
+    expect(apply).not.toHaveBeenCalled();
+    expect(replacement).not.toHaveBeenCalled();
+    await field.trigger("keydown", { key: "Escape" });
+    expect(field.element.value).toBe("5");
+    await field.setValue("10");
+    await field.trigger("keydown", { key: "Enter" });
+    expect(replacement).toHaveBeenCalledExactlyOnceWith({
+      kind: "series",
+      seriesId: "apples",
+      format: { color: "#123456", markers: true, markerSizePt: 10 },
+    });
+    const currentCommit = control(wrapper).props("onCommit");
+    await wrapper.setProps({ target: { kind: "series", seriesId: "pears" } });
+    expect(input(wrapper, "markerSizePt").element.value).toBe("");
+    expect(
+      currentCommit(
+        { kind: "value", value: 11 },
+        {
+          ownerKey: "chart-one/series:apples/markerSizePt",
+          sessionId: "old-target",
+          source: "enter",
+        },
+      ).accepted,
+    ).toBe(false);
+    expect(replacement).toHaveBeenCalledTimes(1);
+  });
+
+  test("IME blocks hide/navigation; rejected reset retains the exact draft without intermediate blur", async () => {
+    const { wrapper, apply } = fixture(target, { drawing: line(5) });
+    const field = input(wrapper, "markerSizePt");
+    field.element.focus();
+    await field.trigger("compositionstart");
+    await field.setValue("9");
+    await field.trigger("keydown", { key: "Enter", isComposing: true });
+    checkbox(wrapper, "Show markers").vm.$emit("change", false);
+    select(wrapper, "Chart element").vm.$emit("change", "title");
+    await flushPromises();
+    expect(apply).not.toHaveBeenCalled();
+    expect(wrapper.emitted("update:target")).toBeUndefined();
+    await field.trigger("compositionend");
+    await field.setValue("9.");
+    const reset = wrapper.get('[data-chart-format-reset="markerSizePt"]');
+    await reset.trigger("pointerdown");
+    (reset.element as HTMLButtonElement).focus();
+    await flushPromises();
+    expect(apply).not.toHaveBeenCalled();
+    apply.mockReturnValue(false);
+    await reset.trigger("click");
+    expect(apply).toHaveBeenCalledExactlyOnceWith({
+      kind: "series",
+      seriesId: "apples",
+      format: { color: "#123456", markers: true },
+    });
+    expect(field.element.value).toBe("9.");
+    apply.mockReturnValue(true);
+    await reset.trigger("click");
+    expect(field.element.value).toBe("");
+    expect(apply).toHaveBeenCalledTimes(2);
+  });
+
+  test.each(["column", "bar", "area", "radar", "combo"] as const)(
+    "does not offer marker size for %s",
+    (type) => {
+      const { wrapper } = fixture(target, { drawing: drawing({ type }) });
+      expect(wrapper.find('[data-chart-format-field="markerSizePt"]').exists()).toBe(false);
+    },
+  );
+});

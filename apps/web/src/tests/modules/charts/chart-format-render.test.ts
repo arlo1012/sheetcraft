@@ -700,3 +700,88 @@ describe("chart axis numeric budget", () => {
     ).toThrow(RangeError);
   });
 });
+
+describe("ordinary line marker point sizes", () => {
+  test("maps explicit points to CSS pixels by stable ID through reorder/filter and renders actual SVG symbols", () => {
+    const format: ChartFormatSettings = {
+      series: [
+        { id: "a", color: "#aa0000", markers: true, markerSizePt: 5 },
+        { id: "b", color: "#0000bb", markers: true, markerSizePt: 9 },
+        { id: "dormant", markerSizePt: 72 },
+      ],
+    };
+    for (const entries of [data.series, [...data.series].reverse(), [data.series[1]!]]) {
+      const source = sourceChart(data.series, { type: "line", format });
+      const option = createChartOption(source, frozenData(entries), dimensions);
+      const projected = series(option);
+      for (const entry of projected) {
+        if (entry.type !== "line") throw new Error("Expected line series");
+        expect(entry.symbolSize).toBe(entry.id === "a" ? 20 / 3 : 12);
+      }
+      render(option, (instance, svg) => {
+        for (const entry of entries) {
+          const fill = entry.id === "a" ? "#aa0000" : "#0000bb";
+          expect(svg.querySelectorAll(`[fill="${fill}"]`)).toHaveLength(2);
+          const symbols = instance
+            .getZr()
+            .storage.getDisplayList(true)
+            .filter((item) => item.style.fill === fill);
+          expect(symbols).toHaveLength(2);
+          for (const symbol of symbols) {
+            // ECharts circle geometry is a unit-diameter path scaled by symbolSize / 2.
+            const transform = symbol.getComputedTransform();
+            expect(transform).not.toBeNull();
+            expect(Math.abs(transform![0]!) * 2).toBeCloseTo(entry.id === "a" ? 20 / 3 : 12);
+            expect(Math.abs(transform![3]!) * 2).toBeCloseTo(entry.id === "a" ? 20 / 3 : 12);
+          }
+        }
+      });
+    }
+  });
+
+  test("absence keeps legacy defaults and hidden markers never paint the dormant size", () => {
+    const source = sourceChart(data.series, { type: "line" });
+    const original = createChartOption(source, data, dimensions);
+    const baseline = series(original);
+    for (const entry of baseline) expect(entry).not.toHaveProperty("symbolSize");
+    const hidden = createChartOption(
+      {
+        ...source,
+        format: {
+          series: [
+            { id: "a", color: "#aa0000", markers: false, markerSizePt: 72 },
+            { id: "b", color: "#0000bb", markers: true, markerSizePt: 9 },
+          ],
+        },
+      },
+      data,
+      dimensions,
+    );
+    expect(series(hidden)).toMatchObject([
+      { id: "a", symbol: "none", showSymbol: false, symbolSize: 96 },
+      { id: "b", symbol: "circle", showSymbol: true, symbolSize: 12 },
+    ]);
+    render(hidden, (_instance, svg) => {
+      expect(svg.querySelectorAll('[fill="#aa0000"]')).toHaveLength(0);
+      expect(svg.querySelectorAll('[fill="#0000bb"]')).toHaveLength(2);
+    });
+  });
+
+  test.each(["column", "bar", "area", "radar", "combo"] as const)(
+    "retains but does not render dormant sizes on %s",
+    (type) => {
+      const format: ChartFormatSettings = { series: [{ id: "a", markerSizePt: 9 }] };
+      const option = createChartOption(
+        sourceChart(data.series, { type, format }),
+        data,
+        dimensions,
+      );
+      for (const entry of series(option)) {
+        expect(entry).not.toHaveProperty("symbolSize");
+        if (entry.type === "radar")
+          for (const item of entry.data ?? []) expect(item).not.toHaveProperty("symbolSize");
+      }
+      expect(format.series?.[0]?.markerSizePt).toBe(9);
+    },
+  );
+});

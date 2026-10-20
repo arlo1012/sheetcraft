@@ -1,0 +1,18 @@
+{
+  "wps-marker-size-none9.xlsx": [
+    "<c:marker><c:symbol val=\"none\"/></c:marker>",
+    "<c:marker><c:symbol val=\"none\"/></c:marker>"
+  ],
+  "wps-marker-size-visible9.xlsx": [
+    "<c:marker><c:symbol val=\"circle\"/><c:size val=\"9\"/><c:spPr><a:solidFill><a:srgbClr val=\"2563EB\"/></a:solidFill><a:ln w=\"12700\"><a:solidFill><a:srgbClr val=\"2563EB\"/></a:solidFill><a:prstDash val=\"solid\"/><a:round/></a:ln></c:spPr></c:marker>",
+    "<c:marker><c:symbol val=\"none\"/></c:marker>"
+  ],
+  "wps-marker-size-reenabled.xlsx": [
+    "<c:marker><c:symbol val=\"square\"/><c:size val=\"6\"/></c:marker>",
+    "<c:marker><c:symbol val=\"none\"/></c:marker>"
+  ],
+  "wps-marker-size-source.xlsx": [
+    "<c:marker><c:symbol val=\"none\"/></c:marker>",
+    "<c:marker><c:symbol val=\"none\"/></c:marker>"
+  ]
+}

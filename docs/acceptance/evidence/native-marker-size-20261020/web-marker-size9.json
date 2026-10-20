@@ -1,0 +1,491 @@
+{
+  "version": 92,
+  "calculation": {
+    "mode": "automatic",
+    "iterative": false,
+    "maxIterations": 100,
+    "maxChange": 0.001
+  },
+  "theme": {
+    "id": "office",
+    "name": "Office",
+    "accentColors": [
+      "#4f81bd",
+      "#c0504d",
+      "#9bbb59",
+      "#8064a2",
+      "#4bacc6",
+      "#f79646"
+    ],
+    "headingFont": "Inter",
+    "bodyFont": "Inter",
+    "colors": {
+      "name": "Office",
+      "dark1": "#000000",
+      "light1": "#ffffff",
+      "dark2": "#1f1f1f",
+      "light2": "#eeeeee",
+      "hyperlink": "#0563c1",
+      "followedHyperlink": "#954f72"
+    },
+    "fonts": {
+      "name": "Office",
+      "headingEastAsia": "宋体",
+      "bodyEastAsia": "宋体",
+      "headingComplexScript": "",
+      "bodyComplexScript": ""
+    },
+    "effects": {
+      "id": "office",
+      "name": "Office",
+      "shadow": "soft",
+      "reflection": false,
+      "bevel": false,
+      "outlineWidth": 1,
+      "gradient": false
+    },
+    "customColors": [],
+    "customFonts": []
+  },
+  "dateSystem": "1900",
+  "id": "xlsx-9a1bc25e-1a2a-4d07-aeff-82545cddb6d0",
+  "activeSheetId": "xlsx-sheet-1",
+  "sheets": [
+    {
+      "drawings": [
+        {
+          "id": "xlsx-column-chart-0-0",
+          "kind": "chart",
+          "chart": {
+            "rectangleSeries": {
+              "rows": [],
+              "columns": [
+                {
+                  "index": 1,
+                  "id": "range-series-1"
+                },
+                {
+                  "index": 2,
+                  "id": "range-series-2"
+                }
+              ]
+            },
+            "type": "line",
+            "range": {
+              "start": {
+                "row": 0,
+                "column": 0
+              },
+              "end": {
+                "row": 3,
+                "column": 2
+              }
+            },
+            "title": "Independent axis titles: line",
+            "headerRow": true,
+            "headerColumn": true,
+            "seriesBy": "columns",
+            "legend": false,
+            "labels": false,
+            "stacked": false,
+            "showHidden": false,
+            "format": {
+              "title": {
+                "fontFamily": "Arial",
+                "fontSize": 15,
+                "color": "#000000",
+                "bold": false
+              },
+              "categoryAxis": {
+                "labelAngle": 0,
+                "title": "Quarter 季度 & <channel>",
+                "titleText": {
+                  "fontFamily": "Arial",
+                  "fontSize": 16,
+                  "color": "#7c3aed",
+                  "bold": true,
+                  "italic": false
+                },
+                "titleRotation": 0,
+                "text": {
+                  "fontFamily": "Arial",
+                  "fontSize": 12,
+                  "color": "#334155",
+                  "bold": false
+                }
+              },
+              "valueAxis": {
+                "title": "Revenue 收入",
+                "titleText": {
+                  "fontFamily": "Arial",
+                  "fontSize": 16,
+                  "color": "#b45309",
+                  "bold": true,
+                  "italic": true
+                },
+                "titleRotation": -90,
+                "text": {
+                  "fontFamily": "Arial",
+                  "fontSize": 12,
+                  "color": "#334155",
+                  "bold": false
+                },
+                "numberFormat": {
+                  "kind": "number",
+                  "fractionDigits": 1,
+                  "useGrouping": false
+                },
+                "linkedToSource": false
+              },
+              "series": [
+                {
+                  "id": "range-series-1",
+                  "strokeWidth": 2,
+                  "markers": true,
+                  "markerSizePt": 9
+                },
+                {
+                  "id": "range-series-2",
+                  "strokeWidth": 4,
+                  "markers": false
+                }
+              ]
+            }
+          },
+          "name": "Sales",
+          "text": "",
+          "shape": "rectangle",
+          "fill": "#ffffff",
+          "stroke": "#d9e2ef",
+          "strokeWidth": 1,
+          "color": "#0f172a",
+          "fontSize": 14,
+          "bold": false,
+          "italic": false,
+          "rotation": 0,
+          "anchor": {
+            "row": 6,
+            "column": 3
+          },
+          "offsetX": 8,
+          "offsetY": 8,
+          "width": 640,
+          "height": 400
+        }
+      ],
+      "id": "xlsx-sheet-1",
+      "name": "Data",
+      "properties": {
+        "pinned": false,
+        "hidden": false,
+        "protected": false
+      },
+      "cells": [
+        {
+          "address": {
+            "row": 0,
+            "column": 0
+          },
+          "content": {
+            "kind": "literal",
+            "value": "region"
+          },
+          "style": {
+            "fontFamily": "Calibri",
+            "fontSize": 13
+          }
+        },
+        {
+          "address": {
+            "row": 0,
+            "column": 1
+          },
+          "content": {
+            "kind": "literal",
+            "value": "apple"
+          },
+          "style": {
+            "fontFamily": "Calibri",
+            "fontSize": 13
+          }
+        },
+        {
+          "address": {
+            "row": 0,
+            "column": 2
+          },
+          "content": {
+            "kind": "literal",
+            "value": "pear"
+          },
+          "style": {
+            "fontFamily": "Calibri",
+            "fontSize": 13
+          }
+        },
+        {
+          "address": {
+            "row": 1,
+            "column": 0
+          },
+          "content": {
+            "kind": "literal",
+            "value": "east"
+          },
+          "style": {
+            "fontFamily": "Calibri",
+            "fontSize": 13
+          }
+        },
+        {
+          "address": {
+            "row": 1,
+            "column": 1
+          },
+          "content": {
+            "kind": "literal",
+            "value": 60
+          },
+          "style": {
+            "fontFamily": "Calibri",
+            "fontSize": 13
+          }
+        },
+        {
+          "address": {
+            "row": 1,
+            "column": 2
+          },
+          "content": {
+            "kind": "literal",
+            "value": 70
+          },
+          "style": {
+            "fontFamily": "Calibri",
+            "fontSize": 13
+          }
+        },
+        {
+          "address": {
+            "row": 2,
+            "column": 0
+          },
+          "content": {
+            "kind": "literal",
+            "value": "north"
+          },
+          "style": {
+            "fontFamily": "Calibri",
+            "fontSize": 13
+          }
+        },
+        {
+          "address": {
+            "row": 2,
+            "column": 1
+          },
+          "content": {
+            "kind": "literal",
+            "value": 100
+          },
+          "style": {
+            "fontFamily": "Calibri",
+            "fontSize": 13
+          }
+        },
+        {
+          "address": {
+            "row": 2,
+            "column": 2
+          },
+          "content": {
+            "kind": "literal",
+            "value": 80
+          },
+          "style": {
+            "fontFamily": "Calibri",
+            "fontSize": 13
+          }
+        },
+        {
+          "address": {
+            "row": 3,
+            "column": 0
+          },
+          "content": {
+            "kind": "literal",
+            "value": "south"
+          },
+          "style": {
+            "fontFamily": "Calibri",
+            "fontSize": 13
+          }
+        },
+        {
+          "address": {
+            "row": 3,
+            "column": 1
+          },
+          "content": {
+            "kind": "literal",
+            "value": 120
+          },
+          "style": {
+            "fontFamily": "Calibri",
+            "fontSize": 13
+          }
+        },
+        {
+          "address": {
+            "row": 3,
+            "column": 2
+          },
+          "content": {
+            "kind": "literal",
+            "value": 90
+          },
+          "style": {
+            "fontFamily": "Calibri",
+            "fontSize": 13
+          }
+        }
+      ],
+      "rowHeights": [],
+      "columnWidths": [],
+      "hiddenRows": [],
+      "hiddenColumns": [],
+      "defaultColumnWidth": 96,
+      "freezePanes": {
+        "rows": 0,
+        "columns": 0
+      },
+      "filter": null,
+      "mergedCells": [],
+      "dataValidations": [],
+      "outlineGroups": [],
+      "subtotalMetadata": [],
+      "duplicateRules": [],
+      "conditionalFormats": [],
+      "tables": [],
+      "pageSetup": {
+        "paperSize": "a4",
+        "orientation": "portrait",
+        "margins": {
+          "top": 19.05,
+          "bottom": 19.05,
+          "left": 17.78,
+          "right": 17.78,
+          "header": 7.62,
+          "footer": 7.62
+        },
+        "scale": 100,
+        "fitToPage": null,
+        "firstPageNumber": null,
+        "printQuality": 600,
+        "printOptions": {
+          "horizontalCentered": false,
+          "verticalCentered": false,
+          "gridLines": false,
+          "blackAndWhite": false,
+          "headings": false,
+          "cellComments": "none",
+          "errors": "displayed"
+        },
+        "printTitles": {
+          "rows": null,
+          "columns": null,
+          "bottomRows": null
+        },
+        "printArea": null,
+        "rowBreaks": [],
+        "columnBreaks": [],
+        "header": {
+          "left": "",
+          "center": "",
+          "right": ""
+        },
+        "footer": {
+          "left": "",
+          "center": "",
+          "right": ""
+        },
+        "headerFooter": {
+          "differentFirst": false,
+          "differentOddEven": false,
+          "scaleWithDocument": true,
+          "alignWithMargins": true,
+          "firstHeader": {
+            "left": "",
+            "center": "",
+            "right": ""
+          },
+          "firstFooter": {
+            "left": "",
+            "center": "",
+            "right": ""
+          },
+          "evenHeader": {
+            "left": "",
+            "center": "",
+            "right": ""
+          },
+          "evenFooter": {
+            "left": "",
+            "center": "",
+            "right": ""
+          }
+        },
+        "pageOrder": "downThenOver"
+      },
+      "pageDecoration": {},
+      "protection": {
+        "editableRanges": []
+      },
+      "floatingImages": []
+    }
+  ],
+  "definedNames": [],
+  "tableStyles": [
+    {
+      "id": "xlsx-excel-style-TableStyleMedium2",
+      "name": "Excel TableStyleMedium2",
+      "category": "custom",
+      "accentColor": "#4f81bd",
+      "elements": {
+        "wholeTable": {
+          "style": {},
+          "innerHorizontal": {
+            "style": "thin",
+            "color": "#a7c0de"
+          }
+        },
+        "headerRow": {
+          "style": {
+            "bold": true,
+            "textColor": "#ffffff",
+            "fillColor": "#4f81bd"
+          }
+        },
+        "firstRowStripe": {
+          "style": {
+            "fillColor": "#c5d5e9"
+          }
+        },
+        "totalRow": {
+          "style": {
+            "bold": true,
+            "borderTop": {
+              "style": "thin",
+              "color": "#4f81bd"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "defaultTableStyleId": "xlsx-excel-style-TableStyleMedium2",
+  "pivotTableStyles": [],
+  "defaultPivotTableStyleId": "xlsx-pivot-table-style-PivotStyleLight16",
+  "cellStyles": [],
+  "watermarkPresets": []
+}

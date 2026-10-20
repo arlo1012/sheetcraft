@@ -241,3 +241,22 @@ describe("shared legend viewport contract", () => {
     }
   });
 });
+
+test("point marker size does not resize normalized legend keys or reserved legend layout", () => {
+  const source: ChartData = { ...data, series: [{ id: "series", name: "Sales", values: [1, 2] }] };
+  const baseline: SheetChart = {
+    ...chart,
+    type: "line",
+    format: { series: [{ id: "series", markers: true }] },
+  };
+  const sized: SheetChart = {
+    ...baseline,
+    format: { series: [{ id: "series", markers: true, markerSizePt: 72 }] },
+  };
+  expect(getChartLegendLayout(sized, source, dimensions)).toEqual(
+    getChartLegendLayout(baseline, source, dimensions),
+  );
+  expect(createChartElementLayout(sized, source, dimensions)).toEqual(
+    createChartElementLayout(baseline, source, dimensions),
+  );
+});

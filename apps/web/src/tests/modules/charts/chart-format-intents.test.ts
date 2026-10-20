@@ -537,3 +537,61 @@ test("value-axis number transitions replace sparsely and reject own undefined nu
     ).toThrow();
   }
 });
+
+describe("marker size intent contract", () => {
+  const target = { kind: "series", seriesId: "apples" } as const;
+  test("accepts a point size on only the captured ID and preserves it when hiding markers", () => {
+    const original = { ...chart(), type: "line" as const };
+    const sized = applyChartFormatIntent(original, target, {
+      kind: "series",
+      seriesId: "apples",
+      format: { markerSizePt: 9, markers: true, color: "#123456" },
+    });
+    const hidden = applyChartFormatIntent(sized, target, {
+      kind: "series",
+      seriesId: "apples",
+      format: { markerSizePt: 9, markers: false, color: "#123456" },
+    });
+    expect(hidden.format?.series?.[0]).toEqual({
+      id: "apples",
+      markerSizePt: 9,
+      markers: false,
+      color: "#123456",
+    });
+    expect(hidden.format?.series?.slice(1)).toEqual(original.format?.series?.slice(1));
+    expect(hidden.source).toEqual(original.source);
+    const reset = applyChartFormatIntent(hidden, target, {
+      kind: "series",
+      seriesId: "apples",
+      format: { markers: false, color: "#123456" },
+    });
+    expect(reset.format?.series?.[0]).toEqual({ id: "apples", markers: false, color: "#123456" });
+  });
+  test.each([undefined, null, "9", 1, 73, 5.5, NaN, Infinity])(
+    "rejects explicit invalid size %s",
+    (markerSizePt) => {
+      expect(() =>
+        applyChartFormatIntent(chart(), target, {
+          kind: "series",
+          seriesId: "apples",
+          format: { markerSizePt },
+        } as ChartFormatIntent),
+      ).toThrow();
+    },
+  );
+  test("rejects size accessors without evaluating them and unknown aliases", () => {
+    const read = vi.fn(() => 9);
+    const format = Object.defineProperty({}, "markerSizePt", { enumerable: true, get: read });
+    expect(() =>
+      applyChartFormatIntent(chart(), target, { kind: "series", seriesId: "apples", format }),
+    ).toThrow();
+    expect(read).not.toHaveBeenCalled();
+    expect(() =>
+      applyChartFormatIntent(chart(), target, {
+        kind: "series",
+        seriesId: "apples",
+        format: { markerSize: 9 },
+      } as unknown as ChartFormatIntent),
+    ).toThrow();
+  });
+});

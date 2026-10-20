@@ -73,6 +73,8 @@ export type ChartSeriesFormat = {
   strokeWidth?: number;
   smooth?: boolean;
   markers?: boolean;
+  /** Explicit point diameter (2–72pt); retained while markers or the series are hidden. */
+  markerSizePt?: number;
 };
 export type ChartLegendFormat = { text?: ChartTextFormat; surface?: ChartSurfaceFormat };
 export type ChartBarFormat = { gapWidth?: number; overlap?: number };
@@ -400,6 +402,7 @@ function series(value: unknown): ChartSeriesFormat[] {
       "strokeWidth",
       "smooth",
       "markers",
+      "markerSizePt",
     ]);
     if (
       typeof source.id !== "string" ||
@@ -425,6 +428,12 @@ function series(value: unknown): ChartSeriesFormat[] {
       result.strokeWidth = number(source.strokeWidth, 0, 32, "series line width");
     if (Object.hasOwn(source, "smooth")) result.smooth = boolean(source.smooth);
     if (Object.hasOwn(source, "markers")) result.markers = boolean(source.markers);
+    if (Object.hasOwn(source, "markerSizePt")) {
+      const size = number(source.markerSizePt, 2, 72, "marker size");
+      if (!Number.isSafeInteger(size))
+        throw new RangeError("Chart marker size must be an integer number of points.");
+      result.markerSizePt = size;
+    }
     return result;
   });
 }

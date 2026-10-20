@@ -61,6 +61,7 @@ export type ChartFormatNumericField =
   | "titleRotation"
   | "fontSize"
   | "strokeWidth"
+  | "markerSizePt"
   | "gapWidth"
   | "overlap";
 export type ChartFormatDraftError = "number" | "bounds" | "format" | "rejected" | "composition";
@@ -184,6 +185,7 @@ export function getChartFormatCapabilities(
     seriesStroke: lines || comboLine || chart.type === "radar",
     seriesSmooth: lines,
     seriesMarkers: lines || comboLine || chart.type === "radar",
+    seriesMarkerSize: chart.type === "line",
   };
 }
 
@@ -353,6 +355,7 @@ export function parseChartFormatNumber(
   if (
     (field === "fontSize" && (value < 1 || value > 256)) ||
     (field === "strokeWidth" && (value < 0 || value > 32)) ||
+    (field === "markerSizePt" && (!Number.isSafeInteger(value) || value < 2 || value > 72)) ||
     ((field === "labelAngle" || field === "titleRotation") && (value < -90 || value > 90)) ||
     (field === "gapWidth" && (value < 0 || value > 500)) ||
     (field === "overlap" && (value < -100 || value > 100)) ||

@@ -483,6 +483,11 @@ export function applyChartCommonFormat(
           ...(!combo && settings?.markers !== undefined
             ? { showSymbol: settings.markers, symbol: settings.markers ? "circle" : "none" }
             : {}),
+          // Marker sizes are points in the document, but ECharts uses CSS pixels.
+          // Other chart families retain this leaf without rendering it.
+          ...(chart.type === "line" && settings?.markerSizePt !== undefined
+            ? { symbolSize: (settings.markerSizePt * 4) / 3 }
+            : {}),
           ...(chart.type === "area" && settings?.color
             ? { areaStyle: { ...series.areaStyle, color: settings.color } }
             : {}),

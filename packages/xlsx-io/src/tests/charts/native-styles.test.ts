@@ -31,8 +31,8 @@ function explicit() {
   return fixture;
 }
 const nativeLineSeries = [
-  { id: "range-series-1", strokeWidth: 3, markers: true },
-  { id: "range-series-2", strokeWidth: 3, markers: true },
+  { id: "range-series-1", strokeWidth: 3, markers: true, markerSizePt: 5 },
+  { id: "range-series-2", strokeWidth: 3, markers: true, markerSizePt: 5 },
 ];
 for (const type of ["column", "bar", "line"] as const)
   describe(`${type} native shared styles`, () => {

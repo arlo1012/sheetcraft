@@ -218,6 +218,9 @@ export const chartsEnUS = {
   "chart.formatSeriesColor": "Series color",
   "chart.formatSmooth": "Smooth lines",
   "chart.formatMarkers": "Show markers",
+  "chart.formatMarkerSize": "Marker size (pt)",
+  "chart.formatMarkerSizeHidden":
+    "Show markers to edit their size. The saved size is retained while hidden.",
   "chart.formatBarLayout": "Bar layout · whole chart",
   "chart.formatGapWidth": "Gap width (%)",
   "chart.formatOverlap": "Series overlap (%)",

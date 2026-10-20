@@ -912,3 +912,23 @@ test("independent axis titles print with their own leased fonts and weight", () 
     result.dispose();
   }
 });
+
+test("ordinary line print keeps explicit point sizes in CSS pixels without density rescaling", () => {
+  const result = renderChartPrintPresentation(
+    drawing({
+      type: "line",
+      format: { series: [{ id: "sales", markerSizePt: 9, markers: true }] },
+    }),
+    data,
+    options,
+  );
+  try {
+    expect(nativeOptions.at(-1)).toMatchObject({
+      series: [{ id: "sales", type: "line", symbol: "circle", showSymbol: true, symbolSize: 12 }],
+    });
+    expect([result.canvas.width, result.canvas.height]).toEqual([960, 600]);
+    expect(instances[0]!.isDisposed()).toBe(true);
+  } finally {
+    result.dispose();
+  }
+});

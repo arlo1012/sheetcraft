@@ -235,6 +235,11 @@ const series = computed(() => {
   const id = resolveChartFormatSeriesId(chart.value, props.target);
   return id ? getChartSeriesFormat(chart.value, id) : {};
 });
+const seriesMarkersVisible = computed(
+  () =>
+    series.value.markers ??
+    (chart.value.type === "combo" ? false : (chart.value.presentation?.lineMarkers ?? true)),
+);
 const textFormat = computed<ChartTextFormat>(() =>
   kind.value === "legend"
     ? (chart.value.format?.legend?.text ?? {})
@@ -269,6 +274,7 @@ const numericFields: ChartFormatNumericField[] = [
   "titleRotation",
   "fontSize",
   "strokeWidth",
+  "markerSizePt",
   "gapWidth",
   "overlap",
 ];
@@ -279,6 +285,7 @@ type SharedNumericField =
   | "minorUnit"
   | "fontSize"
   | "strokeWidth"
+  | "markerSizePt"
   | "labelAngle"
   | "titleRotation"
   | "gapWidth"
@@ -291,6 +298,7 @@ const sharedNumericFields: SharedNumericField[] = [
   "minorUnit",
   "fontSize",
   "strokeWidth",
+  "markerSizePt",
   "labelAngle",
   "titleRotation",
   "gapWidth",
@@ -312,6 +320,7 @@ const decimalsControl = ref<InstanceType<typeof NumericField>>();
 const acceptedCategoryDecimals = ref<{ owner: string; value: number }>();
 const fontSizeControl = ref<InstanceType<typeof NumericField>>();
 const strokeWidthControl = ref<InstanceType<typeof NumericField>>();
+const markerSizePtControl = ref<InstanceType<typeof NumericField>>();
 // NumericField owns these drafts. The pane only mirrors their interaction state
 // for its existing composition guard and reset action availability.
 const sharedNumericDrafts = reactive<Partial<Record<SharedNumericField, NumericDraftChange>>>({});
@@ -360,6 +369,13 @@ const strokeWidthSpec: NumericFieldSpec = {
   canonicalBounds: { min: 0, max: 32 },
   allowAuto: true,
   parsePolicy: { scientific: true },
+};
+const markerSizePtSpec: NumericFieldSpec = {
+  displayUnit: "pt",
+  displayStep: 1,
+  canonicalBounds: { min: 2, max: 72 },
+  integer: true,
+  allowAuto: true,
 };
 const legendStrokeWidthSpec: NumericFieldSpec = {
   ...strokeWidthSpec,
@@ -425,6 +441,9 @@ const fontSizeNumericValue = computed<NumericValue>((previous) =>
 const strokeWidthNumericValue = computed<NumericValue>((previous) =>
   sharedNumericValue("strokeWidth", previous),
 );
+const markerSizePtNumericValue = computed<NumericValue>((previous) =>
+  sharedNumericValue("markerSizePt", previous),
+);
 const labelAngleNumericValue = computed<NumericValue>((previous) =>
   sharedNumericValue("labelAngle", previous),
 );
@@ -447,6 +466,7 @@ const decimalsNumericValue = computed<NumericValue>((previous) =>
 const decimalsCommit = computed(() => sharedNumericCommit("decimals"));
 const fontSizeCommit = computed(() => sharedNumericCommit("fontSize"));
 const strokeWidthCommit = computed(() => sharedNumericCommit("strokeWidth"));
+const markerSizePtCommit = computed(() => sharedNumericCommit("markerSizePt"));
 const axisDraftErrorKeys: Record<ChartValueAxisDraftError, MessageKey> = {
   number: "chart.formatInvalidNumber",
   bounds: "chart.formatAxisBoundsOrder",
@@ -512,6 +532,8 @@ function sharedNumericControl(field: SharedNumericField) {
       return fontSizeControl.value;
     case "strokeWidth":
       return strokeWidthControl.value;
+    case "markerSizePt":
+      return markerSizePtControl.value;
     case "titleRotation":
       return titleRotationControl.value;
     case "labelAngle":
@@ -543,6 +565,8 @@ function numericValue(field: ChartFormatNumericField | "decimals"): number | und
       return textFormat.value.fontSize;
     case "strokeWidth":
       return kind.value === "series" ? series.value.strokeWidth : lineFormat.value.strokeWidth;
+    case "markerSizePt":
+      return series.value.markerSizePt;
     case "gapWidth":
     case "overlap":
       return barFormat.value[field];
@@ -788,6 +812,16 @@ function numericIntent(
     case "overlap":
       return (kind.value === "chart" || kind.value === "series") && capabilities.value.bar
         ? { kind: "chart", format: setChartFormatField(barFormat.value, field, value) }
+        : undefined;
+    case "markerSizePt":
+      return props.target.kind === "series" &&
+        capabilities.value.seriesMarkerSize &&
+        (value === undefined || seriesMarkersVisible.value)
+        ? {
+            kind: "series",
+            seriesId: props.target.seriesId,
+            format: setChartFormatField(series.value, "markerSizePt", value),
+          }
         : undefined;
     case "strokeWidth":
       if (kind.value === "legend")
@@ -2171,14 +2205,59 @@ function escapeDraft(event: KeyboardEvent): void {
         <TCheckbox
           data-format-pane-history-control="discrete"
           v-if="capabilities.seriesMarkers"
-          :checked="
-            series.markers ??
-            (chart.type === 'combo' ? false : (chart.presentation?.lineMarkers ?? true))
-          "
+          :checked="seriesMarkersVisible"
           :disabled="disabled"
           :onChange="captureAction((value: unknown) => setSeries('markers', !!value))"
           >{{ t("chart.formatMarkers") }}</TCheckbox
         >
+        <div
+          v-if="capabilities.seriesMarkerSize"
+          class="chart-format-pane__field"
+          data-chart-format-field="markerSizePt"
+        >
+          <label :for="`${paneId}-marker-size`">{{ t("chart.formatMarkerSize") }}</label>
+          <div class="chart-format-pane__number">
+            <NumericField
+              ref="markerSizePtControl"
+              :id="`${paneId}-marker-size`"
+              :owner-key="`${ownerKey}/markerSizePt`"
+              :value="markerSizePtNumericValue"
+              :spec="markerSizePtSpec"
+              :label="t('chart.formatMarkerSize')"
+              :auto-text="t('chart.formatAuto')"
+              :disabled="disabled || !seriesMarkersVisible"
+              :invalid-message="t('chart.formatInvalidNumber')"
+              :rejected-message="t('chart.formatApplyFailed')"
+              :stale-message="t('chart.formatApplyFailed')"
+              :external-error="sharedNumericResetErrors.markerSizePt"
+              :focus-boundary="() => sharedNumericFocusBoundary('markerSizePt')"
+              :on-commit="markerSizePtCommit"
+              presentation="inline-stepper"
+              :show-unit="false"
+              @draft-change="sharedNumericDraftChange('markerSizePt', $event)"
+              @cancel="delete sharedNumericResetErrors.markerSizePt"
+            /><TButton
+              variant="text"
+              shape="square"
+              size="small"
+              :disabled="
+                disabled ||
+                (markerSizePtNumericValue.kind === 'auto' &&
+                  !sharedNumericDrafts.markerSizePt?.dirty)
+              "
+              :aria-label="t('chart.formatReset')"
+              data-chart-format-reset="markerSizePt"
+              :onClick="captureAction(() => resetNumber('markerSizePt'))"
+              ><RotateCcw :size="14" aria-hidden="true"
+            /></TButton>
+          </div>
+        </div>
+        <p
+          v-if="capabilities.seriesMarkerSize && !seriesMarkersVisible"
+          class="chart-format-pane__hint"
+        >
+          {{ t("chart.formatMarkerSizeHidden") }}
+        </p>
       </FormatSection>
 
       <FormatSection

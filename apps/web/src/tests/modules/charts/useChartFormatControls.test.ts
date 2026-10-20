@@ -591,3 +591,40 @@ test("primary number transitions each use one command and exact Undo/Redo includ
     expect(f.ownerSheet.drawings).toEqual(after);
   }
 });
+
+test("marker size commit, hide and leaf reset each preserve identity, exact history, and JSON", () => {
+  const f = fixture({ kind: "series", seriesId: "apples" });
+  f.first.chart.type = "line";
+  const originalSeries = f.first.chart.format!.series!;
+  const baseline = { color: "#56789a", smooth: true, markers: true };
+  const formats = [
+    { ...baseline, markerSizePt: 9 },
+    { ...baseline, markers: false, markerSizePt: 9 },
+    { ...baseline, markers: false },
+  ];
+  for (const [index, format] of formats.entries()) {
+    const before = structuredClone(f.ownerSheet.drawings);
+    const owner = f.controls.snapshot.value!;
+    expect(owner.apply({ kind: "series", seriesId: "apples", format })).toBe(true);
+    const after = structuredClone(f.ownerSheet.drawings);
+    expect(f.current().chart.format!.series![0]).toEqual({ id: "apples", ...format });
+    expect(f.current().chart.format!.series!.slice(1)).toEqual(originalSeries.slice(1));
+    expect(f.current().chart.source).toEqual(f.first.chart.source);
+    expect(f.session.history.undoStack).toHaveLength(index + 1);
+    const serialized = serializeWorkbook(f.workbook.value);
+    const restored = deserializeWorkbook(serialized);
+    const loaded = getActiveSheet(restored).drawings?.[0];
+    expect(loaded?.kind === "chart" && loaded.chart.format?.series).toEqual(
+      f.current().chart.format!.series,
+    );
+    expect(owner.apply({ kind: "series", seriesId: "apples", format: { markerSizePt: 12 } })).toBe(
+      false,
+    );
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    f.revision.value++;
+    expect(f.ownerSheet.drawings).toEqual(before);
+    expect(redoWorkbookCommand(f.session)).toBe(true);
+    f.revision.value++;
+    expect(f.ownerSheet.drawings).toEqual(after);
+  }
+});

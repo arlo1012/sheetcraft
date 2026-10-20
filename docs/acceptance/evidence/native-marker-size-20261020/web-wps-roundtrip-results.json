@@ -1,0 +1,89 @@
+{
+  "actualUiJsonVersion": 92,
+  "jsonReloadVersion": 92,
+  "results": [
+    {
+      "file": "web-marker-size9.xlsx",
+      "sha256": "705a8087a8536efe190da08e9915ebf6a06a43a5c3d111b698eebb3210f0dc93",
+      "styles": [
+        {
+          "id": "range-series-1",
+          "strokeWidth": 2,
+          "markers": true,
+          "markerSizePt": 9
+        },
+        {
+          "id": "range-series-2",
+          "strokeWidth": 4,
+          "markers": false
+        }
+      ],
+      "importIssues": [
+        {
+          "code": "style-omitted",
+          "severity": "warning",
+          "count": 4,
+          "locations": [
+            "xl/charts/chart1.xml.format.series[0].strokeGeometry",
+            "xl/charts/chart1.xml.format.series[0].markerStroke",
+            "xl/charts/chart1.xml.format.series[1].strokeGeometry",
+            "xl/charts/chart1.xml"
+          ]
+        }
+      ],
+      "exportIssues": [
+        {
+          "code": "style-omitted",
+          "severity": "warning",
+          "count": 1,
+          "locations": [
+            "Data.drawings[\"xlsx-column-chart-0-0\"].chart"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "web-marker-size9-wps-saved.xlsx",
+      "sha256": "69d4a9b42b554a3f213e812c1020d5ff758cdc2e8a2e7e6474eb67dde8433772",
+      "styles": [
+        {
+          "id": "range-series-1",
+          "strokeWidth": 2,
+          "markers": true,
+          "markerSizePt": 9
+        },
+        {
+          "id": "range-series-2",
+          "strokeWidth": 4,
+          "markers": false
+        }
+      ],
+      "importIssues": [
+        {
+          "code": "style-omitted",
+          "severity": "warning",
+          "count": 7,
+          "locations": [
+            "xl/charts/chart1.xml.format.categoryAxis.titleText.kern",
+            "xl/charts/chart1.xml.format.categoryAxis.text.bodyPr",
+            "xl/charts/chart1.xml.format.valueAxis.titleText.kern",
+            "xl/charts/chart1.xml.format.series[0].strokeGeometry",
+            "xl/charts/chart1.xml.format.series[0].markerStroke",
+            "xl/charts/chart1.xml.format.series[1].strokeGeometry",
+            "xl/charts/chart1.xml"
+          ]
+        }
+      ],
+      "exportIssues": [
+        {
+          "code": "style-omitted",
+          "severity": "warning",
+          "count": 1,
+          "locations": [
+            "Data.drawings[\"xlsx-column-chart-0-0\"].chart"
+          ]
+        }
+      ]
+    }
+  ]
+}

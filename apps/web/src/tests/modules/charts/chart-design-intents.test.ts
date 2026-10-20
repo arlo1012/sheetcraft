@@ -348,3 +348,26 @@ test("type and style changes retain independent semantic-axis title styles and a
   expect(styled.format?.valueAxis?.titleText).toEqual(original.format.valueAxis?.titleText);
   expect(styled.format?.valueAxis?.titleRotation).toBe(-90);
 });
+
+test("marker sizes survive subtype, style and chart family changes as independent latent overrides", () => {
+  const original = chart("line");
+  original.format!.series![0]!.markerSizePt = 9;
+  original.format!.series![1]!.markerSizePt = 72;
+  const before = structuredClone(original);
+  for (const variant of lineVariants) {
+    const result = applyChartDesignIntent(original, { kind: "variant", variant });
+    expect(result.format?.series?.map(({ id, markerSizePt }) => ({ id, markerSizePt }))).toEqual([
+      { id: "active", markerSizePt: 9 },
+      { id: "dormant", markerSizePt: 72 },
+    ]);
+  }
+  for (const style of styles) {
+    const result = applyChartDesignIntent(original, { kind: "style", style });
+    expect(result.format?.series?.map((entry) => entry.markerSizePt)).toEqual([9, 72]);
+  }
+  for (const type of ["column", "bar", "area", "radar", "combo"] as const) {
+    const result = changeChartType(original, type);
+    expect(result.format?.series?.map((entry) => entry.markerSizePt)).toEqual([9, 72]);
+  }
+  expect(original).toEqual(before);
+});

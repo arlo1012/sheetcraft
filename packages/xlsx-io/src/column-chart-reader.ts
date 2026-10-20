@@ -265,7 +265,6 @@ export function readXlsxColumnCharts(
           const marker = single(item, "marker");
           only(marker, ["symbol", "size", "spPr"]);
           const symbol = attr(single(marker, "symbol"), "val");
-          const size = symbol === "none" ? undefined : Number(attr(single(marker, "size"), "val"));
           if (!["circle", "none"].includes(symbol)) {
             report.add(
               "style-omitted",
@@ -274,7 +273,20 @@ export function readXlsxColumnCharts(
             );
             throw new Error("Unsupported native marker shape.");
           }
-          if (symbol === "circle" && (!Number.isSafeInteger(size) || size! < 2 || size! > 72)) {
+          const sizes = nodes(marker.size);
+          const size = sizes[0];
+          const rawSize = size ? attr(size, "val") : "";
+          if (
+            symbol === "circle" &&
+            (sizes.length !== 1 ||
+              Array.isArray(marker.size) ||
+              !size ||
+              Object.keys(size).some((key) => key !== "@_val" && !key.startsWith("@_xmlns")) ||
+              !/^\+?\d+$/.test(rawSize) ||
+              !Number.isSafeInteger(Number(rawSize)) ||
+              Number(rawSize) < 2 ||
+              Number(rawSize) > 72)
+          ) {
             report.add(
               "style-omitted",
               "warning",

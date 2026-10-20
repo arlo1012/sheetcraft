@@ -81,8 +81,8 @@ for (const type of ["column", "bar", "line"] as const) {
           ? {
               ...f.drawing.chart.format,
               series: [
-                { id: "range-series-1", strokeWidth: 3, markers: true },
-                { id: "range-series-2", strokeWidth: 3, markers: true },
+                { id: "range-series-1", strokeWidth: 3, markers: true, markerSizePt: 5 },
+                { id: "range-series-2", strokeWidth: 3, markers: true, markerSizePt: 5 },
               ],
             }
           : f.drawing.chart.format;

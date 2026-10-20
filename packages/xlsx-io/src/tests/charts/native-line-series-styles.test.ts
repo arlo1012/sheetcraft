@@ -101,7 +101,7 @@ describe("native ordinary line series styling", () => {
       { strokeWidth: 2, markers: true },
       { strokeWidth: 4, markers: false },
     ]);
-    expect(result.report.issues.flatMap((issue) => issue.locations)).toContain(
+    expect(result.report.issues.flatMap((issue) => issue.locations)).not.toContain(
       "xl/charts/chart1.xml.format.series[0].markerSize",
     );
   });
@@ -169,7 +169,10 @@ describe("native ordinary line series styling", () => {
       );
       const { drawing } = line(result.workbook);
       expect(drawing.chart.type).toBe("line");
-      expect(drawing.chart.format?.series).toBeUndefined();
+      expect(drawing.chart.format?.series).toEqual([
+        { id: "range-series-1", markerSizePt: 5 },
+        { id: "range-series-2", markerSizePt: 5 },
+      ]);
       expect(result.report.issues.some((issue) => issue.code === "feature-omitted")).toBe(false);
       expect(result.report.issues.some((issue) => issue.code === "style-omitted")).toBe(true);
     },
@@ -207,32 +210,24 @@ describe("native ordinary line series styling", () => {
     },
   );
 
-  test.each(["size", "compound", "cap", "width", "marker-paint"])(
+  test.each(["compound", "cap", "width", "marker-paint"])(
     "reports unrepresented %s instead of claiming visual equivalence",
     async (mode) => {
       const result = await withXml((xml) =>
-        mode === "size"
-          ? xml.replace('<c:size val="5"/>', '<c:size val="9"/>')
-          : mode === "compound"
-            ? xml.replace('w="28575"', 'w="28575" cmpd="dbl"')
-            : mode === "cap"
-              ? xml.replace('cap="rnd"', 'cap="sq"')
-              : mode === "width"
-                ? xml.replace('w="28575"', 'w="-1"')
-                : xml.replace(
-                    '<c:spPr><a:solidFill><a:srgbClr val="2563EB"',
-                    '<c:spPr><a:solidFill><a:srgbClr val="FF0000"',
-                  ),
+        mode === "compound"
+          ? xml.replace('w="28575"', 'w="28575" cmpd="dbl"')
+          : mode === "cap"
+            ? xml.replace('cap="rnd"', 'cap="sq"')
+            : mode === "width"
+              ? xml.replace('w="28575"', 'w="-1"')
+              : xml.replace(
+                  '<c:spPr><a:solidFill><a:srgbClr val="2563EB"',
+                  '<c:spPr><a:solidFill><a:srgbClr val="FF0000"',
+                ),
       );
       expect(line(result.workbook).drawing.chart.type).toBe("line");
       const suffix =
-        mode === "size"
-          ? "markerSize"
-          : mode === "width"
-            ? "strokeWidth"
-            : mode === "marker-paint"
-              ? "markerPaint"
-              : "strokeStyle";
+        mode === "width" ? "strokeWidth" : mode === "marker-paint" ? "markerPaint" : "strokeStyle";
       expect(result.report.issues.flatMap((issue) => issue.locations)).toContain(
         `xl/charts/chart1.xml.format.series[0].${suffix}`,
       );
@@ -280,15 +275,15 @@ test("actual WPS-authored 1.5pt/3pt circle/none stays editable through re-export
   );
   const { drawing } = line(read.workbook);
   expect(drawing.chart.format?.series).toEqual([
-    { id: "range-series-1", strokeWidth: 2, markers: true },
+    { id: "range-series-1", strokeWidth: 2, markers: true, markerSizePt: 5 },
     { id: "range-series-2", strokeWidth: 4, markers: false },
   ]);
   expect(drawing.chart.presentation).toBeUndefined();
   const next = await decodeXlsx((await encodeXlsx(read.workbook)).bytes);
   expect(line(next.workbook).drawing.chart.format?.series).toEqual(drawing.chart.format?.series);
-  expect(read.report.issues.flatMap((issue) => issue.locations)).toContain(
-    "xl/charts/chart1.xml.format.series[0].markerSize",
-  );
+  const locations = read.report.issues.flatMap((issue) => issue.locations);
+  expect(locations).not.toContain("xl/charts/chart1.xml.format.series[0].markerSize");
+  expect(locations).toContain("xl/charts/chart1.xml.format.series[0].markerStroke");
 });
 
 test("hidden physical bands never redirect native style binding", async () => {

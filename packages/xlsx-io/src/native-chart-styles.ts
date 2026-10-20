@@ -544,7 +544,7 @@ function readValueAxisNumberFormat(
 }
 
 /** Restore only independently representable leaves; report unresolved fonts/colors precisely. */
-/** Recover only model-owned width and filled-circle/none visibility. Other
+/** Recover only model-owned width, circle size and filled-circle/none visibility. Other
  * geometry remains a precise style loss, never an invented model setting. */
 function readNativeLineSeriesStyles(
   chart: SheetChart,
@@ -562,6 +562,10 @@ function readNativeLineSeriesStyles(
       if (symbol === "none") {
         settings.markers = false;
         if (marker.spPr !== undefined || marker.size !== undefined) warn(`${path}.markerGeometry`);
+      } else if (symbol === "circle") {
+        // The reader has already proved this is one integer size in 2..72 pt.
+        // Size does not depend on whether the separate paint/outline is representable.
+        settings.markerSizePt = Number(attr(single(marker, "size"), "val"));
       }
       const shape = single(item, "spPr");
       const line = single(shape, "ln");
@@ -594,9 +598,6 @@ function readNativeLineSeriesStyles(
         const color = rgbFill(line);
         if (color && markerShape && rgbFill(markerShape) === color) settings.markers = true;
         else warn(`${path}.markerPaint`);
-        // Native marker size is in points. Core currently has no size field;
-        // do not silently claim the renderer's fixed symbol size is equivalent.
-        warn(`${path}.markerSize`);
         if (markerShape?.ln !== undefined) warn(`${path}.markerStroke`);
       } else if (symbol !== "none") warn(`${path}.markers`);
     } catch {
