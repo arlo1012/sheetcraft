@@ -1,0 +1,2566 @@
+{
+  "measuredAt": "2026-10-20",
+  "baselineCommit": "f055089d42ec9e99399686b260596795e033798b",
+  "productionCodeChanged": false,
+  "conclusions": [
+    "Native source and saved-copy min/max/majorUnit absence is verified per value-axis XML, not inferred from the charts.",
+    "Changing splitNumber alone cannot explain this matrix: the narrow range still includes zero, and a 20-unit interval rounds a 120 maximum to 120, not to WPS's 140.",
+    "The integer splitNumber 1..20 sweep only matches max121 among the nine original matrix cases whose native-size option generation succeeds. Saved copies are reported separately alongside their original observation.",
+    "The 200px-height cases are blocked by current axis-title layout validation before ECharts rendering; no successful native-size tick result is claimed.",
+    "WPS's zero-inclusion threshold, headroom rule, automatic interval rule and exact layout dependence remain unestablished by this matrix. No formula or product fix is proposed."
+  ],
+  "results": [
+    {
+      "filename": "auto-axis-base120.xlsx",
+      "sha256": "2a52b0d36da2a20b4d9a8c3ea70ec13ee6bd4bc276fae376710a09caa4d9bcd5",
+      "nativeParts": [
+        {
+          "part": "xl/charts/chart1.xml",
+          "valueAxes": [
+            {
+              "tags": [
+                {
+                  "tag": "min",
+                  "present": false
+                },
+                {
+                  "tag": "max",
+                  "present": false
+                },
+                {
+                  "tag": "majorUnit",
+                  "present": false
+                }
+              ],
+              "noExplicitMinMaxMajorUnit": true
+            }
+          ],
+          "markerSymbols": [
+            "circle",
+            "none"
+          ]
+        }
+      ],
+      "charts": [
+        {
+          "width": 640,
+          "height": 400,
+          "chartType": "line",
+          "dataValues": [
+            [
+              60,
+              100,
+              120
+            ],
+            [
+              70,
+              80,
+              90
+            ]
+          ],
+          "importedValueAxis": {
+            "title": "Revenue \u6536\u5165",
+            "titleText": {
+              "fontFamily": "Arial",
+              "fontSize": 16,
+              "color": "#b45309",
+              "bold": true,
+              "italic": true
+            },
+            "titleRotation": -90,
+            "text": {
+              "fontFamily": "Arial",
+              "fontSize": 12,
+              "color": "#334155",
+              "bold": false
+            },
+            "numberFormat": {
+              "kind": "number",
+              "fractionDigits": 1,
+              "useGrouping": false
+            },
+            "linkedToSource": false
+          },
+          "wpsObservation": {
+            "min": 0,
+            "max": 140,
+            "step": 20
+          },
+          "expectedWpsTicks": [
+            0,
+            20,
+            40,
+            60,
+            80,
+            100,
+            120,
+            140
+          ],
+          "current": {
+            "tickValues": [
+              0,
+              20,
+              40,
+              60,
+              80,
+              100,
+              120
+            ],
+            "tickLabels": [
+              {
+                "value": 0,
+                "formattedLabel": "0.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 20,
+                "formattedLabel": "20.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 40,
+                "formattedLabel": "40.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 60,
+                "formattedLabel": "60.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 80,
+                "formattedLabel": "80.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 100,
+                "formattedLabel": "100.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 120,
+                "formattedLabel": "120.0",
+                "presentInSvg": true
+              }
+            ],
+            "numericTextActuallyInSvg": [
+              "0.0",
+              "20.0",
+              "40.0",
+              "60.0",
+              "80.0",
+              "100.0",
+              "120.0"
+            ],
+            "extent": [
+              0,
+              120
+            ],
+            "interval": 20,
+            "gridRect": {
+              "x": 75.2,
+              "y": 45,
+              "width": 542.8,
+              "height": 292.8,
+              "margin": [
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            "allTextActuallyInSvg": [
+              "Revenue \u6536\u5165",
+              "Quarter \u5b63\u5ea6 & <channel>",
+              "0.0",
+              "20.0",
+              "40.0",
+              "60.0",
+              "80.0",
+              "100.0",
+              "120.0",
+              "east",
+              "north",
+              "south",
+              "Auto axis: base120"
+            ]
+          },
+          "currentMatchesWpsTicks": false,
+          "splitNumberOnlyMatches": [],
+          "optionDomainProperties": {
+            "min": {
+              "own": false,
+              "value": null
+            },
+            "max": {
+              "own": false,
+              "value": null
+            },
+            "interval": {
+              "own": false,
+              "value": null
+            },
+            "splitNumber": {
+              "own": false,
+              "value": null
+            },
+            "scale": {
+              "own": false,
+              "value": null
+            },
+            "boundaryGap": {
+              "own": false,
+              "value": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "filename": "auto-axis-max119.xlsx",
+      "sha256": "f7b9f81762ba2a15343398c3019ddab3cd4ca65d24dd4a84c70e3c2d90ab3ad2",
+      "nativeParts": [
+        {
+          "part": "xl/charts/chart1.xml",
+          "valueAxes": [
+            {
+              "tags": [
+                {
+                  "tag": "min",
+                  "present": false
+                },
+                {
+                  "tag": "max",
+                  "present": false
+                },
+                {
+                  "tag": "majorUnit",
+                  "present": false
+                }
+              ],
+              "noExplicitMinMaxMajorUnit": true
+            }
+          ],
+          "markerSymbols": [
+            "circle",
+            "none"
+          ]
+        }
+      ],
+      "charts": [
+        {
+          "width": 640,
+          "height": 400,
+          "chartType": "line",
+          "dataValues": [
+            [
+              60,
+              100,
+              119
+            ],
+            [
+              70,
+              80,
+              90
+            ]
+          ],
+          "importedValueAxis": {
+            "title": "Revenue \u6536\u5165",
+            "titleText": {
+              "fontFamily": "Arial",
+              "fontSize": 16,
+              "color": "#b45309",
+              "bold": true,
+              "italic": true
+            },
+            "titleRotation": -90,
+            "text": {
+              "fontFamily": "Arial",
+              "fontSize": 12,
+              "color": "#334155",
+              "bold": false
+            },
+            "numberFormat": {
+              "kind": "number",
+              "fractionDigits": 1,
+              "useGrouping": false
+            },
+            "linkedToSource": false
+          },
+          "wpsObservation": {
+            "min": 0,
+            "max": 140,
+            "step": 20
+          },
+          "expectedWpsTicks": [
+            0,
+            20,
+            40,
+            60,
+            80,
+            100,
+            120,
+            140
+          ],
+          "current": {
+            "tickValues": [
+              0,
+              20,
+              40,
+              60,
+              80,
+              100,
+              120
+            ],
+            "tickLabels": [
+              {
+                "value": 0,
+                "formattedLabel": "0.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 20,
+                "formattedLabel": "20.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 40,
+                "formattedLabel": "40.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 60,
+                "formattedLabel": "60.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 80,
+                "formattedLabel": "80.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 100,
+                "formattedLabel": "100.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 120,
+                "formattedLabel": "120.0",
+                "presentInSvg": true
+              }
+            ],
+            "numericTextActuallyInSvg": [
+              "0.0",
+              "20.0",
+              "40.0",
+              "60.0",
+              "80.0",
+              "100.0",
+              "120.0"
+            ],
+            "extent": [
+              0,
+              120
+            ],
+            "interval": 20,
+            "gridRect": {
+              "x": 75.2,
+              "y": 45,
+              "width": 542.8,
+              "height": 292.8,
+              "margin": [
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            "allTextActuallyInSvg": [
+              "Revenue \u6536\u5165",
+              "Quarter \u5b63\u5ea6 & <channel>",
+              "0.0",
+              "20.0",
+              "40.0",
+              "60.0",
+              "80.0",
+              "100.0",
+              "120.0",
+              "east",
+              "north",
+              "south",
+              "Auto axis: max119"
+            ]
+          },
+          "currentMatchesWpsTicks": false,
+          "splitNumberOnlyMatches": [],
+          "optionDomainProperties": {
+            "min": {
+              "own": false,
+              "value": null
+            },
+            "max": {
+              "own": false,
+              "value": null
+            },
+            "interval": {
+              "own": false,
+              "value": null
+            },
+            "splitNumber": {
+              "own": false,
+              "value": null
+            },
+            "scale": {
+              "own": false,
+              "value": null
+            },
+            "boundaryGap": {
+              "own": false,
+              "value": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "filename": "auto-axis-max121.xlsx",
+      "sha256": "5ab4f61568c40cf54a4f79d267333fa2885cbd8230da8a1509669594e5239b36",
+      "nativeParts": [
+        {
+          "part": "xl/charts/chart1.xml",
+          "valueAxes": [
+            {
+              "tags": [
+                {
+                  "tag": "min",
+                  "present": false
+                },
+                {
+                  "tag": "max",
+                  "present": false
+                },
+                {
+                  "tag": "majorUnit",
+                  "present": false
+                }
+              ],
+              "noExplicitMinMaxMajorUnit": true
+            }
+          ],
+          "markerSymbols": [
+            "circle",
+            "none"
+          ]
+        }
+      ],
+      "charts": [
+        {
+          "width": 640,
+          "height": 400,
+          "chartType": "line",
+          "dataValues": [
+            [
+              60,
+              100,
+              121
+            ],
+            [
+              70,
+              80,
+              90
+            ]
+          ],
+          "importedValueAxis": {
+            "title": "Revenue \u6536\u5165",
+            "titleText": {
+              "fontFamily": "Arial",
+              "fontSize": 16,
+              "color": "#b45309",
+              "bold": true,
+              "italic": true
+            },
+            "titleRotation": -90,
+            "text": {
+              "fontFamily": "Arial",
+              "fontSize": 12,
+              "color": "#334155",
+              "bold": false
+            },
+            "numberFormat": {
+              "kind": "number",
+              "fractionDigits": 1,
+              "useGrouping": false
+            },
+            "linkedToSource": false
+          },
+          "wpsObservation": {
+            "min": 0,
+            "max": 140,
+            "step": 20
+          },
+          "expectedWpsTicks": [
+            0,
+            20,
+            40,
+            60,
+            80,
+            100,
+            120,
+            140
+          ],
+          "current": {
+            "tickValues": [
+              0,
+              20,
+              40,
+              60,
+              80,
+              100,
+              120,
+              140
+            ],
+            "tickLabels": [
+              {
+                "value": 0,
+                "formattedLabel": "0.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 20,
+                "formattedLabel": "20.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 40,
+                "formattedLabel": "40.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 60,
+                "formattedLabel": "60.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 80,
+                "formattedLabel": "80.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 100,
+                "formattedLabel": "100.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 120,
+                "formattedLabel": "120.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 140,
+                "formattedLabel": "140.0",
+                "presentInSvg": true
+              }
+            ],
+            "numericTextActuallyInSvg": [
+              "0.0",
+              "20.0",
+              "40.0",
+              "60.0",
+              "80.0",
+              "100.0",
+              "120.0",
+              "140.0"
+            ],
+            "extent": [
+              0,
+              140
+            ],
+            "interval": 20,
+            "gridRect": {
+              "x": 75.2,
+              "y": 45,
+              "width": 542.8,
+              "height": 292.8,
+              "margin": [
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            "allTextActuallyInSvg": [
+              "Revenue \u6536\u5165",
+              "Quarter \u5b63\u5ea6 & <channel>",
+              "0.0",
+              "20.0",
+              "40.0",
+              "60.0",
+              "80.0",
+              "100.0",
+              "120.0",
+              "140.0",
+              "east",
+              "north",
+              "south",
+              "Auto axis: max121"
+            ]
+          },
+          "currentMatchesWpsTicks": true,
+          "splitNumberOnlyMatches": [
+            5,
+            6,
+            7,
+            8
+          ],
+          "optionDomainProperties": {
+            "min": {
+              "own": false,
+              "value": null
+            },
+            "max": {
+              "own": false,
+              "value": null
+            },
+            "interval": {
+              "own": false,
+              "value": null
+            },
+            "splitNumber": {
+              "own": false,
+              "value": null
+            },
+            "scale": {
+              "own": false,
+              "value": null
+            },
+            "boundaryGap": {
+              "own": false,
+              "value": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "filename": "auto-axis-scale01.xlsx",
+      "sha256": "a5818e1b4f3c2f47cd064855fb0c8f0d9cf4b1ff1ab22de3338618a187101f8b",
+      "nativeParts": [
+        {
+          "part": "xl/charts/chart1.xml",
+          "valueAxes": [
+            {
+              "tags": [
+                {
+                  "tag": "min",
+                  "present": false
+                },
+                {
+                  "tag": "max",
+                  "present": false
+                },
+                {
+                  "tag": "majorUnit",
+                  "present": false
+                }
+              ],
+              "noExplicitMinMaxMajorUnit": true
+            }
+          ],
+          "markerSymbols": [
+            "circle",
+            "none"
+          ]
+        }
+      ],
+      "charts": [
+        {
+          "width": 640,
+          "height": 400,
+          "chartType": "line",
+          "dataValues": [
+            [
+              6,
+              10,
+              12
+            ],
+            [
+              7,
+              8,
+              9
+            ]
+          ],
+          "importedValueAxis": {
+            "title": "Revenue \u6536\u5165",
+            "titleText": {
+              "fontFamily": "Arial",
+              "fontSize": 16,
+              "color": "#b45309",
+              "bold": true,
+              "italic": true
+            },
+            "titleRotation": -90,
+            "text": {
+              "fontFamily": "Arial",
+              "fontSize": 12,
+              "color": "#334155",
+              "bold": false
+            },
+            "numberFormat": {
+              "kind": "number",
+              "fractionDigits": 1,
+              "useGrouping": false
+            },
+            "linkedToSource": false
+          },
+          "wpsObservation": {
+            "min": 0,
+            "max": 14,
+            "step": 2
+          },
+          "expectedWpsTicks": [
+            0,
+            2,
+            4,
+            6,
+            8,
+            10,
+            12,
+            14
+          ],
+          "current": {
+            "tickValues": [
+              0,
+              2,
+              4,
+              6,
+              8,
+              10,
+              12
+            ],
+            "tickLabels": [
+              {
+                "value": 0,
+                "formattedLabel": "0.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 2,
+                "formattedLabel": "2.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 4,
+                "formattedLabel": "4.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 6,
+                "formattedLabel": "6.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 8,
+                "formattedLabel": "8.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 10,
+                "formattedLabel": "10.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 12,
+                "formattedLabel": "12.0",
+                "presentInSvg": true
+              }
+            ],
+            "numericTextActuallyInSvg": [
+              "0.0",
+              "2.0",
+              "4.0",
+              "6.0",
+              "8.0",
+              "10.0",
+              "12.0"
+            ],
+            "extent": [
+              0,
+              12
+            ],
+            "interval": 2,
+            "gridRect": {
+              "x": 75.2,
+              "y": 45,
+              "width": 542.8,
+              "height": 292.8,
+              "margin": [
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            "allTextActuallyInSvg": [
+              "Revenue \u6536\u5165",
+              "Quarter \u5b63\u5ea6 & <channel>",
+              "0.0",
+              "2.0",
+              "4.0",
+              "6.0",
+              "8.0",
+              "10.0",
+              "12.0",
+              "east",
+              "north",
+              "south",
+              "Auto axis: scale01"
+            ]
+          },
+          "currentMatchesWpsTicks": false,
+          "splitNumberOnlyMatches": [],
+          "optionDomainProperties": {
+            "min": {
+              "own": false,
+              "value": null
+            },
+            "max": {
+              "own": false,
+              "value": null
+            },
+            "interval": {
+              "own": false,
+              "value": null
+            },
+            "splitNumber": {
+              "own": false,
+              "value": null
+            },
+            "scale": {
+              "own": false,
+              "value": null
+            },
+            "boundaryGap": {
+              "own": false,
+              "value": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "filename": "auto-axis-scale10.xlsx",
+      "sha256": "cc10fa98352b9618283ac5098b858646e116e0a2540d3798dba14236d9bdc239",
+      "nativeParts": [
+        {
+          "part": "xl/charts/chart1.xml",
+          "valueAxes": [
+            {
+              "tags": [
+                {
+                  "tag": "min",
+                  "present": false
+                },
+                {
+                  "tag": "max",
+                  "present": false
+                },
+                {
+                  "tag": "majorUnit",
+                  "present": false
+                }
+              ],
+              "noExplicitMinMaxMajorUnit": true
+            }
+          ],
+          "markerSymbols": [
+            "circle",
+            "none"
+          ]
+        }
+      ],
+      "charts": [
+        {
+          "width": 640,
+          "height": 400,
+          "chartType": "line",
+          "dataValues": [
+            [
+              600,
+              1000,
+              1200
+            ],
+            [
+              700,
+              800,
+              900
+            ]
+          ],
+          "importedValueAxis": {
+            "title": "Revenue \u6536\u5165",
+            "titleText": {
+              "fontFamily": "Arial",
+              "fontSize": 16,
+              "color": "#b45309",
+              "bold": true,
+              "italic": true
+            },
+            "titleRotation": -90,
+            "text": {
+              "fontFamily": "Arial",
+              "fontSize": 12,
+              "color": "#334155",
+              "bold": false
+            },
+            "numberFormat": {
+              "kind": "number",
+              "fractionDigits": 1,
+              "useGrouping": false
+            },
+            "linkedToSource": false
+          },
+          "wpsObservation": {
+            "min": 0,
+            "max": 1400,
+            "step": 200
+          },
+          "expectedWpsTicks": [
+            0,
+            200,
+            400,
+            600,
+            800,
+            1000,
+            1200,
+            1400
+          ],
+          "current": {
+            "tickValues": [
+              0,
+              200,
+              400,
+              600,
+              800,
+              1000,
+              1200
+            ],
+            "tickLabels": [
+              {
+                "value": 0,
+                "formattedLabel": "0.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 200,
+                "formattedLabel": "200.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 400,
+                "formattedLabel": "400.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 600,
+                "formattedLabel": "600.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 800,
+                "formattedLabel": "800.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 1000,
+                "formattedLabel": "1000.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 1200,
+                "formattedLabel": "1200.0",
+                "presentInSvg": true
+              }
+            ],
+            "numericTextActuallyInSvg": [
+              "0.0",
+              "200.0",
+              "400.0",
+              "600.0",
+              "800.0",
+              "1000.0",
+              "1200.0"
+            ],
+            "extent": [
+              0,
+              1200
+            ],
+            "interval": 200,
+            "gridRect": {
+              "x": 79.86000000000001,
+              "y": 45,
+              "width": 538.14,
+              "height": 292.8,
+              "margin": [
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            "allTextActuallyInSvg": [
+              "Revenue \u6536\u5165",
+              "Quarter \u5b63\u5ea6 & <channel>",
+              "0.0",
+              "200.0",
+              "400.0",
+              "600.0",
+              "800.0",
+              "1000.0",
+              "1200.0",
+              "east",
+              "north",
+              "south",
+              "Auto axis: scale10"
+            ]
+          },
+          "currentMatchesWpsTicks": false,
+          "splitNumberOnlyMatches": [],
+          "optionDomainProperties": {
+            "min": {
+              "own": false,
+              "value": null
+            },
+            "max": {
+              "own": false,
+              "value": null
+            },
+            "interval": {
+              "own": false,
+              "value": null
+            },
+            "splitNumber": {
+              "own": false,
+              "value": null
+            },
+            "scale": {
+              "own": false,
+              "value": null
+            },
+            "boundaryGap": {
+              "own": false,
+              "value": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "filename": "auto-axis-narrow.xlsx",
+      "sha256": "7aa784014a19455c97ff2214e88a6244b711ed3664b609ef544d9bea1eeffbd6",
+      "nativeParts": [
+        {
+          "part": "xl/charts/chart1.xml",
+          "valueAxes": [
+            {
+              "tags": [
+                {
+                  "tag": "min",
+                  "present": false
+                },
+                {
+                  "tag": "max",
+                  "present": false
+                },
+                {
+                  "tag": "majorUnit",
+                  "present": false
+                }
+              ],
+              "noExplicitMinMaxMajorUnit": true
+            }
+          ],
+          "markerSymbols": [
+            "circle",
+            "none"
+          ]
+        }
+      ],
+      "charts": [
+        {
+          "width": 640,
+          "height": 400,
+          "chartType": "line",
+          "dataValues": [
+            [
+              118,
+              119,
+              120
+            ],
+            [
+              118.5,
+              119.2,
+              119.5
+            ]
+          ],
+          "importedValueAxis": {
+            "title": "Revenue \u6536\u5165",
+            "titleText": {
+              "fontFamily": "Arial",
+              "fontSize": 16,
+              "color": "#b45309",
+              "bold": true,
+              "italic": true
+            },
+            "titleRotation": -90,
+            "text": {
+              "fontFamily": "Arial",
+              "fontSize": 12,
+              "color": "#334155",
+              "bold": false
+            },
+            "numberFormat": {
+              "kind": "number",
+              "fractionDigits": 1,
+              "useGrouping": false
+            },
+            "linkedToSource": false
+          },
+          "wpsObservation": {
+            "min": 117,
+            "max": 120.5,
+            "step": 0.5
+          },
+          "expectedWpsTicks": [
+            117,
+            117.5,
+            118,
+            118.5,
+            119,
+            119.5,
+            120,
+            120.5
+          ],
+          "current": {
+            "tickValues": [
+              0,
+              20,
+              40,
+              60,
+              80,
+              100,
+              120
+            ],
+            "tickLabels": [
+              {
+                "value": 0,
+                "formattedLabel": "0.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 20,
+                "formattedLabel": "20.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 40,
+                "formattedLabel": "40.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 60,
+                "formattedLabel": "60.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 80,
+                "formattedLabel": "80.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 100,
+                "formattedLabel": "100.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 120,
+                "formattedLabel": "120.0",
+                "presentInSvg": true
+              }
+            ],
+            "numericTextActuallyInSvg": [
+              "0.0",
+              "20.0",
+              "40.0",
+              "60.0",
+              "80.0",
+              "100.0",
+              "120.0"
+            ],
+            "extent": [
+              0,
+              120
+            ],
+            "interval": 20,
+            "gridRect": {
+              "x": 75.2,
+              "y": 45,
+              "width": 542.8,
+              "height": 292.8,
+              "margin": [
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            "allTextActuallyInSvg": [
+              "Revenue \u6536\u5165",
+              "Quarter \u5b63\u5ea6 & <channel>",
+              "0.0",
+              "20.0",
+              "40.0",
+              "60.0",
+              "80.0",
+              "100.0",
+              "120.0",
+              "east",
+              "north",
+              "south",
+              "Auto axis: narrow"
+            ]
+          },
+          "currentMatchesWpsTicks": false,
+          "splitNumberOnlyMatches": [],
+          "optionDomainProperties": {
+            "min": {
+              "own": false,
+              "value": null
+            },
+            "max": {
+              "own": false,
+              "value": null
+            },
+            "interval": {
+              "own": false,
+              "value": null
+            },
+            "splitNumber": {
+              "own": false,
+              "value": null
+            },
+            "scale": {
+              "own": false,
+              "value": null
+            },
+            "boundaryGap": {
+              "own": false,
+              "value": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "filename": "auto-axis-small.xlsx",
+      "sha256": "babce167a7499362a55be8389f40f926bb8acd132bdb55d098f067e598a81c08",
+      "nativeParts": [
+        {
+          "part": "xl/charts/chart1.xml",
+          "valueAxes": [
+            {
+              "tags": [
+                {
+                  "tag": "min",
+                  "present": false
+                },
+                {
+                  "tag": "max",
+                  "present": false
+                },
+                {
+                  "tag": "majorUnit",
+                  "present": false
+                }
+              ],
+              "noExplicitMinMaxMajorUnit": true
+            }
+          ],
+          "markerSymbols": [
+            "circle",
+            "none"
+          ]
+        }
+      ],
+      "charts": [
+        {
+          "width": 320,
+          "height": 200,
+          "chartType": "line",
+          "dataValues": [
+            [
+              60,
+              100,
+              120
+            ],
+            [
+              70,
+              80,
+              90
+            ]
+          ],
+          "importedValueAxis": {
+            "title": "Revenue \u6536\u5165",
+            "titleText": {
+              "fontFamily": "Arial",
+              "fontSize": 16,
+              "color": "#b45309",
+              "bold": true,
+              "italic": true
+            },
+            "titleRotation": -90,
+            "text": {
+              "fontFamily": "Arial",
+              "fontSize": 12,
+              "color": "#334155",
+              "bold": false
+            },
+            "numberFormat": {
+              "kind": "number",
+              "fractionDigits": 1,
+              "useGrouping": false
+            },
+            "linkedToSource": false
+          },
+          "renderingError": {
+            "stage": "createChartOption at decoded native dimensions",
+            "name": "RangeError",
+            "message": "Axis titles leave less than a 96\u00d796px plot; enlarge the chart or reduce title size."
+          },
+          "wpsObservation": {
+            "min": 0,
+            "max": 150,
+            "step": 50
+          },
+          "expectedWpsTicks": [
+            0,
+            50,
+            100,
+            150
+          ],
+          "splitNumberOnlyMatches": null
+        }
+      ]
+    },
+    {
+      "filename": "auto-axis-large.xlsx",
+      "sha256": "e17df183291c2e388b93bc73e00bca04c00ac9c4906b4c5aaa9d33ac316bfb0c",
+      "nativeParts": [
+        {
+          "part": "xl/charts/chart1.xml",
+          "valueAxes": [
+            {
+              "tags": [
+                {
+                  "tag": "min",
+                  "present": false
+                },
+                {
+                  "tag": "max",
+                  "present": false
+                },
+                {
+                  "tag": "majorUnit",
+                  "present": false
+                }
+              ],
+              "noExplicitMinMaxMajorUnit": true
+            }
+          ],
+          "markerSymbols": [
+            "circle",
+            "none"
+          ]
+        }
+      ],
+      "charts": [
+        {
+          "width": 960,
+          "height": 600,
+          "chartType": "line",
+          "dataValues": [
+            [
+              60,
+              100,
+              120
+            ],
+            [
+              70,
+              80,
+              90
+            ]
+          ],
+          "importedValueAxis": {
+            "title": "Revenue \u6536\u5165",
+            "titleText": {
+              "fontFamily": "Arial",
+              "fontSize": 16,
+              "color": "#b45309",
+              "bold": true,
+              "italic": true
+            },
+            "titleRotation": -90,
+            "text": {
+              "fontFamily": "Arial",
+              "fontSize": 12,
+              "color": "#334155",
+              "bold": false
+            },
+            "numberFormat": {
+              "kind": "number",
+              "fractionDigits": 1,
+              "useGrouping": false
+            },
+            "linkedToSource": false
+          },
+          "wpsObservation": {
+            "min": 0,
+            "max": 140,
+            "step": 20
+          },
+          "expectedWpsTicks": [
+            0,
+            20,
+            40,
+            60,
+            80,
+            100,
+            120,
+            140
+          ],
+          "current": {
+            "tickValues": [
+              0,
+              20,
+              40,
+              60,
+              80,
+              100,
+              120
+            ],
+            "tickLabels": [
+              {
+                "value": 0,
+                "formattedLabel": "0.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 20,
+                "formattedLabel": "20.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 40,
+                "formattedLabel": "40.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 60,
+                "formattedLabel": "60.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 80,
+                "formattedLabel": "80.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 100,
+                "formattedLabel": "100.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 120,
+                "formattedLabel": "120.0",
+                "presentInSvg": true
+              }
+            ],
+            "numericTextActuallyInSvg": [
+              "0.0",
+              "20.0",
+              "40.0",
+              "60.0",
+              "80.0",
+              "100.0",
+              "120.0"
+            ],
+            "extent": [
+              0,
+              120
+            ],
+            "interval": 20,
+            "gridRect": {
+              "x": 75.2,
+              "y": 45,
+              "width": 862.8,
+              "height": 492.79999999999995,
+              "margin": [
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            "allTextActuallyInSvg": [
+              "Revenue \u6536\u5165",
+              "Quarter \u5b63\u5ea6 & <channel>",
+              "0.0",
+              "20.0",
+              "40.0",
+              "60.0",
+              "80.0",
+              "100.0",
+              "120.0",
+              "east",
+              "north",
+              "south",
+              "Auto axis: large"
+            ]
+          },
+          "currentMatchesWpsTicks": false,
+          "splitNumberOnlyMatches": [],
+          "optionDomainProperties": {
+            "min": {
+              "own": false,
+              "value": null
+            },
+            "max": {
+              "own": false,
+              "value": null
+            },
+            "interval": {
+              "own": false,
+              "value": null
+            },
+            "splitNumber": {
+              "own": false,
+              "value": null
+            },
+            "scale": {
+              "own": false,
+              "value": null
+            },
+            "boundaryGap": {
+              "own": false,
+              "value": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "filename": "auto-axis-short.xlsx",
+      "sha256": "d81452832c1579ecd4a5ab70d6dd30744b7415e388aba26519788fc940ac2996",
+      "nativeParts": [
+        {
+          "part": "xl/charts/chart1.xml",
+          "valueAxes": [
+            {
+              "tags": [
+                {
+                  "tag": "min",
+                  "present": false
+                },
+                {
+                  "tag": "max",
+                  "present": false
+                },
+                {
+                  "tag": "majorUnit",
+                  "present": false
+                }
+              ],
+              "noExplicitMinMaxMajorUnit": true
+            }
+          ],
+          "markerSymbols": [
+            "circle",
+            "none"
+          ]
+        }
+      ],
+      "charts": [
+        {
+          "width": 640,
+          "height": 200,
+          "chartType": "line",
+          "dataValues": [
+            [
+              60,
+              100,
+              120
+            ],
+            [
+              70,
+              80,
+              90
+            ]
+          ],
+          "importedValueAxis": {
+            "title": "Revenue \u6536\u5165",
+            "titleText": {
+              "fontFamily": "Arial",
+              "fontSize": 16,
+              "color": "#b45309",
+              "bold": true,
+              "italic": true
+            },
+            "titleRotation": -90,
+            "text": {
+              "fontFamily": "Arial",
+              "fontSize": 12,
+              "color": "#334155",
+              "bold": false
+            },
+            "numberFormat": {
+              "kind": "number",
+              "fractionDigits": 1,
+              "useGrouping": false
+            },
+            "linkedToSource": false
+          },
+          "renderingError": {
+            "stage": "createChartOption at decoded native dimensions",
+            "name": "RangeError",
+            "message": "Axis titles leave less than a 96\u00d796px plot; enlarge the chart or reduce title size."
+          },
+          "wpsObservation": {
+            "min": 0,
+            "max": 150,
+            "step": 50
+          },
+          "expectedWpsTicks": [
+            0,
+            50,
+            100,
+            150
+          ],
+          "splitNumberOnlyMatches": null
+        }
+      ]
+    },
+    {
+      "filename": "auto-axis-tall.xlsx",
+      "sha256": "75c57c4ddc08362c93773b012a0ead3848c67876abc35cf8bbe15590f20ffe68",
+      "nativeParts": [
+        {
+          "part": "xl/charts/chart1.xml",
+          "valueAxes": [
+            {
+              "tags": [
+                {
+                  "tag": "min",
+                  "present": false
+                },
+                {
+                  "tag": "max",
+                  "present": false
+                },
+                {
+                  "tag": "majorUnit",
+                  "present": false
+                }
+              ],
+              "noExplicitMinMaxMajorUnit": true
+            }
+          ],
+          "markerSymbols": [
+            "circle",
+            "none"
+          ]
+        }
+      ],
+      "charts": [
+        {
+          "width": 640,
+          "height": 600,
+          "chartType": "line",
+          "dataValues": [
+            [
+              60,
+              100,
+              120
+            ],
+            [
+              70,
+              80,
+              90
+            ]
+          ],
+          "importedValueAxis": {
+            "title": "Revenue \u6536\u5165",
+            "titleText": {
+              "fontFamily": "Arial",
+              "fontSize": 16,
+              "color": "#b45309",
+              "bold": true,
+              "italic": true
+            },
+            "titleRotation": -90,
+            "text": {
+              "fontFamily": "Arial",
+              "fontSize": 12,
+              "color": "#334155",
+              "bold": false
+            },
+            "numberFormat": {
+              "kind": "number",
+              "fractionDigits": 1,
+              "useGrouping": false
+            },
+            "linkedToSource": false
+          },
+          "wpsObservation": {
+            "min": 0,
+            "max": 140,
+            "step": 20
+          },
+          "expectedWpsTicks": [
+            0,
+            20,
+            40,
+            60,
+            80,
+            100,
+            120,
+            140
+          ],
+          "current": {
+            "tickValues": [
+              0,
+              20,
+              40,
+              60,
+              80,
+              100,
+              120
+            ],
+            "tickLabels": [
+              {
+                "value": 0,
+                "formattedLabel": "0.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 20,
+                "formattedLabel": "20.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 40,
+                "formattedLabel": "40.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 60,
+                "formattedLabel": "60.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 80,
+                "formattedLabel": "80.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 100,
+                "formattedLabel": "100.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 120,
+                "formattedLabel": "120.0",
+                "presentInSvg": true
+              }
+            ],
+            "numericTextActuallyInSvg": [
+              "0.0",
+              "20.0",
+              "40.0",
+              "60.0",
+              "80.0",
+              "100.0",
+              "120.0"
+            ],
+            "extent": [
+              0,
+              120
+            ],
+            "interval": 20,
+            "gridRect": {
+              "x": 75.2,
+              "y": 45,
+              "width": 542.8,
+              "height": 492.79999999999995,
+              "margin": [
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            "allTextActuallyInSvg": [
+              "Revenue \u6536\u5165",
+              "Quarter \u5b63\u5ea6 & <channel>",
+              "0.0",
+              "20.0",
+              "40.0",
+              "60.0",
+              "80.0",
+              "100.0",
+              "120.0",
+              "east",
+              "north",
+              "south",
+              "Auto axis: tall"
+            ]
+          },
+          "currentMatchesWpsTicks": false,
+          "splitNumberOnlyMatches": [],
+          "optionDomainProperties": {
+            "min": {
+              "own": false,
+              "value": null
+            },
+            "max": {
+              "own": false,
+              "value": null
+            },
+            "interval": {
+              "own": false,
+              "value": null
+            },
+            "splitNumber": {
+              "own": false,
+              "value": null
+            },
+            "scale": {
+              "own": false,
+              "value": null
+            },
+            "boundaryGap": {
+              "own": false,
+              "value": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "filename": "auto-axis-nomarkers.xlsx",
+      "sha256": "cee628e1f7b2a9fb2a285cff4ef4751603c3061f89b52c70fa5b541a0d5235bf",
+      "nativeParts": [
+        {
+          "part": "xl/charts/chart1.xml",
+          "valueAxes": [
+            {
+              "tags": [
+                {
+                  "tag": "min",
+                  "present": false
+                },
+                {
+                  "tag": "max",
+                  "present": false
+                },
+                {
+                  "tag": "majorUnit",
+                  "present": false
+                }
+              ],
+              "noExplicitMinMaxMajorUnit": true
+            }
+          ],
+          "markerSymbols": [
+            "none",
+            "none"
+          ]
+        }
+      ],
+      "charts": [
+        {
+          "width": 640,
+          "height": 400,
+          "chartType": "line",
+          "dataValues": [
+            [
+              60,
+              100,
+              120
+            ],
+            [
+              70,
+              80,
+              90
+            ]
+          ],
+          "importedValueAxis": {
+            "title": "Revenue \u6536\u5165",
+            "titleText": {
+              "fontFamily": "Arial",
+              "fontSize": 16,
+              "color": "#b45309",
+              "bold": true,
+              "italic": true
+            },
+            "titleRotation": -90,
+            "text": {
+              "fontFamily": "Arial",
+              "fontSize": 12,
+              "color": "#334155",
+              "bold": false
+            },
+            "numberFormat": {
+              "kind": "number",
+              "fractionDigits": 1,
+              "useGrouping": false
+            },
+            "linkedToSource": false
+          },
+          "wpsObservation": {
+            "min": 0,
+            "max": 140,
+            "step": 20
+          },
+          "expectedWpsTicks": [
+            0,
+            20,
+            40,
+            60,
+            80,
+            100,
+            120,
+            140
+          ],
+          "current": {
+            "tickValues": [
+              0,
+              20,
+              40,
+              60,
+              80,
+              100,
+              120
+            ],
+            "tickLabels": [
+              {
+                "value": 0,
+                "formattedLabel": "0.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 20,
+                "formattedLabel": "20.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 40,
+                "formattedLabel": "40.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 60,
+                "formattedLabel": "60.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 80,
+                "formattedLabel": "80.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 100,
+                "formattedLabel": "100.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 120,
+                "formattedLabel": "120.0",
+                "presentInSvg": true
+              }
+            ],
+            "numericTextActuallyInSvg": [
+              "0.0",
+              "20.0",
+              "40.0",
+              "60.0",
+              "80.0",
+              "100.0",
+              "120.0"
+            ],
+            "extent": [
+              0,
+              120
+            ],
+            "interval": 20,
+            "gridRect": {
+              "x": 75.2,
+              "y": 45,
+              "width": 542.8,
+              "height": 292.8,
+              "margin": [
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            "allTextActuallyInSvg": [
+              "Revenue \u6536\u5165",
+              "Quarter \u5b63\u5ea6 & <channel>",
+              "0.0",
+              "20.0",
+              "40.0",
+              "60.0",
+              "80.0",
+              "100.0",
+              "120.0",
+              "east",
+              "north",
+              "south",
+              "Auto axis: nomarkers"
+            ]
+          },
+          "currentMatchesWpsTicks": false,
+          "splitNumberOnlyMatches": [],
+          "optionDomainProperties": {
+            "min": {
+              "own": false,
+              "value": null
+            },
+            "max": {
+              "own": false,
+              "value": null
+            },
+            "interval": {
+              "own": false,
+              "value": null
+            },
+            "splitNumber": {
+              "own": false,
+              "value": null
+            },
+            "scale": {
+              "own": false,
+              "value": null
+            },
+            "boundaryGap": {
+              "own": false,
+              "value": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "filename": "auto-axis-short-wps-saved.xlsx",
+      "sha256": "d2fa4c9caf194d0eef07744cb7401e91e379b1c935712388ea68d51c7016298e",
+      "nativeParts": [
+        {
+          "part": "xl/charts/chart1.xml",
+          "valueAxes": [
+            {
+              "tags": [
+                {
+                  "tag": "min",
+                  "present": false
+                },
+                {
+                  "tag": "max",
+                  "present": false
+                },
+                {
+                  "tag": "majorUnit",
+                  "present": false
+                }
+              ],
+              "noExplicitMinMaxMajorUnit": true
+            }
+          ],
+          "markerSymbols": [
+            "circle",
+            "none"
+          ]
+        }
+      ],
+      "charts": [
+        {
+          "width": 640,
+          "height": 200,
+          "chartType": "line",
+          "dataValues": [
+            [
+              60,
+              100,
+              120
+            ],
+            [
+              70,
+              80,
+              90
+            ]
+          ],
+          "importedValueAxis": {
+            "title": "Revenue \u6536\u5165",
+            "titleText": {
+              "fontFamily": "Arial",
+              "fontSize": 16,
+              "color": "#b45309",
+              "bold": true,
+              "italic": true
+            },
+            "titleRotation": -90,
+            "text": {
+              "fontFamily": "Arial",
+              "fontSize": 12,
+              "color": "#334155",
+              "bold": false
+            },
+            "numberFormat": {
+              "kind": "number",
+              "fractionDigits": 1,
+              "useGrouping": false
+            },
+            "linkedToSource": false
+          },
+          "renderingError": {
+            "stage": "createChartOption at decoded native dimensions",
+            "name": "RangeError",
+            "message": "Axis titles leave less than a 96\u00d796px plot; enlarge the chart or reduce title size."
+          },
+          "wpsObservation": {
+            "min": 0,
+            "max": 150,
+            "step": 50
+          },
+          "expectedWpsTicks": [
+            0,
+            50,
+            100,
+            150
+          ],
+          "splitNumberOnlyMatches": null
+        }
+      ]
+    },
+    {
+      "filename": "auto-axis-narrow-wps-saved.xlsx",
+      "sha256": "8ed718ff4116e2f295bd7dad0aa361e1e64fc826a5d7c6f690f570129242d2eb",
+      "nativeParts": [
+        {
+          "part": "xl/charts/chart1.xml",
+          "valueAxes": [
+            {
+              "tags": [
+                {
+                  "tag": "min",
+                  "present": false
+                },
+                {
+                  "tag": "max",
+                  "present": false
+                },
+                {
+                  "tag": "majorUnit",
+                  "present": false
+                }
+              ],
+              "noExplicitMinMaxMajorUnit": true
+            }
+          ],
+          "markerSymbols": [
+            "circle",
+            "none"
+          ]
+        }
+      ],
+      "charts": [
+        {
+          "width": 640,
+          "height": 400,
+          "chartType": "line",
+          "dataValues": [
+            [
+              118,
+              119,
+              120
+            ],
+            [
+              118.5,
+              119.2,
+              119.5
+            ]
+          ],
+          "importedValueAxis": {
+            "title": "Revenue \u6536\u5165",
+            "titleText": {
+              "fontFamily": "Arial",
+              "fontSize": 16,
+              "color": "#b45309",
+              "bold": true,
+              "italic": true
+            },
+            "titleRotation": -90,
+            "text": {
+              "fontFamily": "Arial",
+              "fontSize": 12,
+              "color": "#334155",
+              "bold": false
+            },
+            "numberFormat": {
+              "kind": "number",
+              "fractionDigits": 1,
+              "useGrouping": false
+            },
+            "linkedToSource": false
+          },
+          "wpsObservation": {
+            "min": 117,
+            "max": 120.5,
+            "step": 0.5
+          },
+          "expectedWpsTicks": [
+            117,
+            117.5,
+            118,
+            118.5,
+            119,
+            119.5,
+            120,
+            120.5
+          ],
+          "current": {
+            "tickValues": [
+              0,
+              20,
+              40,
+              60,
+              80,
+              100,
+              120
+            ],
+            "tickLabels": [
+              {
+                "value": 0,
+                "formattedLabel": "0.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 20,
+                "formattedLabel": "20.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 40,
+                "formattedLabel": "40.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 60,
+                "formattedLabel": "60.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 80,
+                "formattedLabel": "80.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 100,
+                "formattedLabel": "100.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 120,
+                "formattedLabel": "120.0",
+                "presentInSvg": true
+              }
+            ],
+            "numericTextActuallyInSvg": [
+              "0.0",
+              "20.0",
+              "40.0",
+              "60.0",
+              "80.0",
+              "100.0",
+              "120.0"
+            ],
+            "extent": [
+              0,
+              120
+            ],
+            "interval": 20,
+            "gridRect": {
+              "x": 75.2,
+              "y": 45,
+              "width": 542.8,
+              "height": 292.8,
+              "margin": [
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            "allTextActuallyInSvg": [
+              "Revenue \u6536\u5165",
+              "Quarter \u5b63\u5ea6 & <channel>",
+              "0.0",
+              "20.0",
+              "40.0",
+              "60.0",
+              "80.0",
+              "100.0",
+              "120.0",
+              "east",
+              "north",
+              "south",
+              "Auto axis: narrow"
+            ]
+          },
+          "currentMatchesWpsTicks": false,
+          "splitNumberOnlyMatches": [],
+          "optionDomainProperties": {
+            "min": {
+              "own": false,
+              "value": null
+            },
+            "max": {
+              "own": false,
+              "value": null
+            },
+            "interval": {
+              "own": false,
+              "value": null
+            },
+            "splitNumber": {
+              "own": false,
+              "value": null
+            },
+            "scale": {
+              "own": false,
+              "value": null
+            },
+            "boundaryGap": {
+              "own": false,
+              "value": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "filename": "auto-axis-base120-wps-saved.xlsx",
+      "sha256": "9ff45d5eb82bfb05d49a6837be82a40a5f424a08f8e24a46688d95370549e9df",
+      "nativeParts": [
+        {
+          "part": "xl/charts/chart1.xml",
+          "valueAxes": [
+            {
+              "tags": [
+                {
+                  "tag": "min",
+                  "present": false
+                },
+                {
+                  "tag": "max",
+                  "present": false
+                },
+                {
+                  "tag": "majorUnit",
+                  "present": false
+                }
+              ],
+              "noExplicitMinMaxMajorUnit": true
+            }
+          ],
+          "markerSymbols": [
+            "circle",
+            "none"
+          ]
+        }
+      ],
+      "charts": [
+        {
+          "width": 640,
+          "height": 400,
+          "chartType": "line",
+          "dataValues": [
+            [
+              60,
+              100,
+              120
+            ],
+            [
+              70,
+              80,
+              90
+            ]
+          ],
+          "importedValueAxis": {
+            "title": "Revenue \u6536\u5165",
+            "titleText": {
+              "fontFamily": "Arial",
+              "fontSize": 16,
+              "color": "#b45309",
+              "bold": true,
+              "italic": true
+            },
+            "titleRotation": -90,
+            "text": {
+              "fontFamily": "Arial",
+              "fontSize": 12,
+              "color": "#334155",
+              "bold": false
+            },
+            "numberFormat": {
+              "kind": "number",
+              "fractionDigits": 1,
+              "useGrouping": false
+            },
+            "linkedToSource": false
+          },
+          "wpsObservation": {
+            "min": 0,
+            "max": 140,
+            "step": 20
+          },
+          "expectedWpsTicks": [
+            0,
+            20,
+            40,
+            60,
+            80,
+            100,
+            120,
+            140
+          ],
+          "current": {
+            "tickValues": [
+              0,
+              20,
+              40,
+              60,
+              80,
+              100,
+              120
+            ],
+            "tickLabels": [
+              {
+                "value": 0,
+                "formattedLabel": "0.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 20,
+                "formattedLabel": "20.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 40,
+                "formattedLabel": "40.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 60,
+                "formattedLabel": "60.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 80,
+                "formattedLabel": "80.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 100,
+                "formattedLabel": "100.0",
+                "presentInSvg": true
+              },
+              {
+                "value": 120,
+                "formattedLabel": "120.0",
+                "presentInSvg": true
+              }
+            ],
+            "numericTextActuallyInSvg": [
+              "0.0",
+              "20.0",
+              "40.0",
+              "60.0",
+              "80.0",
+              "100.0",
+              "120.0"
+            ],
+            "extent": [
+              0,
+              120
+            ],
+            "interval": 20,
+            "gridRect": {
+              "x": 75.2,
+              "y": 45,
+              "width": 542.8,
+              "height": 292.8,
+              "margin": [
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            "allTextActuallyInSvg": [
+              "Revenue \u6536\u5165",
+              "Quarter \u5b63\u5ea6 & <channel>",
+              "0.0",
+              "20.0",
+              "40.0",
+              "60.0",
+              "80.0",
+              "100.0",
+              "120.0",
+              "east",
+              "north",
+              "south",
+              "Auto axis: base120"
+            ]
+          },
+          "currentMatchesWpsTicks": false,
+          "splitNumberOnlyMatches": [],
+          "optionDomainProperties": {
+            "min": {
+              "own": false,
+              "value": null
+            },
+            "max": {
+              "own": false,
+              "value": null
+            },
+            "interval": {
+              "own": false,
+              "value": null
+            },
+            "splitNumber": {
+              "own": false,
+              "value": null
+            },
+            "scale": {
+              "own": false,
+              "value": null
+            },
+            "boundaryGap": {
+              "own": false,
+              "value": null
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

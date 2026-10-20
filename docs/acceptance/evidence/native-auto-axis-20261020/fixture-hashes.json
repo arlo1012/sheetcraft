@@ -1,0 +1,86 @@
+[
+  {
+    "file": "auto-axis-base120-wps-saved.xlsx",
+    "sha256": "9ff45d5eb82bfb05d49a6837be82a40a5f424a08f8e24a46688d95370549e9df",
+    "valueAxisCount": 1,
+    "explicitDomainTags": []
+  },
+  {
+    "file": "auto-axis-base120.xlsx",
+    "sha256": "2a52b0d36da2a20b4d9a8c3ea70ec13ee6bd4bc276fae376710a09caa4d9bcd5",
+    "valueAxisCount": 1,
+    "explicitDomainTags": []
+  },
+  {
+    "file": "auto-axis-large.xlsx",
+    "sha256": "e17df183291c2e388b93bc73e00bca04c00ac9c4906b4c5aaa9d33ac316bfb0c",
+    "valueAxisCount": 1,
+    "explicitDomainTags": []
+  },
+  {
+    "file": "auto-axis-max119.xlsx",
+    "sha256": "f7b9f81762ba2a15343398c3019ddab3cd4ca65d24dd4a84c70e3c2d90ab3ad2",
+    "valueAxisCount": 1,
+    "explicitDomainTags": []
+  },
+  {
+    "file": "auto-axis-max121.xlsx",
+    "sha256": "5ab4f61568c40cf54a4f79d267333fa2885cbd8230da8a1509669594e5239b36",
+    "valueAxisCount": 1,
+    "explicitDomainTags": []
+  },
+  {
+    "file": "auto-axis-narrow-wps-saved.xlsx",
+    "sha256": "8ed718ff4116e2f295bd7dad0aa361e1e64fc826a5d7c6f690f570129242d2eb",
+    "valueAxisCount": 1,
+    "explicitDomainTags": []
+  },
+  {
+    "file": "auto-axis-narrow.xlsx",
+    "sha256": "7aa784014a19455c97ff2214e88a6244b711ed3664b609ef544d9bea1eeffbd6",
+    "valueAxisCount": 1,
+    "explicitDomainTags": []
+  },
+  {
+    "file": "auto-axis-nomarkers.xlsx",
+    "sha256": "cee628e1f7b2a9fb2a285cff4ef4751603c3061f89b52c70fa5b541a0d5235bf",
+    "valueAxisCount": 1,
+    "explicitDomainTags": []
+  },
+  {
+    "file": "auto-axis-scale01.xlsx",
+    "sha256": "a5818e1b4f3c2f47cd064855fb0c8f0d9cf4b1ff1ab22de3338618a187101f8b",
+    "valueAxisCount": 1,
+    "explicitDomainTags": []
+  },
+  {
+    "file": "auto-axis-scale10.xlsx",
+    "sha256": "cc10fa98352b9618283ac5098b858646e116e0a2540d3798dba14236d9bdc239",
+    "valueAxisCount": 1,
+    "explicitDomainTags": []
+  },
+  {
+    "file": "auto-axis-short-wps-saved.xlsx",
+    "sha256": "d2fa4c9caf194d0eef07744cb7401e91e379b1c935712388ea68d51c7016298e",
+    "valueAxisCount": 1,
+    "explicitDomainTags": []
+  },
+  {
+    "file": "auto-axis-short.xlsx",
+    "sha256": "d81452832c1579ecd4a5ab70d6dd30744b7415e388aba26519788fc940ac2996",
+    "valueAxisCount": 1,
+    "explicitDomainTags": []
+  },
+  {
+    "file": "auto-axis-small.xlsx",
+    "sha256": "babce167a7499362a55be8389f40f926bb8acd132bdb55d098f067e598a81c08",
+    "valueAxisCount": 1,
+    "explicitDomainTags": []
+  },
+  {
+    "file": "auto-axis-tall.xlsx",
+    "sha256": "75c57c4ddc08362c93773b012a0ead3848c67876abc35cf8bbe15590f20ffe68",
+    "valueAxisCount": 1,
+    "explicitDomainTags": []
+  }
+]

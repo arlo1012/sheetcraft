@@ -1,0 +1,222 @@
+[
+  {
+    "name": "base120",
+    "values": [
+      [
+        60,
+        100,
+        120
+      ],
+      [
+        70,
+        80,
+        90
+      ]
+    ],
+    "width": 640,
+    "height": 400,
+    "markersHidden": false,
+    "sha256": "2a52b0d36da2a20b4d9a8c3ea70ec13ee6bd4bc276fae376710a09caa4d9bcd5",
+    "autoMinMaxMajor": true
+  },
+  {
+    "name": "max119",
+    "values": [
+      [
+        60,
+        100,
+        119
+      ],
+      [
+        70,
+        80,
+        90
+      ]
+    ],
+    "width": 640,
+    "height": 400,
+    "markersHidden": false,
+    "sha256": "f7b9f81762ba2a15343398c3019ddab3cd4ca65d24dd4a84c70e3c2d90ab3ad2",
+    "autoMinMaxMajor": true
+  },
+  {
+    "name": "max121",
+    "values": [
+      [
+        60,
+        100,
+        121
+      ],
+      [
+        70,
+        80,
+        90
+      ]
+    ],
+    "width": 640,
+    "height": 400,
+    "markersHidden": false,
+    "sha256": "5ab4f61568c40cf54a4f79d267333fa2885cbd8230da8a1509669594e5239b36",
+    "autoMinMaxMajor": true
+  },
+  {
+    "name": "scale01",
+    "values": [
+      [
+        6,
+        10,
+        12
+      ],
+      [
+        7,
+        8,
+        9
+      ]
+    ],
+    "width": 640,
+    "height": 400,
+    "markersHidden": false,
+    "sha256": "a5818e1b4f3c2f47cd064855fb0c8f0d9cf4b1ff1ab22de3338618a187101f8b",
+    "autoMinMaxMajor": true
+  },
+  {
+    "name": "scale10",
+    "values": [
+      [
+        600,
+        1000,
+        1200
+      ],
+      [
+        700,
+        800,
+        900
+      ]
+    ],
+    "width": 640,
+    "height": 400,
+    "markersHidden": false,
+    "sha256": "cc10fa98352b9618283ac5098b858646e116e0a2540d3798dba14236d9bdc239",
+    "autoMinMaxMajor": true
+  },
+  {
+    "name": "narrow",
+    "values": [
+      [
+        118,
+        119,
+        120
+      ],
+      [
+        118.5,
+        119.2,
+        119.5
+      ]
+    ],
+    "width": 640,
+    "height": 400,
+    "markersHidden": false,
+    "sha256": "7aa784014a19455c97ff2214e88a6244b711ed3664b609ef544d9bea1eeffbd6",
+    "autoMinMaxMajor": true
+  },
+  {
+    "name": "small",
+    "values": [
+      [
+        60,
+        100,
+        120
+      ],
+      [
+        70,
+        80,
+        90
+      ]
+    ],
+    "width": 320,
+    "height": 200,
+    "markersHidden": false,
+    "sha256": "babce167a7499362a55be8389f40f926bb8acd132bdb55d098f067e598a81c08",
+    "autoMinMaxMajor": true
+  },
+  {
+    "name": "large",
+    "values": [
+      [
+        60,
+        100,
+        120
+      ],
+      [
+        70,
+        80,
+        90
+      ]
+    ],
+    "width": 960,
+    "height": 600,
+    "markersHidden": false,
+    "sha256": "e17df183291c2e388b93bc73e00bca04c00ac9c4906b4c5aaa9d33ac316bfb0c",
+    "autoMinMaxMajor": true
+  },
+  {
+    "name": "short",
+    "values": [
+      [
+        60,
+        100,
+        120
+      ],
+      [
+        70,
+        80,
+        90
+      ]
+    ],
+    "width": 640,
+    "height": 200,
+    "markersHidden": false,
+    "sha256": "d81452832c1579ecd4a5ab70d6dd30744b7415e388aba26519788fc940ac2996",
+    "autoMinMaxMajor": true
+  },
+  {
+    "name": "tall",
+    "values": [
+      [
+        60,
+        100,
+        120
+      ],
+      [
+        70,
+        80,
+        90
+      ]
+    ],
+    "width": 640,
+    "height": 600,
+    "markersHidden": false,
+    "sha256": "75c57c4ddc08362c93773b012a0ead3848c67876abc35cf8bbe15590f20ffe68",
+    "autoMinMaxMajor": true
+  },
+  {
+    "name": "nomarkers",
+    "values": [
+      [
+        60,
+        100,
+        120
+      ],
+      [
+        70,
+        80,
+        90
+      ]
+    ],
+    "width": 640,
+    "height": 400,
+    "markersHidden": true,
+    "sha256": "cee628e1f7b2a9fb2a285cff4ef4751603c3061f89b52c70fa5b541a0d5235bf",
+    "autoMinMaxMajor": true
+  }
+]
