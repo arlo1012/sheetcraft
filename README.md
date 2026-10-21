@@ -13,22 +13,24 @@ The Web application supports virtualized cells, range and axis selection,
 keyboard navigation, IME-safe editing, row and column resizing and insertion,
 TSV clipboard and selective paste, cell and number formatting, format painter,
 sorting and value filtering, frozen panes, merged cells, cell and floating images, and multiple Sheet
-management. A compact Home Ribbon, formula bar, search, selection summaries,
+management. Ribbon toolbars, formula bar, search, selection summaries,
 and Chinese/English localization complete the editing surface.
 
 Clipboard actions skip filtered-out rows and keep each paste atomic for undo.
 See [Filtered Clipboard](docs/filtered-clipboard.md) for formula/style handling,
 selection rules, and the explicit cut and merged-cell restrictions.
 
-Formulas currently support single-Sheet A1 references, absolute and relative
-references, ranges, parentheses, arithmetic (`+`, `-`, `*`, `/`), text, booleans,
-comparison and concatenation. The first registry contains `SUM`, `IF`, `IFERROR`,
-`AVERAGE`, `COUNT`, `MIN`, `MAX`, and `ROUND`; AutoSum remains available.
+Formulas support same-Sheet and cross-Sheet A1 references within a workbook,
+absolute and relative references, ranges, parentheses, arithmetic, text, booleans,
+comparison and concatenation. The registry includes mathematical, logical,
+statistical, lookup, text, date, financial, engineering, database and dynamic-array
+functions; AutoSum remains available.
 The formula bar and in-cell editor share one draft and caret session, including
 F2 Point/Edit modes, arrow-reference selection, and Ctrl+F2 surface transfer.
-Copying, moving, and changing rows or columns transform references. Cross-Sheet
-formulas and functions beyond this first set are not implemented. See
-[Formula Editing](docs/formula-editing.md) and [Formula Runtime](docs/formula-runtime.md).
+Copying, moving, and changing rows or columns transform references. Formula
+coverage remains a supported subset of Excel/WPS; see
+[Formula Editing](docs/formula-editing.md) and [Formula Runtime](docs/formula-runtime.md)
+for supported behavior and current limits.
 
 The proposed [Formula and Excel Compatibility Plan](docs/formula-excel-compatibility-plan.md)
 defines target scope, ownership, library qualification, and acceptance gates.
@@ -39,7 +41,8 @@ reviewable function/feature inventories, typed error and empty-string content,
 per-workbook date systems, shared reference contracts, and an isolated library
 qualification lab. Product runtime progress and XLSX IO are documented separately.
 
-Core writes V6 snapshots and accepts V1 through V6 input. The Web application restores
+Core writes feature-dependent snapshots up to V93 and validates V1 through V93
+input. The Web application restores
 the current workbook from IndexedDB, automatically saves document edits, and
 offers JSON import/export with validation and replacement confirmation. See
 [Saving And Recovery](docs/workbook-persistence.md) for the local-only storage
@@ -52,9 +55,12 @@ backup format for images and product-specific metadata.
 
 See [Images](docs/images.md) for image insertion, movement, clipboard, and portable assets.
 
-Charts, conditional formatting, printing,
-additional Ribbon categories, and view/zoom controls remain unimplemented;
-their existing disabled UI entries are placeholders.
+Charts, conditional formatting, page setup and browser printing, additional
+Ribbon categories, and view/zoom controls have implemented functionality.
+Sheetcraft remains an active-development beta: feature coverage and Excel/WPS
+compatibility vary. Known limits and scoped validation results are recorded in
+the [acceptance reports](docs/acceptance/); scoped passes do not imply a
+full-suite-green or complete-compatibility claim.
 
 ## Engine ownership
 
