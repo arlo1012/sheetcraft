@@ -161,3 +161,23 @@ Previous implementations remain available through Git:
 
 Use them to inspect behavior and tests. Reimplement features against the new
 requirements instead of copying the old frontend components or dependencies.
+
+## License
+
+Sheetcraft's original code is licensed under the [MIT License](LICENSE).
+
+Third-party dependencies, fonts, data, and test fixtures retain their own
+licenses and notices. The root MIT license does not relicense those materials.
+Existing notices include:
+
+- [Apache POI shape presets](packages/core/resources/shape-presets/README.md),
+  with their Apache License and notices.
+- [Ecma text-warp definitions](packages/core/resources/text-warps/ECMA-NOTICES.txt).
+  Keep these notices with binary distributions of the generated text-warp data.
+- [Noto fonts](apps/web/src/shared/cell-text/fonts/NOTICE.txt), with their
+  individual SIL Open Font License files.
+- [Unicode symbol metadata](apps/web/src/modules/insert-tools/symbols/assets/Unicode-LICENSE-v3.txt).
+- [XLSX helpers](apps/web/public/third-party/xlsx/NOTICE.txt) and
+  [number formatting](apps/web/public/third-party/number-format/NOTICE.txt).
+- [msoffcrypto test fixtures](packages/xlsx-io/src/tests/fixtures/LICENSE.msoffcrypto.txt).
+  Other external fixtures retain their recorded provenance and applicable terms.

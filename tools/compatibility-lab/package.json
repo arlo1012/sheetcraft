@@ -2,6 +2,7 @@
   "name": "@sheetcraft/compatibility-lab",
   "version": "0.0.0-private",
   "private": true,
+  "license": "MIT",
   "description": "First-party Core formula and XLSX regression probes through public package outputs.",
   "type": "module",
   "scripts": {
