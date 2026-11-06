@@ -1,6 +1,8 @@
+// 未执行：按用户要求仅编写测试，避免额外内存占用。
 import { isPictureGroup } from "@sheetcraft/core/picture-group";
 import PictureFormatPane from "../../../modules/sheet-images/components/format-pane/PictureFormatPane.vue";
 import PictureCellOverwriteDialog from "../../../modules/sheet-images/components/PictureCellOverwriteDialog.vue";
+import PictureBatchInsertDialog from "../../../modules/sheet-images/components/PictureBatchInsertDialog.vue";
 import { framedPicture } from "../../modules/sheet-images/framed-picture-fixture";
 import { pictureGroup } from "../../modules/sheet-images/picture-group-fixture";
 import SheetOwnedPictureGroupLayer from "../../../modules/sheet-images/components/SheetOwnedPictureGroupLayer.vue";
@@ -77,6 +79,35 @@ test("local cell insertion presents overwrite confirmation and cancels without l
     kind: "literal",
     value: "original",
   });
+});
+
+test("selects every newly inserted floating batch picture without selecting pre-existing pictures", async () => {
+  const { wrapper, sheet } = await fixture();
+  const existingIds = new Set(sheet.floatingImages.map(({ id }) => id));
+  vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
+  wrapper.getComponent(SpreadsheetRibbon).vm.$emit("insertImage", "floating");
+  await flushPromises();
+  const input = wrapper.get<HTMLInputElement>(".spreadsheet-workspace__image-input");
+  Object.defineProperty(input.element, "files", {
+    configurable: true,
+    value: ["one.png", "two.png"].map(
+      (name) => new File([new Uint8Array(actualPng)], name, { type: "image/png" }),
+    ),
+  });
+  await input.trigger("change");
+  await flushPromises();
+  wrapper
+    .getComponent(PictureBatchInsertDialog)
+    .vm.$emit("confirm", { order: [0, 1], arrangement: "cascade" });
+  await flushPromises();
+
+  const addedIds = sheet.floatingImages
+    .filter(({ id }) => !existingIds.has(id))
+    .map(({ id }) => id);
+  expect(addedIds).toHaveLength(2);
+  const grid = wrapper.getComponent(SheetGrid);
+  expect(grid.emitted("selectedFloatingImageChange")?.at(-1)?.[1]).toEqual(addedIds);
+  expect(wrapper.getComponent(SheetPictureSelectionToolbar).props("count")).toBe(2);
 });
 
 test("a local insertion dialog supersedes conversion without accepting its stale callback", async () => {

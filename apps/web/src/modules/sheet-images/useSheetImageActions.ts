@@ -14,6 +14,7 @@ import {
   MIN_FLOATING_IMAGE_SIZE,
   MAX_FLOATING_IMAGE_SIZE,
   getCellContent,
+  getDefaultRowHeight,
   cloneFloatingImage,
   areFloatingImageCollectionsEqual,
   type CellAddress,
@@ -61,6 +62,8 @@ import {
   type PictureBatchInsertion,
 } from "./picture-batch-layout";
 
+import { analyzePictureNameMatches } from "./picture-name-matching";
+
 export type ImageInsertMode = "cell" | "floating";
 type ImageTarget = {
   workbook: Workbook;
@@ -69,6 +72,7 @@ type ImageTarget = {
   address: CellAddress;
   generation: number;
   operation: number;
+  selectionRange: CellRange;
   cellRange?: CellRange;
   initialCellLease?: PictureCellInsertionTargetLease;
   replacementRootId?: string;
@@ -112,6 +116,7 @@ export function useSheetImageActions(options: {
   getSelectedIds?: () => readonly string[];
   getFrameContext?: () => PictureFrameLayoutContext | undefined;
   getAddress: () => CellAddress;
+  getRange?: () => CellRange;
   flushPendingEdits: () => boolean;
   setCellImage: (
     payload: CellImage & {
@@ -136,6 +141,7 @@ export function useSheetImageActions(options: {
   } | null>(null);
   let confirmationKey = 0;
   const feedback = ref<MessageKey>();
+  const batchError = ref<MessageKey>();
   const idFactory = createBrowserIdFactory();
   let operation = 0;
   let disposed = false;
@@ -144,6 +150,7 @@ export function useSheetImageActions(options: {
     pending = undefined;
     insertionConfirmation.value = null;
     batchInsertion.value = null;
+    batchError.value = undefined;
   }
   function dispose(): void {
     disposed = true;
@@ -189,7 +196,9 @@ export function useSheetImageActions(options: {
         return;
       }
     }
+    const selected = options.getRange?.() ?? { start: address, end: address };
     return {
+      selectionRange: { start: { ...selected.start }, end: { ...selected.end } },
       workbook: options.getWorkbook(),
       sheet,
       sheetId: sheet.id,
@@ -616,12 +625,13 @@ export function useSheetImageActions(options: {
     target = captureTarget(options.getAddress(), mode),
     arrangement: PictureBatchArrangement = mode === "cell" ? "vertical" : "cascade",
     wrapAfter?: number,
-    layoutOptions: Pick<PictureBatchInsertion, "namePlacement" | "rowHeight"> = {},
+    layoutOptions: Pick<PictureBatchInsertion, "namePlacement" | "rowHeight" | "nameMatch"> = {},
   ): Promise<void> {
     files = files.slice();
     if (
       files.length === 1 &&
       !layoutOptions.namePlacement &&
+      !layoutOptions.nameMatch &&
       layoutOptions.rowHeight === undefined
     ) {
       await insertFile(files[0]!, mode, target);
@@ -633,7 +643,7 @@ export function useSheetImageActions(options: {
       target.replacementRootId ||
       busy.value ||
       !options.execute ||
-      !isCurrent(target, mode)
+      !(layoutOptions.nameMatch ? isOwnerCurrent(target) : isCurrent(target, mode))
     )
       return;
     feedback.value = undefined;
@@ -645,20 +655,48 @@ export function useSheetImageActions(options: {
     feedback.value = undefined;
     try {
       const sheet = target.workbook.sheets.get(target.sheetId)!;
+      const requestedNames = files.map((file) => file.name);
+      const matchSource = layoutOptions.nameMatch;
+      const readMatches = () => {
+        if (!matchSource || arrangement === "cascade") return undefined;
+        return analyzePictureNameMatches(
+          target.workbook,
+          target.sheetId,
+          requestedNames,
+          matchSource.range,
+          arrangement,
+          layoutOptions.namePlacement ?? "before",
+        );
+      };
+      const matches = readMatches();
+      if (
+        matchSource &&
+        (!matches ||
+          matches.hasConflicts ||
+          !matches.matches.length ||
+          matches.fingerprint !== matchSource.fingerprint)
+      ) {
+        feedback.value = "image.batchMatchChanged";
+        return;
+      }
+      if (matches) files = matches.matches.map((match) => files[match.fileIndex]!);
       const gridLayout =
+        !!matches ||
         mode === "cell" ||
         (arrangement !== "cascade" &&
           (layoutOptions.namePlacement !== undefined || layoutOptions.rowHeight !== undefined));
-      const layout = gridLayout
-        ? getPictureBatchCellLayout(
-            sheet,
-            target.address,
-            files.length,
-            arrangement,
-            wrapAfter,
-            layoutOptions.namePlacement,
-          )
-        : { pictures: [], names: [] };
+      const layout = matches
+        ? { pictures: matches.matches.map((match) => match.pictureAddress), names: [] }
+        : gridLayout
+          ? getPictureBatchCellLayout(
+              sheet,
+              target.address,
+              files.length,
+              arrangement,
+              wrapAfter,
+              layoutOptions.namePlacement,
+            )
+          : { pictures: [], names: [] };
       insertionConfirmation.value = null;
       const cellLease =
         mode === "cell" ? capturePictureCellInsertionTargets(sheet, layout.pictures) : undefined;
@@ -681,7 +719,17 @@ export function useSheetImageActions(options: {
         ]);
       const originalGeometry = gridLayout ? geometry() : "";
       const valid = () => {
-        if (!insertionOwnerValid(target, mode)) return false;
+        if (
+          matchSource
+            ? !isOwnerCurrent(target) ||
+              (mode === "floating" && !canUseSheetPermission(sheet, "editObjects"))
+            : !insertionOwnerValid(target, mode)
+        )
+          return false;
+        if (matchSource && readMatches()?.fingerprint !== matchSource.fingerprint) {
+          feedback.value = "image.batchMatchChanged";
+          return false;
+        }
         if (
           leases.some((lease) => !isPictureCellInsertionTargetsCurrent(sheet, lease)) ||
           (gridLayout && geometry() !== originalGeometry)
@@ -710,7 +758,7 @@ export function useSheetImageActions(options: {
         await options.assetStore.put(asset);
         if (!valid()) return;
       }
-      if (mode === "cell" && !nameLease && rowHeight === undefined) {
+      if (mode === "cell" && !nameLease && !matchSource && rowHeight === undefined) {
         await commitCellImages(
           target,
           cellLease!,
@@ -756,6 +804,20 @@ export function useSheetImageActions(options: {
               index,
               size: rowHeight,
             }));
+      if (
+        !images.length &&
+        cells.every(({ address, content }) =>
+          content.kind === "image"
+            ? cellImageMatches(sheet, address, content.image)
+            : JSON.stringify(getCellContent(sheet, address)) === JSON.stringify(content),
+        ) &&
+        rowHeights.every(
+          ({ index, size }) => (sheet.rowHeights.get(index) ?? getDefaultRowHeight(sheet)) === size,
+        )
+      ) {
+        feedback.value = "image.unchanged";
+        return;
+      }
       const apply = async (): Promise<boolean> => {
         if (!valid()) return false;
         let accepted: unknown;
@@ -819,11 +881,36 @@ export function useSheetImageActions(options: {
       )
     )
       return;
-    if (!isCurrent(batch.target, batch.mode)) {
+    if (payload.nameMatch ? !isOwnerCurrent(batch.target) : !isCurrent(batch.target, batch.mode)) {
       cancelPending();
       feedback.value = "image.insertTargetsChanged";
       return;
     }
+    if (payload.nameMatch) {
+      try {
+        if (payload.arrangement === "cascade") return;
+        const current = analyzePictureNameMatches(
+          batch.target.workbook,
+          batch.target.sheetId,
+          payload.order.map((index) => batch.files[index]!.name),
+          payload.nameMatch.range,
+          payload.arrangement,
+          payload.namePlacement ?? "before",
+        );
+        if (
+          current.hasConflicts ||
+          !current.matches.length ||
+          current.fingerprint !== payload.nameMatch.fingerprint
+        ) {
+          batchError.value = "image.batchMatchChanged";
+          return;
+        }
+      } catch {
+        batchError.value = "image.batchMatchChanged";
+        return;
+      }
+    }
+    batchError.value = undefined;
     batchInsertion.value = null;
     await insertFiles(
       payload.order.map((index) => batch.files[index]!),
@@ -831,7 +918,11 @@ export function useSheetImageActions(options: {
       batch.target,
       payload.arrangement,
       payload.wrapAfter,
-      { namePlacement: payload.namePlacement, rowHeight: payload.rowHeight },
+      {
+        namePlacement: payload.namePlacement,
+        rowHeight: payload.rowHeight,
+        nameMatch: payload.nameMatch,
+      },
     );
   }
 
@@ -1006,6 +1097,7 @@ export function useSheetImageActions(options: {
     busy: readonly(busy),
     insertionConfirmation,
     batchInsertion,
+    batchError: readonly(batchError),
     confirmBatchInsertion,
     feedback: readonly(feedback),
     reportFeedback: (message: MessageKey) => {

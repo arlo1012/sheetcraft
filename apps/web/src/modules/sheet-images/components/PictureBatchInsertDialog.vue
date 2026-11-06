@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
+import type { CellRange, Workbook } from "@sheetcraft/core/workbook";
+import { formatCellAddress } from "@sheetcraft/core/coordinates";
+import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
+import {
+  formatRangeReference,
+  resolveRangeReference,
+} from "../../../shared/range-reference/formatRangeReference";
+import { analyzePictureNameMatches, type PictureNameMatchStatus } from "../picture-name-matching";
+import type { MessageKey } from "../../../shared/i18n";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Button } from "tdesign-vue-next/es/button";
 import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
@@ -14,6 +23,11 @@ const props = defineProps<{
   fileNames: readonly string[];
   mode: "cell" | "floating";
   busy: boolean;
+  workbook: Workbook;
+  sheetId: string;
+  initialRange: CellRange;
+  revision: number;
+  error?: string;
 }>();
 const emit = defineEmits<{ confirm: [payload: PictureBatchInsertion]; close: [] }>();
 const { t } = useAppI18n();
@@ -23,6 +37,49 @@ const wrapEnabled = ref(false);
 const wrapAfter = ref(3);
 const namesEnabled = ref(false);
 const namePlacement = ref<"before" | "after">("after");
+const matchEnabled = ref(false);
+const matchActive = computed(() => matchEnabled.value && arrangement.value !== "cascade");
+const nameRange = ref(
+  formatRangeReference(props.workbook.sheets.get(props.sheetId)!.name, props.initialRange),
+);
+watch(matchEnabled, (value) => {
+  if (value) namePlacement.value = "before";
+});
+const nameMatches = computed(() => {
+  void props.revision;
+  if (!matchActive.value || arrangement.value === "cascade") return;
+  const selected = resolveRangeReference(props.workbook, nameRange.value, props.sheetId);
+  if (!selected || selected.sheetId !== props.sheetId) return;
+  try {
+    return {
+      range: selected.range,
+      plan: analyzePictureNameMatches(
+        props.workbook,
+        props.sheetId,
+        order.value.map((index) => props.fileNames[index]!),
+        selected.range,
+        arrangement.value,
+        namePlacement.value,
+      ),
+    };
+  } catch {
+    return;
+  }
+});
+const validMatches = computed(
+  () =>
+    !matchActive.value ||
+    (!!nameMatches.value &&
+      !nameMatches.value.plan.hasConflicts &&
+      nameMatches.value.plan.matches.length > 0),
+);
+const matchStatusKeys: Record<PictureNameMatchStatus, MessageKey> = {
+  matched: "image.batchMatchFound",
+  unmatched: "image.batchMatchMissing",
+  duplicateFile: "image.batchMatchDuplicateFile",
+  duplicateName: "image.batchMatchDuplicateName",
+  invalidTarget: "image.batchMatchInvalidTarget",
+};
 const rowHeightEnabled = ref(false);
 const rowHeight = ref(100);
 const validRowHeight = computed(
@@ -33,6 +90,7 @@ const validRowHeight = computed(
 );
 const validWrap = computed(
   () =>
+    matchActive.value ||
     !wrapEnabled.value ||
     arrangement.value === "cascade" ||
     (Number.isInteger(wrapAfter.value) && wrapAfter.value >= 1 && wrapAfter.value <= 100),
@@ -40,9 +98,25 @@ const validWrap = computed(
 const wrapLabel = computed(() =>
   t(arrangement.value === "horizontal" ? "image.batchPerRow" : "image.batchPerColumn"),
 );
-const rows = computed(() => order.value.map((index) => ({ index, name: props.fileNames[index] })));
+const rows = computed(() =>
+  order.value.map((index, rowIndex) => {
+    const entry = nameMatches.value?.plan.entries[rowIndex];
+    return {
+      index,
+      name: props.fileNames[index],
+      match: entry
+        ? entry.status === "matched"
+          ? formatCellAddress(entry.pictureAddress!)
+          : t(matchStatusKeys[entry.status])
+        : "—",
+    };
+  }),
+);
 const columns = computed<BaseTableCol[]>(() => [
   { colKey: "name", title: t("image.batchFileName"), ellipsis: true },
+  ...(matchActive.value
+    ? [{ colKey: "match", title: t("image.batchMatchResult"), width: 160 }]
+    : []),
   { colKey: "actions", title: t("image.batchOrder"), width: 190 },
 ]);
 function move(index: number, delta: number): void {
@@ -52,17 +126,34 @@ function move(index: number, delta: number): void {
   order.value.splice(next, 0, value);
 }
 function confirm(): void {
-  if (props.busy || !order.value.length || !validWrap.value || !validRowHeight.value) return;
+  if (
+    props.busy ||
+    !order.value.length ||
+    !validWrap.value ||
+    !validRowHeight.value ||
+    !validMatches.value
+  )
+    return;
   emit("confirm", {
-    ...(arrangement.value !== "cascade" && namesEnabled.value
+    ...(arrangement.value !== "cascade" && (namesEnabled.value || matchActive.value)
       ? { namePlacement: namePlacement.value }
       : {}),
     ...(arrangement.value !== "cascade" && rowHeightEnabled.value
       ? { rowHeight: rowHeight.value }
       : {}),
+    ...(matchActive.value && nameMatches.value
+      ? {
+          nameMatch: {
+            range: nameMatches.value.range,
+            fingerprint: nameMatches.value.plan.fingerprint,
+          },
+        }
+      : {}),
     order: [...order.value],
     arrangement: arrangement.value,
-    ...(wrapEnabled.value && arrangement.value !== "cascade" ? { wrapAfter: wrapAfter.value } : {}),
+    ...(wrapEnabled.value && !matchActive.value && arrangement.value !== "cascade"
+      ? { wrapAfter: wrapAfter.value }
+      : {}),
   });
 }
 </script>
@@ -75,8 +166,10 @@ function confirm(): void {
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
     :confirm-btn="{
-      content: t('drawing.insert'),
-      disabled: busy || !order.length || !validWrap || !validRowHeight,
+      content: matchActive
+        ? t('image.batchMatchInsert', { count: nameMatches?.plan.matches.length ?? 0 })
+        : t('drawing.insert'),
+      disabled: busy || !order.length || !validWrap || !validRowHeight || !validMatches,
       loading: busy,
     }"
     :cancel-btn="t('picture.cancel')"
@@ -90,8 +183,33 @@ function confirm(): void {
         <Radio value="horizontal">{{ t("image.batchHorizontal") }}</Radio>
         <Radio v-if="mode === 'floating'" value="cascade">{{ t("image.batchCascade") }}</Radio>
       </RadioGroup>
+      <template v-if="arrangement !== 'cascade'">
+        <Checkbox v-model="matchEnabled" :disabled="busy">{{
+          t("image.batchMatchNames")
+        }}</Checkbox>
+        <div v-if="matchActive" class="picture-batch-insert__match-range">
+          <span>{{ t("image.batchMatchRange") }}</span>
+          <RangeReferenceInput
+            v-model="nameRange"
+            :show-picker="false"
+            :disabled="busy"
+            :label="t('image.batchMatchRange')"
+            placeholder="A1:A20"
+          />
+          <p>
+            {{
+              t(
+                arrangement === "horizontal"
+                  ? "image.batchMatchRowHint"
+                  : "image.batchMatchColumnHint",
+              )
+            }}
+          </p>
+          <p v-if="!nameMatches" role="alert">{{ t("image.batchMatchInvalidRange") }}</p>
+        </div>
+      </template>
       <div
-        v-if="arrangement !== 'cascade'"
+        v-if="arrangement !== 'cascade' && !matchActive"
         class="picture-batch-insert__wrap"
         role="group"
         :aria-label="wrapLabel"
@@ -134,10 +252,11 @@ function confirm(): void {
           role="group"
           :aria-label="t('image.batchShowNames')"
         >
-          <Checkbox v-model="namesEnabled" :disabled="busy">{{
+          <span v-if="matchActive">{{ t("image.batchExistingNamePosition") }}</span>
+          <Checkbox v-else v-model="namesEnabled" :disabled="busy">{{
             t("image.batchShowNames")
           }}</Checkbox>
-          <RadioGroup v-model="namePlacement" :disabled="busy || !namesEnabled">
+          <RadioGroup v-model="namePlacement" :disabled="busy || (!namesEnabled && !matchActive)">
             <Radio value="before">{{
               t(arrangement === "horizontal" ? "image.batchNameAbove" : "image.batchNameLeft")
             }}</Radio>
@@ -146,7 +265,7 @@ function confirm(): void {
             }}</Radio>
           </RadioGroup>
         </div>
-        <p v-if="mode === 'floating' && (rowHeightEnabled || namesEnabled)">
+        <p v-if="mode === 'floating' && (rowHeightEnabled || namesEnabled || matchActive)">
           {{ t("image.batchFitCellsHint") }}
         </p>
       </template>
@@ -192,7 +311,17 @@ function confirm(): void {
           </BaseTable>
         </TableHeightWrapper>
       </div>
-      <p>{{ t("image.batchCount", { count: order.length }) }}</p>
+      <p v-if="matchActive && nameMatches">
+        {{
+          t("image.batchMatchSummary", {
+            matched: nameMatches.plan.matches.length,
+            skipped: nameMatches.plan.entries.filter((entry) => entry.status === "unmatched")
+              .length,
+          })
+        }}
+      </p>
+      <p v-else>{{ t("image.batchCount", { count: order.length }) }}</p>
+      <p v-if="error" role="alert">{{ error }}</p>
     </div>
   </Dialog>
 </template>
@@ -204,6 +333,10 @@ function confirm(): void {
   p {
     margin: 0;
     color: var(--sheetcraft-text-secondary);
+  }
+  &__match-range {
+    display: grid;
+    gap: 8px;
   }
   &__table {
     height: min(280px, 40vh);

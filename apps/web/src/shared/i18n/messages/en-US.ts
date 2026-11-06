@@ -1870,6 +1870,25 @@ export const enUS = {
     batchVertical: "Vertical",
     batchHorizontal: "Horizontal",
     batchCascade: "Cascade",
+    batchMatchNames: "Match existing picture names",
+    batchMatchRange: "Name range",
+    batchExistingNamePosition: "Existing name position",
+    batchMatchRowHint:
+      "Select one row of names on this sheet. Existing names are preserved; matched pictures go in the adjacent row.",
+    batchMatchColumnHint:
+      "Select one column of names on this sheet. Existing names are preserved; matched pictures go in the adjacent column.",
+    batchMatchInvalidRange:
+      "Enter a single row or column on this sheet matching the selected arrangement.",
+    batchMatchResult: "Picture destination",
+    batchMatchFound: "Matched",
+    batchMatchMissing: "No match; skipped",
+    batchMatchDuplicateFile: "Ambiguous file name",
+    batchMatchDuplicateName: "Duplicate names in range",
+    batchMatchInvalidTarget: "Overlapping or out-of-bounds target",
+    batchMatchSummary:
+      "{matched} matched; {skipped} unmatched files will be skipped. Resolve duplicate names or destination conflicts before inserting.",
+    batchMatchInsert: "Insert {count} matched pictures",
+    batchMatchChanged: "Names or destinations changed. Review the matches and confirm again.",
     batchRowHeight: "Custom picture row height",
     batchShowNames: "Show picture names",
     batchNameAbove: "Above pictures",

@@ -3,6 +3,7 @@ import type { CellRange } from "@sheetcraft/core/workbook";
 import { createPictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import { MIN_FLOATING_IMAGE_SIZE } from "@sheetcraft/core/workbook";
 import { isCellAddressInBounds, type CellAddress, type Sheet } from "@sheetcraft/core/workbook";
+import type { PictureNameMatchSource } from "./picture-name-matching";
 
 export type PictureBatchArrangement = "vertical" | "horizontal" | "cascade";
 export type PictureBatchInsertion = {
@@ -11,6 +12,7 @@ export type PictureBatchInsertion = {
   wrapAfter?: number;
   namePlacement?: "before" | "after";
   rowHeight?: number;
+  nameMatch?: PictureNameMatchSource;
 };
 
 /** Each picture and its caption reserve separate merged-cell regions. */

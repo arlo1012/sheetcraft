@@ -1317,7 +1317,10 @@ const imageActions = useSheetImageActions({
   execute: (command) => {
     const oldIds = new Set(activeSheet.value.floatingImages.map((image) => image.id));
     const result = executeCommand(command);
-    if (command.type === "setSheetFloatingImages" && command.sheetId === activeSheet.value.id) {
+    if (
+      (command.type === "setSheetFloatingImages" || command.type === "insertPictureBatch") &&
+      command.sheetId === activeSheet.value.id
+    ) {
       const added = activeSheet.value.floatingImages
         .filter((image) => !oldIds.has(image.id))
         .map((image) => image.id);
@@ -1329,6 +1332,7 @@ const imageActions = useSheetImageActions({
   getSheet: () => activeSheet.value,
   getGeneration: () => pictureOwnerGeneration.value,
   getAddress: () => activeAddress.value,
+  getRange: () => activeSelectionRange.value,
   getSelectedIds: () => selectedPictureIds.value,
   getSelectedPath: () => selectedOwnedPicturePath.value,
   getFrameContext: () => sheetGridRef.value?.getPictureFrameContext(activeSheet.value),
@@ -6908,6 +6912,11 @@ watch(
       :key="imageActions.pickerKey.value"
       :file-names="imageActions.batchInsertion.value.files.map((file) => file.name)"
       :mode="imageActions.batchInsertion.value.mode"
+      :workbook="imageActions.batchInsertion.value.target.workbook"
+      :sheet-id="imageActions.batchInsertion.value.target.sheetId"
+      :initial-range="imageActions.batchInsertion.value.target.selectionRange"
+      :revision="session.history.revision"
+      :error="imageActions.batchError.value ? t(imageActions.batchError.value) : ''"
       :busy="imageBusy"
       @confirm="imageActions.confirmBatchInsertion"
       @close="imageActions.cancelPending"
