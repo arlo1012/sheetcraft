@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { Button } from "tdesign-vue-next/es/button";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Input } from "tdesign-vue-next/es/input";
 import { Select } from "tdesign-vue-next/es/select";
 import { ArrowDown, ArrowUp, Pencil, Plus, SquareMousePointer, Trash2 } from "lucide-vue-next";
@@ -18,6 +19,7 @@ import { normalizeSheetChart, type SheetChart } from "@sheetcraft/core/sheet-cha
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { Sheet, SheetEvaluator, Workbook } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import { formatRangeReference } from "../../../shared/range-reference/formatRangeReference";
 import {
   allocateChartSourceSeriesId,
@@ -53,7 +55,7 @@ const props = withDefaults(
   { error: false, suspended: false },
 );
 const emit = defineEmits<{ close: [] }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const root = ref<HTMLElement>();
 const draft = ref(cloneChartSourceDrawing(props.drawing));
 // Sparse user intents are separate from both the document and read-only promotion seeds.
@@ -719,70 +721,88 @@ onBeforeUnmount(() => {
           )
         }}
       </p>
-      <div class="chart-source-editor__range" data-chart-source-range>
-        <span class="chart-source-editor__label">{{ t("chart.sourceChartRange") }}</span>
-        <div class="chart-source-editor__range-row">
-          <label class="chart-source-editor__range-input"
-            ><span class="ui-visually-hidden">{{ t("chart.sourceChartRange") }}</span>
-            <Input
-              v-model="sourceText"
-              :disabled="blocked"
-              :aria-label="t('chart.sourceChartRange')"
-              autocomplete="off"
-              :placeholder="customSource ? t('chart.sourceComplexPlaceholder') : undefined"
-              @enter="resetRange"
-              @blur="syncInput"
-            >
-              <template v-if="selectReference" #suffixIcon
-                ><Button
-                  size="small"
-                  variant="text"
+      <Form
+        label-align="right"
+        :label-width="locale === 'zh-CN' ? 112 : 152"
+        :prevent-submit-default="true"
+      >
+        <FormItem :label="t('chart.sourceChartRange')" data-chart-source-range
+          ><div class="chart-source-editor__range">
+            <div class="chart-source-editor__range-row">
+              <label class="chart-source-editor__range-input"
+                ><span class="ui-visually-hidden">{{ t("chart.sourceChartRange") }}</span>
+                <Input
+                  v-model="sourceText"
                   :disabled="blocked"
-                  :aria-label="t('chart.sourcePickRange')"
-                  @click.stop="pickSource"
-                  ><template #icon
-                    ><SquareMousePointer
-                      class="sheetcraft-action-icon"
-                      aria-hidden="true" /></template></Button
-              ></template> </Input
-          ></label>
-          <Button :disabled="blocked" data-reset-chart-range @click="resetRange">{{
-            t("chart.sourceResetRange")
-          }}</Button>
-        </div>
-        <p class="chart-source-editor__hint">
-          {{ t(customSource ? "chart.sourceComplexHint" : "chart.sourceResetHint") }}
-        </p>
-      </div>
-      <div v-if="!customSource" class="chart-source-editor__layout">
-        <span class="chart-source-editor__label">{{ t("chart.sourceDirection") }}</span>
-        <Select
-          :value="draft.chart.seriesBy"
-          :options="directionOptions"
-          :popup-props="{ overlayClassName: 'chart-source-options-popup' }"
-          :disabled="blocked"
-          :aria-label="t('chart.sourceDirection')"
-          @change="changeLayout('seriesBy', $event)"
-        />
-        <div class="chart-source-editor__headers">
-          <Checkbox
-            :checked="draft.chart.headerRow"
-            :disabled="blocked"
-            @change="changeLayout('headerRow', $event)"
-            >{{
-              t(draft.chart.seriesBy === "rows" ? "chart.headerRowCategories" : "chart.headerRow")
-            }}</Checkbox
+                  v-native-control="{ attributes: { 'aria-label': t('chart.sourceChartRange') } }"
+                  autocomplete="off"
+                  :placeholder="customSource ? t('chart.sourceComplexPlaceholder') : undefined"
+                  @enter="resetRange"
+                  @blur="syncInput"
+                >
+                  <template v-if="selectReference" #suffixIcon
+                    ><Button
+                      size="small"
+                      variant="text"
+                      :disabled="blocked"
+                      :aria-label="t('chart.sourcePickRange')"
+                      @click.stop="pickSource"
+                      ><template #icon
+                        ><SquareMousePointer
+                          class="sheetcraft-action-icon"
+                          aria-hidden="true" /></template></Button
+                  ></template> </Input
+              ></label>
+              <Button :disabled="blocked" data-reset-chart-range @click="resetRange">{{
+                t("chart.sourceResetRange")
+              }}</Button>
+            </div>
+            <p class="chart-source-editor__hint">
+              {{ t(customSource ? "chart.sourceComplexHint" : "chart.sourceResetHint") }}
+            </p>
+          </div></FormItem
+        >
+        <template v-if="!customSource">
+          <FormItem :label="t('chart.sourceDirection')">
+            <Select
+              :value="draft.chart.seriesBy"
+              :options="directionOptions"
+              :popup-props="{ overlayClassName: 'chart-source-options-popup' }"
+              :disabled="blocked"
+              v-native-control="{ attributes: { 'aria-label': t('chart.sourceDirection') } }"
+              @change="changeLayout('seriesBy', $event)"
+            />
+          </FormItem>
+          <FormItem
+            ><div class="chart-source-editor__headers">
+              <Checkbox
+                :checked="draft.chart.headerRow"
+                :disabled="blocked"
+                @change="changeLayout('headerRow', $event)"
+                >{{
+                  t(
+                    draft.chart.seriesBy === "rows"
+                      ? "chart.headerRowCategories"
+                      : "chart.headerRow",
+                  )
+                }}</Checkbox
+              >
+              <Checkbox
+                :checked="draft.chart.headerColumn"
+                :disabled="blocked"
+                @change="changeLayout('headerColumn', $event)"
+                >{{
+                  t(
+                    draft.chart.seriesBy === "rows"
+                      ? "chart.headerColumnSeries"
+                      : "chart.headerColumn",
+                  )
+                }}</Checkbox
+              >
+            </div></FormItem
           >
-          <Checkbox
-            :checked="draft.chart.headerColumn"
-            :disabled="blocked"
-            @change="changeLayout('headerColumn', $event)"
-            >{{
-              t(draft.chart.seriesBy === "rows" ? "chart.headerColumnSeries" : "chart.headerColumn")
-            }}</Checkbox
-          >
-        </div>
-      </div>
+        </template></Form
+      >
       <div class="chart-source-editor__columns">
         <section class="chart-source-editor__section">
           <div class="chart-source-editor__section-title">
@@ -980,13 +1000,11 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 16px;
   min-width: 0;
-  &__label {
-    white-space: nowrap;
-    font-weight: 500;
-  }
   &__range {
     display: grid;
     gap: 8px;
+    width: 100%;
+    min-width: 0;
   }
   &__range-input {
     display: block;
@@ -1001,14 +1019,7 @@ onBeforeUnmount(() => {
       min-width: 0;
     }
   }
-  &__layout {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 8px 12px;
-    align-items: center;
-  }
   &__headers {
-    grid-column: 1 / -1;
     display: flex;
     flex-wrap: wrap;
     gap: 8px 20px;

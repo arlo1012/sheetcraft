@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Button } from "tdesign-vue-next/es/button";
 import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
 import { Input } from "tdesign-vue-next/es/input";
@@ -11,6 +12,7 @@ import { isGroupedPicture } from "@sheetcraft/core/picture-group";
 import { getDetailedPictureStyleAssetIds } from "@sheetcraft/core/picture-detailed-style";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import { paintImagePresentation } from "../../../shared/images/imageAppearance";
 import { PicturePaintUnavailableError } from "../../../shared/images/picture-detailed-render";
@@ -43,7 +45,7 @@ const props = defineProps<{
   confirmHandler?: (image: PictureAssetSource) => boolean;
 }>();
 const emit = defineEmits<{ confirm: [image: PictureAssetSource]; close: [] }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const canvas = ref<HTMLCanvasElement>();
 const previewCanvas = ref<HTMLCanvasElement>();
 const framed = computed(() => isGroupedPicture(props.image) || isFramedPictureObject(props.image));
@@ -509,23 +511,23 @@ onBeforeUnmount(() => {
         ><Radio value="ellipse">{{ t("picture.ellipse") }}</Radio>
         <Radio value="text">{{ t("picture.text") }}</Radio>
       </RadioGroup>
-      <div class="picture-annotation__options">
-        <div
-          class="picture-annotation__field picture-annotation__field--color"
-          role="group"
-          :aria-label="t('picture.annotationColor')"
-        >
-          <span>{{ t("picture.annotationColor") }}</span>
-          <ColorPaletteSelect
-            :model-value="color"
-            :label="t('picture.annotationColor')"
-            :show-default="false"
-            :disabled="busy || confirming || sourceInvalid"
-            @select="selectColor"
-          />
-        </div>
-        <div class="picture-annotation__field" role="group" :aria-label="t('picture.strokeWidth')">
-          <span>{{ t("picture.strokeWidth") }}</span>
+      <Form
+        class="picture-annotation__options sheetcraft-form-grid"
+        label-align="right"
+        :label-width="locale === 'zh-CN' ? 80 : 112"
+        :prevent-submit-default="true"
+      >
+        <FormItem :label="t('picture.annotationColor')"
+          ><div class="picture-annotation__color">
+            <ColorPaletteSelect
+              :model-value="color"
+              :label="t('picture.annotationColor')"
+              :show-default="false"
+              :disabled="busy || confirming || sourceInvalid"
+              @select="selectColor"
+            /></div
+        ></FormItem>
+        <FormItem :label="t('picture.strokeWidth')">
           <InputNumber
             v-model="stroke"
             :min="1"
@@ -534,19 +536,19 @@ onBeforeUnmount(() => {
             theme="column"
             class="sheetcraft-input-number--persistent-controls"
             :disabled="busy || confirming"
-            :aria-label="t('picture.strokeWidth')"
+            v-native-control="{ attributes: { 'aria-label': t('picture.strokeWidth') } }"
           />
-        </div>
+        </FormItem>
         <template v-if="tool === 'text'">
-          <Input
-            v-model="text"
-            :maxlength="1000"
-            :disabled="busy || confirming"
-            :placeholder="t('picture.text')"
-            :aria-label="t('picture.text')"
-          />
-          <div class="picture-annotation__field" role="group" :aria-label="t('picture.fontSize')">
-            <span>{{ t("picture.fontSize") }}</span>
+          <FormItem :label="t('picture.text')"
+            ><Input
+              v-model="text"
+              :maxlength="1000"
+              :disabled="busy || confirming"
+              :placeholder="t('picture.text')"
+              v-native-control="{ attributes: { 'aria-label': t('picture.text') } }"
+          /></FormItem>
+          <FormItem :label="t('picture.fontSize')">
             <InputNumber
               v-model="fontSize"
               :min="8"
@@ -555,9 +557,9 @@ onBeforeUnmount(() => {
               theme="column"
               class="sheetcraft-input-number--persistent-controls"
               :disabled="busy || confirming"
-              :aria-label="t('picture.fontSize')"
+              v-native-control="{ attributes: { 'aria-label': t('picture.fontSize') } }"
             />
-          </div>
+          </FormItem>
         </template>
         <Button size="small" :disabled="!canUndo || busy || confirming" @click="undo">{{
           t("picture.undoAnnotation")
@@ -565,7 +567,7 @@ onBeforeUnmount(() => {
         <Button size="small" :disabled="!annotations.length || busy || confirming" @click="clear">{{
           t("picture.clearAnnotations")
         }}</Button>
-      </div>
+      </Form>
       <p v-if="failed" role="alert">{{ t("picture.assetFailed") }}</p>
       <div
         v-else
@@ -614,20 +616,9 @@ onBeforeUnmount(() => {
     align-items: center;
     flex-wrap: wrap;
     gap: 8px;
-    .picture-annotation__field {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      > span {
-        flex: none;
-        white-space: nowrap;
-      }
-      &--color {
-        display: grid;
-        grid-template-columns: max-content 48px;
-        flex: none;
-      }
-    }
+  }
+  &__color {
+    width: 48px;
   }
   &__views,
   &__view {

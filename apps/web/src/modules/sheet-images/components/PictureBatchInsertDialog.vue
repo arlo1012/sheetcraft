@@ -10,6 +10,7 @@ import {
 import { analyzePictureNameMatches, type PictureNameMatchStatus } from "../picture-name-matching";
 import type { MessageKey } from "../../../shared/i18n";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Button } from "tdesign-vue-next/es/button";
 import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
@@ -17,6 +18,7 @@ import { InputNumber } from "tdesign-vue-next/es/input-number";
 import { BaseTable, type BaseTableCol } from "tdesign-vue-next/es/table";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import type { PictureBatchArrangement, PictureBatchInsertion } from "../picture-batch-layout";
 
 const props = defineProps<{
@@ -30,7 +32,7 @@ const props = defineProps<{
   error?: string;
 }>();
 const emit = defineEmits<{ confirm: [payload: PictureBatchInsertion]; close: [] }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const order = ref(props.fileNames.map((_, index) => index));
 const arrangement = ref<PictureBatchArrangement>(props.mode === "cell" ? "vertical" : "cascade");
 const wrapEnabled = ref(false);
@@ -178,97 +180,109 @@ function confirm(): void {
   >
     <div class="picture-batch-insert">
       <p>{{ t(mode === "cell" ? "image.batchCellHint" : "image.batchFloatingHint") }}</p>
-      <RadioGroup v-model="arrangement" :disabled="busy" :aria-label="t('image.batchArrangement')">
-        <Radio value="vertical">{{ t("image.batchVertical") }}</Radio>
-        <Radio value="horizontal">{{ t("image.batchHorizontal") }}</Radio>
-        <Radio v-if="mode === 'floating'" value="cascade">{{ t("image.batchCascade") }}</Radio>
-      </RadioGroup>
-      <template v-if="arrangement !== 'cascade'">
-        <Checkbox v-model="matchEnabled" :disabled="busy">{{
-          t("image.batchMatchNames")
-        }}</Checkbox>
-        <div v-if="matchActive" class="picture-batch-insert__match-range">
-          <span>{{ t("image.batchMatchRange") }}</span>
-          <RangeReferenceInput
-            v-model="nameRange"
-            :show-picker="false"
-            :disabled="busy"
-            :label="t('image.batchMatchRange')"
-            placeholder="A1:A20"
-          />
-          <p>
-            {{
-              t(
-                arrangement === "horizontal"
-                  ? "image.batchMatchRowHint"
-                  : "image.batchMatchColumnHint",
-              )
-            }}
-          </p>
-          <p v-if="!nameMatches" role="alert">{{ t("image.batchMatchInvalidRange") }}</p>
-        </div>
-      </template>
-      <div
-        v-if="arrangement !== 'cascade' && !matchActive"
-        class="picture-batch-insert__wrap"
-        role="group"
-        :aria-label="wrapLabel"
+      <Form
+        label-align="right"
+        :label-width="locale === 'zh-CN' ? 144 : 192"
+        :prevent-submit-default="true"
       >
-        <Checkbox v-model="wrapEnabled" :disabled="busy">{{ wrapLabel }}</Checkbox>
-        <InputNumber
-          v-model="wrapAfter"
-          theme="column"
-          class="picture-batch-insert__count sheetcraft-input-number--persistent-controls"
-          :min="1"
-          :max="100"
-          :decimal-places="0"
-          :disabled="busy || !wrapEnabled"
-          :aria-label="wrapLabel"
-        />
-      </div>
-      <template v-if="arrangement !== 'cascade'">
-        <div
-          class="picture-batch-insert__wrap"
-          role="group"
-          :aria-label="t('image.batchRowHeight')"
+        <FormItem :label="t('image.batchArrangement')"
+          ><RadioGroup
+            v-model="arrangement"
+            :disabled="busy"
+            :aria-label="t('image.batchArrangement')"
+          >
+            <Radio value="vertical">{{ t("image.batchVertical") }}</Radio>
+            <Radio value="horizontal">{{ t("image.batchHorizontal") }}</Radio>
+            <Radio v-if="mode === 'floating'" value="cascade">{{ t("image.batchCascade") }}</Radio>
+          </RadioGroup></FormItem
         >
-          <Checkbox v-model="rowHeightEnabled" :disabled="busy">{{
-            t("image.batchRowHeight")
-          }}</Checkbox>
+        <template v-if="arrangement !== 'cascade'">
+          <FormItem
+            ><Checkbox v-model="matchEnabled" :disabled="busy">{{
+              t("image.batchMatchNames")
+            }}</Checkbox></FormItem
+          >
+          <FormItem v-if="matchActive" :label="t('image.batchMatchRange')"
+            ><div class="picture-batch-insert__match-range">
+              <RangeReferenceInput
+                v-model="nameRange"
+                :show-picker="false"
+                :disabled="busy"
+                :label="t('image.batchMatchRange')"
+                placeholder="A1:A20"
+              />
+              <p>
+                {{
+                  t(
+                    arrangement === "horizontal"
+                      ? "image.batchMatchRowHint"
+                      : "image.batchMatchColumnHint",
+                  )
+                }}
+              </p>
+              <p v-if="!nameMatches" role="alert">{{ t("image.batchMatchInvalidRange") }}</p>
+            </div></FormItem
+          >
+        </template>
+        <FormItem v-if="arrangement !== 'cascade' && !matchActive">
+          <template #label
+            ><Checkbox v-model="wrapEnabled" :disabled="busy">{{ wrapLabel }}</Checkbox></template
+          >
           <InputNumber
-            v-model="rowHeight"
+            v-model="wrapAfter"
             theme="column"
             class="picture-batch-insert__count sheetcraft-input-number--persistent-controls"
-            :min="16"
-            :max="512"
+            :min="1"
+            :max="100"
             :decimal-places="0"
-            :disabled="busy || !rowHeightEnabled"
-            :aria-label="t('image.batchRowHeight')"
+            :disabled="busy || !wrapEnabled"
+            v-native-control="{ attributes: { 'aria-label': wrapLabel } }"
           />
-          <span>px</span>
-        </div>
-        <div
-          class="picture-batch-insert__wrap"
-          role="group"
-          :aria-label="t('image.batchShowNames')"
-        >
-          <span v-if="matchActive">{{ t("image.batchExistingNamePosition") }}</span>
-          <Checkbox v-else v-model="namesEnabled" :disabled="busy">{{
-            t("image.batchShowNames")
-          }}</Checkbox>
-          <RadioGroup v-model="namePlacement" :disabled="busy || (!namesEnabled && !matchActive)">
-            <Radio value="before">{{
-              t(arrangement === "horizontal" ? "image.batchNameAbove" : "image.batchNameLeft")
-            }}</Radio>
-            <Radio value="after">{{
-              t(arrangement === "horizontal" ? "image.batchNameBelow" : "image.batchNameRight")
-            }}</Radio>
-          </RadioGroup>
-        </div>
-        <p v-if="mode === 'floating' && (rowHeightEnabled || namesEnabled || matchActive)">
-          {{ t("image.batchFitCellsHint") }}
-        </p>
-      </template>
+        </FormItem>
+        <template v-if="arrangement !== 'cascade'">
+          <FormItem>
+            <template #label
+              ><Checkbox v-model="rowHeightEnabled" :disabled="busy">{{
+                t("image.batchRowHeight")
+              }}</Checkbox></template
+            >
+            <InputNumber
+              v-model="rowHeight"
+              theme="column"
+              class="picture-batch-insert__count sheetcraft-input-number--persistent-controls"
+              :min="16"
+              :max="512"
+              :decimal-places="0"
+              :disabled="busy || !rowHeightEnabled"
+              v-native-control="{ attributes: { 'aria-label': t('image.batchRowHeight') } }"
+            />
+            <span>px</span>
+          </FormItem>
+          <FormItem>
+            <template #label
+              ><span v-if="matchActive">{{ t("image.batchExistingNamePosition") }}</span>
+              <Checkbox v-else v-model="namesEnabled" :disabled="busy">{{
+                t("image.batchShowNames")
+              }}</Checkbox></template
+            >
+            <RadioGroup
+              v-model="namePlacement"
+              :aria-label="t('image.batchExistingNamePosition')"
+              :disabled="busy || (!namesEnabled && !matchActive)"
+            >
+              <Radio value="before">{{
+                t(arrangement === "horizontal" ? "image.batchNameAbove" : "image.batchNameLeft")
+              }}</Radio>
+              <Radio value="after">{{
+                t(arrangement === "horizontal" ? "image.batchNameBelow" : "image.batchNameRight")
+              }}</Radio>
+            </RadioGroup>
+          </FormItem>
+          <p v-if="mode === 'floating' && (rowHeightEnabled || namesEnabled || matchActive)">
+            {{ t("image.batchFitCellsHint") }}
+          </p>
+        </template>
+      </Form>
       <div class="picture-batch-insert__table">
         <TableHeightWrapper v-slot="{ height }">
           <BaseTable
@@ -337,6 +351,7 @@ function confirm(): void {
   &__match-range {
     display: grid;
     gap: 8px;
+    width: 100%;
   }
   &__table {
     height: min(280px, 40vh);
@@ -345,11 +360,6 @@ function confirm(): void {
   &__actions {
     display: flex;
     gap: 4px;
-  }
-  &__wrap {
-    display: flex;
-    align-items: center;
-    gap: 12px;
   }
   &__count {
     width: 100px;

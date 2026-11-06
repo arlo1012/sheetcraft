@@ -9,6 +9,7 @@ import { Select } from "tdesign-vue-next/es/select";
 import type { SheetControlDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { FormControlType } from "@sheetcraft/core/form-controls";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { formatRangeReference } from "../../../shared/range-reference/formatRangeReference";
 const props = defineProps<{
@@ -23,7 +24,7 @@ const emit = defineEmits<{
   confirm: [drawing: SheetControlDrawing, linked: string, source: string];
   close: [];
 }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const draft = ref({
   ...props.drawing,
   control: { ...props.drawing.control, items: [...props.drawing.control.items] },
@@ -149,74 +150,89 @@ function confirm() {
     @confirm="confirm"
     @close="emit('close')"
   >
-    <Form class="form-control-editor sheetcraft-form-grid" label-align="top" :data="draft">
+    <Form
+      class="form-control-editor sheetcraft-form-grid"
+      label-align="right"
+      :label-width="locale === 'zh-CN' ? 100 : 144"
+      :data="draft"
+      :prevent-submit-default="true"
+    >
       <FormItem :label="t('control.type')">
-        <Select v-model="draft.control.type" :options="options" :aria-label="t('control.type')" />
+        <Select
+          v-model="draft.control.type"
+          :options="options"
+          v-native-control="{ attributes: { 'aria-label': t('control.type') } }"
+        />
       </FormItem>
-      <div class="form-control-editor__names">
-        <FormItem :label="t('drawing.name')"
-          ><Input v-model="draft.name" :maxlength="200" :aria-label="t('drawing.name')"
-        /></FormItem>
-        <FormItem :label="t('control.labelText')"
-          ><Input
-            v-model="draft.control.label"
-            :maxlength="1000"
-            :aria-label="t('control.labelText')"
-        /></FormItem>
-      </div>
+      <FormItem :label="t('drawing.name')"
+        ><Input
+          v-model="draft.name"
+          :maxlength="200"
+          v-native-control="{ attributes: { 'aria-label': t('drawing.name') } }"
+      /></FormItem>
+      <FormItem :label="t('control.labelText')"
+        ><Input
+          v-model="draft.control.label"
+          :maxlength="1000"
+          v-native-control="{ attributes: { 'aria-label': t('control.labelText') } }"
+      /></FormItem>
       <FormItem
         v-if="draft.control.type !== 'label' && draft.control.type !== 'group'"
         :label="t('control.linked')"
       >
-        <RangeReferenceInput
-          v-model="linked"
-          :label="t('control.linked')"
-          :select-reference="selectReference"
-        />
+        <div class="form-control-editor__reference">
+          <RangeReferenceInput
+            v-model="linked"
+            :label="t('control.linked')"
+            :select-reference="selectReference"
+          />
+        </div>
       </FormItem>
       <template v-if="draft.control.type === 'combo' || draft.control.type === 'list'">
         <FormItem :label="t('control.source')"
-          ><RangeReferenceInput
-            v-model="source"
-            :label="t('control.source')"
-            :select-reference="selectReference"
-        /></FormItem>
+          ><div class="form-control-editor__reference">
+            <RangeReferenceInput
+              v-model="source"
+              :label="t('control.source')"
+              :select-reference="selectReference"
+            /></div
+        ></FormItem>
         <FormItem :label="t('control.items')"
           ><Textarea
             v-model="items"
             :autosize="{ minRows: 3, maxRows: 6 }"
-            :aria-label="t('control.items')"
+            v-native-control="{ attributes: { 'aria-label': t('control.items') } }"
         /></FormItem>
         <p>{{ t("control.listHint") }}</p>
       </template>
-      <div v-if="numeric" class="form-control-editor__numbers">
+      <template v-if="numeric">
         <FormItem :label="t('control.min')"
           ><InputNumber
             v-model="draft.control.min"
-            :aria-label="t('control.min')"
+            v-native-control="{ attributes: { 'aria-label': t('control.min') } }"
             theme="column"
             class="sheetcraft-input-number--persistent-controls"
         /></FormItem>
         <FormItem :label="t('control.max')"
           ><InputNumber
             v-model="draft.control.max"
-            :aria-label="t('control.max')"
+            v-native-control="{ attributes: { 'aria-label': t('control.max') } }"
             theme="column"
             class="sheetcraft-input-number--persistent-controls"
         /></FormItem>
         <FormItem :label="t('control.step')"
           ><InputNumber
             v-model="draft.control.step"
-            :aria-label="t('control.step')"
+            v-native-control="{ attributes: { 'aria-label': t('control.step') } }"
             :min="0.000001"
             theme="column"
             class="sheetcraft-input-number--persistent-controls"
         /></FormItem>
-      </div>
+      </template>
       <FormItem v-if="draft.control.type === 'radio'" :label="t('control.optionValue')"
         ><InputNumber
           v-model="draft.control.optionValue"
-          :aria-label="t('control.optionValue')"
+          v-native-control="{ attributes: { 'aria-label': t('control.optionValue') } }"
           theme="column"
           class="sheetcraft-input-number--persistent-controls"
       /></FormItem>
@@ -225,7 +241,7 @@ function confirm() {
           <Select
             v-model="resetType"
             :options="resetTypeOptions"
-            :aria-label="t('control.resetType')"
+            v-native-control="{ attributes: { 'aria-label': t('control.resetType') } }"
           />
         </FormItem>
         <FormItem v-if="resetType !== 'empty'" :label="t('control.resetValue')">
@@ -233,14 +249,14 @@ function confirm() {
             v-if="resetType === 'text'"
             v-model="resetText"
             :maxlength="1000"
-            :aria-label="t('control.resetValue')"
+            v-native-control="{ attributes: { 'aria-label': t('control.resetValue') } }"
           />
           <InputNumber
             v-else-if="resetType === 'number'"
             v-model="resetNumber"
             theme="column"
             class="sheetcraft-input-number--persistent-controls"
-            :aria-label="t('control.resetValue')"
+            v-native-control="{ attributes: { 'aria-label': t('control.resetValue') } }"
           />
           <Select
             v-else
@@ -249,7 +265,7 @@ function confirm() {
               { value: true, label: 'TRUE' },
               { value: false, label: 'FALSE' },
             ]"
-            :aria-label="t('control.resetValue')"
+            v-native-control="{ attributes: { 'aria-label': t('control.resetValue') } }"
           />
         </FormItem>
         <p v-else>{{ t("control.emptyValueHint") }}</p>
@@ -263,15 +279,10 @@ function confirm() {
 .form-control-editor {
   display: grid;
   gap: var(--sheetcraft-space-3);
-  &__names {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--sheetcraft-space-2);
-  }
-  &__numbers {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--sheetcraft-space-2);
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+  &__reference {
+    width: 100%;
   }
   p {
     margin: 0;

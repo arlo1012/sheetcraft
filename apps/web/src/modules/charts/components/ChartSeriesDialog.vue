@@ -2,12 +2,14 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { Button } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Input } from "tdesign-vue-next/es/input";
 import { SquareMousePointer } from "lucide-vue-next";
 import type { ChartSourceSeries } from "@sheetcraft/core/chart-source";
 import type { SheetChart } from "@sheetcraft/core/sheet-charts";
 import type { Sheet, SheetEvaluator, Workbook } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import {
   formatChartSourceName,
   formatChartSourceValues,
@@ -34,7 +36,7 @@ const props = defineProps<{
   selectReference?: ChartSourceReferencePicker;
 }>();
 const emit = defineEmits<{ close: [] }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const root = ref<HTMLElement>();
 const nameText = ref(formatChartSourceName(props.workbook, props.entry.name));
 const valuesText = ref(formatChartSourceValues(props.workbook, props.entry.values));
@@ -161,84 +163,91 @@ onBeforeUnmount(() => {
       @compositionend.capture="compositionEnd"
       @keydown.capture="keydown"
     >
-      <div class="chart-series-editor__field" data-series-name>
-        <label class="chart-series-editor__control"
-          ><span class="chart-series-editor__label">{{ t("chart.sourceSeriesName") }}</span>
-          <Input
-            v-model="nameText"
-            :disabled="disabled"
-            :aria-label="t('chart.sourceSeriesName')"
-            autocomplete="off"
-            @enter="confirm"
-            @blur="syncInputs"
-          >
-            <template v-if="selectReference" #suffixIcon>
-              <Button
-                size="small"
-                variant="text"
-                :disabled="disabled"
-                :aria-label="t('chart.sourcePickName')"
-                @click.stop="pick('series-name')"
-                ><template #icon
-                  ><SquareMousePointer
-                    class="sheetcraft-action-icon"
-                    aria-hidden="true" /></template
-              ></Button>
-            </template> </Input
-        ></label>
-        <p class="chart-series-editor__hint">{{ t("chart.sourceNameHint") }}</p>
-        <p class="chart-series-editor__resolved" data-series-name-preview>
-          {{ resolved?.name ?? t("chart.sourcePreviewUnavailable") }}
+      <Form
+        class="chart-series-editor__form sheetcraft-form-grid"
+        label-align="right"
+        :label-width="locale === 'zh-CN' ? 104 : 144"
+        :prevent-submit-default="true"
+      >
+        <FormItem :label="t('chart.sourceSeriesName')" data-series-name
+          ><div class="chart-series-editor__field">
+            <Input
+              v-model="nameText"
+              :disabled="disabled"
+              v-native-control="{ attributes: { 'aria-label': t('chart.sourceSeriesName') } }"
+              autocomplete="off"
+              @enter="confirm"
+              @blur="syncInputs"
+            >
+              <template v-if="selectReference" #suffixIcon>
+                <Button
+                  size="small"
+                  variant="text"
+                  :disabled="disabled"
+                  :aria-label="t('chart.sourcePickName')"
+                  @click.stop="pick('series-name')"
+                  ><template #icon
+                    ><SquareMousePointer
+                      class="sheetcraft-action-icon"
+                      aria-hidden="true" /></template
+                ></Button>
+              </template>
+            </Input>
+            <p class="chart-series-editor__hint">{{ t("chart.sourceNameHint") }}</p>
+            <p class="chart-series-editor__resolved" data-series-name-preview>
+              {{ resolved?.name ?? t("chart.sourcePreviewUnavailable") }}
+            </p>
+          </div></FormItem
+        >
+        <FormItem :label="t('chart.sourceSeriesValues')" data-series-values
+          ><div class="chart-series-editor__field">
+            <Input
+              v-model="valuesText"
+              :disabled="disabled"
+              v-native-control="{ attributes: { 'aria-label': t('chart.sourceSeriesValues') } }"
+              autocomplete="off"
+              @enter="confirm"
+              @blur="syncInputs"
+            >
+              <template v-if="selectReference" #suffixIcon>
+                <Button
+                  size="small"
+                  variant="text"
+                  :disabled="disabled"
+                  :aria-label="t('chart.sourcePickValues')"
+                  @click.stop="pick('series-values')"
+                  ><template #icon
+                    ><SquareMousePointer
+                      class="sheetcraft-action-icon"
+                      aria-hidden="true" /></template
+                ></Button>
+              </template>
+            </Input>
+            <p class="chart-series-editor__hint">
+              {{ t("chart.sourceValuesHint", { example: "={10,20,30}" }) }}
+            </p>
+            <p class="chart-series-editor__resolved" data-series-values-preview>
+              {{
+                resolved
+                  ? resolved.values
+                      .slice(0, 24)
+                      .map((value) => value ?? "∅")
+                      .join(", ")
+                  : t("chart.sourcePreviewUnavailable")
+              }}{{ resolved && resolved.values.length > 24 ? "…" : "" }}
+            </p>
+          </div></FormItem
+        >
+        <p v-if="compositionBlocked" class="chart-series-editor__error" role="alert">
+          {{ t("chart.sourceFinishComposition") }}
         </p>
-      </div>
-      <div class="chart-series-editor__field" data-series-values>
-        <label class="chart-series-editor__control"
-          ><span class="chart-series-editor__label">{{ t("chart.sourceSeriesValues") }}</span>
-          <Input
-            v-model="valuesText"
-            :disabled="disabled"
-            :aria-label="t('chart.sourceSeriesValues')"
-            autocomplete="off"
-            @enter="confirm"
-            @blur="syncInputs"
-          >
-            <template v-if="selectReference" #suffixIcon>
-              <Button
-                size="small"
-                variant="text"
-                :disabled="disabled"
-                :aria-label="t('chart.sourcePickValues')"
-                @click.stop="pick('series-values')"
-                ><template #icon
-                  ><SquareMousePointer
-                    class="sheetcraft-action-icon"
-                    aria-hidden="true" /></template
-              ></Button>
-            </template> </Input
-        ></label>
-        <p class="chart-series-editor__hint">
-          {{ t("chart.sourceValuesHint", { example: "={10,20,30}" }) }}
+        <p v-else-if="attempted && invalid" class="chart-series-editor__error" role="alert">
+          {{ t("chart.sourceInvalidSeries") }}
         </p>
-        <p class="chart-series-editor__resolved" data-series-values-preview>
-          {{
-            resolved
-              ? resolved.values
-                  .slice(0, 24)
-                  .map((value) => value ?? "∅")
-                  .join(", ")
-              : t("chart.sourcePreviewUnavailable")
-          }}{{ resolved && resolved.values.length > 24 ? "…" : "" }}
+        <p v-else-if="feedback" class="chart-series-editor__error" role="alert">
+          {{ t("chart.sourceApplyFailed") }}
         </p>
-      </div>
-      <p v-if="compositionBlocked" class="chart-series-editor__error" role="alert">
-        {{ t("chart.sourceFinishComposition") }}
-      </p>
-      <p v-else-if="attempted && invalid" class="chart-series-editor__error" role="alert">
-        {{ t("chart.sourceInvalidSeries") }}
-      </p>
-      <p v-else-if="feedback" class="chart-series-editor__error" role="alert">
-        {{ t("chart.sourceApplyFailed") }}
-      </p>
+      </Form>
     </div>
   </Dialog>
 </template>
@@ -249,19 +258,15 @@ onBeforeUnmount(() => {
   gap: 20px;
   max-height: calc(100vh - 190px);
   overflow-y: auto;
+  &__form {
+    display: grid;
+    gap: 20px;
+  }
   &__field {
     display: grid;
     gap: 6px;
     min-width: 0;
-  }
-  &__control {
-    display: grid;
-    gap: 6px;
-    min-width: 0;
-  }
-  &__label {
-    white-space: nowrap;
-    font-weight: 500;
+    width: 100%;
   }
   &__hint,
   &__resolved,

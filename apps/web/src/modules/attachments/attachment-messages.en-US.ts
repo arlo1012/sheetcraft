@@ -1,5 +1,6 @@
 export const attachmentsEnUS = {
   "attachment.title": "Attachment",
+  "attachment.file": "File",
   "attachment.insertObject": "Insert file object",
   "attachment.noFile": "No file selected",
   "attachment.browse": "Browse…",

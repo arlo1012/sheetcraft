@@ -2,6 +2,7 @@
 import { ref, computed, watch, onBeforeUnmount, nextTick } from "vue";
 import { Button } from "tdesign-vue-next/es/button";
 import { Dialog, type DialogCloseContext } from "tdesign-vue-next/es/dialog";
+import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
@@ -52,7 +53,7 @@ const emit = defineEmits<{
   confirm: [drawing: SheetChartDrawing, source: string, comboChanges?: ChartComboSeriesChange[]];
   close: [];
 }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const draft = ref<SheetChartDrawing>({
   ...props.drawing,
   chart: normalizeSheetChart(props.drawing.chart),
@@ -435,26 +436,32 @@ function onDialogKeydown(event: KeyboardEvent): void {
             :resolve-sheet="(sheetId) => workbook.sheets.get(sheetId)"
           />
         </div>
-        <div v-if="rectangularSource" class="chart-selector__range">
-          <span>{{ t("chart.source") }}</span>
-          <div class="chart-selector__source-controls">
-            <RangeReferenceInput
-              v-model="source"
-              :disabled="disabled"
-              :label="t('chart.source')"
-              :select-reference="selectReference"
-            />
-            <Button
-              ref="sourceTrigger"
-              data-chart-select-data
-              theme="default"
-              variant="base"
-              :disabled="disabled"
-              @click="openSource"
-              >{{ t("chart.selectData") }}</Button
-            >
-          </div>
-        </div>
+        <Form
+          v-if="rectangularSource"
+          label-align="right"
+          :label-width="locale === 'zh-CN' ? 88 : 112"
+          :prevent-submit-default="true"
+        >
+          <FormItem :label="t('chart.source')">
+            <div class="chart-selector__source-controls">
+              <RangeReferenceInput
+                v-model="source"
+                :disabled="disabled"
+                :label="t('chart.source')"
+                :select-reference="selectReference"
+              />
+              <Button
+                ref="sourceTrigger"
+                data-chart-select-data
+                theme="default"
+                variant="base"
+                :disabled="disabled"
+                @click="openSource"
+                >{{ t("chart.selectData") }}</Button
+              >
+            </div>
+          </FormItem>
+        </Form>
         <div v-else class="chart-selector__source-controls">
           <p class="chart-selector__hint">
             {{
@@ -507,34 +514,48 @@ function onDialogKeydown(event: KeyboardEvent): void {
             t("chart.linkSource")
           }}</Button>
         </p>
-        <div class="chart-selector__range">
-          <span>{{ t("chart.source") }}</span>
-          <RangeReferenceInput
-            v-model="source"
-            :disabled="sourceLocked"
-            :label="t('chart.source')"
-            :select-reference="selectReference"
-          />
-        </div>
-        <p v-if="draft.chart.source" class="chart-selector__hint">
-          {{ t("chart.customSourceHint") }}
-        </p>
-        <Checkbox v-model="draft.chart.headerRow" :disabled="sourceLocked">{{
-          t(draft.chart.seriesBy === "rows" ? "chart.headerRowCategories" : "chart.headerRow")
-        }}</Checkbox>
-        <Checkbox v-model="draft.chart.headerColumn" :disabled="sourceLocked">{{
-          t(draft.chart.seriesBy === "rows" ? "chart.headerColumnSeries" : "chart.headerColumn")
-        }}</Checkbox>
-        <Checkbox
-          :checked="draft.chart.seriesBy === 'rows'"
-          :disabled="sourceLocked"
-          @change="draft.chart.seriesBy = $event ? 'rows' : 'columns'"
-          >{{ t("chart.seriesByRows") }}</Checkbox
+        <Form
+          label-align="right"
+          :label-width="locale === 'zh-CN' ? 88 : 112"
+          :prevent-submit-default="true"
         >
-        <Checkbox
-          v-model="draft.chart.showHidden"
-          :disabled="disabled || !!draft.chart.dataCache"
-          >{{ t("chart.showHidden") }}</Checkbox
+          <FormItem :label="t('chart.source')"
+            ><div class="chart-selector__range">
+              <RangeReferenceInput
+                v-model="source"
+                :disabled="sourceLocked"
+                :label="t('chart.source')"
+                :select-reference="selectReference"
+              /></div
+          ></FormItem>
+          <p v-if="draft.chart.source" class="chart-selector__hint">
+            {{ t("chart.customSourceHint") }}
+          </p>
+          <FormItem
+            ><div class="chart-selector__source-options">
+              <Checkbox v-model="draft.chart.headerRow" :disabled="sourceLocked">{{
+                t(draft.chart.seriesBy === "rows" ? "chart.headerRowCategories" : "chart.headerRow")
+              }}</Checkbox>
+              <Checkbox v-model="draft.chart.headerColumn" :disabled="sourceLocked">{{
+                t(
+                  draft.chart.seriesBy === "rows"
+                    ? "chart.headerColumnSeries"
+                    : "chart.headerColumn",
+                )
+              }}</Checkbox>
+              <Checkbox
+                :checked="draft.chart.seriesBy === 'rows'"
+                :disabled="sourceLocked"
+                @change="draft.chart.seriesBy = $event ? 'rows' : 'columns'"
+                >{{ t("chart.seriesByRows") }}</Checkbox
+              >
+              <Checkbox
+                v-model="draft.chart.showHidden"
+                :disabled="disabled || !!draft.chart.dataCache"
+                >{{ t("chart.showHidden") }}</Checkbox
+              >
+            </div></FormItem
+          ></Form
         >
         <ChartComboControls
           v-if="draft.chart.type === 'combo' && comboAvailable"
@@ -628,6 +649,7 @@ function onDialogKeydown(event: KeyboardEvent): void {
     align-items: center;
     gap: 8px;
     min-width: 0;
+    width: 100%;
   }
   &__source-editor {
     display: flex;
@@ -642,10 +664,12 @@ function onDialogKeydown(event: KeyboardEvent): void {
     }
   }
   &__range {
+    width: 100%;
+    min-width: 0;
+  }
+  &__source-options {
     display: grid;
-    gap: 4px;
-    font-size: var(--sheetcraft-font-size-body-medium);
-    line-height: var(--sheetcraft-line-height-body-medium);
+    gap: 8px;
   }
   &__hint,
   &__error {

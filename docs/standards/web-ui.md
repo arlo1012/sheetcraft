@@ -108,6 +108,12 @@ Use CSS pixels at 100% scale; size and line height are a pair.
 
 ## Dialog and popover actions
 
+- Dialog form fields place labels on the left and controls on the right, with
+  right-aligned labels and one consistent label width within each form. Prefer
+  TDesign `Form` / `FormItem` with `label-align="right"`; allow localized label
+  widths and keep controls usable in narrow dialogs. Checkbox/radio captions
+  remain attached to their controls. Do not use top-aligned form labels.
+
 - Use `NewCellStyleDialog` (the Style dialog) as the reference for footer actions.
   Prefer TDesign Dialog's built-in `confirmBtn` and `cancelBtn` APIs. Custom
   dialog footers and popover action rows must use the same button modes:

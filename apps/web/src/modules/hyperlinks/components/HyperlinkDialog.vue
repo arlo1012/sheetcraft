@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { TabPanel as TTabPanel, Tabs as TTabs } from "tdesign-vue-next/es/tabs";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import type { HyperlinkDraft, HyperlinkInput } from "../useHyperlinksController";
 import {
   readHyperlinkTarget,
@@ -24,7 +26,7 @@ const props = withDefaults(
   { sheets: () => [], currentSheetName: "" },
 );
 const emit = defineEmits<{ confirm: [value: HyperlinkInput]; remove: []; cancel: [] }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const displayText = ref(props.draft.displayText);
 const initial = readHyperlinkTarget(props.draft.target, props.currentSheetName);
 const kind = ref<HyperlinkKind>(initial.kind);
@@ -68,56 +70,83 @@ const tooltip = ref(props.draft.tooltip);
     @confirm="emit('confirm', { target, tooltip, displayText })"
     @close="emit('cancel')"
   >
-    <div class="hyperlink-dialog">
-      <label class="hyperlink-dialog__field"
-        ><span>{{ t("hyperlinks.displayText") }}</span>
-        <TInput v-model="displayText" :disabled="!draft.canEditDisplay" data-hyperlink-text />
-      </label>
+    <Form
+      class="hyperlink-dialog sheetcraft-form-grid"
+      label-align="right"
+      :label-width="locale === 'zh-CN' ? 100 : 136"
+      :prevent-submit-default="true"
+    >
+      <FormItem :label="t('hyperlinks.displayText')">
+        <TInput
+          v-model="displayText"
+          :disabled="!draft.canEditDisplay"
+          v-native-control="{ attributes: { 'aria-label': t('hyperlinks.displayText') } }"
+          data-hyperlink-text
+        />
+      </FormItem>
       <p v-if="!draft.canEditDisplay" class="hyperlink-dialog__hint">
         {{ t("hyperlinks.formulaTextHint") }}
       </p>
       <TTabs v-model="kind" class="hyperlink-dialog__targets">
         <TTabPanel value="web" :label="t('hyperlinks.web')">
           <div class="hyperlink-dialog__target-fields">
-            <label class="hyperlink-dialog__field"
-              ><span>{{ t("hyperlinks.address") }}</span>
-              <TInput v-model="webAddress" placeholder="https://" autofocus data-hyperlink-target />
-            </label>
+            <FormItem :label="t('hyperlinks.address')">
+              <TInput
+                v-model="webAddress"
+                placeholder="https://"
+                autofocus
+                v-native-control="{ attributes: { 'aria-label': t('hyperlinks.address') } }"
+                data-hyperlink-target
+              />
+            </FormItem>
           </div>
         </TTabPanel>
         <TTabPanel value="location" :label="t('hyperlinks.location')">
           <div class="hyperlink-dialog__target-fields">
-            <label class="hyperlink-dialog__field"
-              ><span>{{ t("hyperlinks.sheet") }}</span>
+            <FormItem :label="t('hyperlinks.sheet')">
               <TSelect
                 v-model="sheetName"
+                v-native-control="{ attributes: { 'aria-label': t('hyperlinks.sheet') } }"
                 :options="sheets.map((sheet) => ({ value: sheet.name, label: sheet.name }))"
                 data-hyperlink-sheet
               />
-            </label>
-            <label class="hyperlink-dialog__field"
-              ><span>{{ t("hyperlinks.cellReference") }}</span>
-              <TInput v-model="cellReference" placeholder="A1" data-hyperlink-reference />
-            </label>
+            </FormItem>
+            <FormItem :label="t('hyperlinks.cellReference')">
+              <TInput
+                v-model="cellReference"
+                placeholder="A1"
+                v-native-control="{ attributes: { 'aria-label': t('hyperlinks.cellReference') } }"
+                data-hyperlink-reference
+              />
+            </FormItem>
           </div>
         </TTabPanel>
         <TTabPanel value="email" :label="t('hyperlinks.email')">
           <div class="hyperlink-dialog__target-fields">
-            <label class="hyperlink-dialog__field"
-              ><span>{{ t("hyperlinks.emailAddress") }}</span>
-              <TInput v-model="emailAddress" data-hyperlink-email />
-            </label>
-            <label class="hyperlink-dialog__field"
-              ><span>{{ t("hyperlinks.emailSubject") }}</span>
-              <TInput v-model="emailSubject" data-hyperlink-subject />
-            </label>
+            <FormItem :label="t('hyperlinks.emailAddress')">
+              <TInput
+                v-model="emailAddress"
+                v-native-control="{ attributes: { 'aria-label': t('hyperlinks.emailAddress') } }"
+                data-hyperlink-email
+              />
+            </FormItem>
+            <FormItem :label="t('hyperlinks.emailSubject')">
+              <TInput
+                v-model="emailSubject"
+                v-native-control="{ attributes: { 'aria-label': t('hyperlinks.emailSubject') } }"
+                data-hyperlink-subject
+              />
+            </FormItem>
           </div>
         </TTabPanel>
       </TTabs>
-      <label class="hyperlink-dialog__field"
-        ><span>{{ t("hyperlinks.tooltip") }}</span>
-        <TInput v-model="tooltip" data-hyperlink-tooltip />
-      </label>
+      <FormItem :label="t('hyperlinks.tooltip')">
+        <TInput
+          v-model="tooltip"
+          v-native-control="{ attributes: { 'aria-label': t('hyperlinks.tooltip') } }"
+          data-hyperlink-tooltip
+        />
+      </FormItem>
       <p v-if="error" class="hyperlink-dialog__error" role="alert">{{ error }}</p>
       <TButton
         v-if="draft.hasLink"
@@ -127,7 +156,7 @@ const tooltip = ref(props.draft.tooltip);
         @click="emit('remove')"
         >{{ t("hyperlinks.remove") }}</TButton
       >
-    </div>
+    </Form>
   </Dialog>
 </template>
 
@@ -136,12 +165,6 @@ const tooltip = ref(props.draft.tooltip);
   display: grid;
   gap: 12px;
   align-items: center;
-  &__field {
-    display: grid;
-    grid-template-columns: 100px minmax(0, 1fr);
-    gap: 12px;
-    align-items: center;
-  }
   &__targets {
     min-width: 0;
   }

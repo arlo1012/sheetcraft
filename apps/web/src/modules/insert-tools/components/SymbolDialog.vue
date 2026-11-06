@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Input } from "tdesign-vue-next/es/input";
 import { Select } from "tdesign-vue-next/es/select";
 import { Button } from "tdesign-vue-next/es/button";
@@ -657,7 +659,13 @@ function onCustomListKey(event: KeyboardEvent): void {
     @confirm="insert"
     @close="close"
   >
-    <div class="symbol-dialog" :data-cell-edit-session="editSessionId">
+    <Form
+      class="symbol-dialog sheetcraft-form-grid"
+      :data-cell-edit-session="editSessionId"
+      label-align="right"
+      :label-width="locale === 'zh-CN' ? 80 : 112"
+      :prevent-submit-default="true"
+    >
       <Tabs v-model="tab" size="medium">
         <TabPanel value="symbols" :label="t('symbolTools.symbols')" />
         <TabPanel value="special" :label="t('symbolTools.special')" />
@@ -670,33 +678,36 @@ function onCustomListKey(event: KeyboardEvent): void {
           :aria-label="t('symbolTools.symbols')"
         >
           <div class="symbol-dialog__fields">
-            <label class="symbol-dialog__field"
-              ><span>{{ t("symbolTools.font") }}</span
+            <FormItem class="symbol-dialog__field" :label="t('symbolTools.font')"
               ><Select
+                v-native-control="{ attributes: { 'aria-label': t('symbolTools.font') } }"
                 size="small"
                 :model-value="fontId"
                 @update:model-value="chooseFont"
                 :options="fontOptions"
                 filterable
                 :disabled="loading"
-            /></label>
-            <label class="symbol-dialog__field" v-if="codeFormat === 'unicode-hex'"
-              ><span>{{ t("symbolTools.subset") }}</span
+            /></FormItem>
+            <FormItem
+              class="symbol-dialog__field"
+              v-if="codeFormat === 'unicode-hex'"
+              :label="t('symbolTools.subset')"
               ><Select
+                v-native-control="{ attributes: { 'aria-label': t('symbolTools.subset') } }"
                 size="small"
                 :value="subset"
                 :options="subsetOptions"
                 filterable
                 :disabled="loading"
                 @change="changeSubset"
-            /></label>
+            /></FormItem>
           </div>
           <div class="symbol-dialog__search">
             <Input
               size="small"
               v-model="query"
               :placeholder="t('symbolTools.search')"
-              :aria-label="t('symbolTools.search')"
+              v-native-control="{ attributes: { 'aria-label': t('symbolTools.search') } }"
               clearable
             /><Checkbox v-model="allUnicode">{{ t("symbolTools.browseAll") }}</Checkbox>
           </div>
@@ -760,20 +771,23 @@ function onCustomListKey(event: KeyboardEvent): void {
             }}</span>
           </div>
           <div class="symbol-dialog__fields">
-            <label class="symbol-dialog__field"
-              ><span>{{ t("symbolTools.code") }}</span
+            <FormItem class="symbol-dialog__field" :label="t('symbolTools.code')"
               ><Input
+                v-native-control="{ attributes: { 'aria-label': t('symbolTools.code') } }"
                 size="small"
                 :value="codeInput"
                 :status="invalidCode ? 'error' : undefined"
                 :aria-invalid="invalidCode"
                 @change="navigateCode(String($event))"
                 @enter="insert"
-            /></label>
-            <label class="symbol-dialog__field"
-              ><span>{{ t("symbolTools.from") }}</span
-              ><Select size="small" v-model="codeFormat" :options="formatOptions"
-            /></label>
+            /></FormItem>
+            <FormItem class="symbol-dialog__field" :label="t('symbolTools.from')"
+              ><Select
+                size="small"
+                v-model="codeFormat"
+                :options="formatOptions"
+                v-native-control="{ attributes: { 'aria-label': t('symbolTools.from') } }"
+            /></FormItem>
           </div>
           <div v-if="invalidCode" class="symbol-dialog__error" role="alert">
             {{ t("symbolTools.invalidCode") }}
@@ -864,14 +878,14 @@ function onCustomListKey(event: KeyboardEvent): void {
             </TableHeightWrapper>
           </div>
           <div class="symbol-dialog__shortcut">
-            <label class="symbol-dialog__field"
-              ><span>{{ t("symbolTools.shortcut") }}</span
+            <FormItem class="symbol-dialog__field" :label="t('symbolTools.shortcut')"
               ><Input
+                v-native-control="{ attributes: { 'aria-label': t('symbolTools.shortcut') } }"
                 size="small"
                 :value="shortcutInput"
                 readonly
                 :placeholder="t('symbolTools.shortcutCapture')"
-                @keydown="(_value, context) => captureShortcut(context.e)" /></label
+                @keydown="(_value, context) => captureShortcut(context.e)" /></FormItem
             ><Button
               theme="default"
               variant="base"
@@ -997,9 +1011,11 @@ function onCustomListKey(event: KeyboardEvent): void {
               </div>
             </div>
             <div v-show="tab === 'symbols'">
-              <label class="symbol-dialog__literal symbol-dialog__field"
-                ><span>{{ t("symbolTools.literal") }}</span
+              <FormItem
+                class="symbol-dialog__literal symbol-dialog__field"
+                :label="t('symbolTools.literal')"
                 ><Input
+                  v-native-control="{ attributes: { 'aria-label': t('symbolTools.literal') } }"
                   v-model="literal"
                   :maxlength="16"
                   :placeholder="t('symbolTools.literalHint')"
@@ -1008,7 +1024,7 @@ function onCustomListKey(event: KeyboardEvent): void {
                     selectionOverride = undefined;
                   "
                   @enter="insert"
-              /></label>
+              /></FormItem>
             </div>
             <p v-if="tab === 'special'" class="symbol-dialog__hint">
               {{ t("symbolTools.specialNote") }}
@@ -1016,7 +1032,7 @@ function onCustomListKey(event: KeyboardEvent): void {
           </div>
         </details>
       </div>
-    </div>
+    </Form>
   </Dialog>
   <Dialog
     :visible="resetVisible"
@@ -1066,18 +1082,7 @@ function onCustomListKey(event: KeyboardEvent): void {
     gap: 16px;
   }
   &__field {
-    display: flex;
-    align-items: center;
-    gap: 8px;
     min-width: 0;
-    > span {
-      flex-shrink: 0;
-      white-space: nowrap;
-    }
-    > :last-child {
-      min-width: 0;
-      flex: 1;
-    }
   }
   &__search {
     display: grid;

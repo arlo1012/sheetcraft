@@ -2,12 +2,14 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { Button } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Input } from "tdesign-vue-next/es/input";
 import { SquareMousePointer } from "lucide-vue-next";
 import type { ChartSourceCategories } from "@sheetcraft/core/chart-source";
 import type { SheetChart } from "@sheetcraft/core/sheet-charts";
 import type { Sheet, SheetEvaluator, Workbook } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import {
   formatChartSourceCategories,
   getEditableChartSource,
@@ -30,7 +32,7 @@ const props = defineProps<{
   selectReference?: ChartSourceReferencePicker;
 }>();
 const emit = defineEmits<{ close: [] }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const root = ref<HTMLElement>();
 const text = ref(formatChartSourceCategories(props.workbook, props.categories));
 const attempted = ref(false);
@@ -144,36 +146,46 @@ onBeforeUnmount(() => {
       @compositionend.capture="compositionEnd"
       @keydown.capture="keydown"
     >
-      <label class="chart-categories-editor__control"
-        ><span class="chart-categories-editor__label">{{ t("chart.sourceCategoryRange") }}</span>
-        <Input
-          v-model="text"
-          :disabled="disabled"
-          :aria-label="t('chart.sourceCategoryRange')"
-          autocomplete="off"
-          @enter="confirm"
-          @blur="syncInput"
-        >
-          <template v-if="selectReference" #suffixIcon>
-            <Button
-              size="small"
-              variant="text"
+      <Form
+        label-align="right"
+        :label-width="locale === 'zh-CN' ? 104 : 144"
+        :prevent-submit-default="true"
+      >
+        <FormItem :label="t('chart.sourceCategoryRange')"
+          ><div class="chart-categories-editor__control">
+            <Input
+              v-model="text"
               :disabled="disabled"
-              :aria-label="t('chart.sourcePickCategories')"
-              @click.stop="pick"
-              ><template #icon
-                ><SquareMousePointer class="sheetcraft-action-icon" aria-hidden="true" /></template
-            ></Button>
-          </template> </Input
-      ></label>
-      <p class="chart-categories-editor__hint">{{ t("chart.sourceCategoriesHint") }}</p>
-      <p class="chart-categories-editor__resolved" data-categories-preview>
-        {{
-          preview
-            ? preview.data.categories.slice(0, 24).join(", ")
-            : t("chart.sourcePreviewUnavailable")
-        }}{{ preview && preview.data.categories.length > 24 ? "…" : "" }}
-      </p>
+              v-native-control="{ attributes: { 'aria-label': t('chart.sourceCategoryRange') } }"
+              autocomplete="off"
+              @enter="confirm"
+              @blur="syncInput"
+            >
+              <template v-if="selectReference" #suffixIcon>
+                <Button
+                  size="small"
+                  variant="text"
+                  :disabled="disabled"
+                  :aria-label="t('chart.sourcePickCategories')"
+                  @click.stop="pick"
+                  ><template #icon
+                    ><SquareMousePointer
+                      class="sheetcraft-action-icon"
+                      aria-hidden="true" /></template
+                ></Button>
+              </template>
+            </Input>
+            <p class="chart-categories-editor__hint">{{ t("chart.sourceCategoriesHint") }}</p>
+            <p class="chart-categories-editor__resolved" data-categories-preview>
+              {{
+                preview
+                  ? preview.data.categories.slice(0, 24).join(", ")
+                  : t("chart.sourcePreviewUnavailable")
+              }}{{ preview && preview.data.categories.length > 24 ? "…" : "" }}
+            </p>
+          </div></FormItem
+        ></Form
+      >
       <p v-if="compositionBlocked" class="chart-categories-editor__error" role="alert">
         {{ t("chart.sourceFinishComposition") }}
       </p>
@@ -196,10 +208,7 @@ onBeforeUnmount(() => {
     display: grid;
     gap: 6px;
     min-width: 0;
-  }
-  &__label {
-    white-space: nowrap;
-    font-weight: 500;
+    width: 100%;
   }
   &__hint,
   &__resolved,

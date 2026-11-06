@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Select } from "tdesign-vue-next/es/select";
 import { Button } from "tdesign-vue-next/es/button";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import type { TextBoxReferenceDialog } from "../useTextBoxReference";
 const props = defineProps<{
@@ -14,7 +16,7 @@ const props = defineProps<{
   suspended?: boolean;
   selectReference: (current: string) => Promise<string | undefined>;
 }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const source = ref(props.request.initial);
 const sourceSheetId = ref(props.request.sheetId);
 const sheets = computed(() =>
@@ -50,17 +52,27 @@ function confirm() {
       <p v-if="request.linked" class="textbox-reference-dialog__hint">
         {{ t("drawing.textBoxReferenceReadonly") }}
       </p>
-      <label
-        >{{ t("drawing.textBoxReferenceSheet")
-        }}<Select v-model="sourceSheetId" :options="sheets" :disabled="disabled"
-      /></label>
-      <label
-        >{{ t("drawing.textBoxReferenceSource")
-        }}<RangeReferenceInput
-          v-model="source"
-          :disabled="disabled"
-          :select-reference="selectReference"
-      /></label>
+      <Form
+        label-align="right"
+        :label-width="locale === 'zh-CN' ? 96 : 144"
+        :prevent-submit-default="true"
+      >
+        <FormItem :label="t('drawing.textBoxReferenceSheet')"
+          ><Select
+            v-model="sourceSheetId"
+            :options="sheets"
+            :disabled="disabled"
+            v-native-control="{ attributes: { 'aria-label': t('drawing.textBoxReferenceSheet') } }"
+        /></FormItem>
+        <FormItem :label="t('drawing.textBoxReferenceSource')"
+          ><div class="textbox-reference-dialog__reference">
+            <RangeReferenceInput
+              v-model="source"
+              :label="t('drawing.textBoxReferenceSource')"
+              :disabled="disabled"
+              :select-reference="selectReference"
+            /></div></FormItem
+      ></Form>
       <p class="textbox-reference-dialog__hint">{{ t("drawing.textBoxReferenceHint") }}</p>
       <p v-if="request.replacesContent" class="textbox-reference-dialog__warning">
         {{ t("drawing.textBoxReferenceOverwrite") }}
@@ -103,9 +115,8 @@ function confirm() {
   p {
     margin: 0;
   }
-  label {
-    display: grid;
-    gap: 8px;
+  &__reference {
+    width: 100%;
   }
   &__name {
     font-weight: 600;

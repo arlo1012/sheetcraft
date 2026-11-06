@@ -7,7 +7,7 @@ import { useAppI18n } from "../i18n";
 import { localFontAccess } from "./local-fonts";
 import { fontSettingsVisible } from "./font-settings";
 
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const { availability, loading, status, families, load } = localFontAccess;
 const message = computed(() => {
   if (availability.value === "insecure") return t("format.localFontsInsecure");
@@ -25,10 +25,10 @@ const message = computed(() => {
   <TDialog
     v-model:visible="fontSettingsVisible"
     :header="t('format.fontSettings')"
-    width="420px"
+    width="min(480px, calc(100vw - 32px))"
     :footer="false"
   >
-    <TForm label-align="top">
+    <TForm label-align="right" :label-width="locale === 'zh-CN' ? 88 : 112">
       <TFormItem :label="t('format.localFonts')">
         <div class="font-settings" data-local-font-access>
           <TButton

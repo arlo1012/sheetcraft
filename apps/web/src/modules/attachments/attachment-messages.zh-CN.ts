@@ -2,6 +2,7 @@ export const attachmentsZhCN = {
   "attachment.title": "附件",
   "attachment.insertObject": "插入文件对象",
   "attachment.noFile": "尚未选择文件",
+  "attachment.file": "文件",
   "attachment.browse": "浏览…",
   "attachment.displayAsIcon": "显示为图标",
   "attachment.preview": "显示方式预览",

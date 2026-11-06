@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, useId } from "vue";
+import { ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import type { SparklineDataOptions } from "../useSparklineDataOptions";
@@ -12,10 +13,9 @@ const props = defineProps<{
   failed: boolean;
 }>();
 const emit = defineEmits<{ confirm: [patch: SparklineDataOptions]; close: [] }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const empty = ref(props.initial.empty);
 const showHidden = ref(props.initial.showHidden);
-const labelId = `sparkline-empty-${useId()}`;
 function confirm(): void {
   if (props.disabled) return;
   emit("confirm", {
@@ -43,13 +43,17 @@ function confirm(): void {
     @confirm="confirm"
     @close="emit('close')"
   >
-    <div class="sparkline-data-options">
-      <div class="sparkline-data-options__empty">
-        <span :id="labelId">{{ t("sparkline.emptyDisplay") }}</span>
+    <Form
+      class="sparkline-data-options sheetcraft-form-grid"
+      label-align="right"
+      :label-width="locale === 'zh-CN' ? 128 : 152"
+      :prevent-submit-default="true"
+    >
+      <FormItem :label="t('sparkline.emptyDisplay')">
         <RadioGroup
           v-model="empty"
           role="radiogroup"
-          :aria-labelledby="labelId"
+          :aria-label="t('sparkline.emptyDisplay')"
           :disabled="disabled"
           class="sparkline-data-options__choices"
         >
@@ -57,18 +61,20 @@ function confirm(): void {
           <Radio value="zero">{{ t("sparkline.zero") }}</Radio>
           <Radio value="connect">{{ t("sparkline.connect") }}</Radio>
         </RadioGroup>
-      </div>
-      <Checkbox
-        :checked="showHidden === true"
-        :indeterminate="showHidden === undefined"
-        :disabled="disabled"
-        @change="showHidden = Boolean($event)"
-        >{{ t("sparkline.showHiddenData") }}</Checkbox
+      </FormItem>
+      <FormItem
+        ><Checkbox
+          :checked="showHidden === true"
+          :indeterminate="showHidden === undefined"
+          :disabled="disabled"
+          @change="showHidden = Boolean($event)"
+          >{{ t("sparkline.showHiddenData") }}</Checkbox
+        ></FormItem
       >
       <p v-if="failed" class="sparkline-data-options__error" role="alert">
         {{ t("sparkline.failed") }}
       </p>
-    </div>
+    </Form>
   </Dialog>
 </template>
 
@@ -76,12 +82,6 @@ function confirm(): void {
 .sparkline-data-options {
   display: grid;
   gap: 16px;
-  &__empty {
-    display: flex;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 8px 16px;
-  }
   &__choices {
     display: flex;
     flex-direction: column;

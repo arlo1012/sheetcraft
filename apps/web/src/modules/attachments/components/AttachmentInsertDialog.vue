@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Button } from "tdesign-vue-next/es/button";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { FileText, Paperclip } from "lucide-vue-next";
@@ -13,7 +14,7 @@ const props = defineProps<{
   error: boolean;
 }>();
 const emit = defineEmits<{ chooseFile: []; confirm: [display: "icon" | "document"]; close: [] }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const asIcon = ref(props.display === "icon");
 </script>
 
@@ -30,13 +31,25 @@ const asIcon = ref(props.display === "icon");
     @close="emit('close')"
   >
     <div class="attachment-insert">
-      <div class="attachment-insert__file">
-        <span>{{ fileName || t("attachment.noFile") }}</span>
-        <Button theme="default" variant="base" :disabled="busy" @click="emit('chooseFile')">{{
-          t("attachment.browse")
-        }}</Button>
-      </div>
-      <Checkbox v-model="asIcon" :disabled="busy">{{ t("attachment.displayAsIcon") }}</Checkbox>
+      <Form
+        label-align="right"
+        :label-width="locale === 'zh-CN' ? 88 : 112"
+        :prevent-submit-default="true"
+      >
+        <FormItem :label="t('attachment.file')"
+          ><div class="attachment-insert__file">
+            <span>{{ fileName || t("attachment.noFile") }}</span>
+            <Button theme="default" variant="base" :disabled="busy" @click="emit('chooseFile')">{{
+              t("attachment.browse")
+            }}</Button>
+          </div></FormItem
+        >
+        <FormItem
+          ><Checkbox v-model="asIcon" :disabled="busy">{{
+            t("attachment.displayAsIcon")
+          }}</Checkbox></FormItem
+        >
+      </Form>
       <div class="attachment-insert__preview" :aria-label="t('attachment.preview')">
         <Paperclip v-if="asIcon" :size="32" aria-hidden="true" />
         <FileText v-else :size="48" aria-hidden="true" />
@@ -54,6 +67,7 @@ const asIcon = ref(props.display === "icon");
   gap: 16px;
   &__file {
     display: flex;
+    width: 100%;
     align-items: center;
     gap: 12px;
   }

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Button } from "tdesign-vue-next/es/button";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
 import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import {
   startPointerSession,
   type GestureEvent,
@@ -19,7 +21,7 @@ import {
 
 const props = defineProps<{ file: File; busy: boolean }>();
 const emit = defineEmits<{ confirm: [file: File]; close: [] }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const source = URL.createObjectURL(props.file);
 const image = ref<HTMLImageElement>();
 const size = ref({ width: 0, height: 0 });
@@ -169,12 +171,17 @@ onBeforeUnmount(() => {
           <div v-if="size.width" class="screen-capture__region" :style="regionStyle" />
         </div>
       </div>
-      <div v-if="size.width" class="screen-capture__controls">
-        <div role="group" :aria-label="t('drawing.captureLeft')">
-          <span>{{ t("drawing.captureLeft") }}</span
+      <Form
+        v-if="size.width"
+        class="screen-capture__controls sheetcraft-form-grid"
+        label-align="right"
+        :label-width="locale === 'zh-CN' ? 48 : 64"
+        :prevent-submit-default="true"
+      >
+        <FormItem :label="t('drawing.captureLeft')"
           ><InputNumber
             :model-value="region.x"
-            :aria-label="t('drawing.captureLeft')"
+            v-native-control="{ attributes: { 'aria-label': t('drawing.captureLeft') } }"
             :min="0"
             :max="size.width - 1"
             :decimal-places="0"
@@ -183,12 +190,11 @@ onBeforeUnmount(() => {
             class="sheetcraft-input-number--persistent-controls"
             @update:model-value="setField('x', $event)"
           />
-        </div>
-        <div role="group" :aria-label="t('drawing.captureTop')">
-          <span>{{ t("drawing.captureTop") }}</span
+        </FormItem>
+        <FormItem :label="t('drawing.captureTop')"
           ><InputNumber
             :model-value="region.y"
-            :aria-label="t('drawing.captureTop')"
+            v-native-control="{ attributes: { 'aria-label': t('drawing.captureTop') } }"
             :min="0"
             :max="size.height - 1"
             :decimal-places="0"
@@ -197,12 +203,11 @@ onBeforeUnmount(() => {
             class="sheetcraft-input-number--persistent-controls"
             @update:model-value="setField('y', $event)"
           />
-        </div>
-        <div role="group" :aria-label="t('drawing.width')">
-          <span>{{ t("drawing.width") }}</span
+        </FormItem>
+        <FormItem :label="t('drawing.width')"
           ><InputNumber
             :model-value="region.width"
-            :aria-label="t('drawing.width')"
+            v-native-control="{ attributes: { 'aria-label': t('drawing.width') } }"
             :min="1"
             :max="size.width - region.x"
             :decimal-places="0"
@@ -211,12 +216,11 @@ onBeforeUnmount(() => {
             class="sheetcraft-input-number--persistent-controls"
             @update:model-value="setField('width', $event)"
           />
-        </div>
-        <div role="group" :aria-label="t('drawing.height')">
-          <span>{{ t("drawing.height") }}</span
+        </FormItem>
+        <FormItem :label="t('drawing.height')"
           ><InputNumber
             :model-value="region.height"
-            :aria-label="t('drawing.height')"
+            v-native-control="{ attributes: { 'aria-label': t('drawing.height') } }"
             :min="1"
             :max="size.height - region.y"
             :decimal-places="0"
@@ -225,11 +229,11 @@ onBeforeUnmount(() => {
             class="sheetcraft-input-number--persistent-controls"
             @update:model-value="setField('height', $event)"
           />
-        </div>
+        </FormItem>
         <Button theme="default" variant="base" :disabled="busy" @click="selectAll">{{
           t("drawing.captureAll")
         }}</Button>
-      </div>
+      </Form>
       <p v-if="failed" role="alert">{{ t("drawing.captureFailed") }}</p>
     </div>
   </Dialog>
@@ -276,18 +280,13 @@ onBeforeUnmount(() => {
   }
   &__controls {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: end;
     gap: 8px;
   }
-  [role="group"] {
-    display: grid;
-    gap: 4px;
-    min-width: 0;
-  }
-  @media (max-width: 600px) {
+  @media (max-width: 460px) {
     &__controls {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 }

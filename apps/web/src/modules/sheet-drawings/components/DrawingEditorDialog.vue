@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Input } from "tdesign-vue-next/es/input";
 import { Textarea } from "tdesign-vue-next/es/textarea";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
@@ -11,6 +12,7 @@ import {
   type DrawingShape,
 } from "@sheetcraft/core/sheet-drawings";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import DrawingContent from "./DrawingContent.vue";
 import type { TextBoxReferenceResolver } from "../textbox-reference-display";
@@ -255,16 +257,21 @@ const shapes: DrawingShape[] = [
           {{ t("drawing.changeRejected") }}
         </p>
       </div>
-      <div class="drawing-editor__fields">
+      <Form
+        class="drawing-editor__fields sheetcraft-form-grid"
+        label-align="right"
+        :label-width="locale === 'zh-CN' ? 88 : 112"
+        :prevent-submit-default="true"
+      >
         <p v-if="applyError" role="alert">{{ t("drawing.changeRejected") }}</p>
-        <label
-          >{{ t("drawing.name")
-          }}<Input
+        <FormItem :label="t('drawing.name')"
+          ><Input
+            v-native-control="{ attributes: { 'aria-label': t('drawing.name') } }"
             :model-value="draft.name"
             :disabled="disabled"
             :maxlength="200"
             @update:model-value="setName"
-        /></label>
+        /></FormItem>
         <div
           v-if="drawing.kind === 'icon'"
           class="drawing-editor__shapes"
@@ -283,9 +290,17 @@ const shapes: DrawingShape[] = [
             <DrawingContent :drawing="{ ...draft, shape, text: '', rotation: 0 }" />
           </button>
         </div>
-        <label v-if="!lineGeometry"
-          >{{ t(drawing.kind === "equation" ? "drawing.equationSource" : "drawing.text")
-          }}<Textarea
+        <FormItem
+          v-if="!lineGeometry"
+          :label="t(drawing.kind === 'equation' ? 'drawing.equationSource' : 'drawing.text')"
+          ><Textarea
+            v-native-control="{
+              attributes: {
+                'aria-label': t(
+                  drawing.kind === 'equation' ? 'drawing.equationSource' : 'drawing.text',
+                ),
+              },
+            }"
             :model-value="
               referencedDisplay?.status === 'ready' ? referencedDisplay.text : draft.text
             "
@@ -293,7 +308,7 @@ const shapes: DrawingShape[] = [
             @update:model-value="setText"
             :maxlength="100000"
             :autosize="{ minRows: 2, maxRows: 5 }"
-        /></label>
+        /></FormItem>
         <p v-if="draft.textReference" class="drawing-editor__hint">
           {{ t("drawing.textBoxReferenceReadonly") }}
         </p>
@@ -304,13 +319,7 @@ const shapes: DrawingShape[] = [
           v-if="drawing.kind !== 'wordArt' && drawing.kind !== 'equation'"
           class="drawing-editor__row"
         >
-          <div
-            v-if="!lineGeometry"
-            class="drawing-editor__field"
-            role="group"
-            :aria-label="t('drawing.fill')"
-          >
-            <span>{{ t("drawing.fill") }}</span>
+          <FormItem v-if="!lineGeometry" :label="t('drawing.fill')">
             <div class="drawing-editor__color">
               <ColorPaletteSelect
                 :model-value="draft.fill"
@@ -320,16 +329,16 @@ const shapes: DrawingShape[] = [
                 @select="selectColor('fill', $event)"
               />
             </div>
-          </div>
-          <Checkbox
-            v-if="!lineGeometry"
-            :checked="draft.fill === 'transparent'"
-            :disabled="disabled"
-            @change="setAppearance('fill', $event ? 'transparent' : '#ffffff')"
-            >{{ t("drawing.noFill") }}</Checkbox
+          </FormItem>
+          <FormItem v-if="!lineGeometry"
+            ><Checkbox
+              :checked="draft.fill === 'transparent'"
+              :disabled="disabled"
+              @change="setAppearance('fill', $event ? 'transparent' : '#ffffff')"
+              >{{ t("drawing.noFill") }}</Checkbox
+            ></FormItem
           >
-          <div class="drawing-editor__field" role="group" :aria-label="t('drawing.stroke')">
-            <span>{{ t("drawing.stroke") }}</span>
+          <FormItem :label="t('drawing.stroke')">
             <div class="drawing-editor__color">
               <ColorPaletteSelect
                 :model-value="draft.stroke"
@@ -339,21 +348,20 @@ const shapes: DrawingShape[] = [
                 @select="selectColor('stroke', $event)"
               />
             </div>
-          </div>
-          <div class="drawing-editor__field" role="group" :aria-label="t('drawing.strokeWidth')">
-            <span>{{ t("drawing.strokeWidth") }}</span>
+          </FormItem>
+          <FormItem :label="t('drawing.strokeWidth')">
             <InputNumber
               class="drawing-editor__number sheetcraft-input-number--persistent-controls"
               :model-value="draft.strokeWidth"
               :disabled="disabled"
-              :aria-label="t('drawing.strokeWidth')"
+              v-native-control="{ attributes: { 'aria-label': t('drawing.strokeWidth') } }"
               @change="typeof $event === 'number' && setAppearance('strokeWidth', $event)"
               :min="0"
               :max="32"
               size="small"
               theme="column"
             />
-          </div>
+          </FormItem>
         </div>
         <ShapeLineEndsControls
           v-if="strokeGeometry"
@@ -363,8 +371,7 @@ const shapes: DrawingShape[] = [
           :handler="lineEndsHandler"
         />
         <div v-if="!lineGeometry" class="drawing-editor__row">
-          <div class="drawing-editor__field" role="group" :aria-label="t('drawing.color')">
-            <span>{{ t("drawing.color") }}</span>
+          <FormItem :label="t('drawing.color')">
             <div class="drawing-editor__color">
               <ColorPaletteSelect
                 :model-value="draft.color"
@@ -374,14 +381,13 @@ const shapes: DrawingShape[] = [
                 @select="selectColor('textColor', $event)"
               />
             </div>
-          </div>
-          <div class="drawing-editor__field" role="group" :aria-label="t('drawing.fontSize')">
-            <span>{{ t("drawing.fontSize") }}</span>
+          </FormItem>
+          <FormItem :label="t('drawing.fontSize')">
             <InputNumber
               class="drawing-editor__number sheetcraft-input-number--persistent-controls"
               :model-value="draft.fontSize"
               :disabled="disabled"
-              :aria-label="t('drawing.fontSize')"
+              v-native-control="{ attributes: { 'aria-label': t('drawing.fontSize') } }"
               @update:model-value="
                 typeof $event === 'number' && setTypography('fontSizePt', $event * 0.75)
               "
@@ -390,64 +396,61 @@ const shapes: DrawingShape[] = [
               size="small"
               theme="column"
             />
-          </div>
-          <Checkbox
-            v-if="drawing.kind !== 'equation'"
-            :model-value="draft.bold"
-            :disabled="disabled"
-            @update:model-value="setTypography('textBold', $event)"
-            >{{ t("drawing.bold") }}</Checkbox
-          ><Checkbox
-            v-if="drawing.kind !== 'equation'"
-            :model-value="draft.italic"
-            :disabled="disabled"
-            @update:model-value="setTypography('textItalic', $event)"
-            >{{ t("drawing.italic") }}</Checkbox
+          </FormItem>
+          <FormItem v-if="drawing.kind !== 'equation'"
+            ><Checkbox
+              :model-value="draft.bold"
+              :disabled="disabled"
+              @update:model-value="setTypography('textBold', $event)"
+              >{{ t("drawing.bold") }}</Checkbox
+            ><Checkbox
+              :model-value="draft.italic"
+              :disabled="disabled"
+              @update:model-value="setTypography('textItalic', $event)"
+              >{{ t("drawing.italic") }}</Checkbox
+            ></FormItem
           >
         </div>
         <div class="drawing-editor__row">
-          <div class="drawing-editor__field" role="group" :aria-label="t('drawing.width')">
-            <span>{{ t("drawing.width") }}</span>
+          <FormItem :label="t('drawing.width')">
             <InputNumber
               class="drawing-editor__number sheetcraft-input-number--persistent-controls"
               :model-value="draft.width"
               :disabled="disabled"
-              :aria-label="t('drawing.width')"
+              v-native-control="{ attributes: { 'aria-label': t('drawing.width') } }"
               @update:model-value="setGeometry('width', $event)"
               :min="strokeGeometry ? 1 : 16"
               :max="16384"
               size="small"
               theme="column"
             />
-          </div>
-          <div class="drawing-editor__field" role="group" :aria-label="t('drawing.height')">
-            <span>{{ t("drawing.height") }}</span>
+          </FormItem>
+          <FormItem :label="t('drawing.height')">
             <InputNumber
               class="drawing-editor__number sheetcraft-input-number--persistent-controls"
               :model-value="draft.height"
               :disabled="disabled"
-              :aria-label="t('drawing.height')"
+              v-native-control="{ attributes: { 'aria-label': t('drawing.height') } }"
               @update:model-value="setHeight"
               :min="strokeGeometry ? 1 : 16"
               :max="16384"
               size="small"
               theme="column"
             />
-          </div>
-          <div class="drawing-editor__field" role="group" :aria-label="t('drawing.rotation')">
-            <span>{{ t("drawing.rotation") }}</span>
+          </FormItem>
+          <FormItem :label="t('drawing.rotation')">
             <InputNumber
               class="drawing-editor__number sheetcraft-input-number--persistent-controls"
               :model-value="draft.rotation"
               :disabled="disabled"
-              :aria-label="t('drawing.rotation')"
+              v-native-control="{ attributes: { 'aria-label': t('drawing.rotation') } }"
               @update:model-value="setGeometry('rotation', $event)"
               :min="-360"
               :max="360"
               size="small"
               theme="column"
             />
-          </div>
+          </FormItem>
         </div>
         <div class="drawing-editor__preview" :aria-label="t('drawing.preview')">
           <div
@@ -476,7 +479,7 @@ const shapes: DrawingShape[] = [
         <p v-if="!validGeometry" class="drawing-editor__hint" role="alert">
           {{ t("drawing.geometryUnavailable") }}
         </p>
-      </div>
+      </Form>
     </div>
   </Dialog>
 </template>
@@ -486,6 +489,8 @@ const shapes: DrawingShape[] = [
 .drawing-editor {
   display: grid;
   gap: 16px;
+  max-height: calc(100dvh - 180px);
+  overflow-y: auto;
   &.has-shape-gallery {
     grid-template-columns: minmax(220px, 0.9fr) minmax(300px, 1fr);
   }
@@ -497,24 +502,15 @@ const shapes: DrawingShape[] = [
   &__gallery {
     min-width: 0;
   }
-  label,
-  &__field {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-  &__field > span {
-    white-space: nowrap;
-  }
   &__color {
     width: 64px;
     flex: none;
   }
   &__row {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
     gap: 12px;
     align-items: center;
-    flex-wrap: wrap;
     .drawing-editor__number {
       width: 90px;
     }
