@@ -11,6 +11,13 @@ export const controlsZhCN = {
   "control.step": "步长",
   "control.optionValue": "选中时写入的值",
   "control.resetValue": "点击时写入的值",
+  "control.resetType": "点击值类型",
+  "control.valueText": "文本",
+  "control.valueNumber": "数字",
+  "control.valueBoolean": "逻辑值",
+  "control.valueEmpty": "清空单元格",
+  "control.emptyValueHint": "点击按钮时清空关联单元格的内容。",
+  "control.invalidResetNumber": "请输入有效的数字。",
   "control.hint":
     "拖动标题可移动控件，双击标题可编辑设置。关联单元格需可编辑；按钮用于设置单元格值。",
   "control.invalid": "请检查关联单元格、单行或单列选项来源及数值范围。仅支持当前工作表。",

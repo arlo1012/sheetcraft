@@ -42,7 +42,26 @@ const source = ref(
     : "",
 );
 const items = ref(props.drawing.control.items.join("\n"));
-const reset = ref(String(props.drawing.control.resetValue ?? ""));
+type ResetValueType = "empty" | "text" | "number" | "boolean";
+const initialReset = props.drawing.control.resetValue;
+const resetType = ref<ResetValueType>(
+  initialReset === null
+    ? "empty"
+    : typeof initialReset === "string"
+      ? "text"
+      : typeof initialReset === "number"
+        ? "number"
+        : "boolean",
+);
+const resetText = ref(typeof initialReset === "string" ? initialReset : "");
+const resetNumber = ref<number | undefined>(typeof initialReset === "number" ? initialReset : 0);
+const resetBoolean = ref(typeof initialReset === "boolean" ? initialReset : false);
+const resetTypeOptions = computed(() => [
+  { value: "text", label: t("control.valueText") },
+  { value: "number", label: t("control.valueNumber") },
+  { value: "boolean", label: t("control.valueBoolean") },
+  { value: "empty", label: t("control.valueEmpty") },
+]);
 const types: FormControlType[] = [
   "checkbox",
   "radio",
@@ -69,6 +88,12 @@ const localError = computed(() => {
     return t("control.invalidStep");
   if (control.type === "radio" && !Number.isFinite(control.optionValue))
     return t("control.invalidOptionValue");
+  if (
+    control.type === "button" &&
+    resetType.value === "number" &&
+    (typeof resetNumber.value !== "number" || !Number.isFinite(resetNumber.value))
+  )
+    return t("control.invalidResetNumber");
   return "";
 });
 watch(
@@ -81,17 +106,14 @@ watch(
 );
 function confirm() {
   if (props.disabled || localError.value) return;
-  const raw = reset.value;
   const resetValue =
-    raw === ""
-      ? null
-      : raw === "true"
-        ? true
-        : raw === "false"
-          ? false
-          : raw.trim() && Number.isFinite(Number(raw))
-            ? Number(raw)
-            : raw;
+    resetType.value === "text"
+      ? resetText.value
+      : resetType.value === "number"
+        ? resetNumber.value!
+        : resetType.value === "boolean"
+          ? resetBoolean.value
+          : null;
   emit(
     "confirm",
     {
@@ -198,9 +220,40 @@ function confirm() {
           theme="column"
           class="sheetcraft-input-number--persistent-controls"
       /></FormItem>
-      <FormItem v-if="draft.control.type === 'button'" :label="t('control.resetValue')"
-        ><Input v-model="reset" :maxlength="1000" :aria-label="t('control.resetValue')"
-      /></FormItem>
+      <template v-if="draft.control.type === 'button'">
+        <FormItem :label="t('control.resetType')">
+          <Select
+            v-model="resetType"
+            :options="resetTypeOptions"
+            :aria-label="t('control.resetType')"
+          />
+        </FormItem>
+        <FormItem v-if="resetType !== 'empty'" :label="t('control.resetValue')">
+          <Input
+            v-if="resetType === 'text'"
+            v-model="resetText"
+            :maxlength="1000"
+            :aria-label="t('control.resetValue')"
+          />
+          <InputNumber
+            v-else-if="resetType === 'number'"
+            v-model="resetNumber"
+            theme="column"
+            class="sheetcraft-input-number--persistent-controls"
+            :aria-label="t('control.resetValue')"
+          />
+          <Select
+            v-else
+            v-model="resetBoolean"
+            :options="[
+              { value: true, label: 'TRUE' },
+              { value: false, label: 'FALSE' },
+            ]"
+            :aria-label="t('control.resetValue')"
+          />
+        </FormItem>
+        <p v-else>{{ t("control.emptyValueHint") }}</p>
+      </template>
       <p>{{ t("control.hint") }}</p>
       <p v-if="localError || error" role="alert">{{ localError || t("control.invalid") }}</p>
     </Form>

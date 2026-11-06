@@ -15,6 +15,13 @@ export const controlsEnUS = {
   "control.step": "Step",
   "control.optionValue": "Selected value",
   "control.resetValue": "Value to write on click",
+  "control.resetType": "Value type",
+  "control.valueText": "Text",
+  "control.valueNumber": "Number",
+  "control.valueBoolean": "Logical value",
+  "control.valueEmpty": "Clear cell",
+  "control.emptyValueHint": "Clicking the button clears the linked cell's contents.",
+  "control.invalidResetNumber": "Enter a valid number.",
   "control.hint":
     "Drag the caption to move; double-click it to edit. The linked cell must be editable. Buttons set a cell value.",
   "control.invalid":
