@@ -8,6 +8,7 @@ import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceI
 import type { SparklineDraft } from "../useSparklineActions";
 const props = defineProps<{
   initial: SparklineDraft;
+  editing?: boolean;
   disabled: boolean;
   error: boolean;
   failed?: boolean;
@@ -21,8 +22,8 @@ const { t } = useAppI18n();
 <template>
   <Dialog
     :visible="!suspended"
-    :header="t('sparkline.title')"
-    :aria-label="t('sparkline.title')"
+    :header="t(editing ? 'sparkline.edit' : 'sparkline.create')"
+    :aria-label="t(editing ? 'sparkline.edit' : 'sparkline.create')"
     role="dialog"
     aria-modal="true"
     width="530px"
@@ -33,54 +34,67 @@ const { t } = useAppI18n();
     @close="emit('close')"
   >
     <div class="sparkline-dialog">
-      <label
-        >{{ t("sparkline.source")
-        }}<RangeReferenceInput
-          v-model="draft.source"
-          :label="t('sparkline.source')"
-          :select-reference="selectReference"
-      /></label>
-      <label
-        >{{ t("sparkline.destination")
-        }}<RangeReferenceInput
-          v-model="draft.destination"
-          :label="t('sparkline.destination')"
-          :select-reference="selectReference"
-      /></label>
-      <label
-        >{{ t("sparkline.type")
-        }}<Select
-          v-model="draft.sparkline.type"
-          :options="[
-            { value: 'line', label: t('chart.line') },
-            { value: 'column', label: t('chart.column') },
-            { value: 'winLoss', label: t('sparkline.winLoss') },
-          ]"
-      /></label>
-      <div class="sparkline-dialog__row">
+      <fieldset class="sparkline-dialog__range">
+        <legend>{{ t("sparkline.selectData") }}</legend>
+        <div class="sparkline-dialog__field">
+          <span>{{ t("sparkline.source") }}</span
+          ><RangeReferenceInput
+            v-model="draft.source"
+            :label="t('sparkline.source')"
+            :disabled="disabled"
+            :select-reference="selectReference"
+          />
+        </div>
+      </fieldset>
+      <fieldset class="sparkline-dialog__range">
+        <legend>{{ t("sparkline.selectLocation") }}</legend>
+        <div class="sparkline-dialog__field">
+          <span>{{ t("sparkline.destination") }}</span
+          ><RangeReferenceInput
+            v-model="draft.destination"
+            :label="t('sparkline.destination')"
+            :disabled="disabled"
+            :select-reference="selectReference"
+          />
+        </div>
+      </fieldset>
+      <template v-if="editing">
         <label
-          >{{ t("sparkline.color") }}<input v-model="draft.sparkline.color" type="color" /></label
-        ><label
-          >{{ t("sparkline.negative") }}<input v-model="draft.sparkline.negativeColor" type="color"
+          >{{ t("sparkline.type")
+          }}<Select
+            v-model="draft.sparkline.type"
+            :options="[
+              { value: 'line', label: t('chart.line') },
+              { value: 'column', label: t('chart.column') },
+              { value: 'winLoss', label: t('sparkline.winLoss') },
+            ]"
         /></label>
-      </div>
-      <div class="sparkline-dialog__row">
-        <Checkbox v-if="draft.sparkline.type === 'line'" v-model="draft.sparkline.markers">{{
-          t("sparkline.markers")
-        }}</Checkbox
-        ><Checkbox v-model="draft.sparkline.axis">{{ t("sparkline.axis") }}</Checkbox
-        ><Checkbox v-model="draft.sparkline.showHidden">{{ t("chart.showHidden") }}</Checkbox>
-      </div>
-      <label
-        >{{ t("sparkline.empty")
-        }}<Select
-          v-model="draft.sparkline.empty"
-          :options="[
-            { value: 'gap', label: t('sparkline.gap') },
-            { value: 'zero', label: t('sparkline.zero') },
-            { value: 'connect', label: t('sparkline.connect') },
-          ]"
-      /></label>
+        <div class="sparkline-dialog__row">
+          <label
+            >{{ t("sparkline.color") }}<input v-model="draft.sparkline.color" type="color" /></label
+          ><label
+            >{{ t("sparkline.negative")
+            }}<input v-model="draft.sparkline.negativeColor" type="color"
+          /></label>
+        </div>
+        <div class="sparkline-dialog__row">
+          <Checkbox v-if="draft.sparkline.type === 'line'" v-model="draft.sparkline.markers">{{
+            t("sparkline.markers")
+          }}</Checkbox
+          ><Checkbox v-model="draft.sparkline.axis">{{ t("sparkline.axis") }}</Checkbox
+          ><Checkbox v-model="draft.sparkline.showHidden">{{ t("chart.showHidden") }}</Checkbox>
+        </div>
+        <label
+          >{{ t("sparkline.empty")
+          }}<Select
+            v-model="draft.sparkline.empty"
+            :options="[
+              { value: 'gap', label: t('sparkline.gap') },
+              { value: 'zero', label: t('sparkline.zero') },
+              { value: 'connect', label: t('sparkline.connect') },
+            ]"
+        /></label>
+      </template>
       <p>{{ t("sparkline.hint") }}</p>
       <p v-if="error" class="sparkline-dialog__error" role="alert">
         {{ t(failed ? "sparkline.failed" : "sparkline.invalid") }}
@@ -92,6 +106,23 @@ const { t } = useAppI18n();
 .sparkline-dialog {
   display: grid;
   gap: 14px;
+  &__range {
+    min-width: 0;
+    margin: 0;
+    padding: 12px 0 0;
+    border: 0;
+    border-top: 1px solid var(--sheetcraft-border-subtle);
+    legend {
+      padding: 0 8px 0 0;
+      font-weight: 500;
+    }
+  }
+  &__field {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+  }
   label {
     display: flex;
     align-items: center;

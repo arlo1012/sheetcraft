@@ -1,7 +1,11 @@
 export const sparklinesZhCN = {
   "sparkline.title": "迷你图",
-  "sparkline.source": "数据区域",
-  "sparkline.destination": "放置区域",
+  "sparkline.create": "创建迷你图",
+  "sparkline.edit": "编辑迷你图",
+  "sparkline.selectData": "选择所需的数据",
+  "sparkline.selectLocation": "选择放置迷你图的位置",
+  "sparkline.source": "数据范围",
+  "sparkline.destination": "位置范围",
   "sparkline.type": "类型",
   "sparkline.winLoss": "盈亏图",
   "sparkline.color": "系列颜色",

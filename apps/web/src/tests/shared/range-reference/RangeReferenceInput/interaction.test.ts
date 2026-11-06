@@ -1,3 +1,4 @@
+// 未执行：按用户要求仅编写测试，不运行检查。
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
 import RangeReferenceInput from "../../../../shared/range-reference/RangeReferenceInput.vue";
@@ -14,17 +15,42 @@ function mountInput(
   value: string,
   selectReference: (current: string) => Promise<string | undefined>,
   insertReference = true,
+  label?: string,
 ) {
   const wrapper = mount(RangeReferenceInput, {
     attachTo: document.body,
     global: { plugins: [createAppI18n("en-US")] },
-    props: { modelValue: value, selectReference, insertReference },
+    props: { modelValue: value, selectReference, insertReference, label },
   });
   mounted.push(wrapper);
   return wrapper;
 }
 
 describe("RangeReferenceInput", () => {
+  test.each([
+    { label: undefined, expected: "Reference" },
+    { label: "Data range", expected: "Data range" },
+  ])("names the native input $expected", async ({ label, expected }) => {
+    const wrapper = mountInput("A1:C3", async () => undefined, true, label);
+    await flushPromises();
+
+    expect(wrapper.get("input").attributes("aria-label")).toBe(expected);
+  });
+
+  test("updates the native input name when its label changes and restores the default when removed", async () => {
+    const wrapper = mountInput("A1:C3", async () => undefined, true, "Source range");
+    await flushPromises();
+    expect(wrapper.get("input").attributes("aria-label")).toBe("Source range");
+
+    await wrapper.setProps({ label: "Destination range" });
+    await flushPromises();
+    expect(wrapper.get("input").attributes("aria-label")).toBe("Destination range");
+
+    await wrapper.setProps({ label: undefined });
+    await flushPromises();
+    expect(wrapper.get("input").attributes("aria-label")).toBe("Reference");
+  });
+
   test("inserts the selected range at the saved caret inside a formula", async () => {
     const wrapper = mountInput("=SUM()", async () => "=Budget!$A$1:$A$3");
     const input = wrapper.get<HTMLInputElement>("input");

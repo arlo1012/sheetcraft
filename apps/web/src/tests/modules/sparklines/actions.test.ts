@@ -12,12 +12,13 @@ import {
   getCellSparkline,
   insertSheet,
   setCellSparkline,
+  type CellRange,
 } from "@sheetcraft/core/workbook";
 import type { CellSparkline } from "@sheetcraft/core/sparklines";
 import { useSparklineActions } from "../../../modules/sparklines/useSparklineActions";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 
-function fixture() {
+function fixture(range: CellRange = { start: { row: 0, column: 0 }, end: { row: 1, column: 2 } }) {
   let workbook = createWorkbook({ id: "sparklines", sheetId: "first" });
   let sheet = getActiveSheet(workbook);
   const session = createWorkbookSession({ workbook, idFactory: createSequentialIdFactory() });
@@ -28,7 +29,7 @@ function fixture() {
     getWorkbook: () => workbook,
     getSheet: () => sheet,
     getGeneration: () => 0,
-    getRange: () => ({ start: { row: 0, column: 0 }, end: { row: 1, column: 2 } }),
+    getRange: () => range,
     flush,
     isBusy: () => busy,
     execute,
@@ -62,8 +63,11 @@ describe("sparkline actions", () => {
       f.actions.open(type);
 
       expect(f.actions.draft.value?.sparkline.type).toBe(type);
+      expect(f.actions.draft.value?.source).toBe("");
+      expect(f.actions.draft.value?.destination).toMatch(/!\$A\$1:\$C\$2$/);
+      expect(f.actions.dialog.value?.editing).toBe(false);
       expect(f.execute).not.toHaveBeenCalled();
-      f.actions.confirm(f.actions.draft.value!);
+      f.actions.confirm({ ...f.actions.draft.value!, source: "A1:C2", destination: "D1:D2" });
 
       expect(f.execute).toHaveBeenCalledTimes(1);
       for (let row = 0; row < 2; row++)
@@ -94,6 +98,7 @@ describe("sparkline actions", () => {
       f.actions.open(type);
 
       const draft = f.actions.draft.value!;
+      expect(f.actions.dialog.value?.editing).toBe(true);
       expect(draft.sparkline).toEqual({ ...existing, type });
       expect(draft.source).toMatch(/!\$B\$4:\$D\$4$/);
       expect(draft.destination).toMatch(/!\$A\$1$/);
@@ -114,6 +119,9 @@ describe("sparkline actions", () => {
     const f = fixture();
     f.actions.open();
     expect(f.actions.draft.value?.sparkline.type).toBe("line");
+    expect(f.actions.draft.value?.source).toBe("");
+    expect(f.actions.draft.value?.destination).toMatch(/!\$A\$1:\$C\$2$/);
+    expect(f.actions.dialog.value?.editing).toBe(false);
     const existing: CellSparkline = {
       ...f.actions.draft.value!.sparkline,
       type: "winLoss",
@@ -126,13 +134,53 @@ describe("sparkline actions", () => {
     f.actions.open();
 
     expect(f.actions.draft.value?.sparkline).toEqual(existing);
+    expect(f.actions.draft.value?.source).toMatch(/!\$A\$5:\$C\$5$/);
+    expect(f.actions.draft.value?.destination).toMatch(/!\$A\$1$/);
+    expect(f.actions.dialog.value?.editing).toBe(true);
+    expect(f.execute).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    {
+      label: "single cell",
+      range: { start: { row: 5, column: 3 }, end: { row: 5, column: 3 } },
+      destination: "!$D$6",
+    },
+    {
+      label: "horizontal selection",
+      range: { start: { row: 5, column: 3 }, end: { row: 5, column: 5 } },
+      destination: "!$D$6:$F$6",
+    },
+    {
+      label: "vertical selection",
+      range: { start: { row: 5, column: 3 }, end: { row: 7, column: 3 } },
+      destination: "!$D$6:$D$8",
+    },
+  ])("uses the selected destination for a new sparkline in a $label", ({ range, destination }) => {
+    const f = fixture(range);
+    f.actions.open();
+
+    expect(f.actions.draft.value?.source).toBe("");
+    expect(f.actions.draft.value?.destination.endsWith(destination)).toBe(true);
+    expect(f.actions.dialog.value?.editing).toBe(false);
+    expect(f.execute).not.toHaveBeenCalled();
+  });
+
+  test("requires an explicit source before creating a sparkline", () => {
+    const f = fixture();
+    f.actions.open();
+    f.actions.confirm({ ...f.actions.draft.value!, destination: "D1:D2" });
+
+    expect(f.actions.error.value).toBe(true);
+    expect(f.actions.draft.value?.source).toBe("");
+    expect(f.actions.dialog.value?.editing).toBe(false);
     expect(f.execute).not.toHaveBeenCalled();
   });
 
   test("creates one sparkline per source row in one undoable command", () => {
     const f = fixture();
     f.actions.open();
-    f.actions.confirm(f.actions.draft.value!);
+    f.actions.confirm({ ...f.actions.draft.value!, source: "A1:C2", destination: "D1:D2" });
     expect(f.execute).toHaveBeenCalledTimes(1);
     for (let row = 0; row < 2; row++)
       expect(getCellSparkline(f.sheet, { row, column: 3 })?.source).toEqual({
@@ -160,7 +208,7 @@ describe("sparkline actions", () => {
   test.each(["D1:D3", "D1:E2", "D1"])("rejects incompatible destination %s", (destination) => {
     const f = fixture();
     f.actions.open();
-    f.actions.confirm({ ...f.actions.draft.value!, destination });
+    f.actions.confirm({ ...f.actions.draft.value!, source: "A1:C2", destination });
     expect(f.actions.error.value).toBe(true);
     expect(f.execute).not.toHaveBeenCalled();
     expect(f.actions.draft.value).toBeDefined();
@@ -171,7 +219,7 @@ describe("sparkline actions", () => {
     (change) => {
       const f = fixture();
       f.actions.open();
-      const draft = f.actions.draft.value!;
+      const draft = { ...f.actions.draft.value!, source: "A1:C2", destination: "D1:D2" };
       f[change]();
       f.actions.confirm(draft);
       expect(f.execute).not.toHaveBeenCalled();
@@ -181,7 +229,7 @@ describe("sparkline actions", () => {
   test("rechecks sheet permissions when a draft is confirmed", () => {
     const f = fixture();
     f.actions.open();
-    const draft = f.actions.draft.value!;
+    const draft = { ...f.actions.draft.value!, source: "A1:C2", destination: "D1:D2" };
     f.sheet.properties.protected = true;
     f.actions.confirm(draft);
     expect(f.execute).not.toHaveBeenCalled();

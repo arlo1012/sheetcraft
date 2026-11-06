@@ -8,8 +8,6 @@ import {
 import { normalizeCellSparkline, type CellSparkline } from "@sheetcraft/core/sparklines";
 import {
   getCellSparkline,
-  MAX_SHEET_COLUMNS,
-  MAX_SHEET_ROWS,
   type Sheet,
   type Workbook,
   type CellRange,
@@ -21,6 +19,7 @@ import {
 export type SparklineDraft = { source: string; destination: string; sparkline: CellSparkline };
 type SparklineDialogTarget = {
   dialogId: number;
+  editing: boolean;
   workbook: Workbook;
   sheet: Sheet;
   generation: number;
@@ -65,24 +64,10 @@ export function useSparklineActions(options: {
     if (!canUseSheetPermission(sheet, "formatCells")) return;
     const range = options.getRange();
     const existing = getCellSparkline(sheet, range.start);
-    const source = existing?.source ?? range;
-    const destination = existing
-      ? { start: range.start, end: range.start }
-      : range.end.column + 1 < MAX_SHEET_COLUMNS
-        ? {
-            start: { row: range.start.row, column: range.end.column + 1 },
-            end: { row: range.end.row, column: range.end.column + 1 },
-          }
-        : {
-            start: {
-              row: Math.min(MAX_SHEET_ROWS - 1, range.end.row + 1),
-              column: range.start.column,
-            },
-            end: { row: Math.min(MAX_SHEET_ROWS - 1, range.end.row + 1), column: range.end.column },
-          };
+    const destination = existing ? { start: range.start, end: range.start } : range;
     error.value = false;
     const initial: SparklineDraft = {
-      source: formatRangeReference(sheet.name, source),
+      source: existing?.source ? formatRangeReference(sheet.name, existing.source) : "",
       destination: formatRangeReference(sheet.name, destination),
       sparkline: existing
         ? normalizeCellSparkline(existing)!
@@ -100,6 +85,7 @@ export function useSparklineActions(options: {
     if (type) initial.sparkline.type = type;
     const target: SparklineDialogTarget = {
       dialogId: ++dialogSequence,
+      editing: Boolean(existing),
       workbook: options.getWorkbook(),
       sheet,
       generation: options.getGeneration(),

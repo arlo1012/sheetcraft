@@ -7348,6 +7348,7 @@ watch(
     v-if="sparklineDialog"
     :key="sparklineDialog.dialogId"
     :initial="sparklineDialog.initial"
+    :editing="sparklineDialog.editing"
     :disabled="
       loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'formatCells')
     "

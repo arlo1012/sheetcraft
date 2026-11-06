@@ -3,6 +3,7 @@ import { Input as TInput } from "tdesign-vue-next/es/input";
 import { nextTick, ref } from "vue";
 import { useAppI18n } from "../i18n";
 import { SquareMousePointer } from "lucide-vue-next";
+import { vNativeControl } from "../tdesign/native-control";
 
 const props = withDefaults(
   defineProps<{
@@ -82,10 +83,10 @@ async function pickReference(): Promise<void> {
 <template>
   <div ref="root">
     <TInput
+      v-native-control="{ attributes: { 'aria-label': label ?? t('formulaTools.reference') } }"
       v-model="reference"
       :disabled="disabled"
       :clearable="clearable"
-      :aria-label="label ?? t('formulaTools.reference')"
       :placeholder="placeholder"
       autocomplete="off"
       @enter="emit('enter')"

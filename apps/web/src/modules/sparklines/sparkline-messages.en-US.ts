@@ -1,5 +1,9 @@
 export const sparklinesEnUS = {
   "sparkline.title": "Sparklines",
+  "sparkline.create": "Create Sparklines",
+  "sparkline.edit": "Edit Sparklines",
+  "sparkline.selectData": "Choose the data that you want",
+  "sparkline.selectLocation": "Choose where you want the sparklines to be placed",
   "sparkline.source": "Data range",
   "sparkline.destination": "Location range",
   "sparkline.type": "Type",
