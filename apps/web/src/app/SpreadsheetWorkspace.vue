@@ -2180,7 +2180,7 @@ const workbookPrintSheets = computed(() => {
       activeSheetEvaluator.value.forSheet?.(sheet.id) ??
       createWorkbookEvaluator(session.workbook, sheet.id),
     setup: sheet.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP,
-    displayedNoteKeys: sheet === activeSheet.value ? displayedNoteKeys.value : undefined,
+    displayedNoteKeys: reviewActions.getDisplayedNoteKeys(sheet),
   }));
 });
 const chartPrintSheetResolver = computed(() => {

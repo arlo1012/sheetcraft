@@ -1,5 +1,5 @@
 import { canUseSheetPermission } from "@sheetcraft/core";
-import { computed, nextTick, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, ref, shallowReactive, shallowRef, watch } from "vue";
 import {
   createClearCellNotesCommand,
   createSetCellNoteCommand,
@@ -20,6 +20,13 @@ import { useAppI18n } from "../../shared/i18n";
 
 type NoteDraft = { address: CellAddress; text: string; author: string; box?: CellNote["box"] };
 type NoteTarget = { sheetId: string; address: CellAddress; revision: number };
+type NoteVisibility = {
+  showAll: boolean;
+  allHidden: boolean;
+  hiddenKeys: readonly string[];
+  showActive: boolean;
+  address: CellAddress;
+};
 export type ReviewNote = CellAddress & { address: string; text: string; author?: string };
 
 export function useReviewController(options: {
@@ -40,6 +47,8 @@ export function useReviewController(options: {
   const showAllNotes = ref(false);
   const hiddenNoteKeys = ref<string[]>([]);
   const allNotesHidden = ref(false);
+  // Session view state survives tab changes, but never a document replacement.
+  const sheetVisibility = shallowReactive(new Map<string, NoteVisibility>());
   const draft = shallowRef<NoteDraft>();
   const error = ref("");
   let target: NoteTarget | undefined;
@@ -59,20 +68,31 @@ export function useReviewController(options: {
     void options.getRevision();
     return Boolean(getCellNote(options.getSheet(), anchor(options.getAddress())));
   });
-  const displayedNoteKeys = computed<ReadonlySet<string>>(() => {
+  function getDisplayedNoteKeys(sheet: Sheet): ReadonlySet<string> {
     void options.getRevision();
-    const sheet = options.getSheet();
     const keys = new Set<string>();
-    if (showAllNotes.value)
+    if (options.getWorkbook().sheets.get(sheet.id) !== sheet) return keys;
+    const state =
+      sheet.id === options.getSheet().id
+        ? {
+            showAll: showAllNotes.value,
+            hiddenKeys: hiddenNoteKeys.value,
+            showActive: showActiveNote.value,
+            address: options.getAddress(),
+          }
+        : sheetVisibility.get(sheet.id);
+    if (!state) return keys;
+    if (state.showAll)
       for (const [key, cell] of sheet.cells)
-        if (cell.note && !hiddenNoteKeys.value.includes(key)) keys.add(key);
-    if (showActiveNote.value) {
-      const address = anchor(options.getAddress());
+        if (cell.note && !state.hiddenKeys.includes(key)) keys.add(key);
+    if (state.showActive) {
+      const address = getMergedCellAnchor(sheet.mergedCells, state.address) ?? state.address;
       const key = `${address.row}:${address.column}`;
       if (sheet.cells.get(key)?.note) keys.add(key);
     }
     return keys;
-  });
+  }
+  const displayedNoteKeys = computed(() => getDisplayedNoteKeys(options.getSheet()));
   const hasSelectedNotes = computed(() => {
     const range = options.getSelection();
     return notes.value.some(
@@ -91,12 +111,6 @@ export function useReviewController(options: {
     error.value = "";
     if (wasOpen && restoreFocus) void nextTick(options.focus);
   }
-  watch([options.getGeneration, () => options.getSheet().id], () => {
-    close(false);
-    showAllNotes.value = false;
-    allNotesHidden.value = false;
-    hiddenNoteKeys.value = [];
-  });
   watch(
     [
       options.getGeneration,
@@ -104,7 +118,29 @@ export function useReviewController(options: {
       () => options.getAddress().row,
       () => options.getAddress().column,
     ],
-    () => {
+    ([generation, sheetId, row, column], [oldGeneration, oldSheetId, oldRow, oldColumn]) => {
+      const changedDocument = generation !== oldGeneration;
+      const changedSheet = sheetId !== oldSheetId;
+      if (changedDocument || changedSheet) {
+        close(false);
+        if (changedDocument) sheetVisibility.clear();
+        else
+          sheetVisibility.set(oldSheetId, {
+            showAll: showAllNotes.value,
+            allHidden: allNotesHidden.value,
+            hiddenKeys: [...hiddenNoteKeys.value],
+            showActive: showActiveNote.value,
+            address: { row: oldRow, column: oldColumn },
+          });
+        const saved = sheetVisibility.get(sheetId);
+        showAllNotes.value = saved?.showAll ?? false;
+        allNotesHidden.value = saved?.allHidden ?? false;
+        hiddenNoteKeys.value = [...(saved?.hiddenKeys ?? [])];
+        if (saved && saved.address.row === row && saved.address.column === column) {
+          showActiveNote.value = saved.showActive;
+          return;
+        }
+      }
       const address = anchor(options.getAddress());
       showActiveNote.value =
         !allNotesHidden.value && !hiddenNoteKeys.value.includes(`${address.row}:${address.column}`);
@@ -264,6 +300,7 @@ export function useReviewController(options: {
     showAllNotes,
     hiddenNoteKeys,
     displayedNoteKeys,
+    getDisplayedNoteKeys,
     setAllNotesVisible,
     resetBox,
     hasNote,
