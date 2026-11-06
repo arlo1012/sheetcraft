@@ -16,7 +16,8 @@ export function paintSparkline(
   const max = sparkline.type === "line" ? Math.max(...numbers) : Math.max(0, ...numbers);
   const y = (value: number) =>
     max === min ? top + height / 2 : top + height - ((value - min) / (max - min)) * height;
-  const zero = Math.max(top, Math.min(top + height, y(0)));
+  const zero =
+    sparkline.type === "winLoss" ? top + height / 2 : Math.max(top, Math.min(top + height, y(0)));
   context.save();
   context.beginPath();
   context.rect(rect.x, rect.y, rect.width, rect.height);
@@ -60,7 +61,7 @@ export function paintSparkline(
     values.forEach((value, index) => {
       if (value === null || value === 0) return;
       context.fillStyle = value < 0 ? sparkline.negativeColor : sparkline.color;
-      const base = sparkline.type === "winLoss" ? top + height / 2 : zero;
+      const base = zero;
       const end = sparkline.type === "winLoss" ? (value > 0 ? top : top + height) : y(value);
       context.fillRect(
         left + slot * index + (slot - barWidth) / 2,
