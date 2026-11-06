@@ -170,10 +170,23 @@ requirements instead of copying the old frontend components or dependencies.
 
 ## License
 
-Sheetcraft's original code is licensed under the [MIT License](LICENSE).
+Sheetcraft's original code is dual-licensed under **AGPL-3.0-only** or a
+**separate commercial license**. See [LICENSE](LICENSE).
+
+- **AGPLv3:** use, modify, and distribute the code under the
+  [GNU Affero General Public License, version 3](LICENSE-AGPL-3.0.txt), including
+  applicable source-code obligations when distributing covered works or offering
+  modified versions for remote network interaction. Commercial use, including
+  paid SaaS, is allowed when the AGPL's requirements are met.
+- **Commercial license:** if you need proprietary distribution or hosted use
+  that cannot comply with the AGPL, contact [arlo1012](https://github.com/arlo1012)
+  to discuss a separate written agreement. See
+  [commercial licensing information](LICENSE-COMMERCIAL.txt).
+
+Previously granted MIT permissions for earlier releases remain valid.
 
 Third-party dependencies, fonts, data, and test fixtures retain their own
-licenses and notices. The root MIT license does not relicense those materials.
+licenses and notices. The root dual-license offer does not relicense those materials.
 Existing notices include:
 
 - [Apache POI shape presets](packages/core/resources/shape-presets/README.md),

@@ -2,7 +2,7 @@
   "name": "@sheetcraft/web",
   "version": "0.0.0",
   "private": true,
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 7200",

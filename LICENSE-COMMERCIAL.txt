@@ -1,0 +1,20 @@
+Sheetcraft — Commercial Licensing
+
+Copyright (c) 2026 arlo1012
+
+A commercial license is available by separate written agreement with the
+applicable copyright holder(s). To inquire, contact arlo1012 through the
+repository owner's GitHub profile: https://github.com/arlo1012
+
+A commercial agreement may provide permissions for proprietary distribution,
+proprietary SaaS deployments, or other uses that cannot comply with the AGPL.
+Its scope, fees, support, warranties, and other terms must be agreed separately.
+
+This file is an informational notice, not a commercial license grant. No
+commercial rights are granted by this notice, by access to the repository, or
+by payment without an applicable agreement. Until a commercial agreement is
+in place, use of the original code must comply with LICENSE-AGPL-3.0.txt or
+another valid license you already hold.
+
+Third-party materials remain subject to their own licenses and notices and
+are not relicensed by this commercial licensing option.
