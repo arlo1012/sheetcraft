@@ -18,6 +18,26 @@ import {
   resolveRangeReference,
 } from "../../shared/range-reference/formatRangeReference";
 export type SparklineDraft = { source: string; destination: string; sparkline: CellSparkline };
+function hasSelectedContent(sheet: Sheet, range: CellRange): boolean {
+  // Inspect stored cells so whole-row/column selections do not scan empty coordinates.
+  for (const [key, cell] of sheet.cells) {
+    const content = cell.content;
+    if (
+      !content ||
+      (content.kind === "literal" && (content.value === null || content.value === ""))
+    )
+      continue;
+    const [row, column] = key.split(":").map(Number) as [number, number];
+    if (
+      row >= range.start.row &&
+      row <= range.end.row &&
+      column >= range.start.column &&
+      column <= range.end.column
+    )
+      return true;
+  }
+  return false;
+}
 type SparklineDialogTarget = {
   dialogId: number;
   editing: boolean;
@@ -66,10 +86,15 @@ export function useSparklineActions(options: {
     const range = address ? { start: address, end: address } : options.getRange();
     const existing = getCellSparkline(sheet, range.start);
     const destination = existing ? { start: range.start, end: range.start } : range;
+    const useSelectionAsSource = !existing && hasSelectedContent(sheet, range);
     error.value = false;
     const initial: SparklineDraft = {
-      source: existing?.source ? formatRangeReference(sheet.name, existing.source) : "",
-      destination: formatRangeReference(sheet.name, destination),
+      source: existing?.source
+        ? formatRangeReference(sheet.name, existing.source)
+        : useSelectionAsSource
+          ? formatRangeReference(sheet.name, range)
+          : "",
+      destination: useSelectionAsSource ? "" : formatRangeReference(sheet.name, destination),
       sparkline: existing
         ? normalizeCellSparkline(existing)!
         : {

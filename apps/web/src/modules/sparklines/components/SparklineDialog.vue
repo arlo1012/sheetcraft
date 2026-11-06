@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Select } from "tdesign-vue-next/es/select";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
@@ -17,6 +17,19 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ confirm: [draft: SparklineDraft]; close: [] }>();
 const draft = ref({ ...props.initial, sparkline: { ...props.initial.sparkline } });
+const sourceInput = ref<InstanceType<typeof RangeReferenceInput>>();
+const destinationInput = ref<InstanceType<typeof RangeReferenceInput>>();
+const initialFocus =
+  !props.editing && props.initial.source && !props.initial.destination ? "destination" : "source";
+let focused = false;
+function focusInitialRange(): void {
+  if (focused || props.disabled || props.suspended) return;
+  const input = initialFocus === "destination" ? destinationInput.value : sourceInput.value;
+  if (!input) return;
+  input.focus();
+  focused = true;
+}
+watch([sourceInput, destinationInput], focusInitialRange, { flush: "post" });
 const { t } = useAppI18n();
 </script>
 <template>
@@ -32,6 +45,7 @@ const { t } = useAppI18n();
     :cancel-btn="t('picture.cancel')"
     @confirm="emit('confirm', draft)"
     @close="emit('close')"
+    @opened="focusInitialRange"
   >
     <div class="sparkline-dialog">
       <fieldset class="sparkline-dialog__range">
@@ -39,6 +53,7 @@ const { t } = useAppI18n();
         <div class="sparkline-dialog__field">
           <span>{{ t("sparkline.source") }}</span
           ><RangeReferenceInput
+            ref="sourceInput"
             v-model="draft.source"
             :label="t('sparkline.source')"
             :disabled="disabled"
@@ -51,6 +66,7 @@ const { t } = useAppI18n();
         <div class="sparkline-dialog__field">
           <span>{{ t("sparkline.destination") }}</span
           ><RangeReferenceInput
+            ref="destinationInput"
             v-model="draft.destination"
             :label="t('sparkline.destination')"
             :disabled="disabled"

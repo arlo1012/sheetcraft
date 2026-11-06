@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, h, nextTick, ref, shallowRef } from "vue";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { WorkbookDomainError } from "@sheetcraft/core/errors";
@@ -123,6 +123,18 @@ async function open(f: ReturnType<typeof fixture>) {
 }
 
 describe("sparkline concrete dialog bounded lifecycle", () => {
+  test.each([false, true])(
+    "focuses the missing range after mounting (blank selection: %s)",
+    async (blank) => {
+      const f = fixture();
+      if (blank) f.range.value = { start: { row: 4, column: 3 }, end: { row: 4, column: 3 } };
+      await open(f);
+      await flushPromises();
+      const inputs = f.wrapper.findAll(".sparkline-dialog input");
+      expect(document.activeElement).toBe(inputs[blank ? 0 : 1]!.element);
+    },
+  );
+
   test("disposed owner makes retained confirmation inert", async () => {
     const f = fixture();
     await open(f);

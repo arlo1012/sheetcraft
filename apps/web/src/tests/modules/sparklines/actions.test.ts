@@ -11,7 +11,9 @@ import {
   getActiveSheet,
   getCellSparkline,
   insertSheet,
+  setCellContent,
   setCellSparkline,
+  setCellStyle,
   type CellRange,
 } from "@sheetcraft/core/workbook";
 import type { CellSparkline } from "@sheetcraft/core/sparklines";
@@ -94,6 +96,8 @@ describe("sparkline actions", () => {
         empty: "connect",
       };
       setCellSparkline(f.sheet, address, existing);
+      setCellContent(f.sheet, address, { kind: "literal", value: 0 });
+      setCellContent(f.sheet, { row: 1, column: 2 }, { kind: "literal", value: "Selected data" });
 
       f.actions.open(type);
 
@@ -164,6 +168,93 @@ describe("sparkline actions", () => {
     expect(f.actions.draft.value?.destination.endsWith(destination)).toBe(true);
     expect(f.actions.dialog.value?.editing).toBe(false);
     expect(f.execute).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    { label: "text", content: { kind: "literal", value: "Sales" } },
+    { label: "numeric zero", content: { kind: "literal", value: 0 } },
+    { label: "boolean false", content: { kind: "literal", value: false } },
+    {
+      label: "a formula producing an empty string",
+      content: { kind: "formula", formula: { source: '=""' } },
+    },
+    {
+      label: "an error",
+      content: { kind: "error", error: { kind: "formula-error", code: "DIV0" } },
+    },
+  ] satisfies Array<{ label: string; content: NonNullable<Parameters<typeof setCellContent>[2]> }>)(
+    "uses the entire selection as source when its last cell contains $label",
+    ({ content }) => {
+      const f = fixture();
+      setCellContent(f.sheet, { row: 1, column: 2 }, content);
+      f.actions.open();
+
+      expect(f.actions.draft.value?.source).toMatch(/!\$A\$1:\$C\$2$/);
+      expect(f.actions.draft.value?.destination).toBe("");
+      expect(f.actions.dialog.value?.editing).toBe(false);
+      expect(f.execute).not.toHaveBeenCalled();
+    },
+  );
+
+  test("treats empty literals and style-only cells as a blank destination selection", () => {
+    const f = fixture();
+    setCellStyle(f.sheet, { row: 0, column: 0 }, { bold: true });
+    setCellContent(f.sheet, { row: 1, column: 2 }, { kind: "literal", value: "" });
+    setCellContent(f.sheet, { row: 0, column: 1 }, null);
+    f.actions.open();
+
+    expect(f.actions.draft.value?.source).toBe("");
+    expect(f.actions.draft.value?.destination).toMatch(/!\$A\$1:\$C\$2$/);
+    expect(f.actions.dialog.value?.editing).toBe(false);
+    expect(f.execute).not.toHaveBeenCalled();
+  });
+
+  test("ignores nonempty cells just outside the selected range when choosing source and destination", () => {
+    const f = fixture();
+    setCellContent(f.sheet, { row: 1, column: 3 }, { kind: "literal", value: 12 });
+    setCellContent(f.sheet, { row: 2, column: 2 }, { kind: "literal", value: "Outside" });
+    f.actions.open();
+
+    expect(f.actions.draft.value?.source).toBe("");
+    expect(f.actions.draft.value?.destination).toMatch(/!\$A\$1:\$C\$2$/);
+    expect(f.execute).not.toHaveBeenCalled();
+  });
+
+  test("uses a nonempty single selected cell as source and requires an explicit destination", () => {
+    const f = fixture({ start: { row: 5, column: 3 }, end: { row: 5, column: 3 } });
+    setCellContent(f.sheet, { row: 5, column: 3 }, { kind: "literal", value: 0 });
+    f.actions.open();
+    const draft = f.actions.draft.value!;
+
+    expect(draft.source).toMatch(/!\$D\$6$/);
+    expect(draft.destination).toBe("");
+    expect(f.actions.dialog.value?.editing).toBe(false);
+    f.actions.confirm(draft);
+    expect(f.actions.error.value).toBe(true);
+    expect(f.actions.draft.value).toBe(draft);
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(f.session.history.undoStack).toHaveLength(0);
+  });
+
+  test("keeps a selected data range until the missing destination is supplied", () => {
+    const f = fixture();
+    setCellContent(f.sheet, { row: 1, column: 2 }, { kind: "literal", value: 18 });
+    f.actions.open();
+    const draft = f.actions.draft.value!;
+    f.actions.confirm(draft);
+
+    expect(f.actions.error.value).toBe(true);
+    expect(f.actions.draft.value).toBe(draft);
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(f.session.history.undoStack).toHaveLength(0);
+    f.actions.confirm({ ...draft, destination: "D1:D2" });
+    expect(f.execute).toHaveBeenCalledTimes(1);
+    expect(f.actions.draft.value).toBeUndefined();
+    for (let row = 0; row < 2; row++)
+      expect(getCellSparkline(f.sheet, { row, column: 3 })?.source).toEqual({
+        start: { row, column: 0 },
+        end: { row, column: 2 },
+      });
   });
 
   test("requires an explicit source before creating a sparkline", () => {

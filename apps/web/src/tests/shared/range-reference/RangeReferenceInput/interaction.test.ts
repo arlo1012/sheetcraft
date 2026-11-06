@@ -27,6 +27,13 @@ function mountInput(
 }
 
 describe("RangeReferenceInput", () => {
+  test("exposes focus for a dialog to target its missing range", async () => {
+    const wrapper = mountInput("", async () => undefined, false, "Location range");
+    await flushPromises();
+    wrapper.vm.focus();
+    expect(document.activeElement).toBe(wrapper.get("input").element);
+  });
+
   test.each([
     { label: undefined, expected: "Reference" },
     { label: "Data range", expected: "Data range" },

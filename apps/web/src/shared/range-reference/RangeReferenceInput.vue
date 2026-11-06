@@ -22,6 +22,8 @@ const reference = defineModel<string>({ required: true });
 const emit = defineEmits<{ enter: [] }>();
 const { t } = useAppI18n();
 const root = ref<HTMLElement>();
+const control = ref<{ focus(): void }>();
+defineExpose({ focus: () => control.value?.focus() });
 let selection: { start: number; end: number } | undefined;
 
 function input(): HTMLInputElement | undefined {
@@ -83,6 +85,7 @@ async function pickReference(): Promise<void> {
 <template>
   <div ref="root">
     <TInput
+      ref="control"
       v-native-control="{ attributes: { 'aria-label': label ?? t('formulaTools.reference') } }"
       v-model="reference"
       :disabled="disabled"
