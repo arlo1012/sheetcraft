@@ -1,3 +1,4 @@
+// 未执行：按用户要求仅编写测试，不运行检查。
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
 import { DEFAULT_SHEET_WATERMARK } from "@sheetcraft/core/page-decoration";
@@ -40,7 +41,7 @@ describe("page decoration image actions", () => {
         setDecoration: (id, decoration) => {
           executeWorkbookCommand(session, createSetSheetPageDecorationCommand(id, decoration));
         },
-        setWatermarks: vi.fn(),
+        setWatermarks: vi.fn().mockReturnValue(false),
         setPresets: vi.fn(),
       });
       await actions.setBackgroundFile(file);
@@ -71,7 +72,7 @@ describe("page decoration image actions", () => {
       getSheet: () => sheet,
       flushPendingEdits: () => true,
       setDecoration,
-      setWatermarks: vi.fn(),
+      setWatermarks: vi.fn().mockReturnValue(false),
       setPresets: vi.fn(),
     });
     await actions.setBackgroundFile(file, "remove");
@@ -95,7 +96,7 @@ describe("page decoration image actions", () => {
       getGeneration: () => 0,
       flushPendingEdits: () => true,
       setDecoration,
-      setWatermarks: vi.fn(),
+      setWatermarks: vi.fn().mockReturnValue(false),
       setPresets: vi.fn(),
     });
     const pending = actions.setBackgroundFile(file);
@@ -110,7 +111,7 @@ describe("page decoration image actions", () => {
     vi.mocked(prepareImageAsset).mockResolvedValue(asset);
     const workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
     const store = createMemoryImageAssetStore();
-    const setWatermarks = vi.fn();
+    const setWatermarks = vi.fn().mockReturnValue(true);
     const actions = usePageDecorationActions({
       assetStore: store,
       getWorkbook: () => workbook,
@@ -144,7 +145,7 @@ describe("page decoration image actions", () => {
       }),
     );
     const workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
-    const setWatermarks = vi.fn();
+    const setWatermarks = vi.fn().mockReturnValue(false);
     const actions = usePageDecorationActions({
       assetStore: createMemoryImageAssetStore(),
       getWorkbook: () => workbook,

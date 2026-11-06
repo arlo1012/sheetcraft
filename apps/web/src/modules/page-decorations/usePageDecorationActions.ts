@@ -5,6 +5,7 @@ import type {
   WatermarkPreset,
 } from "@sheetcraft/core/page-decoration";
 import type { Sheet, Workbook } from "@sheetcraft/core/workbook";
+import { applyWorkbookCommand, createSetSheetsWatermarkCommand } from "@sheetcraft/core/commands";
 import type { ImageAssetStore } from "../image-assets/imageAssetStore";
 import { ImageAssetError, prepareImageAsset } from "../image-assets/prepareImageAsset";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
@@ -24,7 +25,7 @@ export function usePageDecorationActions(options: {
     sheetIds: string[],
     watermark: SheetWatermark | undefined,
     presets?: readonly WatermarkPreset[],
-  ) => void;
+  ) => boolean;
   setPresets: (presets: readonly WatermarkPreset[]) => void;
 }) {
   const busy = ref(false);
@@ -140,10 +141,21 @@ export function usePageDecorationActions(options: {
             },
           ]
         : undefined;
-      options.setWatermarks(sheetIds, draft, presets);
-      return true;
+      const command = createSetSheetsWatermarkCommand(sheetIds, draft, presets);
+      const unchanged = () => {
+        // Use Core's normalization and no-op rules on disposable sheet shells.
+        const sheets = new Map(workbook.sheets);
+        for (const id of sheetIds) sheets.set(id, { ...workbook.sheets.get(id)! });
+        return applyWorkbookCommand({ ...workbook, sheets }, command) === null;
+      };
+      const noChange = unchanged();
+      const accepted = options.setWatermarks(sheetIds, draft, presets);
+      if (request !== watermarkRequest || !isCurrent(workbook, sheetId, generation)) return false;
+      if (accepted || (noChange && editable() && unchanged())) return true;
+      feedback.value = "failed";
+      return false;
     } catch (error) {
-      if (request === watermarkRequest)
+      if (request === watermarkRequest && isCurrent(workbook, sheetId, generation))
         feedback.value = error instanceof ImageAssetError ? "invalidImage" : "failed";
       return false;
     } finally {
