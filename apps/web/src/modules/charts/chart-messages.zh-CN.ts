@@ -86,7 +86,7 @@ export const chartsZhCN = {
   "chart.river": "河流图",
   "chart.wordCloud": "词云图",
   "chart.dashboard": "数据看板",
-  "chart.more": "动态图表",
+  "chart.more": "更多图表",
   "chart.finishTitleComposition": "请先完成标题输入。",
   "chart.sourceAddSeries": "添加系列",
   "chart.sourceEditSeries": "编辑系列",

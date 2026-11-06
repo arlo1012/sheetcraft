@@ -21,6 +21,7 @@ import {
   type SheetDrawing,
   type SheetGraphicDrawing,
   type SheetGraphicKind,
+  type DrawingShape,
   normalizeSheetDrawings,
   normalizeSheetDrawing,
   isFramedEquationDrawing,
@@ -186,6 +187,22 @@ export function useDrawingActions(options: {
       direction,
     );
     targets.open(target, initial, (current, next) => confirm(next, current));
+  }
+  function insertIcon(shape: DrawingShape): boolean {
+    const target = targets.prepare();
+    if (!target) return false;
+    const initial = createGraphicDrawing(
+      idFactory("drawing"),
+      "icon",
+      options.name("icon"),
+      options.getAddress(),
+    );
+    initial.shape = shape;
+    targets.open(target, initial, (current, next) => confirm(next, current));
+    const current = dialog.value;
+    const accepted = confirm(initial, current);
+    if (!accepted) close(current);
+    return accepted;
   }
   function requestTextBox(direction: "horizontal" | "vertical", target = dialog.value): boolean {
     let accepted = false;
@@ -578,6 +595,7 @@ export function useDrawingActions(options: {
     canEditDialog,
     normalizeDialogDrawing,
     insert,
+    insertIcon,
     edit,
     editGroupLeaf,
     update,

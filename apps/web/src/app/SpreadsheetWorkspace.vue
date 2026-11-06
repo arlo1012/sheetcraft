@@ -76,6 +76,7 @@ import CalculatedColumnDialog from "../modules/table-styles/components/Calculate
 import TableToolsToolbar from "../modules/table-styles/components/TableToolsToolbar.vue";
 import NewTableStyleDialog from "../modules/table-styles/components/NewTableStyleDialog.vue";
 import HyperlinkDialog from "../modules/hyperlinks/components/HyperlinkDialog.vue";
+import AttachmentInsertDialog from "../modules/attachments/components/AttachmentInsertDialog.vue";
 import { useHyperlinksController } from "../modules/hyperlinks/useHyperlinksController";
 import NewCellStyleDialog from "../modules/cell-styles/components/NewCellStyleDialog.vue";
 import MergeCellStylesDialog from "../modules/cell-styles/components/MergeCellStylesDialog.vue";
@@ -95,6 +96,7 @@ import type { SheetWatermark, WatermarkPreset } from "@sheetcraft/core/page-deco
 import { usePictureAssetTools } from "../modules/sheet-images/usePictureAssetTools";
 import { usePictureCellConversion } from "../modules/sheet-images/usePictureCellConversion";
 import PictureCellOverwriteDialog from "../modules/sheet-images/components/PictureCellOverwriteDialog.vue";
+import PictureBatchInsertDialog from "../modules/sheet-images/components/PictureBatchInsertDialog.vue";
 import type { PictureCellOverwriteConfirmation } from "../modules/sheet-images/picture-cell-overwrite-confirmation";
 import PictureCompressDialog from "../modules/sheet-images/components/PictureCompressDialog.vue";
 import PictureBatchSizeDialog from "../modules/sheet-images/components/PictureBatchSizeDialog.vue";
@@ -105,7 +107,7 @@ import {
 import PictureSelectionPane from "../modules/sheet-images/components/PictureSelectionPane.vue";
 import PictureAnnotationDialog from "../modules/sheet-images/components/PictureAnnotationDialog.vue";
 import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vue";
-import type { Sheet, FloatingImage, ImageAppearance } from "@sheetcraft/core/workbook";
+import type { Workbook, Sheet, FloatingImage, ImageAppearance } from "@sheetcraft/core/workbook";
 import PictureGroupRibbon from "../modules/sheet-images/components/PictureGroupRibbon.vue";
 import PictureOwnedLeafRibbon from "../modules/sheet-images/components/PictureOwnedLeafRibbon.vue";
 import { resolveOwnedPictureNode } from "../modules/sheet-images/picture-group-interaction";
@@ -184,6 +186,7 @@ import { ensureCellFontResource } from "../shared/cell-text/font-resources";
 import { useSheetDisplaySnapshot } from "../modules/sheet-grid/canvas/sheet-display-snapshot";
 import { DEFAULT_CELL_FONT_FAMILY } from "@sheetcraft/core/style";
 import { captureScreen } from "../modules/insert-tools/captureScreen";
+import ScreenCaptureDialog from "../modules/insert-tools/components/ScreenCaptureDialog.vue";
 import { useShapeCreation } from "../modules/sheet-drawings/useShapeCreation";
 import type { ShapeGalleryChoice } from "../modules/sheet-drawings/shape-gallery";
 import { useDrawingActions } from "../modules/sheet-drawings/useDrawingActions";
@@ -680,6 +683,13 @@ const showPageBreaks = computed({
   set: (show: boolean) => showPageBreaksBySheet.set(activeSheet.value.id, show),
 });
 const printPreviewVisible = ref(false);
+const returnToPrintPreview = ref(false);
+watch(pageSetupVisible, (visible) => {
+  if (!visible && returnToPrintPreview.value) {
+    returnToPrintPreview.value = false;
+    printPreviewVisible.value = true;
+  }
+});
 const watermarkVisible = ref(false);
 const backgroundConflictVisible = ref(false);
 const editingWatermarkPreset = shallowRef<WatermarkPreset>();
@@ -841,6 +851,12 @@ function openPrintPreview(): void {
   if (sheetGridRef.value?.flushPendingEdit() === false) return;
   printPreviewVisible.value = true;
 }
+function openPrintPageSetup(): void {
+  openPageSetup("page");
+  if (!pageSetupVisible.value) return;
+  returnToPrintPreview.value = true;
+  printPreviewVisible.value = false;
+}
 function savePageSetup(setup: SheetPageSetup): void {
   if (loading.value || fileBusy.value || xlsxBusy.value || activeSheet.value.properties.protected)
     return;
@@ -849,6 +865,7 @@ function savePageSetup(setup: SheetPageSetup): void {
   void nextTick(focusCellEditor);
 }
 watch(workbookGeneration, () => {
+  returnToPrintPreview.value = false;
   pageViewModes.clear();
   showPageBreaksBySheet.clear();
   printPreviewVisible.value = false;
@@ -858,6 +875,7 @@ watch(workbookGeneration, () => {
 watch(
   () => activeSheet.value.id,
   () => {
+    returnToPrintPreview.value = false;
     pageSetupVisible.value = false;
     printPreviewVisible.value = false;
     watermarkVisible.value = false;
@@ -1543,12 +1561,17 @@ const attachmentActions = useAttachmentActions({
     void MessagePlugin.error(t("attachment.failed"));
   },
 });
-const { viewing: viewingAttachment, busy: attachmentBusy } = attachmentActions;
+const {
+  viewing: viewingAttachment,
+  busy: attachmentBusy,
+  inserting: insertingAttachment,
+} = attachmentActions;
 watch(() => activeSheet.value.id, attachmentActions.close);
 watch(workbookGeneration, attachmentActions.close);
 const cameraActions = useCameraActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
+  getEvaluator: () => activeSheetEvaluator.value,
   getGeneration: () => workbookGeneration.value,
   getRevision: () => workbookRevision.value,
   getRange: () => activeSelectionRange.value,
@@ -1891,6 +1914,16 @@ const symbolVisible = computed(() => !!symbolDialog.value);
 const symbolPreferences = useSymbolPreferences();
 let symbolDialogSequence = 0;
 const captureBusy = ref(false);
+const screenCapture = shallowRef<{
+  file: File;
+  workbook: Workbook;
+  sheet: Sheet;
+  generation: number;
+  address: CellAddress;
+}>();
+watch([workbookGeneration, () => activeSheet.value.id], () => {
+  screenCapture.value = undefined;
+});
 function openSymbolDialog(): void {
   if (
     loading.value ||
@@ -2033,6 +2066,7 @@ watch(
 async function insertScreenCapture(): Promise<void> {
   if (
     captureBusy.value ||
+    screenCapture.value ||
     imageBusy.value ||
     loading.value ||
     fileBusy.value ||
@@ -2046,7 +2080,8 @@ async function insertScreenCapture(): Promise<void> {
     return;
   }
   const workbook = session.workbook;
-  const sheetId = activeSheet.value.id;
+  const sheet = activeSheet.value;
+  const generation = workbookGeneration.value;
   const address = { ...activeAddress.value };
   captureBusy.value = true;
   try {
@@ -2054,12 +2089,33 @@ async function insertScreenCapture(): Promise<void> {
     if (
       file &&
       session.workbook === workbook &&
-      activeSheet.value.id === sheetId &&
+      activeSheet.value === sheet &&
+      workbookGeneration.value === generation &&
       canUseSheetPermission(activeSheet.value, "editObjects")
     )
-      await imageActions.pasteImageFile(file, "floating", address);
+      screenCapture.value = { file, workbook, sheet, generation, address };
   } catch {
     void MessagePlugin.error(t("drawing.captureFailed"));
+  } finally {
+    captureBusy.value = false;
+  }
+}
+async function insertCapturedRegion(file: File): Promise<void> {
+  const target = screenCapture.value;
+  if (!target || captureBusy.value) return;
+  if (
+    target.workbook !== session.workbook ||
+    target.sheet !== activeSheet.value ||
+    target.generation !== workbookGeneration.value ||
+    !canUseSheetPermission(target.sheet, "editObjects")
+  ) {
+    screenCapture.value = undefined;
+    return;
+  }
+  captureBusy.value = true;
+  try {
+    await imageActions.pasteImageFile(file, "floating", target.address);
+    if (screenCapture.value === target) screenCapture.value = undefined;
   } finally {
     captureBusy.value = false;
   }
@@ -4746,6 +4802,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     themeDialogVisible.value ||
     backgroundConflictVisible.value ||
     printPreviewVisible.value ||
+    !!screenCapture.value ||
+    !!imageActions.batchInsertion.value ||
     watermarkVisible.value ||
     (pageSetupVisible.value && !pickingPageSetupRange.value) ||
     formulaEditorVisible.value ||
@@ -4909,6 +4967,8 @@ const gridInert = computed(
     loading.value ||
     fileBusy.value ||
     xlsxBusy.value ||
+    !!screenCapture.value ||
+    !!imageActions.batchInsertion.value ||
     (!!protectionDialog.value && !pickingProtectionRange.value) ||
     !!textReview.mode.value ||
     !!wordProofreading.panel.value ||
@@ -4924,6 +4984,7 @@ const gridInert = computed(
     pivotFieldSettingsOpen.value ||
     !!pictureAnnotation.value ||
     !!viewingAttachment.value ||
+    !!insertingAttachment.value ||
     !!editingDrawing.value ||
     (!!textBoxReferenceDialog.value && !pickingTextBoxReference.value) ||
     !!shapeClipboardTransferConfirmation.value ||
@@ -4977,6 +5038,7 @@ watch(
       @cancel="imageActions.onFileCancel"
     />
     <SpreadsheetRibbon
+      :print-disabled="loading || fileBusy || xlsxBusy"
       :has-chart="!!chartObjectContext"
       :has-image="!!selectedPicture"
       :has-shape="!!shapeObjectControls.snapshot.value?.paths.length"
@@ -5040,6 +5102,7 @@ watch(
         pivotFieldSettingsOpen ||
         !!pictureAnnotation ||
         !!viewingAttachment ||
+        !!insertingAttachment ||
         !!editingDrawing ||
         !!textBoxReferenceDialog ||
         !!shapeClipboardTransferConfirmation ||
@@ -5058,6 +5121,7 @@ watch(
       "
       @insert-image="imageActions.requestInsert"
       @insert-hyperlink="hyperlinkActions.edit"
+      @print="openPrintPreview"
       @apply-borders="applyCellBorders"
       @update-border-format="updateBorderFormat"
       @open-cell-format="openCellFormat"
@@ -5429,9 +5493,10 @@ watch(
           @edit-pivot="openPivotFields()"
           @refresh-pivot="pivotActions.refresh"
           @remove-pivot="pivotActions.remove"
-          @insert-control="controlActions.open()"
+          @insert-control="controlActions.insert($event)"
           @insert-attachment="attachmentActions.requestInsert"
           @insert-drawing="drawingActions.insert"
+          :insert-icon-handler="drawingActions.insertIcon"
           :insert-shape-handler="shapeInsertHandler"
           :insert-word-art-handler="wordArtInsertHandler"
           :insert-equation-handler="equationInsertHandler"
@@ -6218,6 +6283,12 @@ watch(
       :key="hyperlinkDialog.dialogId"
       :draft="hyperlinkDialog.initial"
       :error="hyperlinkError"
+      :current-sheet-name="activeSheet.name"
+      :sheets="
+        [...session.workbook.sheets.values()]
+          .filter((sheet) => !sheet.properties.hidden)
+          .map((sheet) => ({ id: sheet.id, name: sheet.name }))
+      "
       @confirm="hyperlinkDialog.confirm"
       @remove="hyperlinkDialog.remove"
       @cancel="hyperlinkDialog.cancel"
@@ -6335,6 +6406,7 @@ watch(
         pivotFieldSettingsOpen ||
         !!pictureAnnotation ||
         !!viewingAttachment ||
+        !!insertingAttachment ||
         !!editingDrawing ||
         !!textBoxReferenceDialog ||
         !!shapeClipboardTransferConfirmation ||
@@ -6831,6 +6903,15 @@ watch(
       @confirm="pictureAnnotation.confirm"
       @close="pictureAnnotation.close"
     />
+    <PictureBatchInsertDialog
+      v-if="imageActions.batchInsertion.value"
+      :key="imageActions.pickerKey.value"
+      :file-names="imageActions.batchInsertion.value.files.map((file) => file.name)"
+      :mode="imageActions.batchInsertion.value.mode"
+      :busy="imageBusy"
+      @confirm="imageActions.confirmBatchInsertion"
+      @close="imageActions.cancelPending"
+    />
     <PictureCellOverwriteDialog
       v-if="pictureCellOverwriteConfirmation"
       :key="`${pictureCellOverwriteConfirmation.insertionTargets ? 'insert' : 'convert'}:${pictureCellOverwriteConfirmation.key}`"
@@ -6855,9 +6936,19 @@ watch(
       @confirm="pictureBatchSize.confirm"
       @close="pictureBatchSize.close"
     />
+    <ScreenCaptureDialog
+      v-if="screenCapture"
+      :file="screenCapture.file"
+      :busy="captureBusy"
+      @confirm="insertCapturedRegion"
+      @close="screenCapture = undefined"
+    />
     <PagePrintPreview
+      :selection="activeSelectionRange"
+      :setup-disabled="activeSheet.properties.protected"
+      @page-setup="openPrintPageSetup"
       :theme="workbookTheme"
-      v-if="printPreviewVisible"
+      v-if="printPreviewVisible || returnToPrintPreview"
       v-model:visible="printPreviewVisible"
       :sheet="activeSheet"
       :evaluator="activeSheetEvaluator"
@@ -6966,6 +7057,7 @@ watch(
         pivotFieldSettingsOpen ||
         !!pictureAnnotation ||
         !!viewingAttachment ||
+        !!insertingAttachment ||
         !!editingDrawing ||
         symbolVisible ||
         ((!!editingChart || !!chartSourceDialog) && !pickingChartRange) ||
@@ -7140,6 +7232,17 @@ watch(
     type="file"
     hidden
     @change="attachmentActions.onFiles"
+  />
+  <AttachmentInsertDialog
+    v-if="insertingAttachment"
+    :key="insertingAttachment.id"
+    :display="insertingAttachment.display"
+    :file-name="insertingAttachment.file?.name"
+    :busy="attachmentBusy"
+    :error="attachmentActions.insertError.value"
+    @choose-file="attachmentActions.chooseFile"
+    @confirm="attachmentActions.confirmInsert"
+    @close="attachmentActions.close"
   />
   <AttachmentDialog
     v-if="viewingAttachment"

@@ -95,7 +95,7 @@ export const chartsEnUS = {
   "chart.river": "River",
   "chart.wordCloud": "Word cloud",
   "chart.dashboard": "Dashboard",
-  "chart.more": "Dynamic charts",
+  "chart.more": "More charts",
   "chart.finishTitleComposition": "Finish composing the title first.",
   "chart.sourceAddSeries": "Add series",
   "chart.sourceEditSeries": "Edit series",

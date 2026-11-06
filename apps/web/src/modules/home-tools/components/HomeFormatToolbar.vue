@@ -37,6 +37,7 @@ const props = withDefaults(
   defineProps<{
     state: SelectionCellStyleState;
     disabled: boolean;
+    printDisabled?: boolean;
     hyperlinkDisabled?: boolean;
     imageDisabled?: boolean;
     conditionalFormattingDisabled?: boolean;
@@ -78,6 +79,7 @@ const emit = defineEmits<{
   unmerge: [];
   insertImage: [mode: "cell" | "floating"];
   insertHyperlink: [];
+  print: [];
   undo: [];
   redo: [];
   toggleProtection: [];
@@ -225,7 +227,7 @@ function onKeydown(event: KeyboardEvent): void {
       @insert-hyperlink="emit('insertHyperlink')"
     />
     <HomeAutomationGroup />
-    <HomeUtilityGroup />
+    <HomeUtilityGroup :disabled="printDisabled" @print="emit('print')" />
   </RibbonToolbar>
 </template>
 

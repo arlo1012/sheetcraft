@@ -6,6 +6,14 @@ import type { Workbook, Sheet, CellAddress } from "@sheetcraft/core/workbook";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { downloadBlob } from "../../shared/files/download";
 import { prepareAttachment, attachmentBlob } from "./attachment-file";
+type AttachmentInsertion = {
+  id: number;
+  workbook: Workbook;
+  sheet: Sheet;
+  address: CellAddress;
+  display: "icon" | "document";
+  file?: File;
+};
 export function useAttachmentActions(options: {
   getWorkbook: () => Workbook;
   getSheet: () => Sheet;
@@ -18,41 +26,60 @@ export function useAttachmentActions(options: {
   const fileInput = ref<HTMLInputElement>();
   const busy = ref(false);
   const viewing = shallowRef<SheetAttachmentDrawing>();
+  const inserting = shallowRef<AttachmentInsertion>();
+  const insertError = ref(false);
+  let sequence = 0;
   const idFactory = createBrowserIdFactory();
-  let target:
-    | { workbook: Workbook; sheetId: string; address: CellAddress; display: "icon" | "document" }
-    | undefined;
+  let pickerTarget: AttachmentInsertion | undefined;
   const allowed = () =>
     !options.isBusy() && canUseSheetPermission(options.getSheet(), "editObjects");
   function requestInsert(display: "icon" | "document") {
     if (!allowed() || busy.value || !options.flush()) return;
-    target = {
+    inserting.value = {
+      id: ++sequence,
       workbook: options.getWorkbook(),
-      sheetId: options.getSheet().id,
+      sheet: options.getSheet(),
       address: { ...options.getAddress() },
       display,
     };
+    insertError.value = false;
+    pickerTarget = undefined;
+  }
+  function chooseFile() {
+    if (!inserting.value || !allowed() || busy.value) return;
+    pickerTarget = inserting.value;
     if (fileInput.value) {
       fileInput.value.value = "";
       fileInput.value.click();
     }
   }
-  async function onFiles(event: Event) {
+  function onFiles(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     input.value = "";
-    const pending = target;
-    target = undefined;
-    if (!file || !pending || busy.value || !allowed()) return;
+    const pending = pickerTarget;
+    pickerTarget = undefined;
+    if (!file || !pending || !isCurrent(pending) || busy.value) return;
+    inserting.value = { ...pending, file };
+    insertError.value = false;
+  }
+  function isCurrent(pending: AttachmentInsertion) {
+    return (
+      inserting.value === pending &&
+      pending.workbook === options.getWorkbook() &&
+      pending.sheet === options.getSheet() &&
+      pending.workbook.sheets.get(pending.sheet.id) === pending.sheet &&
+      allowed()
+    );
+  }
+  async function confirmInsert(display: "icon" | "document") {
+    const pending = inserting.value;
+    if (!pending?.file || busy.value || !isCurrent(pending)) return;
     busy.value = true;
+    insertError.value = false;
     try {
-      const attachment = await prepareAttachment(file, pending.display);
-      if (
-        pending.workbook !== options.getWorkbook() ||
-        pending.sheetId !== options.getSheet().id ||
-        !allowed()
-      )
-        return;
+      const attachment = await prepareAttachment(pending.file, display);
+      if (!isCurrent(pending)) return;
       const drawing: SheetAttachmentDrawing = {
         id: idFactory("attachment"),
         kind: "attachment",
@@ -60,8 +87,8 @@ export function useAttachmentActions(options: {
         anchor: pending.address,
         offsetX: 8,
         offsetY: 8,
-        width: pending.display === "document" ? 360 : 220,
-        height: pending.display === "document" ? 240 : 80,
+        width: display === "document" ? 360 : 220,
+        height: display === "document" ? 240 : 80,
         text: "",
         shape: "rectangle",
         fill: "#ffffff",
@@ -74,14 +101,17 @@ export function useAttachmentActions(options: {
         rotation: 0,
         attachment,
       };
-      options.execute(
-        createSetSheetDrawingsCommand(pending.sheetId, [
+      const accepted = options.execute(
+        createSetSheetDrawingsCommand(pending.sheet.id, [
           ...(options.getSheet().drawings ?? []),
           drawing,
         ]),
       );
+      if (!isCurrent(pending)) return;
+      if (accepted !== true) throw new Error("Attachment insertion was refused.");
+      inserting.value = undefined;
     } catch {
-      options.onError();
+      if (isCurrent(pending)) insertError.value = true;
     } finally {
       busy.value = false;
     }
@@ -95,7 +125,21 @@ export function useAttachmentActions(options: {
   }
   function close() {
     viewing.value = undefined;
-    target = undefined;
+    inserting.value = undefined;
+    pickerTarget = undefined;
+    insertError.value = false;
   }
-  return { fileInput, busy, viewing, requestInsert, onFiles, download, close };
+  return {
+    fileInput,
+    busy,
+    viewing,
+    inserting,
+    insertError,
+    requestInsert,
+    chooseFile,
+    onFiles,
+    confirmInsert,
+    download,
+    close,
+  };
 }

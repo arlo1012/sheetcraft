@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Input } from "tdesign-vue-next/es/input";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
 import { Textarea } from "tdesign-vue-next/es/textarea";
@@ -54,7 +55,32 @@ const types: FormControlType[] = [
   "group",
 ];
 const options = computed(() => types.map((value) => ({ label: t(`control.${value}`), value })));
+const numeric = computed(
+  () => draft.value.control.type === "spinner" || draft.value.control.type === "scrollbar",
+);
+const localError = computed(() => {
+  const control = draft.value.control;
+  if (
+    numeric.value &&
+    (!Number.isFinite(control.min) || !Number.isFinite(control.max) || control.min > control.max)
+  )
+    return t("control.invalidBounds");
+  if (numeric.value && (!Number.isFinite(control.step) || control.step <= 0))
+    return t("control.invalidStep");
+  if (control.type === "radio" && !Number.isFinite(control.optionValue))
+    return t("control.invalidOptionValue");
+  return "";
+});
+watch(
+  () => draft.value.control.type,
+  (type, previous) => {
+    if (draft.value.name === t(`control.${previous}`)) draft.value.name = t(`control.${type}`);
+    if (draft.value.control.label === t(`control.${previous}`))
+      draft.value.control.label = t(`control.${type}`);
+  },
+);
 function confirm() {
+  if (props.disabled || localError.value) return;
   const raw = reset.value;
   const resetValue =
     raw === ""
@@ -72,8 +98,12 @@ function confirm() {
       ...draft.value,
       control: {
         ...draft.value.control,
+        min: numeric.value ? draft.value.control.min : 0,
+        max: numeric.value ? draft.value.control.max : 100,
+        step: numeric.value ? draft.value.control.step : 1,
+        optionValue: draft.value.control.type === "radio" ? draft.value.control.optionValue : 1,
         items: items.value ? items.value.split(/\r?\n/) : [],
-        resetValue,
+        resetValue: draft.value.control.type === "button" ? resetValue : null,
       },
     },
     linked.value,
@@ -85,76 +115,114 @@ function confirm() {
   <Dialog
     :visible="!suspended"
     :header="t('control.title')"
-    width="540px"
+    :aria-label="t('control.title')"
+    role="dialog"
+    aria-modal="true"
+    placement="center"
+    width="min(540px, calc(100vw - 32px))"
     :close-on-overlay-click="false"
-    :confirm-btn="{ content: t('picture.confirm'), disabled }"
+    :confirm-on-enter="false"
+    :confirm-btn="{ content: t('picture.confirm'), disabled: disabled || Boolean(localError) }"
     :cancel-btn="t('picture.cancel')"
     @confirm="confirm"
     @close="emit('close')"
-    ><div class="form-control-editor">
-      <label
-        >{{ t("control.type") }}<Select v-model="draft.control.type" :options="options"
-      /></label>
-      <label>{{ t("drawing.name") }}<Input v-model="draft.name" :maxlength="200" /></label>
-      <label
-        >{{ t("control.labelText") }}<Input v-model="draft.control.label" :maxlength="1000"
-      /></label>
-      <label v-if="draft.control.type !== 'label' && draft.control.type !== 'group'"
-        >{{ t("control.linked")
-        }}<RangeReferenceInput
+  >
+    <Form class="form-control-editor sheetcraft-form-grid" label-align="top" :data="draft">
+      <FormItem :label="t('control.type')">
+        <Select v-model="draft.control.type" :options="options" :aria-label="t('control.type')" />
+      </FormItem>
+      <div class="form-control-editor__names">
+        <FormItem :label="t('drawing.name')"
+          ><Input v-model="draft.name" :maxlength="200" :aria-label="t('drawing.name')"
+        /></FormItem>
+        <FormItem :label="t('control.labelText')"
+          ><Input
+            v-model="draft.control.label"
+            :maxlength="1000"
+            :aria-label="t('control.labelText')"
+        /></FormItem>
+      </div>
+      <FormItem
+        v-if="draft.control.type !== 'label' && draft.control.type !== 'group'"
+        :label="t('control.linked')"
+      >
+        <RangeReferenceInput
           v-model="linked"
           :label="t('control.linked')"
           :select-reference="selectReference"
-      /></label>
-      <template v-if="draft.control.type === 'combo' || draft.control.type === 'list'"
-        ><label
-          >{{ t("control.source")
-          }}<RangeReferenceInput
+        />
+      </FormItem>
+      <template v-if="draft.control.type === 'combo' || draft.control.type === 'list'">
+        <FormItem :label="t('control.source')"
+          ><RangeReferenceInput
             v-model="source"
             :label="t('control.source')"
-            :select-reference="selectReference" /></label
-        ><label
-          >{{ t("control.items") }}<Textarea v-model="items" :autosize="{ minRows: 3, maxRows: 6 }"
-        /></label>
-        <p>{{ t("control.listHint") }}</p></template
-      >
-      <div
-        v-if="draft.control.type === 'spinner' || draft.control.type === 'scrollbar'"
-        class="form-control-editor__numbers"
-      >
-        <label>{{ t("control.min") }}<InputNumber v-model="draft.control.min" /></label
-        ><label>{{ t("control.max") }}<InputNumber v-model="draft.control.max" /></label
-        ><label
-          >{{ t("control.step") }}<InputNumber v-model="draft.control.step" :min="0.000001"
-        /></label>
+            :select-reference="selectReference"
+        /></FormItem>
+        <FormItem :label="t('control.items')"
+          ><Textarea
+            v-model="items"
+            :autosize="{ minRows: 3, maxRows: 6 }"
+            :aria-label="t('control.items')"
+        /></FormItem>
+        <p>{{ t("control.listHint") }}</p>
+      </template>
+      <div v-if="numeric" class="form-control-editor__numbers">
+        <FormItem :label="t('control.min')"
+          ><InputNumber
+            v-model="draft.control.min"
+            :aria-label="t('control.min')"
+            theme="column"
+            class="sheetcraft-input-number--persistent-controls"
+        /></FormItem>
+        <FormItem :label="t('control.max')"
+          ><InputNumber
+            v-model="draft.control.max"
+            :aria-label="t('control.max')"
+            theme="column"
+            class="sheetcraft-input-number--persistent-controls"
+        /></FormItem>
+        <FormItem :label="t('control.step')"
+          ><InputNumber
+            v-model="draft.control.step"
+            :aria-label="t('control.step')"
+            :min="0.000001"
+            theme="column"
+            class="sheetcraft-input-number--persistent-controls"
+        /></FormItem>
       </div>
-      <label v-if="draft.control.type === 'radio'"
-        >{{ t("control.optionValue") }}<InputNumber v-model="draft.control.optionValue"
-      /></label>
-      <label v-if="draft.control.type === 'button'"
-        >{{ t("control.resetValue") }}<Input v-model="reset" :maxlength="1000"
-      /></label>
+      <FormItem v-if="draft.control.type === 'radio'" :label="t('control.optionValue')"
+        ><InputNumber
+          v-model="draft.control.optionValue"
+          :aria-label="t('control.optionValue')"
+          theme="column"
+          class="sheetcraft-input-number--persistent-controls"
+      /></FormItem>
+      <FormItem v-if="draft.control.type === 'button'" :label="t('control.resetValue')"
+        ><Input v-model="reset" :maxlength="1000" :aria-label="t('control.resetValue')"
+      /></FormItem>
       <p>{{ t("control.hint") }}</p>
-      <p v-if="error" role="alert">{{ t("control.invalid") }}</p>
-    </div></Dialog
-  >
+      <p v-if="localError || error" role="alert">{{ localError || t("control.invalid") }}</p>
+    </Form>
+  </Dialog>
 </template>
 <style scoped lang="scss">
 .form-control-editor {
   display: grid;
-  gap: 12px;
-  label {
+  gap: var(--sheetcraft-space-3);
+  &__names {
     display: grid;
-    gap: 5px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sheetcraft-space-2);
   }
   &__numbers {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--sheetcraft-space-2);
   }
   p {
     margin: 0;
-    color: var(--text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   [role="alert"] {
     color: var(--sheetcraft-status-error);

@@ -2,21 +2,22 @@ import { ref } from "vue";
 import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
 import { normalizeSheetDrawing, type SheetCameraDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
-  getDefaultRowHeight,
-  getDefaultColumnWidth,
   type Workbook,
   type Sheet,
   type CellRange,
+  type SheetEvaluator,
 } from "@sheetcraft/core/workbook";
 import { useDrawingDialogTarget } from "../../shared/drawing-dialog/useDrawingDialogTarget";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { resolveRangeReference } from "../../shared/range-reference/formatRangeReference";
+import { createCameraRangeLayout, fitCameraSize } from "./camera-range-layout";
 export function useCameraActions(options: {
   getWorkbook: () => Workbook;
   getSheet: () => Sheet;
   getGeneration?: () => number;
   getRevision?: () => number;
   getRange: () => CellRange;
+  getEvaluator?: () => SheetEvaluator;
   isBusy: () => boolean;
   flush: () => boolean;
   execute: (command: WorkbookCommand) => unknown;
@@ -36,6 +37,7 @@ export function useCameraActions(options: {
     if (!target) return;
     const sheet = target.sheet;
     const range = options.getRange();
+    const sourceLayout = createCameraRangeLayout(sheet, range, options.getEvaluator?.());
     const initial = drawing ?? {
       id: idFactory("camera"),
       kind: "camera",
@@ -43,14 +45,7 @@ export function useCameraActions(options: {
       anchor: { ...range.start },
       offsetX: 16,
       offsetY: 16,
-      width: Math.min(
-        800,
-        Math.max(80, (range.end.column - range.start.column + 1) * getDefaultColumnWidth(sheet)),
-      ),
-      height: Math.min(
-        600,
-        Math.max(40, (range.end.row - range.start.row + 1) * getDefaultRowHeight(sheet)),
-      ),
+      ...fitCameraSize(sourceLayout.width, sourceLayout.height),
       text: "",
       shape: "rectangle",
       fill: "#ffffff",
@@ -78,8 +73,14 @@ export function useCameraActions(options: {
         return;
       }
       try {
+        const layout = createCameraRangeLayout(
+          currentTarget.sheet,
+          reference.range,
+          options.getEvaluator?.(),
+        );
         const next = normalizeSheetDrawing({
           ...drawing,
+          ...(!currentTarget.existing ? fitCameraSize(layout.width, layout.height) : {}),
           camera: { ...drawing.camera, range: reference.range },
         });
         const current = currentTarget.sheet.drawings ?? [];

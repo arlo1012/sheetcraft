@@ -1,3 +1,4 @@
+// 未执行：按用户要求仅编写测试，避免额外内存占用。
 import { effectScope, ref } from "vue";
 import { describe, expect, test, vi } from "vitest";
 import { applyWorkbookCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
@@ -66,13 +67,75 @@ describe("camera actions", () => {
     { baseline: undefined, expected: 72 },
     { baseline: 20, expected: 60 },
     { baseline: 24, expected: 72 },
-  ])("estimates initial source height from baseline $baseline", ({ baseline, expected }) => {
+  ])("uses the initial source row height baseline $baseline", ({ baseline, expected }) => {
     const f = fixture();
     f.sheet.defaultRowHeight = baseline;
     f.actions.open();
     expect(f.actions.editing.value?.height).toBe(expected);
     expect(f.sheet.rowHeights.size).toBe(0);
     expect(f.execute).not.toHaveBeenCalled();
+  });
+
+  test("sizes a new camera from the visible selected rows and columns", () => {
+    const f = fixture();
+    f.sheet.columnWidths.set(0, 140);
+    f.sheet.columnWidths.set(1, 60);
+    f.sheet.rowHeights.set(0, 32);
+    f.sheet.rowHeights.set(1, 48);
+    f.sheet.rowHeights.set(2, 72);
+    f.sheet.hiddenRows = new Set([1]);
+    f.sheet.hiddenColumns = new Set([1]);
+
+    f.actions.open();
+
+    expect(f.actions.editing.value).toMatchObject({ width: 140, height: 104 });
+    expect(f.execute).not.toHaveBeenCalled();
+  });
+
+  test("recomputes a new camera's size from the source chosen at confirmation", () => {
+    const f = fixture();
+    f.sheet.defaultColumnWidth = 80;
+    f.sheet.defaultRowHeight = 20;
+    f.sheet.columnWidths.set(3, 150);
+    f.sheet.columnWidths.set(4, 200);
+    f.sheet.columnWidths.set(5, 250);
+    f.sheet.rowHeights.set(4, 55);
+    f.sheet.rowHeights.set(5, 45);
+    f.actions.open();
+    const draft = f.actions.editing.value!;
+    expect(draft).toMatchObject({ width: 160, height: 60 });
+
+    f.actions.confirm(draft, "D5:F6");
+
+    expect(f.sheet.drawings![0]).toMatchObject({
+      width: 600,
+      height: 100,
+      camera: { range: { start: { row: 4, column: 3 }, end: { row: 5, column: 5 } } },
+    });
+    expect(f.execute).toHaveBeenCalledTimes(1);
+  });
+
+  test("retains the dimensions of an existing camera when its source changes", () => {
+    const f = fixture();
+    f.actions.open();
+    f.actions.confirm(f.actions.editing.value!, "A1:B3");
+    const original = f.sheet.drawings![0] as SheetCameraDrawing;
+    const resized = { ...original, width: 340, height: 180 };
+    f.sheet.drawings = [resized];
+    f.sheet.columnWidths.set(3, 700);
+    f.sheet.columnWidths.set(4, 700);
+    f.sheet.rowHeights.set(4, 500);
+    f.actions.open(resized);
+
+    f.actions.confirm(f.actions.editing.value!, "D5:E5");
+
+    expect(f.sheet.drawings).toHaveLength(1);
+    expect(f.sheet.drawings![0]).toMatchObject({
+      id: resized.id,
+      width: 340,
+      height: 180,
+      camera: { range: { start: { row: 4, column: 3 }, end: { row: 4, column: 4 } } },
+    });
   });
 
   test("inserts and edits a camera through Core without adding a duplicate", () => {

@@ -5,6 +5,13 @@ export const hyperlinksEnUS = {
     edit: "Edit hyperlink",
     displayText: "Text to display",
     address: "Address",
+    web: "Web page",
+    location: "Place in this document",
+    email: "Email address",
+    sheet: "Worksheet",
+    cellReference: "Cell reference",
+    emailAddress: "Email address",
+    emailSubject: "Subject",
     tooltip: "Screen tip",
     addressHint:
       "Enter a web or email address, such as https://example.com or mailto:name{'@'}example.com, or a worksheet location such as #Sheet1!A1.",

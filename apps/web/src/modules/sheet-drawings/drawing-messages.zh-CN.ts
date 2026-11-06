@@ -45,6 +45,12 @@ export const drawingsZhCN = {
   "drawing.insert": "插入",
   "drawing.customSymbol": "自定义字符",
   "drawing.screenshot": "截图",
+  "drawing.captureRegion": "选择截图区域",
+  "drawing.captureRegionHint":
+    "在截图上拖动选择区域，也可输入位置和尺寸。确认后插入工作表，取消不会插入图片。",
+  "drawing.captureLeft": "左侧位置（px）",
+  "drawing.captureTop": "顶部位置（px）",
+  "drawing.captureAll": "选择整张图片",
   "drawing.captureFailed": "无法截取屏幕。请检查浏览器屏幕共享权限。",
   "drawing.captureUnsupported": "当前浏览器不支持屏幕截图，可将截图粘贴到工作表。",
 

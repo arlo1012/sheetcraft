@@ -6,7 +6,10 @@ import type { SymbolInsertion } from "../symbols/symbol-preferences";
 import PivotInsertTools from "../../pivot-tables/components/PivotInsertTools.vue";
 import ChartInsertTools from "../../charts/components/ChartInsertTools.vue";
 import type { ChartInsertIntent } from "../../charts/chart-design-intents";
-import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { DrawingShape, SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import IconInsertMenu from "../../sheet-drawings/components/IconInsertMenu.vue";
+import FormControlInsertMenu from "../../form-controls/components/FormControlInsertMenu.vue";
+import type { FormControlType } from "@sheetcraft/core/form-controls";
 import WordArtInsertMenu from "../../sheet-drawings/components/WordArtInsertMenu.vue";
 import type { WordArtStylePreset } from "../../sheet-drawings/wordart-style-presets";
 import ShapeInsertMenu from "../../sheet-drawings/components/ShapeInsertMenu.vue";
@@ -14,7 +17,6 @@ import TextBoxInsertMenu from "../../sheet-drawings/components/TextBoxInsertMenu
 import type { ShapeGalleryChoice } from "../../sheet-drawings/shape-gallery";
 import {
   Camera,
-  PanelsTopLeft,
   FileText,
   Paperclip,
   Link2,
@@ -25,13 +27,14 @@ import {
   Star,
   Sigma,
   Scan,
-  Activity,
   Eraser,
 } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import ImageInsertMenu from "../../home-tools/components/ImageInsertMenu.vue";
+import SparklineInsertMenu from "../../sparklines/components/SparklineInsertMenu.vue";
+import type { CellSparkline } from "@sheetcraft/core/sparklines";
 defineProps<{
   disabled: boolean;
   pivotDisabled: boolean;
@@ -49,6 +52,7 @@ defineProps<{
   shapeOwnerId?: string | number;
   insertEquationHandler?: (choice: EquationPresetId | null) => boolean | Promise<boolean>;
   insertWordArtHandler?: (choice: WordArtStylePreset) => boolean | Promise<boolean>;
+  insertIconHandler?: (shape: DrawingShape) => boolean;
 }>();
 const emit = defineEmits<{
   insertPivot: [chart: boolean];
@@ -58,10 +62,10 @@ const emit = defineEmits<{
   insertChart: [intent: ChartInsertIntent];
   insertAttachment: [display: "icon" | "document"];
   insertCamera: [];
-  insertControl: [];
+  insertControl: [type: FormControlType];
   insertSymbol: [];
   insertSymbolText: [payload: SymbolInsertion];
-  insertSparkline: [];
+  insertSparkline: [type: CellSparkline["type"]];
   clearSparklines: [];
   captureScreen: [];
   insertDrawing: [kind: SheetGraphicDrawing["kind"]];
@@ -144,7 +148,14 @@ const { t, locale } = useAppI18n();
         @activate="emit('insertDrawing', 'shape')"
         ><Shapes
       /></RibbonButton>
+      <IconInsertMenu
+        v-if="insertIconHandler"
+        :disabled="imageDisabled"
+        :owner-id="shapeOwnerId"
+        :handler="insertIconHandler"
+      />
       <RibbonButton
+        v-else
         variant="tall"
         :label="t('drawing.icon')"
         :text="t('drawing.icon')"
@@ -190,14 +201,11 @@ const { t, locale } = useAppI18n();
     </section>
     <ChartInsertTools :disabled="imageDisabled" @insert="emit('insertChart', $event)" />
     <section class="insert-toolbar__group" role="group" :aria-label="t('sparkline.title')">
-      <RibbonButton
-        variant="tall"
-        :label="t('sparkline.title')"
-        :text="t('sparkline.title')"
+      <SparklineInsertMenu
         :disabled="sparklineDisabled"
-        @activate="emit('insertSparkline')"
-        ><Activity /></RibbonButton
-      ><RibbonButton
+        @insert="emit('insertSparkline', $event)"
+      />
+      <RibbonButton
         variant="tall"
         :label="t('sparkline.remove')"
         :text="t('sparkline.remove')"
@@ -231,15 +239,11 @@ const { t, locale } = useAppI18n();
         @activate="emit('insertAttachment', 'icon')"
         ><Paperclip
       /></RibbonButton>
-      <RibbonButton
-        variant="tall"
-        :label="t('control.title')"
-        :text="t('control.title')"
+      <FormControlInsertMenu
         :disabled="imageDisabled"
-        data-insert-tool="control"
-        @activate="emit('insertControl')"
-        ><PanelsTopLeft
-      /></RibbonButton>
+        :owner-id="shapeOwnerId"
+        @insert="emit('insertControl', $event)"
+      />
       <RibbonButton
         variant="tall"
         :label="t('camera.title')"

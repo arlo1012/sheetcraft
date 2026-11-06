@@ -30,6 +30,7 @@ const props = withDefaults(
     theme?: WorkbookTheme;
     state: SelectionCellStyleState;
     disabled: boolean;
+    printDisabled?: boolean;
     hyperlinkDisabled?: boolean;
     imageDisabled?: boolean;
     conditionalFormattingDisabled?: boolean;
@@ -87,6 +88,7 @@ const emit = defineEmits<{
   unmerge: [];
   insertImage: [mode: "cell" | "floating"];
   insertHyperlink: [];
+  print: [];
   undo: [];
   redo: [];
   toggleProtection: [];
@@ -608,6 +610,7 @@ defineSlots<{
         :theme-accent-color="theme?.accentColors[0]"
         :state="state"
         :disabled="disabled"
+        :print-disabled="printDisabled"
         :hyperlink-disabled="hyperlinkDisabled"
         :image-disabled="imageDisabled"
         :conditional-formatting-disabled="conditionalFormattingDisabled"
@@ -639,6 +642,7 @@ defineSlots<{
         @unmerge="emit('unmerge')"
         @insert-image="emit('insertImage', $event)"
         @insert-hyperlink="emit('insertHyperlink')"
+        @print="emit('print')"
         @undo="emit('undo')"
         @redo="emit('redo')"
         @toggle-protection="emit('toggleProtection')"

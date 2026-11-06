@@ -1,9 +1,15 @@
+// 未执行：按用户要求仅编写测试，避免额外内存占用。
 import { requireLegacySheetDrawings } from "@sheetcraft/core/sheet-drawings";
 import { effectScope, ref } from "vue";
 import { describe, expect, test, vi } from "vitest";
 import { createWorkbook, createSheet, getActiveSheet } from "@sheetcraft/core/workbook";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { applyWorkbookCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
+import {
+  createWorkbookSession,
+  executeWorkbookCommand,
+  undoWorkbookCommand,
+} from "@sheetcraft/core/history";
 import { useDrawingActions } from "../../../modules/sheet-drawings/useDrawingActions";
 
 function fixture() {
@@ -55,6 +61,32 @@ function fixture() {
 }
 
 describe("drawing actions", () => {
+  test("inserts a selected icon through one undoable Core command without leaving an editor open", () => {
+    const f = fixture();
+    const session = createWorkbookSession({
+      workbook: f.getWorkbook(),
+      idFactory: createSequentialIdFactory(),
+    });
+    f.execute.mockImplementation((command) => executeWorkbookCommand(session, command));
+
+    expect(f.actions.insertIcon("heart")).toBe(true);
+
+    expect(f.execute).toHaveBeenCalledTimes(1);
+    expect(f.getSheet().drawings).toHaveLength(1);
+    expect(f.getSheet().drawings![0]).toMatchObject({
+      kind: "icon",
+      shape: "heart",
+      anchor: { row: 2, column: 3 },
+    });
+    expect(f.actions.editing.value).toBeUndefined();
+    expect(f.actions.dialog.value).toBeUndefined();
+    expect(session.history.undoStack).toHaveLength(1);
+
+    undoWorkbookCommand(session);
+
+    expect(f.getSheet().drawings ?? []).toEqual([]);
+  });
+
   test.each(["shape", "textBox", "wordArt", "icon", "equation"] as const)(
     "inserts and confirms %s through one Core command",
     (kind) => {

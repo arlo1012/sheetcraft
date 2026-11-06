@@ -49,6 +49,12 @@ export const drawingsEnUS = {
   "drawing.insert": "Insert",
   "drawing.customSymbol": "Custom characters",
   "drawing.screenshot": "Screenshot",
+  "drawing.captureRegion": "Choose capture region",
+  "drawing.captureRegionHint":
+    "Drag to select a region or enter its position and size. Insert confirms the image; cancel leaves the sheet unchanged.",
+  "drawing.captureLeft": "Left (px)",
+  "drawing.captureTop": "Top (px)",
+  "drawing.captureAll": "Select entire image",
   "drawing.captureFailed":
     "Could not capture the screen. Check the browser screen-sharing permission.",
   "drawing.captureUnsupported":

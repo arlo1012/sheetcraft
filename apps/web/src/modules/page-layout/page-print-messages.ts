@@ -1,5 +1,13 @@
 export type PagePrintMessageSchema = {
   pagePrint: {
+    scope: string;
+    sheet: string;
+    selection: string;
+    fromPage: string;
+    toPage: string;
+    zoom: string;
+    invalidPages: string;
+
     title: string;
     popupBlocked: string;
     failed: string;

@@ -6,6 +6,12 @@ import {
   type PrintChartPass,
 } from "./page-print-charts";
 import { createPrintChartPixels, preparePrintChartFonts } from "./page-print-chart-pixels";
+import {
+  capturePrintWidgets,
+  getPrintWidgetExtent,
+  paintPrintWidget,
+  type PrintWidget,
+} from "./page-print-widgets";
 import { requireLegacyPictures } from "../sheet-images/picture-document-support";
 import {
   assertEquationPrintConsumer,
@@ -93,6 +99,8 @@ export type PrintPreviewDocument = {
   shapeRenderPass: ResolvedShapeForestForRender;
   equationPrintPass?: PrintEquationPass;
   chartPrintPass?: PrintChartPass;
+  widgets: readonly PrintWidget[];
+  evaluator: SheetEvaluator;
   sheetName: string;
   fileName: string;
   locale: string;
@@ -282,6 +290,8 @@ export function createPrintPreviewDocument(options: {
     },
   };
   const shapeMetrics = createPrintShapeMetrics(options.sheet, options.evaluator);
+  const widgets = capturePrintWidgets(options.sheet, options.evaluator, shapeMetrics);
+  const widgetExtent = getPrintWidgetExtent(widgets, shapeMetrics);
   // Capture the entire worksheet before filtering printObject. Connectors may
   // attach to a nonprinting target or a leaf owned by a different group.
   const shapeRenderPass = resolveShapeForestForRender({
@@ -324,6 +334,7 @@ export function createPrintPreviewDocument(options: {
     shapeExtent.rowCount,
     equationExtent.rowCount,
     chartExtent.rowCount,
+    widgetExtent.rowCount,
     (requested.printArea?.end.row ?? -1) + 1,
   );
   const contentColumnCount = Math.max(
@@ -332,6 +343,7 @@ export function createPrintPreviewDocument(options: {
     shapeExtent.columnCount,
     equationExtent.columnCount,
     chartExtent.columnCount,
+    widgetExtent.columnCount,
     (requested.printArea?.end.column ?? -1) + 1,
   );
   const rowCount = Math.max(contentRowCount, (requested.printTitles?.rows?.end ?? -1) + 1);
@@ -407,6 +419,8 @@ export function createPrintPreviewDocument(options: {
     shapeRenderPass,
     equationPrintPass,
     chartPrintPass,
+    widgets,
+    evaluator: options.evaluator,
     sheetName: options.sheetName ?? options.sheet.name,
     fileName: options.fileName ?? "workbook.xlsx",
     locale: options.locale ?? "en-US",
@@ -798,14 +812,33 @@ export function createPrintPreviewRenderer(
         ...viewportSize,
       };
       let equationIndex = 0,
-        chartIndex = 0;
+        chartIndex = 0,
+        widgetIndex = 0;
       const paintObjectsBefore = (rootOrder: number) => {
         while (true) {
           const equation = equationPass?.entries[equationIndex];
           const chart = chartPass?.entries[chartIndex];
-          const next = Math.min(equation?.order ?? Infinity, chart?.order ?? Infinity);
+          const widget = document.widgets[widgetIndex];
+          const next = Math.min(
+            equation?.order ?? Infinity,
+            chart?.order ?? Infinity,
+            widget?.order ?? Infinity,
+          );
           if (next >= rootOrder) return;
-          if (chart && chart.order === next) {
+          if (widget && widget.order === next) {
+            paintPrintWidget(context, widget, {
+              viewport,
+              sheet: document.sheet,
+              evaluator: document.evaluator,
+              revision: document.display.revision ?? 0,
+              images,
+              theme: options.theme,
+              imageAssetUrls: options.imageAssetUrls,
+              locale: document.locale,
+              dateSystem: document.dateSystem,
+            });
+            widgetIndex++;
+          } else if (chart && chart.order === next) {
             chartPixels.paint(context, chartPass!, chart, viewport, equationDensity);
             chartIndex++;
           } else if (equation) {

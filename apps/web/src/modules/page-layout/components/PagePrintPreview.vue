@@ -5,8 +5,10 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import { Button as TButton } from "tdesign-vue-next/es/button";
+import { InputNumber } from "tdesign-vue-next/es/input-number";
+import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
 import { ChevronLeft, ChevronRight, Printer } from "lucide-vue-next";
-import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
+import type { CellRange, Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import {
   TextBoxReferenceUnavailableError,
   type TextBoxReferenceResolver,
@@ -37,12 +39,26 @@ const props = withDefaults(
     resolveChartSheet?: (id: string) => Sheet | undefined;
     imageAssetUrls?: ReadonlyMap<string, string>;
     theme?: WorkbookTheme;
+    selection?: CellRange;
+    setupDisabled?: boolean;
   }>(),
   { fileName: "workbook.xlsx", locale: "en-US", dateSystem: "1900" },
 );
-const emit = defineEmits<{ "update:visible": [value: boolean] }>();
+const emit = defineEmits<{ "update:visible": [value: boolean]; pageSetup: [] }>();
 const { t } = useAppI18n();
 const selected = ref(0);
+const scope = ref<"sheet" | "selection">("sheet");
+const zoom = ref(60);
+const pageFrom = ref(1);
+const pageTo = ref(1);
+const effectiveSetup = computed(() =>
+  scope.value === "selection" && props.selection
+    ? {
+        ...props.setup,
+        printArea: { start: { ...props.selection.start }, end: { ...props.selection.end } },
+      }
+    : props.setup,
+);
 const printing = ref(false);
 const renderFailure = ref<string>();
 const equationFailure = ref<string>();
@@ -94,7 +110,7 @@ const previewResult = computed<{
       theme: props.theme,
       sheet: props.sheet,
       evaluator: props.evaluator,
-      setup: props.setup,
+      setup: effectiveSetup.value,
       sheetName: props.sheet.name,
       fileName: props.fileName,
       locale: props.locale,
@@ -135,6 +151,22 @@ const chartPreparing = computed(() => {
 });
 const preparing = computed(() => equationPreparing.value || chartPreparing.value);
 const pages = computed(() => documentPreview.value?.pages ?? []);
+const validPageRange = computed(
+  () =>
+    Number.isInteger(pageFrom.value) &&
+    Number.isInteger(pageTo.value) &&
+    pageFrom.value >= 1 &&
+    pageTo.value >= pageFrom.value &&
+    pageTo.value <= pages.value.length,
+);
+watch(
+  () => pages.value.length,
+  (count) => {
+    pageFrom.value = 1;
+    pageTo.value = Math.max(1, count);
+  },
+  { immediate: true },
+);
 const activePage = computed(() => pages.value[selected.value] ?? pages.value[0]);
 const canPrevious = computed(() => selected.value > 0);
 const canNext = computed(() => selected.value < pages.value.length - 1);
@@ -184,7 +216,7 @@ function renderPages(): void {
       page: activePage.value,
       imageAssetUrls: props.imageAssetUrls,
       theme: props.theme,
-      scale: 0.6,
+      scale: zoom.value / 100,
       density: 1,
     });
 }
@@ -203,7 +235,8 @@ async function print(): Promise<void> {
     preparing.value ||
     equationFailure.value ||
     chartFailure.value ||
-    renderFailure.value
+    renderFailure.value ||
+    !validPageRange.value
   )
     return;
   const printWindow = window.open("", "_blank");
@@ -217,7 +250,7 @@ async function print(): Promise<void> {
     let document = documentPreview.value;
     const sheet = props.sheet,
       revision = props.workbookRevision,
-      setup = props.setup,
+      setup = effectiveSetup.value,
       evaluator = props.evaluator,
       theme = props.theme,
       assetUrls = props.imageAssetUrls,
@@ -225,13 +258,17 @@ async function print(): Promise<void> {
       locale = props.locale,
       dateSystem = props.dateSystem,
       textBoxReferenceResolver = props.textBoxReferenceResolver,
-      resolveChartSheet = props.resolveChartSheet;
+      resolveChartSheet = props.resolveChartSheet,
+      from = pageFrom.value,
+      to = pageTo.value;
     const isCurrent = () =>
       props.visible &&
       !printWindow.closed &&
       props.sheet === sheet &&
       props.workbookRevision === revision &&
-      props.setup === setup &&
+      effectiveSetup.value === setup &&
+      pageFrom.value === from &&
+      pageTo.value === to &&
       props.evaluator === evaluator &&
       props.theme === theme &&
       props.imageAssetUrls === assetUrls &&
@@ -254,7 +291,7 @@ async function print(): Promise<void> {
       printWindow.closed ||
       props.sheet !== sheet ||
       props.workbookRevision !== revision ||
-      props.setup !== setup ||
+      effectiveSetup.value !== setup ||
       props.evaluator !== evaluator ||
       props.theme !== theme ||
       props.imageAssetUrls !== assetUrls ||
@@ -294,7 +331,8 @@ async function print(): Promise<void> {
       printWindow.close();
       return;
     }
-    const images = document.pages.map((page) => {
+    if (to > document.pages.length) throw new Error(t("pagePrint.invalidPages"));
+    const images = document.pages.slice(from - 1, to).map((page) => {
       const canvas = window.document.createElement("canvas");
       renderer.render({
         canvas,
@@ -347,6 +385,7 @@ watch(
     () => props.theme,
     repaint,
     selected,
+    zoom,
   ],
   async () => {
     if (!props.visible) return;
@@ -369,7 +408,7 @@ watch(
     props.resolveChartSheet,
     props.locale,
     props.dateSystem,
-    props.setup,
+    effectiveSetup.value,
     props.fileName,
     equationResourceRevision.value,
   ],
@@ -421,12 +460,66 @@ onBeforeUnmount(() => {
     :visible="visible"
     :header="t('pagePrint.title')"
     width="min(1120px, calc(100vw - 32px))"
+    placement="center"
     class="page-print-preview"
     :confirm-btn="null"
     :cancel-btn="null"
     :close-on-overlay-click="false"
     @close="close"
   >
+    <div class="page-print-preview__options">
+      <RadioGroup v-model="scope" :disabled="printing" :aria-label="t('pagePrint.scope')">
+        <Radio value="sheet">{{ t("pagePrint.sheet") }}</Radio>
+        <Radio value="selection" :disabled="!selection">{{ t("pagePrint.selection") }}</Radio>
+      </RadioGroup>
+      <div role="group" :aria-label="t('pagePrint.fromPage')">
+        <span>{{ t("pagePrint.fromPage") }}</span>
+        <InputNumber
+          v-model="pageFrom"
+          :min="1"
+          :max="pages.length || 1"
+          :decimal-places="0"
+          :disabled="printing"
+          theme="column"
+          class="sheetcraft-input-number--persistent-controls"
+          :aria-label="t('pagePrint.fromPage')"
+        />
+      </div>
+      <div role="group" :aria-label="t('pagePrint.toPage')">
+        <span>{{ t("pagePrint.toPage") }}</span>
+        <InputNumber
+          v-model="pageTo"
+          :min="1"
+          :max="pages.length || 1"
+          :decimal-places="0"
+          :disabled="printing"
+          theme="column"
+          class="sheetcraft-input-number--persistent-controls"
+          :aria-label="t('pagePrint.toPage')"
+        />
+      </div>
+      <div role="group" :aria-label="t('pagePrint.zoom')">
+        <span>{{ t("pagePrint.zoom") }}</span>
+        <InputNumber
+          v-model="zoom"
+          :min="25"
+          :max="200"
+          :step="10"
+          :decimal-places="0"
+          theme="column"
+          class="sheetcraft-input-number--persistent-controls"
+          :aria-label="t('pagePrint.zoom')"
+        />
+      </div>
+      <TButton
+        theme="default"
+        variant="base"
+        :disabled="printing || setupDisabled"
+        @click="emit('pageSetup')"
+        >{{ t("pageLayout.pageSetup") }}</TButton
+      >
+    </div>
+    <p v-if="!validPageRange && pages.length" role="alert">{{ t("pagePrint.invalidPages") }}</p>
     <div class="page-print-preview__body">
       <aside class="page-print-preview__thumbnails" :aria-label="t('pagePrint.thumbnails')">
         <button
@@ -468,14 +561,14 @@ onBeforeUnmount(() => {
     </div>
     <template #footer>
       <div class="page-print-preview__footer">
-        <TButton variant="outline" :disabled="!canPrevious" @click="selected -= 1"
+        <TButton theme="default" variant="base" :disabled="!canPrevious" @click="selected -= 1"
           ><ChevronLeft :size="15" aria-hidden="true" />{{ t("pagePrint.previous") }}</TButton
         >
-        <TButton variant="outline" :disabled="!canNext" @click="selected += 1"
+        <TButton theme="default" variant="base" :disabled="!canNext" @click="selected += 1"
           >{{ t("pagePrint.next") }}<ChevronRight :size="15" aria-hidden="true"
         /></TButton>
         <span />
-        <TButton variant="outline" @click="close">{{ t("pagePrint.close") }}</TButton>
+        <TButton theme="default" variant="base" @click="close">{{ t("pagePrint.close") }}</TButton>
         <TButton
           theme="primary"
           :loading="printing"
@@ -484,7 +577,8 @@ onBeforeUnmount(() => {
             preparing ||
             Boolean(renderFailure) ||
             Boolean(equationFailure) ||
-            Boolean(chartFailure)
+            Boolean(chartFailure) ||
+            !validPageRange
           "
           @click="print"
           ><Printer :size="15" aria-hidden="true" />{{ t("pagePrint.print") }}</TButton
@@ -496,11 +590,26 @@ onBeforeUnmount(() => {
 
 <style scoped lang="scss">
 .page-print-preview {
+  &__options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    align-items: center;
+    margin-bottom: 12px;
+    [role="group"] {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    [role="group"] > :last-child {
+      width: 88px;
+    }
+  }
   &__body {
     display: grid;
     grid-template-columns: 164px minmax(0, 1fr);
-    height: min(640px, calc(100vh - 220px));
-    min-height: 200px;
+    height: min(600px, calc(100vh - 300px));
+    min-height: 100px;
     overflow: hidden;
     background: var(--sheetcraft-surface-secondary);
   }
@@ -535,14 +644,14 @@ onBeforeUnmount(() => {
   }
   &__page {
     display: grid;
-    place-content: center;
-    justify-items: center;
+    align-content: start;
+    justify-items: safe center;
     gap: 10px;
     overflow: auto;
     padding: 24px;
   }
   &__page canvas {
-    max-width: 100%;
+    max-width: none;
     height: auto;
     box-shadow: 0 3px 14px rgb(0 0 0 / 20%);
   }

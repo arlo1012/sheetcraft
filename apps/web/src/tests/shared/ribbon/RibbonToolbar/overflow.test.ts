@@ -1,3 +1,4 @@
+// 未执行：按用户要求仅编写测试，避免额外内存占用。
 import { mount, type VueWrapper } from "@vue/test-utils";
 import { h, nextTick } from "vue";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -195,7 +196,37 @@ describe("RibbonToolbar overflow navigation", () => {
     expect(document.activeElement).toBe(wrapper.get('[data-ribbon-action="first"]').element);
   });
 
-  test("scrolls a regular owning group into the unobscured viewport on focus", async () => {
+  test("keeps a mouse-focused tool stationary through the first click", async () => {
+    const wrapper = mountToolbar();
+    const geometry = setHorizontalGeometry(wrapper, {
+      toolbarWidth: 320,
+      railWidth: 800,
+      viewportWidth: 320,
+      scrollWidth: 864,
+    });
+    await measureOverflow();
+    geometry.viewport.getBoundingClientRect = () => rect(100, 320, 0, 68);
+
+    const target = wrapper.get('[aria-label="Align center"]');
+    const group = target.element.closest<HTMLElement>('[data-ribbon-group="alignment"]');
+    expect(group).not.toBeNull();
+    // The clicked tool is visible while the rest of its group extends past the edge.
+    group!.getBoundingClientRect = () => rect(350 - geometry.getScrollLeft(), 120, 7, 54);
+    target.element.getBoundingClientRect = () => rect(350 - geometry.getScrollLeft(), 20, 7, 26);
+    const activate = vi.fn();
+    target.element.addEventListener("click", activate);
+
+    await target.trigger("pointerdown", { pointerType: "mouse" });
+    await target.trigger("focusin");
+    expect(geometry.getScrollLeft()).toBe(0);
+    await target.trigger("pointerup", { pointerType: "mouse" });
+    await target.trigger("click");
+
+    expect(geometry.getScrollLeft()).toBe(0);
+    expect(activate).toHaveBeenCalledTimes(1);
+  });
+
+  test("reveals an off-screen group on keyboard focus after a pointer interaction", async () => {
     const wrapper = mountToolbar();
     const geometry = setHorizontalGeometry(wrapper, {
       toolbarWidth: 320,
@@ -210,10 +241,37 @@ describe("RibbonToolbar overflow navigation", () => {
     const group = target.element.closest<HTMLElement>('[data-ribbon-group="alignment"]');
     expect(group).not.toBeNull();
     group!.getBoundingClientRect = () => rect(700 - geometry.getScrollLeft(), 120, 7, 54);
+    await target.trigger("pointerdown", { pointerType: "mouse" });
+    await target.trigger("keydown", { key: "Tab" });
     await target.trigger("focusin");
 
     expect(geometry.getScrollLeft()).toBe(432);
   });
+
+  test.each(["pointerup", "pointercancel"] as const)(
+    "does not suppress later focus revelation after %s ends a pointer interaction",
+    async (event) => {
+      const wrapper = mountToolbar();
+      const geometry = setHorizontalGeometry(wrapper, {
+        toolbarWidth: 320,
+        railWidth: 800,
+        viewportWidth: 320,
+        scrollWidth: 864,
+      });
+      await measureOverflow();
+      geometry.viewport.getBoundingClientRect = () => rect(100, 320, 0, 68);
+      const target = wrapper.get('[aria-label="Align center"]');
+      const group = target.element.closest<HTMLElement>('[data-ribbon-group="alignment"]');
+      expect(group).not.toBeNull();
+      group!.getBoundingClientRect = () => rect(700 - geometry.getScrollLeft(), 120, 7, 54);
+
+      await target.trigger("pointerdown", { pointerType: "mouse" });
+      await target.trigger(event);
+      await target.trigger("focusin");
+
+      expect(geometry.getScrollLeft()).toBe(432);
+    },
+  );
 
   test("reveals the focused tool in an oversized group", async () => {
     const wrapper = mountToolbar();

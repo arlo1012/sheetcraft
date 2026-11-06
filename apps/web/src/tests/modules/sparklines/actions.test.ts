@@ -1,3 +1,4 @@
+// 未执行：按用户要求仅编写测试，避免额外内存占用。
 import { describe, expect, test, vi } from "vitest";
 import {
   createWorkbookSession,
@@ -10,7 +11,9 @@ import {
   getActiveSheet,
   getCellSparkline,
   insertSheet,
+  setCellSparkline,
 } from "@sheetcraft/core/workbook";
+import type { CellSparkline } from "@sheetcraft/core/sparklines";
 import { useSparklineActions } from "../../../modules/sparklines/useSparklineActions";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 
@@ -52,6 +55,80 @@ function fixture() {
 }
 
 describe("sparkline actions", () => {
+  test.each(["line", "column", "winLoss"] as const)(
+    "creates the selected %s sparkline type",
+    (type) => {
+      const f = fixture();
+      f.actions.open(type);
+
+      expect(f.actions.draft.value?.sparkline.type).toBe(type);
+      expect(f.execute).not.toHaveBeenCalled();
+      f.actions.confirm(f.actions.draft.value!);
+
+      expect(f.execute).toHaveBeenCalledTimes(1);
+      for (let row = 0; row < 2; row++)
+        expect(getCellSparkline(f.sheet, { row, column: 3 })).toMatchObject({
+          type,
+          source: { start: { row, column: 0 }, end: { row, column: 2 } },
+        });
+    },
+  );
+
+  test.each(["line", "column", "winLoss"] as const)(
+    "changes an existing sparkline to %s while retaining its source and style",
+    (type) => {
+      const f = fixture();
+      const address = { row: 0, column: 0 };
+      const existing: CellSparkline = {
+        type: type === "line" ? "column" : "line",
+        source: { start: { row: 3, column: 1 }, end: { row: 3, column: 3 } },
+        color: "#12ab34",
+        negativeColor: "#ab1234",
+        markers: true,
+        axis: true,
+        showHidden: true,
+        empty: "connect",
+      };
+      setCellSparkline(f.sheet, address, existing);
+
+      f.actions.open(type);
+
+      const draft = f.actions.draft.value!;
+      expect(draft.sparkline).toEqual({ ...existing, type });
+      expect(draft.source).toMatch(/!\$B\$4:\$D\$4$/);
+      expect(draft.destination).toMatch(/!\$A\$1$/);
+      expect(getCellSparkline(f.sheet, address)).toEqual(existing);
+      expect(f.execute).not.toHaveBeenCalled();
+
+      f.actions.confirm(draft);
+
+      expect(getCellSparkline(f.sheet, address)).toEqual({ ...existing, type });
+      expect(f.execute).toHaveBeenCalledTimes(1);
+      expect(f.actions.draft.value).toBeUndefined();
+      undoWorkbookCommand(f.session);
+      expect(getCellSparkline(f.sheet, address)).toEqual(existing);
+    },
+  );
+
+  test("keeps the default and existing type when open has no type argument", () => {
+    const f = fixture();
+    f.actions.open();
+    expect(f.actions.draft.value?.sparkline.type).toBe("line");
+    const existing: CellSparkline = {
+      ...f.actions.draft.value!.sparkline,
+      type: "winLoss",
+      source: { start: { row: 4, column: 0 }, end: { row: 4, column: 2 } },
+      color: "#aabbcc",
+      markers: true,
+    };
+    setCellSparkline(f.sheet, { row: 0, column: 0 }, existing);
+
+    f.actions.open();
+
+    expect(f.actions.draft.value?.sparkline).toEqual(existing);
+    expect(f.execute).not.toHaveBeenCalled();
+  });
+
   test("creates one sparkline per source row in one undoable command", () => {
     const f = fixture();
     f.actions.open();

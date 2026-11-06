@@ -1,3 +1,4 @@
+// 未执行：按用户要求仅编写测试，避免额外内存占用。
 import { effectScope, ref } from "vue";
 import { describe, expect, test, vi } from "vitest";
 import {
@@ -71,6 +72,90 @@ function fixture() {
   };
 }
 describe("form control actions", () => {
+  test.each([
+    "checkbox",
+    "radio",
+    "combo",
+    "list",
+    "spinner",
+    "scrollbar",
+    "button",
+    "label",
+    "group",
+  ] as const)("opens and inserts the chosen %s control with its own defaults", (type) => {
+    const f = fixture();
+    const passive = type === "label" || type === "group";
+
+    f.actions.insert(type);
+
+    const draft = f.actions.editing.value!;
+    expect(draft).toMatchObject({
+      name: type,
+      anchor: { row: 1, column: 1 },
+      width: 220,
+      height: type === "list" || type === "group" ? 160 : 64,
+      control: { type, label: type, linkedCell: passive ? null : { row: 1, column: 1 } },
+    });
+    expect(f.execute).not.toHaveBeenCalled();
+    f.actions.confirm(draft, passive ? "" : "B2", "");
+
+    expect(f.sheet.drawings).toHaveLength(1);
+    expect(f.sheet.drawings![0]).toMatchObject({
+      control: { type, linkedCell: passive ? null : { row: 1, column: 1 } },
+    });
+    expect(f.execute).toHaveBeenCalledTimes(1);
+    expect(f.actions.error.value).toBe(false);
+  });
+
+  test.each(["combo", "list"] as const)(
+    "ignores the obsolete source reference when changing a %s to a checkbox",
+    (type) => {
+      const f = fixture();
+      const original = controlDrawing(type);
+      original.control.source = { start: { row: 0, column: 2 }, end: { row: 1, column: 2 } };
+      f.sheet.drawings = [original];
+      f.actions.open(original);
+
+      f.actions.confirm(
+        { ...original, control: { ...original.control, type: "checkbox" } },
+        "A1",
+        "'Removed source sheet'!C1:C2",
+      );
+
+      expect(f.actions.error.value).toBe(false);
+      expect(f.sheet.drawings).toHaveLength(1);
+      expect(f.sheet.drawings![0]).toMatchObject({
+        id: original.id,
+        control: { type: "checkbox", linkedCell: { row: 0, column: 0 }, source: null, items: [] },
+      });
+      expect(f.execute).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each(["label", "group"] as const)(
+    "ignores an obsolete linked-cell reference when changing an interactive control to %s",
+    (type) => {
+      const f = fixture();
+      const original = controlDrawing();
+      f.sheet.drawings = [original];
+      f.actions.open(original);
+
+      f.actions.confirm(
+        { ...original, control: { ...original.control, type } },
+        "'Removed linked sheet'!A1",
+        "not a range",
+      );
+
+      expect(f.actions.error.value).toBe(false);
+      expect(f.sheet.drawings).toHaveLength(1);
+      expect(f.sheet.drawings![0]).toMatchObject({
+        id: original.id,
+        control: { type, linkedCell: null, source: null, items: [] },
+      });
+      expect(f.execute).toHaveBeenCalledTimes(1);
+    },
+  );
+
   test("inserts and edits a control through Core without duplicates", () => {
     const f = fixture();
     f.actions.open();

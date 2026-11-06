@@ -90,6 +90,8 @@ const number = computed(() => (typeof value.value === "number" ? value.value : c
         </select>
         <InputNumber
           v-else-if="control.type === 'spinner'"
+          theme="column"
+          class="sheetcraft-input-number--persistent-controls"
           :model-value="number"
           :min="control.min"
           :max="control.max"
@@ -131,7 +133,7 @@ const number = computed(() => (typeof value.value === "number" ? value.value : c
   color: #202124;
   pointer-events: auto;
   &__caption {
-    font-size: 11px;
+    font-size: 12px;
     line-height: 18px;
     color: #666;
     white-space: nowrap;

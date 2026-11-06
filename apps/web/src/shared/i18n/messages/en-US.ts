@@ -825,7 +825,8 @@ export const enUS = {
         numberFormatOmitted: "Number formats cannot be retained",
         numberFormatDegraded: "Number formats will be simplified",
         dimensionApproximated: "Row or column dimensions will be approximated",
-        textboxLayoutNormalized: "Horizontal text box column order was normalized to left-to-right for Excel online editing",
+        textboxLayoutNormalized:
+          "Horizontal text box column order was normalized to left-to-right for Excel online editing",
         pictureGeometryApproximated: "Picture positions or sizes may be approximated or changed",
         dateNormalized: "Date values will be normalized",
         cellValueOmitted: "Cell values cannot be retained",
@@ -1862,6 +1863,22 @@ export const enUS = {
     noBorder: "No border",
   },
   image: {
+    batchInsert: "Insert multiple pictures",
+    batchFileName: "Picture name",
+    batchOrder: "Order",
+    batchArrangement: "Arrangement",
+    batchVertical: "Vertical",
+    batchHorizontal: "Horizontal",
+    batchCascade: "Cascade",
+    batchUp: "Up",
+    batchDown: "Down",
+    batchRemove: "Remove",
+    batchCount: "{count} pictures will be inserted together.",
+    batchCellHint:
+      "Place pictures in adjacent cells from the current cell, skipping merged areas. Replacing existing content requires a separate confirmation.",
+    batchFloatingHint:
+      "Arrange pictures from the current cell while preserving aspect ratios. Reorder or remove pictures before inserting.",
+
     replace: "Change picture",
     tools: "Picture tools",
     widthPoints: "Width (pt)",
@@ -1869,6 +1886,11 @@ export const enUS = {
     lockAspectRatio: "Lock aspect ratio",
     insertMenu: "Insert image",
     insertInCell: "Image in cell",
+    fromFile: "Pictures from file…",
+    cellPlacementHint:
+      "Pictures fit inside cells. Select multiple pictures, then choose their order and arrangement.",
+    floatingPlacementHint:
+      "Pictures float above cells and can be moved and resized. You can select multiple pictures.",
     insertFloating: "Floating image",
     cellAlt: "Image",
     floatingAlt: "Floating image",

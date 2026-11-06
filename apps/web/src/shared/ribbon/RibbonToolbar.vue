@@ -34,6 +34,7 @@ const RIBBON_FOCUS_TARGET_SELECTOR = [
 ].join(", ");
 
 let resizeObserver: ResizeObserver | null = null;
+let pointerFocusing = false;
 
 function getMaxScrollLeft(viewport: HTMLDivElement): number {
   return Math.max(0, viewport.scrollWidth - viewport.clientWidth);
@@ -101,6 +102,12 @@ function scrollByPage(direction: -1 | 1): void {
 }
 
 function onViewportFocusIn(event: FocusEvent): void {
+  // Moving the rail between pointerdown and click moves the pressed tool out
+  // from under the pointer. Only keyboard/programmatic focus should reveal groups.
+  if (pointerFocusing) {
+    pointerFocusing = false;
+    return;
+  }
   const viewport = viewportRef.value;
   const target = event.target;
   if (!viewport || !isOverflowing.value || !(target instanceof Element)) {
@@ -194,6 +201,10 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
       data-ribbon-scroll-viewport
       @scroll.passive="updateScrollPositionState"
       @focusin="onViewportFocusIn"
+      @pointerdown.capture="pointerFocusing = true"
+      @pointerup.capture="pointerFocusing = false"
+      @pointercancel.capture="pointerFocusing = false"
+      @keydown.capture="pointerFocusing = false"
     >
       <div ref="railRef" class="ribbon-toolbar__rail" data-ribbon-rail>
         <slot />

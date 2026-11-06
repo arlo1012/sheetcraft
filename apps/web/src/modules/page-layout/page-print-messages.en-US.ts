@@ -2,6 +2,14 @@ import type { PagePrintMessageSchema } from "./page-print-messages";
 
 export const pagePrintEnUS = {
   pagePrint: {
+    scope: "Print scope",
+    sheet: "Worksheet",
+    selection: "Selection",
+    fromPage: "From page",
+    toPage: "To page",
+    zoom: "Preview zoom (%)",
+    invalidPages: "Enter a valid page range.",
+
     unsupportedCharts:
       "Chart data, fonts or pixels could not be verified. Printing is stopped so charts are not silently omitted. Your workbook is unchanged.",
     preparingCharts: "Preparing chart layout and fonts…",

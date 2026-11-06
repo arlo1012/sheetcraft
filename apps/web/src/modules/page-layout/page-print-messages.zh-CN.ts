@@ -2,6 +2,14 @@ import type { PagePrintMessageSchema } from "./page-print-messages";
 
 export const pagePrintZhCN = {
   pagePrint: {
+    scope: "打印范围",
+    sheet: "工作表",
+    selection: "当前选区",
+    fromPage: "起始页",
+    toPage: "结束页",
+    zoom: "预览缩放（%）",
+    invalidPages: "请输入有效的起止页码。",
+
     unsupportedCharts:
       "无法核验图表数据、字体或实际画面，已停止打印，避免图表被静默省略。工作簿未改动。",
     preparingCharts: "正在准备图表排版与字体…",

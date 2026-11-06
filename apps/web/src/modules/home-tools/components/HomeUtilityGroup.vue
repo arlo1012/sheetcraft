@@ -4,6 +4,8 @@ import { useAppI18n } from "../../../shared/i18n";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 
 const { t } = useAppI18n();
+defineProps<{ disabled?: boolean }>();
+const emit = defineEmits<{ print: [] }>();
 </script>
 
 <template>
@@ -15,11 +17,12 @@ const { t } = useAppI18n();
   >
     <RibbonButton
       variant="tall"
-      :label="t('app.unavailableFeature', { feature: t('ribbon.print') })"
+      :label="t('ribbon.print')"
       :text="t('ribbon.print')"
-      disabled
+      :disabled="disabled"
       data-ribbon-layout="tall"
-      data-ribbon-placeholder="print"
+      data-ribbon-action="print"
+      @activate="emit('print')"
       data-ribbon-span="2"
     >
       <Printer aria-hidden="true" />

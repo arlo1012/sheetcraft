@@ -36,18 +36,18 @@ export function useFormControlActions(options: {
     },
   });
   const { dialog, editing, close } = targets;
-  function open(drawing?: SheetControlDrawing) {
+  function open(drawing?: SheetControlDrawing, type: FormControlType = "checkbox") {
     const target = targets.prepare(drawing);
     if (!target) return;
     const initial = drawing ?? {
       id: idFactory("control"),
       kind: "control",
-      name: options.name("checkbox"),
+      name: options.name(type),
       anchor: { ...options.getAddress() },
       offsetX: 8,
       offsetY: 8,
       width: 220,
-      height: 80,
+      height: type === "list" || type === "group" ? 160 : 64,
       text: "",
       shape: "rectangle",
       fill: "#ffffff",
@@ -59,9 +59,9 @@ export function useFormControlActions(options: {
       italic: false,
       rotation: 0,
       control: {
-        type: "checkbox",
-        label: options.name("checkbox"),
-        linkedCell: { ...options.getAddress() },
+        type,
+        label: options.name(type),
+        linkedCell: type === "label" || type === "group" ? null : { ...options.getAddress() },
         source: null,
         items: [],
         min: 0,
@@ -84,20 +84,23 @@ export function useFormControlActions(options: {
     targets.run(target, (currentTarget) => {
       const sheet = currentTarget.sheet;
       if (drawing.id !== currentTarget.initial.id || drawing.kind !== "control") return;
-      const linked = linkedReference.trim()
-        ? resolveRangeReference(currentTarget.workbook, linkedReference, sheet.id)
-        : undefined;
-      const source = sourceReference.trim()
-        ? resolveRangeReference(currentTarget.workbook, sourceReference, sheet.id)
-        : undefined;
       const passive = drawing.control.type === "label" || drawing.control.type === "group";
+      const hasItems = drawing.control.type === "combo" || drawing.control.type === "list";
+      const linked =
+        !passive && linkedReference.trim()
+          ? resolveRangeReference(currentTarget.workbook, linkedReference, sheet.id)
+          : undefined;
+      const source =
+        hasItems && sourceReference.trim()
+          ? resolveRangeReference(currentTarget.workbook, sourceReference, sheet.id)
+          : undefined;
       if (
         (!passive && !linked) ||
         (linked &&
           (linked.sheetId !== sheet.id ||
             linked.range.start.row !== linked.range.end.row ||
             linked.range.start.column !== linked.range.end.column)) ||
-        (sourceReference.trim() && (!source || source.sheetId !== sheet.id))
+        (hasItems && sourceReference.trim() && (!source || source.sheetId !== sheet.id))
       ) {
         error.value = true;
         return;
@@ -109,6 +112,7 @@ export function useFormControlActions(options: {
             ...drawing.control,
             linkedCell: linked?.range.start ?? null,
             source: source?.range ?? null,
+            items: hasItems ? drawing.control.items : [],
           },
         });
         const current = sheet.drawings ?? [];
@@ -155,5 +159,14 @@ export function useFormControlActions(options: {
       ),
     );
   }
-  return { dialog, editing, error, open, confirm, change, close };
+  return {
+    dialog,
+    editing,
+    error,
+    open,
+    insert: (type: FormControlType) => open(undefined, type),
+    confirm,
+    change,
+    close,
+  };
 }

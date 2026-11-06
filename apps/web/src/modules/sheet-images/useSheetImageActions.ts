@@ -13,7 +13,6 @@ import { getCurrentScope, nextTick, onScopeDispose, readonly, ref, shallowRef } 
 import {
   MIN_FLOATING_IMAGE_SIZE,
   MAX_FLOATING_IMAGE_SIZE,
-  MAX_SHEET_ROWS,
   getCellContent,
   cloneFloatingImage,
   areFloatingImageCollectionsEqual,
@@ -53,6 +52,12 @@ import {
   type PictureCellInsertionTargetLease,
 } from "./picture-cell-insertion-targets";
 import type { PictureCellOverwriteConfirmation } from "./picture-cell-overwrite-confirmation";
+import {
+  getPictureBatchCellAddresses,
+  getPictureBatchFloatingOffsets,
+  type PictureBatchArrangement,
+  type PictureBatchInsertion,
+} from "./picture-batch-layout";
 
 export type ImageInsertMode = "cell" | "floating";
 type ImageTarget = {
@@ -122,6 +127,11 @@ export function useSheetImageActions(options: {
 }) {
   const busy = ref(false);
   const insertionConfirmation = shallowRef<PictureCellOverwriteConfirmation | null>(null);
+  const batchInsertion = shallowRef<{
+    files: readonly File[];
+    mode: ImageInsertMode;
+    target: ImageTarget;
+  } | null>(null);
   let confirmationKey = 0;
   const feedback = ref<MessageKey>();
   const idFactory = createBrowserIdFactory();
@@ -131,6 +141,7 @@ export function useSheetImageActions(options: {
     operation += 1;
     pending = undefined;
     insertionConfirmation.value = null;
+    batchInsertion.value = null;
   }
   function dispose(): void {
     disposed = true;
@@ -586,6 +597,7 @@ export function useSheetImageActions(options: {
     files: readonly File[],
     mode: ImageInsertMode,
     target = captureTarget(options.getAddress(), mode),
+    arrangement: PictureBatchArrangement = mode === "cell" ? "vertical" : "cascade",
   ): Promise<void> {
     files = files.slice();
     if (files.length === 1) return insertFile(files[0]!, mode, target);
@@ -607,21 +619,10 @@ export function useSheetImageActions(options: {
     feedback.value = undefined;
     try {
       const sheet = target.workbook.sheets.get(target.sheetId)!;
-      const addresses: CellAddress[] = [];
-      let row = target.address.row;
-      for (const _file of files) {
-        if (row >= MAX_SHEET_ROWS) throw new Error("Image placement exceeds sheet bounds.");
-        const address = { row, column: target.address.column };
-        addresses.push(address);
-        const merged = sheet.mergedCells.find(
-          (range) =>
-            row >= range.start.row &&
-            row <= range.end.row &&
-            address.column >= range.start.column &&
-            address.column <= range.end.column,
-        );
-        row = (merged?.end.row ?? row) + 1;
-      }
+      const addresses =
+        mode === "cell"
+          ? getPictureBatchCellAddresses(sheet, target.address, files.length, arrangement)
+          : [];
       insertionConfirmation.value = null;
       const cellLease =
         mode === "cell" ? capturePictureCellInsertionTargets(sheet, addresses) : undefined;
@@ -643,6 +644,7 @@ export function useSheetImageActions(options: {
         mode === "floating"
           ? assets.map((asset) => initialFloatingSize(asset.width, asset.height))
           : [];
+      const offsets = getPictureBatchFloatingOffsets(sizes, arrangement);
       for (const asset of assets) {
         await options.assetStore.put(asset);
         if (!valid()) return;
@@ -668,8 +670,7 @@ export function useSheetImageActions(options: {
                 assetId: asset.id,
                 altText: files[index]!.name,
                 anchor: { ...target.address },
-                offsetX: index * 24,
-                offsetY: index * 24,
+                ...offsets[index]!,
                 ...sizes[index]!,
               };
             }),
@@ -707,8 +708,36 @@ export function useSheetImageActions(options: {
     input.value = "";
     if (file && request) {
       if (request.replacement) void replaceFile(file, request.target, request.replacement);
+      else if (files.length > 100) feedback.value = "picture.tooMany";
+      else if (files.length > 1)
+        batchInsertion.value = { files, mode: request.mode, target: request.target };
       else void insertFiles(files, request.mode, request.target);
     }
+  }
+
+  async function confirmBatchInsertion(payload: PictureBatchInsertion): Promise<void> {
+    const batch = batchInsertion.value;
+    if (!batch || busy.value) return;
+    if (
+      !payload.order.length ||
+      new Set(payload.order).size !== payload.order.length ||
+      payload.order.some(
+        (index) => !Number.isInteger(index) || index < 0 || index >= batch.files.length,
+      )
+    )
+      return;
+    if (!isCurrent(batch.target, batch.mode)) {
+      cancelPending();
+      feedback.value = "image.insertTargetsChanged";
+      return;
+    }
+    batchInsertion.value = null;
+    await insertFiles(
+      payload.order.map((index) => batch.files[index]!),
+      batch.mode,
+      batch.target,
+      payload.arrangement,
+    );
   }
 
   async function pasteFloatingImage(
@@ -881,6 +910,8 @@ export function useSheetImageActions(options: {
     dispose,
     busy: readonly(busy),
     insertionConfirmation,
+    batchInsertion,
+    confirmBatchInsertion,
     feedback: readonly(feedback),
     reportFeedback: (message: MessageKey) => {
       feedback.value = message;

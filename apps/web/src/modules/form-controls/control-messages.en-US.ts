@@ -1,4 +1,7 @@
 export const controlsEnUS = {
+  "control.invalidBounds": "Enter numeric bounds with the minimum no greater than the maximum.",
+  "control.invalidStep": "Enter a step greater than zero.",
+  "control.invalidOptionValue": "Enter a numeric value for the selected option.",
   "control.title": "Form controls",
   "control.type": "Control type",
   "control.labelText": "Label",

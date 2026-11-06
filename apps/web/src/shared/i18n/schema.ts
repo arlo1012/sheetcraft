@@ -1786,6 +1786,20 @@ export type MessageSchema = ToolMessageSchema & {
     noBorder: string;
   };
   image: {
+    batchInsert: string;
+    batchFileName: string;
+    batchOrder: string;
+    batchArrangement: string;
+    batchVertical: string;
+    batchHorizontal: string;
+    batchCascade: string;
+    batchUp: string;
+    batchDown: string;
+    batchRemove: string;
+    batchCount: string;
+    batchCellHint: string;
+    batchFloatingHint: string;
+
     replace: string;
     tools: string;
     widthPoints: string;
@@ -1793,6 +1807,9 @@ export type MessageSchema = ToolMessageSchema & {
     lockAspectRatio: string;
     insertMenu: string;
     insertInCell: string;
+    fromFile: string;
+    cellPlacementHint: string;
+    floatingPlacementHint: string;
     insertFloating: string;
     cellAlt: string;
     floatingAlt: string;

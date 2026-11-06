@@ -59,7 +59,7 @@ export function useSparklineActions(options: {
   function allowed() {
     return !options.isBusy() && canUseSheetPermission(options.getSheet(), "formatCells");
   }
-  function open() {
+  function open(type?: CellSparkline["type"]) {
     if (!allowed() || !options.flush()) return;
     const sheet = options.getSheet();
     if (!canUseSheetPermission(sheet, "formatCells")) return;
@@ -87,7 +87,7 @@ export function useSparklineActions(options: {
       sparkline: existing
         ? normalizeCellSparkline(existing)!
         : {
-            type: "line",
+            type: type ?? "line",
             source: null,
             color: "#2563eb",
             negativeColor: "#ef4444",
@@ -97,6 +97,7 @@ export function useSparklineActions(options: {
             empty: "gap",
           },
     };
+    if (type) initial.sparkline.type = type;
     const target: SparklineDialogTarget = {
       dialogId: ++dialogSequence,
       workbook: options.getWorkbook(),

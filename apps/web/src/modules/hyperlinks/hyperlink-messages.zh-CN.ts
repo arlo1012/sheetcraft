@@ -5,6 +5,13 @@ export const hyperlinksZhCN = {
     edit: "编辑超链接",
     displayText: "显示文字",
     address: "链接地址",
+    web: "网页",
+    location: "本文档中的位置",
+    email: "电子邮件地址",
+    sheet: "工作表",
+    cellReference: "单元格引用",
+    emailAddress: "电子邮件地址",
+    emailSubject: "主题",
     tooltip: "屏幕提示",
     addressHint:
       "网页或邮箱地址，例如 https://example.com、mailto:name{'@'}example.com；工作表位置，例如 #Sheet1!A1。",
