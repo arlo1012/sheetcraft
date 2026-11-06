@@ -1870,6 +1870,8 @@ export const enUS = {
     batchVertical: "Vertical",
     batchHorizontal: "Horizontal",
     batchCascade: "Cascade",
+    batchPerRow: "Pictures per row",
+    batchPerColumn: "Pictures per column",
     batchUp: "Up",
     batchDown: "Down",
     batchRemove: "Remove",

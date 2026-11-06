@@ -602,6 +602,7 @@ export function useSheetImageActions(options: {
     mode: ImageInsertMode,
     target = captureTarget(options.getAddress(), mode),
     arrangement: PictureBatchArrangement = mode === "cell" ? "vertical" : "cascade",
+    wrapAfter?: number,
   ): Promise<void> {
     files = files.slice();
     if (files.length === 1) {
@@ -628,7 +629,13 @@ export function useSheetImageActions(options: {
       const sheet = target.workbook.sheets.get(target.sheetId)!;
       const addresses =
         mode === "cell"
-          ? getPictureBatchCellAddresses(sheet, target.address, files.length, arrangement)
+          ? getPictureBatchCellAddresses(
+              sheet,
+              target.address,
+              files.length,
+              arrangement,
+              wrapAfter,
+            )
           : [];
       insertionConfirmation.value = null;
       const cellLease =
@@ -651,7 +658,7 @@ export function useSheetImageActions(options: {
         mode === "floating"
           ? assets.map((asset) => initialFloatingSize(asset.width, asset.height))
           : [];
-      const offsets = getPictureBatchFloatingOffsets(sizes, arrangement);
+      const offsets = getPictureBatchFloatingOffsets(sizes, arrangement, wrapAfter);
       for (const asset of assets) {
         await options.assetStore.put(asset);
         if (!valid()) return;
@@ -744,6 +751,7 @@ export function useSheetImageActions(options: {
       batch.mode,
       batch.target,
       payload.arrangement,
+      payload.wrapAfter,
     );
   }
 

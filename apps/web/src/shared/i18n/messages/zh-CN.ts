@@ -1823,6 +1823,8 @@ export const zhCN = {
     batchVertical: "纵向排列",
     batchHorizontal: "横向排列",
     batchCascade: "层叠排列",
+    batchPerRow: "每行固定张数",
+    batchPerColumn: "每列固定张数",
     batchUp: "上移",
     batchDown: "下移",
     batchRemove: "移除",

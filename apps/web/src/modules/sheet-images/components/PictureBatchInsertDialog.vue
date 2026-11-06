@@ -3,6 +3,8 @@ import { computed, ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Button } from "tdesign-vue-next/es/button";
 import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
+import { Checkbox } from "tdesign-vue-next/es/checkbox";
+import { InputNumber } from "tdesign-vue-next/es/input-number";
 import { BaseTable, type BaseTableCol } from "tdesign-vue-next/es/table";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import { useAppI18n } from "../../../shared/i18n";
@@ -17,6 +19,17 @@ const emit = defineEmits<{ confirm: [payload: PictureBatchInsertion]; close: [] 
 const { t } = useAppI18n();
 const order = ref(props.fileNames.map((_, index) => index));
 const arrangement = ref<PictureBatchArrangement>(props.mode === "cell" ? "vertical" : "cascade");
+const wrapEnabled = ref(false);
+const wrapAfter = ref(3);
+const validWrap = computed(
+  () =>
+    !wrapEnabled.value ||
+    arrangement.value === "cascade" ||
+    (Number.isInteger(wrapAfter.value) && wrapAfter.value >= 1 && wrapAfter.value <= 100),
+);
+const wrapLabel = computed(() =>
+  t(arrangement.value === "horizontal" ? "image.batchPerRow" : "image.batchPerColumn"),
+);
 const rows = computed(() => order.value.map((index) => ({ index, name: props.fileNames[index] })));
 const columns = computed<BaseTableCol[]>(() => [
   { colKey: "name", title: t("image.batchFileName"), ellipsis: true },
@@ -28,6 +41,14 @@ function move(index: number, delta: number): void {
   const value = order.value.splice(index, 1)[0]!;
   order.value.splice(next, 0, value);
 }
+function confirm(): void {
+  if (props.busy || !order.value.length || !validWrap.value) return;
+  emit("confirm", {
+    order: [...order.value],
+    arrangement: arrangement.value,
+    ...(wrapEnabled.value && arrangement.value !== "cascade" ? { wrapAfter: wrapAfter.value } : {}),
+  });
+}
 </script>
 
 <template>
@@ -37,9 +58,13 @@ function move(index: number, delta: number): void {
     width="min(680px, calc(100vw - 32px))"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
-    :confirm-btn="{ content: t('drawing.insert'), disabled: busy || !order.length, loading: busy }"
+    :confirm-btn="{
+      content: t('drawing.insert'),
+      disabled: busy || !order.length || !validWrap,
+      loading: busy,
+    }"
     :cancel-btn="t('picture.cancel')"
-    @confirm="emit('confirm', { order: [...order], arrangement })"
+    @confirm="confirm"
     @close="emit('close')"
   >
     <div class="picture-batch-insert">
@@ -49,6 +74,24 @@ function move(index: number, delta: number): void {
         <Radio value="horizontal">{{ t("image.batchHorizontal") }}</Radio>
         <Radio v-if="mode === 'floating'" value="cascade">{{ t("image.batchCascade") }}</Radio>
       </RadioGroup>
+      <div
+        v-if="arrangement !== 'cascade'"
+        class="picture-batch-insert__wrap"
+        role="group"
+        :aria-label="wrapLabel"
+      >
+        <Checkbox v-model="wrapEnabled" :disabled="busy">{{ wrapLabel }}</Checkbox>
+        <InputNumber
+          v-model="wrapAfter"
+          theme="column"
+          class="picture-batch-insert__count sheetcraft-input-number--persistent-controls"
+          :min="1"
+          :max="100"
+          :decimal-places="0"
+          :disabled="busy || !wrapEnabled"
+          :aria-label="wrapLabel"
+        />
+      </div>
       <div class="picture-batch-insert__table">
         <TableHeightWrapper v-slot="{ height }">
           <BaseTable
@@ -111,6 +154,14 @@ function move(index: number, delta: number): void {
   &__actions {
     display: flex;
     gap: 4px;
+  }
+  &__wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  &__count {
+    width: 100px;
   }
 }
 </style>

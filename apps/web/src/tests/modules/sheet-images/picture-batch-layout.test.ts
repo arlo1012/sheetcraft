@@ -16,6 +16,90 @@ function sheet() {
 }
 
 describe("batch picture cell layout", () => {
+  test.each([
+    {
+      arrangement: "horizontal",
+      expected: [
+        { row: 2, column: 3 },
+        { row: 2, column: 4 },
+        { row: 3, column: 3 },
+        { row: 3, column: 4 },
+        { row: 4, column: 3 },
+      ],
+    },
+    {
+      arrangement: "vertical",
+      expected: [
+        { row: 2, column: 3 },
+        { row: 3, column: 3 },
+        { row: 2, column: 4 },
+        { row: 3, column: 4 },
+        { row: 2, column: 5 },
+      ],
+    },
+  ] as const)(
+    "wraps $arrangement cell placement after the requested number of pictures",
+    ({ arrangement, expected }) => {
+      expect(
+        getPictureBatchCellAddresses(sheet(), { row: 2, column: 3 }, 5, arrangement, 2),
+      ).toEqual(expected);
+    },
+  );
+
+  test("starts a wrapped horizontal row after the tallest merged region in the preceding row", () => {
+    const source = sheet();
+    source.mergedCells = [
+      { start: { row: 1, column: 2 }, end: { row: 3, column: 3 } },
+      { start: { row: 1, column: 4 }, end: { row: 2, column: 5 } },
+      { start: { row: 4, column: 2 }, end: { row: 5, column: 4 } },
+    ];
+    const addresses = getPictureBatchCellAddresses(
+      source,
+      { row: 1, column: 2 },
+      5,
+      "horizontal",
+      2,
+    );
+    expect(addresses).toEqual([
+      { row: 1, column: 2 },
+      { row: 1, column: 4 },
+      { row: 4, column: 2 },
+      { row: 4, column: 5 },
+      { row: 6, column: 2 },
+    ]);
+    expect(new Set(addresses.map(({ row, column }) => `${row}:${column}`)).size).toBe(5);
+  });
+
+  test("starts a wrapped vertical column after the widest merged region in the preceding column", () => {
+    const source = sheet();
+    source.mergedCells = [
+      { start: { row: 1, column: 2 }, end: { row: 2, column: 4 } },
+      { start: { row: 3, column: 2 }, end: { row: 4, column: 3 } },
+      { start: { row: 1, column: 5 }, end: { row: 3, column: 6 } },
+    ];
+    const addresses = getPictureBatchCellAddresses(source, { row: 1, column: 2 }, 5, "vertical", 2);
+    expect(addresses).toEqual([
+      { row: 1, column: 2 },
+      { row: 3, column: 2 },
+      { row: 1, column: 5 },
+      { row: 4, column: 5 },
+      { row: 1, column: 7 },
+    ]);
+    expect(new Set(addresses.map(({ row, column }) => `${row}:${column}`)).size).toBe(5);
+  });
+
+  test.each([
+    ["horizontal", { row: MAX_SHEET_ROWS - 1, column: 0 }],
+    ["vertical", { row: 0, column: MAX_SHEET_COLUMNS - 1 }],
+  ] as const)(
+    "rejects a new wrapped %s band that would cross the sheet boundary",
+    (arrangement, start) => {
+      expect(() => getPictureBatchCellAddresses(sheet(), start, 3, arrangement, 2)).toThrow(
+        RangeError,
+      );
+    },
+  );
+
   test("places vertical images after each merged region without repeating covered cells", () => {
     const source = sheet();
     source.mergedCells = [
@@ -109,5 +193,121 @@ describe("batch floating picture layout", () => {
   });
   test("does not create offsets for an empty batch", () => {
     expect(getPictureBatchFloatingOffsets([], "vertical")).toEqual([]);
+  });
+
+  test.each([
+    {
+      arrangement: "horizontal",
+      expected: [
+        { offsetX: 0, offsetY: 0 },
+        { offsetX: 132, offsetY: 0 },
+        { offsetX: 0, offsetY: 92 },
+        { offsetX: 62, offsetY: 92 },
+        { offsetX: 0, offsetY: 204 },
+      ],
+    },
+    {
+      arrangement: "vertical",
+      expected: [
+        { offsetX: 0, offsetY: 0 },
+        { offsetX: 0, offsetY: 92 },
+        { offsetX: 212, offsetY: 0 },
+        { offsetX: 212, offsetY: 112 },
+        { offsetX: 314, offsetY: 0 },
+      ],
+    },
+  ] as const)(
+    "wraps mixed-size floating pictures $arrangement with no overlaps between rows or columns",
+    ({ arrangement, expected }) => {
+      const mixed = [...sizes, { width: 90, height: 40 }, { width: 75, height: 60 }];
+      const offsets = getPictureBatchFloatingOffsets(mixed, arrangement, 2);
+      expect(offsets).toEqual(expected);
+      for (let first = 0; first < mixed.length; first += 1)
+        for (let second = first + 1; second < mixed.length; second += 1) {
+          const a = { ...offsets[first]!, ...mixed[first]! };
+          const b = { ...offsets[second]!, ...mixed[second]! };
+          expect(
+            a.offsetX + a.width <= b.offsetX ||
+              b.offsetX + b.width <= a.offsetX ||
+              a.offsetY + a.height <= b.offsetY ||
+              b.offsetY + b.height <= a.offsetY,
+          ).toBe(true);
+        }
+    },
+  );
+
+  test("keeps cascade offsets unchanged when a wrap count is provided", () => {
+    expect(getPictureBatchFloatingOffsets(sizes, "cascade", 1)).toEqual([
+      { offsetX: 0, offsetY: 0 },
+      { offsetX: 24, offsetY: 24 },
+      { offsetX: 48, offsetY: 48 },
+    ]);
+  });
+});
+
+describe("batch picture wrap validation", () => {
+  test.each([0, -1, 1.5, 101, NaN, Infinity])(
+    "rejects invalid wrap count %s for cell and floating arrangements",
+    (wrapAfter) => {
+      for (const arrangement of ["horizontal", "vertical"] as const) {
+        expect(() =>
+          getPictureBatchCellAddresses(sheet(), { row: 0, column: 0 }, 2, arrangement, wrapAfter),
+        ).toThrow(RangeError);
+        expect(() =>
+          getPictureBatchFloatingOffsets(
+            [
+              { width: 100, height: 60 },
+              { width: 80, height: 90 },
+            ],
+            arrangement,
+            wrapAfter,
+          ),
+        ).toThrow(RangeError);
+      }
+    },
+  );
+
+  test("accepts one picture per row or column", () => {
+    expect(
+      getPictureBatchCellAddresses(sheet(), { row: 0, column: 0 }, 2, "horizontal", 1),
+    ).toEqual([
+      { row: 0, column: 0 },
+      { row: 1, column: 0 },
+    ]);
+    expect(
+      getPictureBatchFloatingOffsets(
+        [
+          { width: 100, height: 60 },
+          { width: 80, height: 90 },
+        ],
+        "vertical",
+        1,
+      ),
+    ).toEqual([
+      { offsetX: 0, offsetY: 0 },
+      { offsetX: 112, offsetY: 0 },
+    ]);
+  });
+
+  test("accepts the maximum wrap count without prematurely starting another row or column", () => {
+    expect(
+      getPictureBatchCellAddresses(sheet(), { row: 0, column: 0 }, 2, "horizontal", 100),
+    ).toEqual([
+      { row: 0, column: 0 },
+      { row: 0, column: 1 },
+    ]);
+    expect(
+      getPictureBatchFloatingOffsets(
+        [
+          { width: 100, height: 60 },
+          { width: 80, height: 90 },
+        ],
+        "vertical",
+        100,
+      ),
+    ).toEqual([
+      { offsetX: 0, offsetY: 0 },
+      { offsetX: 0, offsetY: 72 },
+    ]);
   });
 });

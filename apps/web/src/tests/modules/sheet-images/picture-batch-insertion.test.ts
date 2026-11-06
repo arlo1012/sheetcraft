@@ -171,6 +171,38 @@ describe("picture batch insertion configuration", () => {
     expect(serializeWorkbook(f.session.workbook)).toEqual(inserted);
   });
 
+  test("confirms the requested cell wrap count and ordering in one undoable history entry", async () => {
+    const f = fixture();
+    const before = serializeWorkbook(f.session.workbook);
+    await f.select("cell");
+    await f.actions.confirmBatchInsertion({
+      order: [2, 0, 1],
+      arrangement: "horizontal",
+      wrapAfter: 2,
+    });
+
+    expect(getCellContent(f.sheet, { row: 2, column: 3 })).toMatchObject({
+      kind: "image",
+      image: { assetId: "batch-2" },
+    });
+    expect(getCellContent(f.sheet, { row: 2, column: 4 })).toMatchObject({
+      kind: "image",
+      image: { assetId: "batch-0" },
+    });
+    expect(getCellContent(f.sheet, { row: 3, column: 3 })).toMatchObject({
+      kind: "image",
+      image: { assetId: "batch-1" },
+    });
+    expect(getCellContent(f.sheet, { row: 2, column: 5 })).toBeNull();
+    expect(f.execute).toHaveBeenCalledTimes(1);
+    expect(f.session.history.undoStack).toHaveLength(1);
+    const inserted = serializeWorkbook(f.session.workbook);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+    expect(redoWorkbookCommand(f.session)).toBe(true);
+    expect(serializeWorkbook(f.session.workbook)).toEqual(inserted);
+  });
+
   test("confirms reordered floating images with the chosen vertical spacing in one command", async () => {
     const f = fixture();
     const before = serializeWorkbook(f.session.workbook);

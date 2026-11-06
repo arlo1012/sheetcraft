@@ -1793,6 +1793,8 @@ export type MessageSchema = ToolMessageSchema & {
     batchVertical: string;
     batchHorizontal: string;
     batchCascade: string;
+    batchPerRow: string;
+    batchPerColumn: string;
     batchUp: string;
     batchDown: string;
     batchRemove: string;
