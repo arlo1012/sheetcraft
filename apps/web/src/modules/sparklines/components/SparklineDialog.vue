@@ -22,6 +22,9 @@ const { t } = useAppI18n();
   <Dialog
     :visible="!suspended"
     :header="t('sparkline.title')"
+    :aria-label="t('sparkline.title')"
+    role="dialog"
+    aria-modal="true"
     width="530px"
     :close-on-overlay-click="false"
     :confirm-btn="{ content: t('picture.confirm'), disabled }"
