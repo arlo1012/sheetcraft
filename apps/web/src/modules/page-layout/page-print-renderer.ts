@@ -76,11 +76,18 @@ import { createPicturePaintResources } from "../../shared/images/picture-paint-r
 import type { PicturePaintResources } from "../../shared/images/picture-detailed-render";
 import { paintWatermarkInRect } from "../page-decorations/page-decoration-painter";
 import { previewHeaderFooterRuns, type HeaderFooterRun } from "./header-footer-text";
+import {
+  createPrintNotePages,
+  paintPrintNotePage,
+  PRINT_NOTE_FONT,
+  type PrintNotePage,
+} from "./page-print-notes";
 
 const PX_PER_MM = 96 / 25.4;
 
 export type PrintPreviewPage = {
   pageNumber: number;
+  notes?: PrintNotePage;
   row: { start: number; end: number };
   column: { start: number; end: number };
   titleRows: { start: number; end: number } | null;
@@ -407,6 +414,27 @@ export function createPrintPreviewDocument(options: {
   }
   const { pagination } = result;
   const pages = createPreviewPages(setup, result.bands);
+  if (setup.printOptions?.cellComments === "atEnd") {
+    const notePages = createPrintNotePages({
+      sheet: options.sheet,
+      range,
+      width: pagination.contentSize.width,
+      height: pagination.contentSize.height,
+      printScale: pagination.printScale,
+      locale: options.locale ?? "en-US",
+      measurer: browserCellTextMeasurer,
+      maxPages: 10_000 - pages.length,
+    });
+    for (const notes of notePages)
+      pages.push({
+        pageNumber: pages.length + 1,
+        row: { start: 0, end: 0 },
+        column: { start: 0, end: 0 },
+        titleRows: null,
+        titleColumns: null,
+        notes,
+      });
+  }
   return {
     sheet: options.sheet,
     setup,
@@ -666,6 +694,7 @@ export function createPrintPreviewRenderer(
     canvas.style.height = `${paperHeight}px`;
     const context = canvas.getContext("2d");
     if (!context) {
+      if (page.notes) throw new Error("Notes print canvas is unavailable.");
       if (chartPass?.entries.length)
         throw new ChartPrintUnavailableError(
           chartPass.entries.map((entry) => entry.sourceRoot.id),
@@ -691,6 +720,19 @@ export function createPrintPreviewRenderer(
     };
     context.save();
     context.translate(offset.x, offset.y);
+    if (page.notes) {
+      paintPrintNotePage(
+        context,
+        page.notes,
+        document.pagination.contentSize.width,
+        document.pagination.contentSize.height,
+      );
+      context.restore();
+      drawWatermark(context, document, options.imageAssetUrls, images);
+      context.restore();
+      assertShapeDocumentCurrent(document);
+      return;
+    }
     const rowSize = (start: number, end: number) =>
       (document.rows.getBoundaryOffset(end + 1) ?? 0) -
       (document.rows.getBoundaryOffset(start) ?? 0);
@@ -921,6 +963,10 @@ export function createPrintPreviewRenderer(
   async function prepareShapes(document: PrintPreviewDocument): Promise<void> {
     assertShapeDocumentCurrent(document);
     await preparePrintShapeFonts(document.sheet, document.shapeMetrics, document.shapeRenderPass);
+    if (document.pages.some((page) => page.notes)) {
+      await globalThis.document.fonts?.load(`14px ${PRINT_NOTE_FONT}`);
+      await globalThis.document.fonts?.load(`700 14px ${PRINT_NOTE_FONT}`);
+    }
     assertShapeDocumentCurrent(document);
   }
   async function prepareEquations(preview: PrintPreviewDocument, owner: { isCurrent(): boolean }) {
