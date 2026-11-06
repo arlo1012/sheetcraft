@@ -6,6 +6,8 @@ import {
   type Sheet,
   type SheetEvaluator,
 } from "./workbook.js";
+export type SparklinePointStyle = { show: boolean; color: string };
+export type SparklinePointKind = "highPoint" | "lowPoint" | "firstPoint" | "lastPoint";
 export type CellSparkline = {
   type: "line" | "column" | "winLoss";
   source: CellRange | null;
@@ -15,6 +17,12 @@ export type CellSparkline = {
   axis: boolean;
   showHidden: boolean;
   empty: "gap" | "zero" | "connect";
+  highPoint?: SparklinePointStyle;
+  lowPoint?: SparklinePointStyle;
+  firstPoint?: SparklinePointStyle;
+  lastPoint?: SparklinePointStyle;
+  negativePoints?: boolean;
+  markerColor?: string;
 };
 export function normalizeCellSparkline(
   value: CellSparkline | null | undefined,
@@ -32,6 +40,25 @@ export function normalizeCellSparkline(
     )
   )
     throw new RangeError("Invalid sparkline.");
+  if (
+    (value.negativePoints !== undefined && typeof value.negativePoints !== "boolean") ||
+    (value.markerColor !== undefined &&
+      (typeof value.markerColor !== "string" || !/^#[0-9a-f]{6}$/i.test(value.markerColor)))
+  )
+    throw new RangeError("Invalid sparkline point style.");
+  const points: Partial<Record<SparklinePointKind, SparklinePointStyle>> = {};
+  for (const key of ["highPoint", "lowPoint", "firstPoint", "lastPoint"] as const) {
+    const point = value[key];
+    if (point === undefined) continue;
+    if (
+      !point ||
+      typeof point.show !== "boolean" ||
+      typeof point.color !== "string" ||
+      !/^#[0-9a-f]{6}$/i.test(point.color)
+    )
+      throw new RangeError("Invalid sparkline point style.");
+    points[key] = { show: point.show, color: point.color };
+  }
   const source = value.source;
   if (
     source !== null &&
@@ -58,6 +85,9 @@ export function normalizeCellSparkline(
     axis: value.axis,
     showHidden: value.showHidden,
     empty: value.empty,
+    ...points,
+    ...(value.negativePoints !== undefined ? { negativePoints: value.negativePoints } : {}),
+    ...(value.markerColor !== undefined ? { markerColor: value.markerColor } : {}),
   };
 }
 export const cloneCellSparkline = normalizeCellSparkline;

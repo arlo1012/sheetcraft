@@ -130,6 +130,8 @@ import {
 import { getShapeTextAssetIds } from "@sheetcraft/core/shape-text";
 import { createCanvasImageCache } from "../modules/sheet-grid/canvas/image-painter";
 import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
+import { useSparklineTools } from "../modules/sparklines/useSparklineTools";
+import SparklineToolsToolbar from "../modules/sparklines/components/SparklineToolsToolbar.vue";
 import PivotGroupingDialog from "../modules/pivot-tables/components/PivotGroupingDialog.vue";
 import { usePivotGrouping } from "../modules/pivot-tables/usePivotGrouping";
 import { usePivotActions } from "../modules/pivot-tables/usePivotActions";
@@ -1604,6 +1606,18 @@ const {
   error: sparklineError,
   failed: sparklineFailed,
 } = sparklineActions;
+const sparklineToolContext = useSparklineTools({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getRange: () => activeSelectionRange.value,
+  getAddress: () => activeAddress.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  flush: () => cellEditSession.finish(),
+  execute: executeCommand,
+  edit: (address) => sparklineActions.open(undefined, address),
+});
 const sparklineRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingSparklineRange, reference: pickedSparklineReference } = sparklineRangePicker;
 let sparklinePickerSequence = 0;
@@ -5056,6 +5070,7 @@ watch(
     <SpreadsheetRibbon
       :print-disabled="loading || fileBusy || xlsxBusy"
       :has-chart="!!chartObjectContext"
+      :has-sparkline="!!sparklineToolContext"
       :has-image="!!selectedPicture"
       :has-shape="!!shapeObjectControls.snapshot.value?.paths.length"
       :before-shape-context-change="beforeShapeContextChange"
@@ -5490,6 +5505,13 @@ watch(
           :apply-and-format="chartObjectContext.applyAndFormat"
           :format-target="chartFormatTarget"
           :format-targets="chartFormatChoices"
+        />
+      </template>
+      <template #sparkline-tools>
+        <SparklineToolsToolbar
+          v-if="sparklineToolContext"
+          :key="sparklineToolContext.key"
+          :context="sparklineToolContext"
         />
       </template>
       <template #insert-tools>

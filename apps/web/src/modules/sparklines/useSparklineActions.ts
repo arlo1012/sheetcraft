@@ -11,6 +11,7 @@ import {
   type Sheet,
   type Workbook,
   type CellRange,
+  type CellAddress,
 } from "@sheetcraft/core/workbook";
 import {
   formatRangeReference,
@@ -58,11 +59,11 @@ export function useSparklineActions(options: {
   function allowed() {
     return !options.isBusy() && canUseSheetPermission(options.getSheet(), "formatCells");
   }
-  function open(type?: CellSparkline["type"]) {
+  function open(type?: CellSparkline["type"], address?: CellAddress) {
     if (!allowed() || !options.flush()) return;
     const sheet = options.getSheet();
     if (!canUseSheetPermission(sheet, "formatCells")) return;
-    const range = options.getRange();
+    const range = address ? { start: address, end: address } : options.getRange();
     const existing = getCellSparkline(sheet, range.start);
     const destination = existing ? { start: range.start, end: range.start } : range;
     error.value = false;
@@ -80,6 +81,7 @@ export function useSparklineActions(options: {
             axis: false,
             showHidden: false,
             empty: "gap",
+            negativePoints: false,
           },
     };
     if (type) initial.sparkline.type = type;

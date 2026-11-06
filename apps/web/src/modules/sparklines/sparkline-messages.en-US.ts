@@ -1,5 +1,18 @@
 export const sparklinesEnUS = {
   "sparkline.title": "Sparklines",
+  "sparkline.tools": "Sparkline Tools",
+  "sparkline.editData": "Edit Data",
+  "sparkline.show": "Show",
+  "sparkline.colors": "Colors",
+  "sparkline.pointColors": "Marker Color",
+  "sparkline.highPoint": "High Point",
+  "sparkline.lowPoint": "Low Point",
+  "sparkline.firstPoint": "First Point",
+  "sparkline.lastPoint": "Last Point",
+  "sparkline.negativePoints": "Negative Points",
+  "sparkline.options": "Data Options",
+  "sparkline.operationFailed":
+    "Could not change the sparklines. Select the target again and retry.",
   "sparkline.create": "Create Sparklines",
   "sparkline.edit": "Edit Sparklines",
   "sparkline.selectData": "Choose the data that you want",

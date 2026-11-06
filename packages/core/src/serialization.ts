@@ -348,6 +348,8 @@ export type WorkbookSnapshotV91 = Omit<WorkbookSnapshotV90, "version"> & { versi
 export type WorkbookSnapshotV92 = Omit<WorkbookSnapshotV91, "version"> & { version: 92 };
 /** Explicit per-series circle or square markers, including dormant choices. */
 export type WorkbookSnapshotV93 = Omit<WorkbookSnapshotV92, "version"> & { version: 93 };
+/** Independent sparkline point visibility and colors, including dormant choices. */
+export type WorkbookSnapshotV94 = Omit<WorkbookSnapshotV93, "version"> & { version: 94 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -399,8 +401,9 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV90
   | WorkbookSnapshotV91
   | WorkbookSnapshotV92
-  | WorkbookSnapshotV93;
-type WorkbookWritePayload = Omit<WorkbookSnapshotV93, "version"> & {
+  | WorkbookSnapshotV93
+  | WorkbookSnapshotV94;
+type WorkbookWritePayload = Omit<WorkbookSnapshotV94, "version"> & {
   version: WorkbookSnapshot["version"];
 };
 export type SheetSnapshot = SheetSnapshotV7 & {
@@ -513,9 +516,20 @@ type SnapshotVersion =
   | 90
   | 91
   | 92
-  | 93;
+  | 93
+  | 94;
 
 type UnknownRecord = Record<string, unknown>;
+
+function hasSparklinePointStyle(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    ["highPoint", "lowPoint", "firstPoint", "lastPoint", "negativePoints", "markerColor"].some(
+      (key) => Object.hasOwn(value, key),
+    )
+  );
+}
 
 function fail(path: string, reason: string): never {
   throw new WorkbookDomainError(
@@ -1536,6 +1550,8 @@ function parseCell(value: unknown, path: string, version: SnapshotVersion): Cell
   if (version < 27 && Object.hasOwn(record, "sparkline"))
     return fail(path, "Sparklines require snapshot version 27.");
   const hasSparkline = version >= 27 && Object.hasOwn(record, "sparkline");
+  if (hasSparkline && version < 94 && hasSparklinePointStyle(record.sparkline))
+    return fail(`${path}.sparkline`, "Sparkline point styles require snapshot version 94.");
   const hasNote = version >= 20 && Object.hasOwn(record, "note");
   if (
     hasNote &&
@@ -2708,6 +2724,11 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasChartAxisTitles) version = 91;
     if (hasChartMarkerSize) version = 92;
     if (hasChartMarkerSymbol) version = 93;
+    if (
+      Array.isArray(record.cells) &&
+      record.cells.some((cell) => hasSparklinePointStyle(asRecord(cell, path).sparkline))
+    )
+      version = 94;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -3170,6 +3191,8 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     )
   )
     snapshot.version = 93;
+  if (sheets.some((sheet) => sheet.cells.some((cell) => hasSparklinePointStyle(cell.sparkline))))
+    snapshot.version = 94;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -3270,7 +3293,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 90 &&
     record.version !== 91 &&
     record.version !== 92 &&
-    record.version !== 93
+    record.version !== 93 &&
+    record.version !== 94
   ) {
     throw new WorkbookDomainError(
       {

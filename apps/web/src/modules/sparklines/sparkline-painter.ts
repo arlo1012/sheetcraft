@@ -8,6 +8,26 @@ export function paintSparkline(
 ): void {
   const numbers = values.filter((value): value is number => value !== null);
   if (!numbers.length || rect.width < 4 || rect.height < 4) return;
+  const dataMin = Math.min(...numbers);
+  const dataMax = Math.max(...numbers);
+  const first = values.findIndex((value) => value !== null);
+  const last = values.findLastIndex((value) => value !== null);
+  const pointColor = (value: number, index: number): string | undefined => {
+    if (sparkline.highPoint?.show && value === dataMax) return sparkline.highPoint.color;
+    if (sparkline.lowPoint?.show && value === dataMin) return sparkline.lowPoint.color;
+    if (sparkline.firstPoint?.show && index === first) return sparkline.firstPoint.color;
+    if (sparkline.lastPoint?.show && index === last) return sparkline.lastPoint.color;
+    if (value < 0 && sparkline.negativePoints !== false) return sparkline.negativeColor;
+    return undefined;
+  };
+  const explicitPoint = (value: number, index: number): boolean =>
+    !!(
+      (sparkline.highPoint?.show && value === dataMax) ||
+      (sparkline.lowPoint?.show && value === dataMin) ||
+      (sparkline.firstPoint?.show && index === first) ||
+      (sparkline.lastPoint?.show && index === last) ||
+      (sparkline.negativePoints === true && value < 0)
+    );
   const left = rect.x + 3,
     top = rect.y + 3,
     width = rect.width - 6,
@@ -46,21 +66,24 @@ export function paintSparkline(
       active = true;
     });
     context.stroke();
-    if (sparkline.markers || values.length === 1)
-      values.forEach((value, index) => {
-        if (value === null) return;
-        const x = left + (values.length === 1 ? width / 2 : (width * index) / (values.length - 1));
-        context.fillStyle = value < 0 ? sparkline.negativeColor : sparkline.color;
-        context.beginPath();
-        context.arc(x, y(value), 2, 0, 2 * Math.PI);
-        context.fill();
-      });
+    values.forEach((value, index) => {
+      if (
+        value === null ||
+        !(sparkline.markers || values.length === 1 || explicitPoint(value, index))
+      )
+        return;
+      const x = left + (values.length === 1 ? width / 2 : (width * index) / (values.length - 1));
+      context.fillStyle = pointColor(value, index) ?? sparkline.markerColor ?? sparkline.color;
+      context.beginPath();
+      context.arc(x, y(value), 2, 0, 2 * Math.PI);
+      context.fill();
+    });
   } else {
     const slot = width / Math.max(1, values.length);
     const barWidth = Math.max(0.5, slot * 0.72);
     values.forEach((value, index) => {
       if (value === null || value === 0) return;
-      context.fillStyle = value < 0 ? sparkline.negativeColor : sparkline.color;
+      context.fillStyle = pointColor(value, index) ?? sparkline.color;
       const base = zero;
       const end = sparkline.type === "winLoss" ? (value > 0 ? top : top + height) : y(value);
       context.fillRect(
