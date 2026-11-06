@@ -62,7 +62,9 @@ const { t } = useAppI18n();
         /></label>
       </div>
       <div class="sparkline-dialog__row">
-        <Checkbox v-model="draft.sparkline.markers">{{ t("sparkline.markers") }}</Checkbox
+        <Checkbox v-if="draft.sparkline.type === 'line'" v-model="draft.sparkline.markers">{{
+          t("sparkline.markers")
+        }}</Checkbox
         ><Checkbox v-model="draft.sparkline.axis">{{ t("sparkline.axis") }}</Checkbox
         ><Checkbox v-model="draft.sparkline.showHidden">{{ t("chart.showHidden") }}</Checkbox>
       </div>
