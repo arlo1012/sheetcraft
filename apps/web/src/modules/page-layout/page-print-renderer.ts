@@ -82,6 +82,13 @@ import {
   PRINT_NOTE_FONT,
   type PrintNotePage,
 } from "./page-print-notes";
+import {
+  capturePrintNoteBoxes,
+  getPrintNoteBoxExtent,
+  paintPrintNoteBoxes,
+  PRINT_NOTE_BOX_FONT,
+  type PrintNoteBox,
+} from "./page-print-note-boxes";
 
 const PX_PER_MM = 96 / 25.4;
 
@@ -107,6 +114,7 @@ export type PrintPreviewDocument = {
   equationPrintPass?: PrintEquationPass;
   chartPrintPass?: PrintChartPass;
   widgets: readonly PrintWidget[];
+  noteBoxes: readonly PrintNoteBox[];
   evaluator: SheetEvaluator;
   sheetName: string;
   fileName: string;
@@ -239,6 +247,7 @@ function createPreviewPages(
 }
 
 export function createPrintPreviewDocument(options: {
+  displayedNoteKeys?: ReadonlySet<string>;
   sheet: Sheet;
   theme?: WorkbookTheme;
   evaluator: SheetEvaluator;
@@ -297,6 +306,17 @@ export function createPrintPreviewDocument(options: {
     },
   };
   const shapeMetrics = createPrintShapeMetrics(options.sheet, options.evaluator);
+  const noteBoxes =
+    requested.printOptions?.cellComments === "asDisplayed"
+      ? capturePrintNoteBoxes({
+          sheet: options.sheet,
+          metrics: shapeMetrics,
+          displayedKeys: options.displayedNoteKeys,
+          printArea: requested.printArea,
+          anonymous: options.locale?.toLowerCase().startsWith("zh") ? "匿名" : "Anonymous",
+        })
+      : [];
+  const noteExtent = getPrintNoteBoxExtent(noteBoxes, shapeMetrics);
   const widgets = capturePrintWidgets(options.sheet, options.evaluator, shapeMetrics);
   const widgetExtent = getPrintWidgetExtent(widgets, shapeMetrics);
   // Capture the entire worksheet before filtering printObject. Connectors may
@@ -342,6 +362,7 @@ export function createPrintPreviewDocument(options: {
     equationExtent.rowCount,
     chartExtent.rowCount,
     widgetExtent.rowCount,
+    noteExtent.rowCount,
     (requested.printArea?.end.row ?? -1) + 1,
   );
   const contentColumnCount = Math.max(
@@ -351,6 +372,7 @@ export function createPrintPreviewDocument(options: {
     equationExtent.columnCount,
     chartExtent.columnCount,
     widgetExtent.columnCount,
+    noteExtent.columnCount,
     (requested.printArea?.end.column ?? -1) + 1,
   );
   const rowCount = Math.max(contentRowCount, (requested.printTitles?.rows?.end ?? -1) + 1);
@@ -448,6 +470,7 @@ export function createPrintPreviewDocument(options: {
     equationPrintPass,
     chartPrintPass,
     widgets,
+    noteBoxes,
     evaluator: options.evaluator,
     sheetName: options.sheetName ?? options.sheet.name,
     fileName: options.fileName ?? "workbook.xlsx",
@@ -695,6 +718,7 @@ export function createPrintPreviewRenderer(
     const context = canvas.getContext("2d");
     if (!context) {
       if (page.notes) throw new Error("Notes print canvas is unavailable.");
+      if (document.noteBoxes.length) throw new Error("Note box print canvas is unavailable.");
       if (chartPass?.entries.length)
         throw new ChartPrintUnavailableError(
           chartPass.entries.map((entry) => entry.sourceRoot.id),
@@ -923,6 +947,7 @@ export function createPrintPreviewRenderer(
         images,
       });
       paintObjectsBefore(Infinity);
+      paintPrintNoteBoxes(context, document.noteBoxes, viewport);
       context.restore();
     };
     if (page.titleRows && page.titleColumns) paintFragment(page.titleRows, page.titleColumns, 0, 0);
@@ -966,6 +991,10 @@ export function createPrintPreviewRenderer(
     if (document.pages.some((page) => page.notes)) {
       await globalThis.document.fonts?.load(`14px ${PRINT_NOTE_FONT}`);
       await globalThis.document.fonts?.load(`700 14px ${PRINT_NOTE_FONT}`);
+    }
+    if (document.noteBoxes.length) {
+      await globalThis.document.fonts?.load(`12px ${PRINT_NOTE_BOX_FONT}`);
+      await globalThis.document.fonts?.load(`700 12px ${PRINT_NOTE_BOX_FONT}`);
     }
     assertShapeDocumentCurrent(document);
   }

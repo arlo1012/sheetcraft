@@ -2,7 +2,12 @@ import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import type { SheetPageSetup } from "@sheetcraft/core/page-setup";
 import type { PrintPreviewDocument, PrintPreviewPage } from "./page-print-renderer";
 
-export type PrintSheetSource = { sheet: Sheet; evaluator: SheetEvaluator; setup: SheetPageSetup };
+export type PrintSheetSource = {
+  sheet: Sheet;
+  evaluator: SheetEvaluator;
+  setup: SheetPageSetup;
+  displayedNoteKeys?: ReadonlySet<string>;
+};
 export type PrintJobPage = {
   document: PrintPreviewDocument;
   page: PrintPreviewPage;

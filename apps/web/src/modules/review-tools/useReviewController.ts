@@ -59,6 +59,20 @@ export function useReviewController(options: {
     void options.getRevision();
     return Boolean(getCellNote(options.getSheet(), anchor(options.getAddress())));
   });
+  const displayedNoteKeys = computed<ReadonlySet<string>>(() => {
+    void options.getRevision();
+    const sheet = options.getSheet();
+    const keys = new Set<string>();
+    if (showAllNotes.value)
+      for (const [key, cell] of sheet.cells)
+        if (cell.note && !hiddenNoteKeys.value.includes(key)) keys.add(key);
+    if (showActiveNote.value) {
+      const address = anchor(options.getAddress());
+      const key = `${address.row}:${address.column}`;
+      if (sheet.cells.get(key)?.note) keys.add(key);
+    }
+    return keys;
+  });
   const hasSelectedNotes = computed(() => {
     const range = options.getSelection();
     return notes.value.some(
@@ -249,6 +263,7 @@ export function useReviewController(options: {
     showActiveNote,
     showAllNotes,
     hiddenNoteKeys,
+    displayedNoteKeys,
     setAllNotesVisible,
     resetBox,
     hasNote,

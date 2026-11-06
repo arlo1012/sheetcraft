@@ -567,6 +567,7 @@ const {
   showActiveNote,
   showAllNotes,
   hiddenNoteKeys,
+  displayedNoteKeys,
   hasNote,
   hasSelectedNotes,
 } = reviewActions;
@@ -2179,6 +2180,7 @@ const workbookPrintSheets = computed(() => {
       activeSheetEvaluator.value.forSheet?.(sheet.id) ??
       createWorkbookEvaluator(session.workbook, sheet.id),
     setup: sheet.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP,
+    displayedNoteKeys: sheet === activeSheet.value ? displayedNoteKeys.value : undefined,
   }));
 });
 const chartPrintSheetResolver = computed(() => {
@@ -6963,6 +6965,7 @@ watch(
       @close="screenCapture = undefined"
     />
     <PagePrintPreview
+      :displayed-note-keys="displayedNoteKeys"
       :workbook-sheets="workbookPrintSheets"
       :selection="activeSelectionRange"
       :setup-disabled="activeSheet.properties.protected"

@@ -48,6 +48,7 @@ const props = withDefaults(
     theme?: WorkbookTheme;
     selection?: CellRange;
     workbookSheets?: readonly PrintSheetSource[];
+    displayedNoteKeys?: ReadonlySet<string>;
     setupDisabled?: boolean;
   }>(),
   { fileName: "workbook.xlsx", locale: "en-US", dateSystem: "1900" },
@@ -101,7 +102,14 @@ function rendererFor(sheet: Sheet) {
 const printSources = computed<readonly PrintSheetSource[]>(() =>
   scope.value === "workbook"
     ? (props.workbookSheets ?? []).filter(({ sheet }) => !sheet.properties.hidden)
-    : [{ sheet: props.sheet, evaluator: props.evaluator, setup: effectiveSetup.value }],
+    : [
+        {
+          sheet: props.sheet,
+          evaluator: props.evaluator,
+          setup: effectiveSetup.value,
+          displayedNoteKeys: props.displayedNoteKeys,
+        },
+      ],
 );
 watch(printSources, (sources) => {
   const retained = new Set(sources.map(({ sheet }) => sheet));
@@ -146,6 +154,7 @@ const previewResult = computed<{
         sheet: source.sheet,
         evaluator: source.evaluator,
         setup: source.setup,
+        displayedNoteKeys: source.displayedNoteKeys,
         sheetName: source.sheet.name,
         fileName: props.fileName,
         locale: props.locale,
@@ -341,6 +350,7 @@ async function print(): Promise<void> {
         sheet: source.sheet,
         evaluator: source.evaluator,
         setup: source.setup,
+        displayedNoteKeys: source.displayedNoteKeys,
         theme,
         sheetName: source.sheet.name,
         fileName,
