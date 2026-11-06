@@ -4,8 +4,9 @@ import {
   Activity,
   ChartColumn,
   ChartNoAxesColumnIncreasing,
-  Eraser,
   Axis3D,
+  Group,
+  Ungroup,
 } from "lucide-vue-next";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import type { SparklinePointKind } from "@sheetcraft/core/sparklines";
@@ -13,6 +14,7 @@ import type { SparklineToolContext, SparklineStylePatch } from "../useSparklineT
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
+import SparklineClearMenu from "./SparklineClearMenu.vue";
 import SparklineColorMenu from "./SparklineColorMenu.vue";
 import SparklineDataMenu from "./SparklineDataMenu.vue";
 import SparklineStyleGallery from "./SparklineStyleGallery.vue";
@@ -139,14 +141,23 @@ function point(key: SparklinePointKind, show: boolean): void {
         @activate="apply({ axis: context.mixed.includes('axis') || !context.value.axis })"
         ><Axis3D
       /></RibbonButton>
-      <RibbonButton
-        variant="tall"
-        :label="t('sparkline.remove')"
-        :text="t('sparkline.remove')"
-        :disabled="context.disabled"
-        @activate="failed = !context.clear()"
-        ><Eraser
-      /></RibbonButton>
+      <div class="sparkline-tools__stack">
+        <RibbonButton
+          :label="t('sparkline.group')"
+          :text="t('sparkline.group')"
+          :disabled="context.disabled || !context.canGroup"
+          @activate="failed = !context.group()"
+          ><Group
+        /></RibbonButton>
+        <RibbonButton
+          :label="t('sparkline.ungroup')"
+          :text="t('sparkline.ungroup')"
+          :disabled="context.disabled || !context.canUngroup"
+          @activate="failed = !context.ungroup()"
+          ><Ungroup
+        /></RibbonButton>
+      </div>
+      <SparklineClearMenu :context="context" @failed="failed = true" />
     </section>
     <p v-if="failed" class="sparkline-tools__error" role="alert">
       {{ t("sparkline.operationFailed") }}

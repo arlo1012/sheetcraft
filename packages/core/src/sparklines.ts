@@ -8,9 +8,12 @@ import {
 } from "./workbook.js";
 import { createSheetFilterHiddenRowIntervals } from "./commands/filter.js";
 import { getOutlineHiddenIntervals, type HiddenAxisInterval } from "./data-outline.js";
+import type { IdFactory } from "./runtime.js";
 export type SparklinePointStyle = { show: boolean; color: string };
 export type SparklinePointKind = "highPoint" | "lowPoint" | "firstPoint" | "lastPoint";
 export type CellSparkline = {
+  /** Group identities are scoped to the owning worksheet. */
+  groupId?: string;
   type: "line" | "column" | "winLoss";
   source: CellRange | null;
   color: string;
@@ -30,6 +33,8 @@ export function normalizeCellSparkline(
   value: CellSparkline | null | undefined,
 ): CellSparkline | undefined {
   if (value == null) return undefined;
+  if (value.groupId !== undefined && (typeof value.groupId !== "string" || !value.groupId.trim()))
+    throw new RangeError("Invalid sparkline group identity.");
   if (
     !["line", "column", "winLoss"].includes(value.type) ||
     !["gap", "zero", "connect"].includes(value.empty) ||
@@ -79,6 +84,7 @@ export function normalizeCellSparkline(
   )
     throw new RangeError("A sparkline needs one row or column of at most 10,000 cells.");
   return {
+    ...(value.groupId !== undefined ? { groupId: value.groupId } : {}),
     type: value.type,
     source: source ? { start: { ...source.start }, end: { ...source.end } } : null,
     color: value.color,
@@ -93,6 +99,61 @@ export function normalizeCellSparkline(
   };
 }
 export const cloneCellSparkline = normalizeCellSparkline;
+
+/** A copied block retains its internal groups without joining the source groups. */
+export function copySparklineGroups(
+  matrix: readonly (readonly (CellSparkline | null)[])[],
+  idFactory: IdFactory,
+): (CellSparkline | null)[][] {
+  const identities = new Map<string, string>();
+  return matrix.map((row) =>
+    row.map((value) => {
+      const copy = cloneCellSparkline(value);
+      if (!copy) return null;
+      if (copy.groupId) {
+        let identity = identities.get(copy.groupId);
+        if (!identity) {
+          identity = idFactory("sparkline-group");
+          identities.set(copy.groupId, identity);
+        }
+        copy.groupId = identity;
+      }
+      return copy;
+    }),
+  );
+}
+
+export type SparklineEntry = { address: CellAddress; value: CellSparkline };
+export function getSheetSparklines(sheet: Sheet, range?: CellRange): SparklineEntry[] {
+  return [...sheet.cells].flatMap(([key, cell]) => {
+    if (!cell.sparkline) return [];
+    const [row, column] = key.split(":").map(Number) as [number, number];
+    if (
+      range &&
+      (row < range.start.row ||
+        row > range.end.row ||
+        column < range.start.column ||
+        column > range.end.column)
+    )
+      return [];
+    return [{ address: { row, column }, value: normalizeCellSparkline(cell.sparkline)! }];
+  });
+}
+
+/** Include group peers outside the selection when changing shared group settings. */
+export function expandSparklineGroups(
+  sheet: Sheet,
+  entries: readonly SparklineEntry[],
+): SparklineEntry[] {
+  const groups = new Set(entries.flatMap(({ value }) => (value.groupId ? [value.groupId] : [])));
+  if (!groups.size) return [...entries];
+  const addresses = new Set(entries.map(({ address }) => `${address.row}:${address.column}`));
+  return getSheetSparklines(sheet).filter(
+    ({ address, value }) =>
+      addresses.has(`${address.row}:${address.column}`) ||
+      (value.groupId && groups.has(value.groupId)),
+  );
+}
 export function translateCellSparkline(
   value: CellSparkline | null | undefined,
   delta: CellAddress,

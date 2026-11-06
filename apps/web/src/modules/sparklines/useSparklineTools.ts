@@ -1,8 +1,15 @@
 import { computed } from "vue";
 import { canEditCell, canUseSheetPermission } from "@sheetcraft/core";
-import { createSetCellSparklinesCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
+import {
+  createSetCellSparklinesCommand,
+  createGroupCellSparklinesCommand,
+  createUngroupCellSparklinesCommand,
+  type WorkbookCommand,
+} from "@sheetcraft/core/commands";
 import {
   normalizeCellSparkline,
+  getSheetSparklines,
+  expandSparklineGroups,
   type CellSparkline,
   type SparklinePointKind,
   type SparklinePointStyle,
@@ -15,7 +22,11 @@ import {
   type Workbook,
 } from "@sheetcraft/core/workbook";
 
-export type SparklineStylePatch = Partial<Omit<CellSparkline, "source" | SparklinePointKind>> &
+import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
+
+export type SparklineStylePatch = Partial<
+  Omit<CellSparkline, "source" | "groupId" | SparklinePointKind>
+> &
   Partial<Record<SparklinePointKind, Partial<SparklinePointStyle>>>;
 export type SparklineToolContext = {
   key: string;
@@ -26,6 +37,11 @@ export type SparklineToolContext = {
   apply: (patch: SparklineStylePatch) => boolean;
   edit: () => void;
   clear: () => boolean;
+  clearGroup: () => boolean;
+  canGroup: boolean;
+  canUngroup: boolean;
+  group: () => boolean;
+  ungroup: () => boolean;
 };
 const points = ["highPoint", "lowPoint", "firstPoint", "lastPoint"] as const;
 function mergeStyle(value: CellSparkline, patch: SparklineStylePatch): CellSparkline {
@@ -55,6 +71,7 @@ export function useSparklineTools(options: {
   execute: (command: WorkbookCommand) => boolean;
   edit: (address: CellAddress) => void;
 }) {
+  const idFactory = createBrowserIdFactory();
   return computed<SparklineToolContext | undefined>(() => {
     const workbook = options.getWorkbook();
     const sheet = options.getSheet();
@@ -63,18 +80,8 @@ export function useSparklineTools(options: {
     const selection = options.getRange();
     const range = { start: { ...selection.start }, end: { ...selection.end } };
     const address = { ...options.getAddress() };
-    const selected = [...sheet.cells].flatMap(([key, cell]) => {
-      if (!cell.sparkline) return [];
-      const [row, column] = key.split(":").map(Number) as [number, number];
-      if (
-        row < range.start.row ||
-        row > range.end.row ||
-        column < range.start.column ||
-        column > range.end.column
-      )
-        return [];
-      return [{ address: { row, column }, value: normalizeCellSparkline(cell.sparkline)! }];
-    });
+    const selected = getSheetSparklines(sheet, range);
+    const affected = expandSparklineGroups(sheet, selected);
     if (!selected.length) return undefined;
     const primary =
       selected.find(
@@ -93,7 +100,7 @@ export function useSparklineTools(options: {
       ...points,
     ];
     const mixed = fields.filter((key) =>
-      selected.some(
+      affected.some(
         (item) =>
           JSON.stringify(comparable(item.value, key)) !==
           JSON.stringify(comparable(primary.value, key)),
@@ -102,7 +109,7 @@ export function useSparklineTools(options: {
     const allowed = () =>
       !options.isBusy() &&
       canUseSheetPermission(sheet, "formatCells") &&
-      selected.every((item) => canEditCell(sheet, item.address));
+      affected.every((item) => canEditCell(sheet, item.address));
     const current = () =>
       options.getWorkbook() === workbook &&
       options.getSheet() === sheet &&
@@ -111,10 +118,13 @@ export function useSparklineTools(options: {
       options.getRevision() === revision &&
       JSON.stringify(options.getRange()) === JSON.stringify(range) &&
       JSON.stringify(options.getAddress()) === JSON.stringify(address);
-    function commit(patch: SparklineStylePatch | null): boolean {
+    function commit(
+      patch: SparklineStylePatch | null,
+      entries = patch === null ? selected : affected,
+    ): boolean {
       if (!current() || !allowed() || !options.flush() || !current() || !allowed()) return false;
       try {
-        const changes = selected.map((item) => ({
+        const changes = entries.map((item) => ({
           address: item.address,
           sparkline: patch === null ? null : mergeStyle(item.value, patch),
         }));
@@ -132,6 +142,32 @@ export function useSparklineTools(options: {
         return false;
       }
     }
+    const sameGroup = selected[0]?.value.groupId;
+    const canGroup =
+      selected.length > 1 &&
+      (!sameGroup || selected.some((item) => item.value.groupId !== sameGroup));
+    const canUngroup = selected.some((item) => item.value.groupId !== undefined);
+    function changeGroup(group: boolean): boolean {
+      if (
+        !(group ? canGroup : canUngroup) ||
+        !current() ||
+        !allowed() ||
+        !options.flush() ||
+        !current() ||
+        !allowed()
+      )
+        return false;
+      const command = group
+        ? createGroupCellSparklinesCommand(
+            workbook,
+            sheet.id,
+            range,
+            primary.address,
+            idFactory("sparkline-group"),
+          )
+        : createUngroupCellSparklinesCommand(workbook, sheet.id, range);
+      return !!command && options.execute(command);
+    }
     return {
       key: JSON.stringify([generation, sheet.id, range, address]),
       value: {
@@ -140,11 +176,16 @@ export function useSparklineTools(options: {
       },
       mixed,
       mixedPointVisibility: points.filter((key) =>
-        selected.some((item) => !!item.value[key]?.show !== !!primary.value[key]?.show),
+        affected.some((item) => !!item.value[key]?.show !== !!primary.value[key]?.show),
       ),
       disabled: !allowed(),
       apply: (patch) => commit(patch),
       clear: () => commit(null),
+      clearGroup: () => commit(null, affected),
+      canGroup,
+      canUngroup,
+      group: () => changeGroup(true),
+      ungroup: () => changeGroup(false),
       edit: () => {
         if (current() && allowed()) options.edit(primary.address);
       },

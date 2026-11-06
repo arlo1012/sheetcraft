@@ -31,6 +31,11 @@ function createContext(patch: Partial<SparklineToolContext> = {}) {
     apply: vi.fn((_patch: SparklineStylePatch) => true),
     edit: vi.fn(),
     clear: vi.fn(() => true),
+    clearGroup: vi.fn(() => true),
+    canGroup: false,
+    canUngroup: false,
+    group: vi.fn(() => false),
+    ungroup: vi.fn(() => false),
     ...patch,
   } satisfies SparklineToolContext;
 }

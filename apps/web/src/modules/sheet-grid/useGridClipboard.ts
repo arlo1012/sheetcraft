@@ -1,3 +1,5 @@
+import { copySparklineGroups } from "@sheetcraft/core/sparklines";
+import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { computed, shallowRef, watch, type ComputedRef } from "vue";
 import {
   getCellMatrixSize,
@@ -786,6 +788,9 @@ export function useGridClipboard(options: {
           ...(targetRawTextValues ? { rawTextValues: targetRawTextValues } : {}),
         };
       }
+    }
+    if (payload.kind === "all" && payload.sparklines && !payload.moveSource) {
+      payload.sparklines = copySparklineGroups(payload.sparklines, createBrowserIdFactory());
     }
     let result: GridPasteResult;
     try {

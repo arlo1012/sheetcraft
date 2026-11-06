@@ -1,4 +1,7 @@
 export const sparklinesEnUS = {
+  "sparkline.group": "Group",
+  "sparkline.ungroup": "Ungroup",
+  "sparkline.clearGroup": "Clear sparkline groups",
   "sparkline.title": "Sparklines",
   "sparkline.tools": "Sparkline Tools",
   "sparkline.editData": "Edit Data",

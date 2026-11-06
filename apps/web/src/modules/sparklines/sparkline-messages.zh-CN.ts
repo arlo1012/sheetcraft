@@ -1,4 +1,7 @@
 export const sparklinesZhCN = {
+  "sparkline.group": "组合",
+  "sparkline.ungroup": "取消组合",
+  "sparkline.clearGroup": "清除迷你图组",
   "sparkline.title": "迷你图",
   "sparkline.tools": "迷你图工具",
   "sparkline.editData": "编辑数据",

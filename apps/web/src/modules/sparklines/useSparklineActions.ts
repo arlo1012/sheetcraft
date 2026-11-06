@@ -1,11 +1,20 @@
 import { computed, onScopeDispose, ref, shallowRef, watch } from "vue";
-import { canEditRange, canUseSheetPermission, doMergedCellRangesIntersect } from "@sheetcraft/core";
+import {
+  canEditCell,
+  canEditRange,
+  canUseSheetPermission,
+  doMergedCellRangesIntersect,
+} from "@sheetcraft/core";
 import {
   createSetCellSparklinesCommand,
   createClearCellSparklinesCommand,
   type WorkbookCommand,
 } from "@sheetcraft/core/commands";
-import { normalizeCellSparkline, type CellSparkline } from "@sheetcraft/core/sparklines";
+import {
+  normalizeCellSparkline,
+  getSheetSparklines,
+  type CellSparkline,
+} from "@sheetcraft/core/sparklines";
 import {
   getCellSparkline,
   type Sheet,
@@ -17,6 +26,7 @@ import {
   formatRangeReference,
   resolveRangeReference,
 } from "../../shared/range-reference/formatRangeReference";
+import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 export type SparklineDraft = { source: string; destination: string; sparkline: CellSparkline };
 function hasSelectedContent(sheet: Sheet, range: CellRange): boolean {
   // Inspect stored cells so whole-row/column selections do not scan empty coordinates.
@@ -58,6 +68,7 @@ export function useSparklineActions(options: {
   isBusy: () => boolean;
   execute: (command: WorkbookCommand) => boolean;
 }) {
+  const idFactory = createBrowserIdFactory();
   const dialog = shallowRef<SparklineDialogTarget>();
   const draft = computed(() => dialog.value?.initial);
   const error = ref(false);
@@ -158,6 +169,10 @@ export function useSparklineActions(options: {
     }
     try {
       const changes = [];
+      const groupId =
+        (target.editing ? target.initial.sparkline.groupId : undefined) ??
+        (targetRows * targetColumns > 1 ? idFactory("sparkline-group") : undefined);
+      const definition = normalizeCellSparkline({ ...value.sparkline, groupId })!;
       for (let row = 0; row < targetRows; row++)
         for (let column = 0; column < targetColumns; column++) {
           const single = targetRows === 1 && targetColumns === 1;
@@ -180,9 +195,28 @@ export function useSparklineActions(options: {
               row: destination.range.start.row + row,
               column: destination.range.start.column + column,
             },
-            sparkline: normalizeCellSparkline({ ...value.sparkline, source: range })!,
+            sparkline: normalizeCellSparkline({ ...definition, source: range })!,
           });
         }
+      if (target.editing && groupId) {
+        const targets = new Set(changes.map(({ address }) => `${address.row}:${address.column}`));
+        for (const entry of getSheetSparklines(sheet)) {
+          if (
+            entry.value.groupId !== groupId ||
+            targets.has(`${entry.address.row}:${entry.address.column}`)
+          )
+            continue;
+          if (!canEditCell(sheet, entry.address)) {
+            errorKind.value = "failed";
+            error.value = true;
+            return;
+          }
+          changes.push({
+            address: entry.address,
+            sparkline: normalizeCellSparkline({ ...definition, source: entry.value.source })!,
+          });
+        }
+      }
       const accepted = options.execute(createSetCellSparklinesCommand(sheet.id, changes));
       if (!isCurrent(target)) return;
       // Core returns false for a valid unchanged definition as well as Web's

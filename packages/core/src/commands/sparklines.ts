@@ -1,4 +1,10 @@
-import { cloneCellSparkline, normalizeCellSparkline, type CellSparkline } from "../sparklines.js";
+import {
+  cloneCellSparkline,
+  normalizeCellSparkline,
+  getSheetSparklines,
+  expandSparklineGroups,
+  type CellSparkline,
+} from "../sparklines.js";
 import {
   getCellSparkline,
   setCellSparkline,
@@ -14,6 +20,50 @@ import {
   normalizeRange,
   validateCommandPayload,
 } from "./helpers.js";
+
+/** Selected sparklines adopt the primary member's shared settings and retain their own sources. */
+export function createGroupCellSparklinesCommand(
+  workbook: Workbook,
+  sheetId: string,
+  range: CellRange,
+  primary: CellAddress,
+  groupId: string,
+): SetCellSparklinesCommand | null {
+  const normalizedRange = normalizeRange(range);
+  assertCellRange(normalizedRange);
+  const entries = getSheetSparklines(getSheetOrThrow(workbook, sheetId), normalizedRange);
+  if (entries.length < 2) return null;
+  const first =
+    entries.find(
+      ({ address }) => address.row === primary.row && address.column === primary.column,
+    ) ?? entries[0]!;
+  return createSetCellSparklinesCommand(
+    sheetId,
+    entries.map(({ address, value }) => ({
+      address,
+      sparkline: { ...first.value, groupId, source: value.source },
+    })),
+  );
+}
+
+/** Dissolve each selected group, including peers outside the current selection. */
+export function createUngroupCellSparklinesCommand(
+  workbook: Workbook,
+  sheetId: string,
+  range: CellRange,
+): SetCellSparklinesCommand | null {
+  const normalizedRange = normalizeRange(range);
+  assertCellRange(normalizedRange);
+  const sheet = getSheetOrThrow(workbook, sheetId);
+  const entries = expandSparklineGroups(sheet, getSheetSparklines(sheet, normalizedRange));
+  const changes = entries
+    .filter(({ value }) => value.groupId !== undefined)
+    .map(({ address, value }) => {
+      const { groupId: _groupId, ...sparkline } = value;
+      return { address, sparkline };
+    });
+  return changes.length ? createSetCellSparklinesCommand(sheetId, changes) : null;
+}
 
 export function createSetCellSparklineCommand(
   workbook: Workbook,

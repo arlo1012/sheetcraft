@@ -47,14 +47,31 @@ export function writeXlsxSparklines(entries: Unzipped, sheets: readonly Sheet[])
   sheets.forEach((sheet, index) => {
     const part = parts[index];
     if (!part || !entries[part]) return;
-    const groups = [...sheet.cells].flatMap(([key, cell]) => {
-      if (!cell.sparkline) return [];
+    const grouped = new Map<string, { spark: CellSparkline; members: string[] }>();
+    for (const [key, cell] of sheet.cells) {
+      if (!cell.sparkline) continue;
       const spark = normalizeCellSparkline(cell.sparkline)!;
       const [row, column] = key.split(":").map(Number);
       const cellLabel = getCellAddressLabel({ row: row!, column: column! });
       const formula = spark.source
         ? `'${sheet.name.replaceAll("'", "''")}'!${getCellAddressLabel(spark.source.start)}:${getCellAddressLabel(spark.source.end)}`
         : "#REF!";
+      const { source: _source, groupId: _groupId, ...style } = spark;
+      const groupKey = JSON.stringify([
+        spark.groupId ? "group" : "cell",
+        spark.groupId ?? key,
+        style,
+      ]);
+      let group = grouped.get(groupKey);
+      if (!group) {
+        group = { spark, members: [] };
+        grouped.set(groupKey, group);
+      }
+      group.members.push(
+        `<x14:sparkline><xm:f>${escape(formula)}</xm:f><xm:sqref>${cellLabel}</xm:sqref></x14:sparkline>`,
+      );
+    }
+    const groups = [...grouped.values()].map(({ spark, members }) => {
       const pointAttributes = pointFields
         .filter(([field]) => spark[field] !== undefined)
         .map(([field, attribute]) => ` ${attribute}="${Number(spark[field]!.show)}"`)
@@ -64,9 +81,7 @@ export function writeXlsxSparklines(entries: Unzipped, sheets: readonly Sheet[])
         .map(([field, , element]) => colorElement(element, spark[field]!.color))
         .join("");
       const negative = spark.negativePoints ?? (spark.type !== "line" || spark.markers);
-      return [
-        `<x14:sparklineGroup type="${spark.type === "winLoss" ? "stacked" : spark.type}" displayEmptyCellsAs="${spark.empty === "connect" ? "span" : spark.empty}" markers="${Number(spark.markers)}" negative="${Number(negative)}" displayXAxis="${Number(spark.axis)}" displayHidden="${Number(spark.showHidden)}"${pointAttributes}>${colorElement("colorSeries", spark.color)}${colorElement("colorNegative", spark.negativeColor)}${colorElement("colorAxis", "#a3a3a3")}${colorElement("colorMarkers", spark.markerColor ?? spark.color)}${pointColors}<x14:sparklines><x14:sparkline><xm:f>${escape(formula)}</xm:f><xm:sqref>${cellLabel}</xm:sqref></x14:sparkline></x14:sparklines></x14:sparklineGroup>`,
-      ];
+      return `<x14:sparklineGroup type="${spark.type === "winLoss" ? "stacked" : spark.type}" displayEmptyCellsAs="${spark.empty === "connect" ? "span" : spark.empty}" markers="${Number(spark.markers)}" negative="${Number(negative)}" displayXAxis="${Number(spark.axis)}" displayHidden="${Number(spark.showHidden)}"${pointAttributes}>${colorElement("colorSeries", spark.color)}${colorElement("colorNegative", spark.negativeColor)}${colorElement("colorAxis", "#a3a3a3")}${colorElement("colorMarkers", spark.markerColor ?? spark.color)}${pointColors}<x14:sparklines>${members.join("")}</x14:sparklines></x14:sparklineGroup>`;
     });
     if (!groups.length) return;
     const xml = strFromU8(entries[part]!);
@@ -84,9 +99,11 @@ export function readXlsxSparklines(
     const bytes = entries[part];
     if (!bytes) return result;
     const xml = strFromU8(bytes);
+    let groupSequence = 0;
     for (const group of xml.matchAll(
       /<(?:\w+:)?sparklineGroup\b([^>]*)>([\s\S]*?)<\/(?:\w+:)?sparklineGroup>/g,
     )) {
+      const groupId = `xlsx-sparkline-group-${++groupSequence}`;
       const attributes = group[1]!,
         body = group[2]!;
       const hasColor = (name: string) => new RegExp(`<(?:\\w+:)?${name}\\b`).test(body);
@@ -97,9 +114,10 @@ export function readXlsxSparklines(
           ? `#${rgb.slice(-6).toLowerCase()}`
           : fallback;
       };
-      for (const item of body.matchAll(
-        /<(?:\w+:)?sparkline\b[^>]*>([\s\S]*?)<\/(?:\w+:)?sparkline>/g,
-      )) {
+      const items = [
+        ...body.matchAll(/<(?:\w+:)?sparkline\b[^>]*>([\s\S]*?)<\/(?:\w+:)?sparkline>/g),
+      ];
+      for (const item of items) {
         const reference =
           /<(?:\w+:)?sqref>([^<]*)<\//.exec(item[1]!)?.[1]?.trim().replaceAll("$", "") ?? "";
         try {
@@ -128,6 +146,7 @@ export function readXlsxSparklines(
               points[field] = { show: flag(attribute), color: color(element, "#ef4444") };
           }
           const sparkline = normalizeCellSparkline({
+            ...(items.length > 1 ? { groupId } : {}),
             type: type === "stacked" ? "winLoss" : (type as CellSparkline["type"]),
             source: parsed?.target.range ?? null,
             color: color("colorSeries", "#2563eb"),
