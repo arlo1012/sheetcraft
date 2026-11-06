@@ -34,7 +34,7 @@ const RIBBON_FOCUS_TARGET_SELECTOR = [
 ].join(", ");
 
 let resizeObserver: ResizeObserver | null = null;
-let pointerFocusing = false;
+const pointerFocusing = ref(false);
 
 function getMaxScrollLeft(viewport: HTMLDivElement): number {
   return Math.max(0, viewport.scrollWidth - viewport.clientWidth);
@@ -104,8 +104,8 @@ function scrollByPage(direction: -1 | 1): void {
 function onViewportFocusIn(event: FocusEvent): void {
   // Moving the rail between pointerdown and click moves the pressed tool out
   // from under the pointer. Only keyboard/programmatic focus should reveal groups.
-  if (pointerFocusing) {
-    pointerFocusing = false;
+  if (pointerFocusing.value) {
+    pointerFocusing.value = false;
     return;
   }
   const viewport = viewportRef.value;
