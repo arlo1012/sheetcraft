@@ -131,6 +131,8 @@ import { getShapeTextAssetIds } from "@sheetcraft/core/shape-text";
 import { createCanvasImageCache } from "../modules/sheet-grid/canvas/image-painter";
 import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
 import { useSparklineTools } from "../modules/sparklines/useSparklineTools";
+import { useSparklineDataOptions } from "../modules/sparklines/useSparklineDataOptions";
+import SparklineDataOptionsDialog from "../modules/sparklines/components/SparklineDataOptionsDialog.vue";
 import SparklineToolsToolbar from "../modules/sparklines/components/SparklineToolsToolbar.vue";
 import PivotGroupingDialog from "../modules/pivot-tables/components/PivotGroupingDialog.vue";
 import { usePivotGrouping } from "../modules/pivot-tables/usePivotGrouping";
@@ -1619,6 +1621,10 @@ const sparklineToolContext = useSparklineTools({
   edit: (address) => sparklineActions.open(undefined, address),
 });
 const sparklineRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const sparklineDataOptions = useSparklineDataOptions({
+  getContext: () => sparklineToolContext.value,
+  flush: () => cellEditSession.finish(),
+});
 const { active: pickingSparklineRange, reference: pickedSparklineReference } = sparklineRangePicker;
 let sparklinePickerSequence = 0;
 const sparklinePicker = shallowRef<{ id: number; confirm: () => void; cancel: () => void }>();
@@ -5021,6 +5027,7 @@ const gridInert = computed(
     symbolVisible.value ||
     ((!!editingChart.value || !!chartSourceDialog.value) && !pickingChartRange.value) ||
     (!!sparklineDraft.value && !pickingSparklineRange.value) ||
+    !!sparklineDataOptions.dialog.value ||
     cellStylesModalOpen.value ||
     (tableModalOpen.value && !pickingTableRange.value) ||
     formulaEditorVisible.value ||
@@ -5512,6 +5519,7 @@ watch(
           v-if="sparklineToolContext"
           :key="sparklineToolContext.key"
           :context="sparklineToolContext"
+          @data-options="sparklineDataOptions.open"
         />
       </template>
       <template #insert-tools>
@@ -7365,6 +7373,15 @@ watch(
     :edit-session-id="cellEditSession.id"
     @confirm="cameraRangePicker.confirm"
     @cancel="cameraRangePicker.cancel"
+  />
+  <SparklineDataOptionsDialog
+    v-if="sparklineDataOptions.dialog.value"
+    :key="sparklineDataOptions.dialog.value.key"
+    :initial="sparklineDataOptions.dialog.value.initial"
+    :disabled="!sparklineToolContext || sparklineToolContext.disabled"
+    :failed="sparklineDataOptions.failed.value"
+    @confirm="sparklineDataOptions.dialog.value.confirm"
+    @close="sparklineDataOptions.dialog.value.close"
   />
   <SparklineDialog
     v-if="sparklineDialog"

@@ -4,10 +4,8 @@ import {
   Activity,
   ChartColumn,
   ChartNoAxesColumnIncreasing,
-  Database,
   Eraser,
   Axis3D,
-  Settings2,
 } from "lucide-vue-next";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import type { SparklinePointKind } from "@sheetcraft/core/sparklines";
@@ -16,7 +14,9 @@ import { useAppI18n } from "../../../shared/i18n";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import SparklineColorMenu from "./SparklineColorMenu.vue";
+import SparklineDataMenu from "./SparklineDataMenu.vue";
 const props = defineProps<{ context: SparklineToolContext }>();
+const emit = defineEmits<{ dataOptions: [] }>();
 const { t } = useAppI18n();
 const failed = ref(false);
 function apply(patch: SparklineStylePatch): void {
@@ -29,14 +29,7 @@ function point(key: SparklinePointKind, show: boolean): void {
 <template>
   <RibbonToolbar :label="t('sparkline.tools')">
     <section class="sparkline-tools__group" role="group" :aria-label="t('sparkline.editData')">
-      <RibbonButton
-        variant="tall"
-        :label="t('sparkline.editData')"
-        :text="t('sparkline.editData')"
-        :disabled="context.disabled"
-        @activate="context.edit"
-        ><Database
-      /></RibbonButton>
+      <SparklineDataMenu :context="context" @data-options="emit('dataOptions')" />
     </section>
     <section class="sparkline-tools__group" role="group" :aria-label="t('sparkline.type')">
       <RibbonButton
@@ -141,14 +134,6 @@ function point(key: SparklinePointKind, show: boolean): void {
         :disabled="context.disabled"
         @activate="apply({ axis: context.mixed.includes('axis') || !context.value.axis })"
         ><Axis3D
-      /></RibbonButton>
-      <RibbonButton
-        variant="tall"
-        :label="t('sparkline.options')"
-        :text="t('sparkline.options')"
-        :disabled="context.disabled"
-        @activate="context.edit"
-        ><Settings2
       /></RibbonButton>
       <RibbonButton
         variant="tall"
