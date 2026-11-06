@@ -9,6 +9,8 @@ export const sparklinesZhCN = {
   "sparkline.showHiddenData": "显示隐藏行列中的数据",
   "sparkline.show": "显示",
   "sparkline.colors": "颜色",
+  "sparkline.styles": "迷你图样式",
+  "sparkline.themeStyle": "迷你图主题样式 {index}",
   "sparkline.pointColors": "标记颜色",
   "sparkline.highPoint": "高点",
   "sparkline.lowPoint": "低点",

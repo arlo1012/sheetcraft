@@ -15,6 +15,7 @@ import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import SparklineColorMenu from "./SparklineColorMenu.vue";
 import SparklineDataMenu from "./SparklineDataMenu.vue";
+import SparklineStyleGallery from "./SparklineStyleGallery.vue";
 const props = defineProps<{ context: SparklineToolContext }>();
 const emit = defineEmits<{ dataOptions: [] }>();
 const { t } = useAppI18n();
@@ -115,6 +116,9 @@ function point(key: SparklinePointKind, show: boolean): void {
           >{{ t("sparkline.markers") }}</Checkbox
         >
       </div>
+    </section>
+    <section class="sparkline-tools__group" data-ribbon-group>
+      <SparklineStyleGallery :context="context" @failed="failed = true" />
     </section>
     <section class="sparkline-tools__group" role="group" :aria-label="t('sparkline.colors')">
       <div class="sparkline-tools__stack">

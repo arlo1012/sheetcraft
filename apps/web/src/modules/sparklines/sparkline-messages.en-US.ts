@@ -9,6 +9,8 @@ export const sparklinesEnUS = {
   "sparkline.showHiddenData": "Show data in hidden rows and columns",
   "sparkline.show": "Show",
   "sparkline.colors": "Colors",
+  "sparkline.styles": "Sparkline styles",
+  "sparkline.themeStyle": "Sparkline theme style {index}",
   "sparkline.pointColors": "Marker Color",
   "sparkline.highPoint": "High Point",
   "sparkline.lowPoint": "Low Point",
