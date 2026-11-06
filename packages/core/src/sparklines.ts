@@ -6,6 +6,8 @@ import {
   type Sheet,
   type SheetEvaluator,
 } from "./workbook.js";
+import { createSheetFilterHiddenRowIntervals } from "./commands/filter.js";
+import { getOutlineHiddenIntervals, type HiddenAxisInterval } from "./data-outline.js";
 export type SparklinePointStyle = { show: boolean; color: string };
 export type SparklinePointKind = "highPoint" | "lowPoint" | "firstPoint" | "lastPoint";
 export type CellSparkline = {
@@ -123,24 +125,57 @@ export function getSparklineValues(
   value: CellSparkline,
   evaluator: SheetEvaluator,
 ): Array<number | null> {
-  const sparkline = normalizeCellSparkline(value)!;
-  if (!sparkline.source) return [];
-  const { start, end } = sparkline.source;
-  const values: Array<number | null> = [];
-  for (let row = start.row; row <= end.row; row++)
-    for (let column = start.column; column <= end.column; column++) {
-      if (!sparkline.showHidden && (sheet.hiddenRows?.has(row) || sheet.hiddenColumns?.has(column)))
-        continue;
-      const value = evaluator.getComputedValue({ row, column });
-      values.push(
-        typeof value === "number" && Number.isFinite(value)
-          ? value
-          : value == null || value === ""
-            ? sparkline.empty === "zero"
-              ? 0
-              : null
-            : null,
-      );
+  return createSparklineValueResolver(sheet, evaluator)(value);
+}
+
+/** Recreate with the document display snapshot; share visibility work across its sparklines. */
+export function createSparklineValueResolver(sheet: Sheet, evaluator: SheetEvaluator) {
+  let hiddenRows: HiddenAxisInterval[] | undefined;
+  let hiddenColumns: HiddenAxisInterval[] | undefined;
+  let filteredRows: HiddenAxisInterval[] | undefined;
+  function contains(intervals: readonly HiddenAxisInterval[], index: number): boolean {
+    let low = 0;
+    let high = intervals.length - 1;
+    while (low <= high) {
+      const middle = (low + high) >>> 1;
+      const interval = intervals[middle]!;
+      if (index < interval.start) high = middle - 1;
+      else if (index > interval.end) low = middle + 1;
+      else return true;
     }
-  return values;
+    return false;
+  }
+  function isHidden(row: number, column: number): boolean {
+    filteredRows ??= createSheetFilterHiddenRowIntervals(sheet, evaluator);
+    hiddenRows ??= getOutlineHiddenIntervals(sheet.outlineGroups ?? [], "row");
+    hiddenColumns ??= getOutlineHiddenIntervals(sheet.outlineGroups ?? [], "column");
+    return !!(
+      sheet.hiddenRows?.has(row) ||
+      sheet.hiddenColumns?.has(column) ||
+      contains(filteredRows, row) ||
+      contains(hiddenRows, row) ||
+      contains(hiddenColumns, column)
+    );
+  }
+  return (value: CellSparkline): Array<number | null> => {
+    const sparkline = normalizeCellSparkline(value)!;
+    if (!sparkline.source) return [];
+    const { start, end } = sparkline.source;
+    const values: Array<number | null> = [];
+    for (let row = start.row; row <= end.row; row++)
+      for (let column = start.column; column <= end.column; column++) {
+        if (!sparkline.showHidden && isHidden(row, column)) continue;
+        const value = evaluator.getComputedValue({ row, column });
+        values.push(
+          typeof value === "number" && Number.isFinite(value)
+            ? value
+            : value == null || value === ""
+              ? sparkline.empty === "zero"
+                ? 0
+                : null
+              : null,
+        );
+      }
+    return values;
+  };
 }

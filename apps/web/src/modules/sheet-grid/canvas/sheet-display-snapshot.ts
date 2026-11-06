@@ -170,6 +170,7 @@ function trackSheetDisplayDocument(sheet: Sheet): void {
   void sheet.mergedCells;
   void sheet.freezePanes;
   void sheet.filter;
+  void sheet.outlineGroups;
   void sheet.floatingImages;
   void sheet.duplicateRules;
   void sheet.conditionalFormats;

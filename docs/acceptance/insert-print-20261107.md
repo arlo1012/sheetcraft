@@ -3,6 +3,33 @@
 实现基线：`8eca25c8`。此记录只覆盖下列具体路径，不代表整个插入工具栏已与 WPS 完全一致。
 继续按先插入细节、再打印的顺序推进；功能范围仍参考各领域的当前范围文档。
 
+### 迷你图来源可见性（2026-11-07）
+
+修复取值仅检查手动隐藏行列的问题。关闭“显示隐藏行列中的数据”时，
+现同时排除普通/表格筛选结果和折叠分组；开启时包含这些来源。
+隐藏点直接省去，不将其当作空白或零值。规则依据
+[Microsoft CT_SparklineGroup 的 displayHidden 定义](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/331c1ecb-e49d-4cd0-843d-3ae189dc8a88)，
+此处是按格式语义实现，尚未完成本机 WPS/Excel 行为一致性实测。
+设置窗口沿用此前已观察到的 WPS 布局，没有新增推测的坐标轴菜单。
+
+Core 使用已有筛选与分组可见区间，同一显示快照内延迟计算并复用，
+通过二分查找判断来源点是否隐藏。滚动不重复推导整表筛选；文档更新产生新快照时刷新。
+独立网格的显示依赖也补入 outlineGroups。没有新增持久化字段或兼容分支。
+
+浏览器已验：Sheet7 折叠 C 列后，F1（showHidden=true）保留三点，
+F2（false）变为两点，H1/H2 柱形也排除 C 列；开启 F2 开关后恢复谷点。
+撤销开关、折叠和建组后，Sheet7 的原列、原图和无分组状态恢复。
+新增合成 Sheet8：A2:A4 为保留/隐藏/保留，B2:B4 为 1/9/3；筛掉第三行后，
+关闭隐藏数据的折线仅有 1→3，开启后恢复中间的 9 峰值。
+证据：`apps/web/tmp/sparkline-collapsed-column.png`、
+`apps/web/tmp/sparkline-collapsed-show-hidden.png`、
+`apps/web/tmp/sparkline-filter-hidden.png`、`apps/web/tmp/sparkline-visibility-comparison.png`。
+
+Core 与真实显示场景回归由测试代理补写，覆盖混合隐藏来源、全隐藏空白、
+showHidden 的延迟计算、滚动复用、新快照及屏外源值更新；按用户要求未运行。
+格式、静态检查和开发服务增量编译通过。表格筛选和行分组未另做 GUI 复验；
+不据此宣称桌面一致性、迷你图分组/详细轴或整个插入阶段完成。未操作 WPS 打印。
+
 ### 迷你图点样式的原生 XLSX 保存（2026-11-07）
 
 检查原生写入器发现：新点样式原先没有写入 XLSX，负点开关固定为开启，普通标记颜色

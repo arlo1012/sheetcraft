@@ -1,4 +1,4 @@
-import { getSparklineValues, type CellSparkline } from "@sheetcraft/core/sparklines";
+import { createSparklineValueResolver, type CellSparkline } from "@sheetcraft/core/sparklines";
 import type { Cell, CellAddress, CellRange } from "@sheetcraft/core/workbook";
 import type { CellTextFontRun } from "@sheetcraft/core/formula";
 import type { ExcelDateSystem, FormulaValue } from "@sheetcraft/core/formula";
@@ -67,8 +67,15 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
   let spans: ReturnType<typeof createCellTextSpanResolver>;
   let previousMerges: readonly CellRange[] | undefined;
   let previousColumnCount = 0;
+  let resolveSparklineValues: ReturnType<typeof createSparklineValueResolver>;
 
   function prepare(options: PresentationOptions, layout: SheetViewportLayout, columnCount: number) {
+    if (previous?.display !== options.display) {
+      resolveSparklineValues = createSparklineValueResolver(
+        options.display.sheet,
+        options.display.evaluator,
+      );
+    }
     if (
       previous?.display.sheet !== options.display.sheet ||
       previous.locale !== options.locale ||
@@ -166,11 +173,7 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
         ? {
             sparkline: {
               definition: displayCell.sparkline,
-              values: getSparklineValues(
-                options.display.sheet,
-                displayCell.sparkline,
-                options.display.evaluator,
-              ),
+              values: resolveSparklineValues(displayCell.sparkline),
             },
           }
         : {}),
