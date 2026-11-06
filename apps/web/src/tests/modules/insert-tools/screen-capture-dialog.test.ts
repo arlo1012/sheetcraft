@@ -218,6 +218,69 @@ describe("screen capture crop dialog", () => {
     expect(f.toBlob).not.toHaveBeenCalled();
   });
 
+  test("keeps the crop available after encoding fails and clears the error when a retry succeeds", async () => {
+    const f = await fixture(true);
+    await setNumber(f.wrapper, "Left (px)", 100);
+    await setNumber(f.wrapper, "Top (px)", 50);
+    await setNumber(f.wrapper, "Width (px)", 300);
+    await setNumber(f.wrapper, "Height (px)", 200);
+    const selected = cropValues(f.wrapper);
+    confirm(f.wrapper);
+    f.finishEncoding(null);
+    await flushPromises();
+
+    expect(f.toBlob).toHaveBeenCalledTimes(1);
+    expect(f.wrapper.emitted("confirm")).toBeUndefined();
+    expect(cropValues(f.wrapper)).toEqual(selected);
+    expect(document.body.querySelector('[role="alert"]')).not.toBeNull();
+    expect(f.wrapper.getComponent(Dialog).props("confirmBtn")).toMatchObject({
+      disabled: false,
+      loading: false,
+    });
+
+    confirm(f.wrapper);
+    await nextTick();
+    expect(document.body.querySelector('[role="alert"]')).toBeNull();
+    expect(f.toBlob).toHaveBeenCalledTimes(2);
+    expect(f.wrapper.getComponent(Dialog).props("confirmBtn")).toMatchObject({
+      disabled: true,
+      loading: true,
+    });
+    f.finishEncoding(new Blob(["retried PNG"], { type: "image/png" }));
+    await flushPromises();
+
+    expect(f.wrapper.emitted("confirm")).toHaveLength(1);
+    expect(f.wrapper.emitted("confirm")![0]![0]).toBeInstanceOf(File);
+    expect(f.wrapper.emitted("confirm")![0]![0]).toMatchObject({
+      name: "screenshot.png",
+      type: "image/png",
+    });
+    expect(cropValues(f.wrapper)).toEqual(selected);
+    expect(f.encodedCanvases).toHaveLength(2);
+    for (const canvas of f.encodedCanvases)
+      expect(canvas).toMatchObject({ width: 300, height: 200 });
+    expect(f.wrapper.getComponent(Dialog).props("confirmBtn")).toMatchObject({
+      disabled: false,
+      loading: false,
+    });
+  });
+
+  test("keeps confirmation disabled after the source image fails to load", async () => {
+    const f = await fixture();
+    await f.image.trigger("error");
+    expect(document.body.querySelector('[role="alert"]')).not.toBeNull();
+    expect(f.wrapper.getComponent(Dialog).props("confirmBtn")).toMatchObject({
+      disabled: true,
+    });
+
+    confirm(f.wrapper);
+    await flushPromises();
+
+    expect(f.wrapper.emitted("confirm")).toBeUndefined();
+    expect(f.toBlob).not.toHaveBeenCalled();
+    expect(f.drawImage).not.toHaveBeenCalled();
+  });
+
   test("does not submit a crop that finishes encoding after the dialog is unmounted", async () => {
     const f = await fixture(true);
     await setNumber(f.wrapper, "Width (px)", 300);

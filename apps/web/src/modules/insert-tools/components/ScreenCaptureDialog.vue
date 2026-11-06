@@ -30,8 +30,11 @@ let beforeDrag = region.value;
 let disposed = false;
 const encoding = ref(false);
 const failed = ref(false);
+const loadFailed = ref(false);
 const busy = computed(() => props.busy || encoding.value);
-const valid = computed(() => region.value.width > 0 && region.value.height > 0 && !failed.value);
+const valid = computed(
+  () => region.value.width > 0 && region.value.height > 0 && !loadFailed.value,
+);
 const regionStyle = computed(() => ({
   left: `${(100 * region.value.x) / size.value.width}%`,
   top: `${(100 * region.value.y) / size.value.height}%`,
@@ -43,6 +46,8 @@ function selectAll(): void {
 }
 function loaded(): void {
   if (!image.value) return;
+  loadFailed.value = false;
+  failed.value = false;
   size.value = { width: image.value.naturalWidth, height: image.value.naturalHeight };
   selectAll();
 }
@@ -88,6 +93,7 @@ function setField(field: keyof CaptureRegion, value: InputNumberValue | undefine
 }
 async function confirm(): Promise<void> {
   if (!valid.value || busy.value || !image.value) return;
+  failed.value = false;
   const crop = { ...region.value };
   if (
     crop.x === 0 &&
@@ -158,7 +164,7 @@ onBeforeUnmount(() => {
             :alt="t('drawing.preview')"
             draggable="false"
             @load="loaded"
-            @error="failed = true"
+            @error="loadFailed = failed = true"
           />
           <div v-if="size.width" class="screen-capture__region" :style="regionStyle" />
         </div>

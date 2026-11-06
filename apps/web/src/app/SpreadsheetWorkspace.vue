@@ -2114,8 +2114,8 @@ async function insertCapturedRegion(file: File): Promise<void> {
   }
   captureBusy.value = true;
   try {
-    await imageActions.pasteImageFile(file, "floating", target.address);
-    if (screenCapture.value === target) screenCapture.value = undefined;
+    const inserted = await imageActions.pasteImageFile(file, "floating", target.address);
+    if (inserted && screenCapture.value === target) screenCapture.value = undefined;
   } finally {
     captureBusy.value = false;
   }

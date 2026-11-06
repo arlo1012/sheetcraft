@@ -479,9 +479,9 @@ export function useSheetImageActions(options: {
     replaceId?: string,
     replaceAssetId?: string,
     replacePath?: PictureGroupPath | null,
-  ): Promise<void> {
+  ): Promise<boolean> {
     if (replaceId) {
-      if (busy.value || disposed) return;
+      if (busy.value || disposed) return false;
       const sourceSheet = options.getSheet();
       const sourceWorkbook = options.getWorkbook();
       const sourceGeneration = options.getGeneration?.() ?? 0;
@@ -490,9 +490,10 @@ export function useSheetImageActions(options: {
         replacement = replacementSource(replaceId, replacePath);
       } catch {
         feedback.value = "picture.operationFailed";
-        return;
+        return false;
       }
-      if (replaceAssetId !== undefined && replaceAssetId !== replacement.source.assetId) return;
+      if (replaceAssetId !== undefined && replaceAssetId !== replacement.source.assetId)
+        return false;
       target ??= captureTarget(options.getAddress(), "floating", replacement.source.rootId);
       if (
         !target ||
@@ -500,14 +501,14 @@ export function useSheetImageActions(options: {
         target.workbook !== sourceWorkbook ||
         target.generation !== sourceGeneration
       )
-        return;
+        return false;
       return replaceFile(file, target, replacement);
     }
     target ??= captureTarget(options.getAddress(), mode);
-    if (!target || target.replacementRootId || !isCurrent(target, mode) || busy.value) return;
+    if (!target || target.replacementRootId || !isCurrent(target, mode) || busy.value) return false;
     const owner = target;
     const valid = () => insertionOwnerValid(owner, mode);
-    if (!valid()) return;
+    if (!valid()) return false;
     insertionConfirmation.value = null;
     const cellLease = mode === "cell" ? owner.initialCellLease! : undefined;
     const fileName = file.name || "";
@@ -515,14 +516,13 @@ export function useSheetImageActions(options: {
     feedback.value = undefined;
     try {
       const asset = await prepareImageAsset(file);
-      if (!valid()) return;
+      if (!valid()) return false;
       const size = mode === "floating" ? initialFloatingSize(asset.width, asset.height) : undefined;
       await options.assetStore.put(asset);
-      if (!valid()) return;
+      if (!valid()) return false;
       const altText = fileName;
       if (mode === "cell") {
-        await commitCellImages(target, cellLease!, [{ assetId: asset.id, altText }]);
-        return;
+        return await commitCellImages(target, cellLease!, [{ assetId: asset.id, altText }]);
       } else {
         const accepted = await options.setFloatingImage(
           {
@@ -539,8 +539,10 @@ export function useSheetImageActions(options: {
         if (accepted !== true) throw new Error("Picture insertion was refused.");
       }
       if (isOwnerCurrent(target)) feedback.value = "image.inserted";
+      return true;
     } catch (error) {
       if (isOwnerCurrent(target)) feedback.value = assetFailureFeedback(error);
+      return false;
     } finally {
       busy.value = false;
     }
@@ -550,14 +552,14 @@ export function useSheetImageActions(options: {
     file: File,
     target: ImageTarget,
     replacement: PictureSourceReplacementSnapshot,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const valid = () => replacementCurrent(target, replacement);
-    if (busy.value || !valid()) return;
+    if (busy.value || !valid()) return false;
     busy.value = true;
     feedback.value = undefined;
     try {
       const asset = await prepareImageAsset(file);
-      if (!valid()) return;
+      if (!valid()) return false;
       // Preflight the replacement geometry before creating a stored resource.
       planPictureSourceReplacement(
         replacement,
@@ -566,7 +568,7 @@ export function useSheetImageActions(options: {
         asset,
       );
       await options.assetStore.put(asset);
-      if (!valid()) return;
+      if (!valid()) return false;
       const next = planPictureSourceReplacement(
         replacement,
         target.sheet.floatingImages,
@@ -575,7 +577,7 @@ export function useSheetImageActions(options: {
       );
       if (areFloatingImageCollectionsEqual(target.sheet.floatingImages, next)) {
         feedback.value = "image.unchanged";
-        return;
+        return true;
       }
       const accepted =
         replacement.source.kind === "legacy"
@@ -586,8 +588,10 @@ export function useSheetImageActions(options: {
           : await options.execute!(createSetSheetFloatingImagesCommand(target.sheetId, next));
       if (accepted !== true) throw new Error("Picture replacement was refused.");
       if (isOwnerCurrent(target)) feedback.value = "image.inserted";
+      return true;
     } catch (error) {
       if (isOwnerCurrent(target)) feedback.value = assetFailureFeedback(error);
+      return false;
     } finally {
       busy.value = false;
     }
@@ -600,7 +604,10 @@ export function useSheetImageActions(options: {
     arrangement: PictureBatchArrangement = mode === "cell" ? "vertical" : "cascade",
   ): Promise<void> {
     files = files.slice();
-    if (files.length === 1) return insertFile(files[0]!, mode, target);
+    if (files.length === 1) {
+      await insertFile(files[0]!, mode, target);
+      return;
+    }
     if (
       !files.length ||
       !target ||
