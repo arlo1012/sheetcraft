@@ -1,11 +1,26 @@
 import { strFromU8, strToU8, type Unzipped } from "fflate/browser";
 import { parseFormulaReference } from "@sheetcraft/core/formula";
 import { getCellAddressLabel, parseCellAddress } from "@sheetcraft/core/coordinates";
-import { normalizeCellSparkline, type CellSparkline } from "@sheetcraft/core/sparklines";
+import {
+  normalizeCellSparkline,
+  type CellSparkline,
+  type SparklinePointKind,
+  type SparklinePointStyle,
+} from "@sheetcraft/core/sparklines";
 import type { Sheet } from "@sheetcraft/core/workbook";
 import { readXlsxWorksheetPartTargets } from "./raw-cell-values.js";
 import { appendNativeWorksheetExtension } from "./native/worksheet-order.js";
 const URI = "{05C60535-1F16-4fd2-B633-F4F36F0B64E0}";
+// CT_SparklineGroup requires this child-element order.
+const pointFields = [
+  ["firstPoint", "first", "colorFirst"],
+  ["lastPoint", "last", "colorLast"],
+  ["highPoint", "high", "colorHigh"],
+  ["lowPoint", "low", "colorLow"],
+] as const;
+function colorElement(name: string, color: string): string {
+  return `<x14:${name} rgb="FF${color.slice(1).toUpperCase()}"/>`;
+}
 function escape(value: string): string {
   return value.replace(
     /[&<>"']/g,
@@ -40,8 +55,17 @@ export function writeXlsxSparklines(entries: Unzipped, sheets: readonly Sheet[])
       const formula = spark.source
         ? `'${sheet.name.replaceAll("'", "''")}'!${getCellAddressLabel(spark.source.start)}:${getCellAddressLabel(spark.source.end)}`
         : "#REF!";
+      const pointAttributes = pointFields
+        .filter(([field]) => spark[field] !== undefined)
+        .map(([field, attribute]) => ` ${attribute}="${Number(spark[field]!.show)}"`)
+        .join("");
+      const pointColors = pointFields
+        .filter(([field]) => spark[field] !== undefined)
+        .map(([field, , element]) => colorElement(element, spark[field]!.color))
+        .join("");
+      const negative = spark.negativePoints ?? (spark.type !== "line" || spark.markers);
       return [
-        `<x14:sparklineGroup type="${spark.type === "winLoss" ? "stacked" : spark.type}" displayEmptyCellsAs="${spark.empty === "connect" ? "span" : spark.empty}" markers="${Number(spark.markers)}" negative="1" displayXAxis="${Number(spark.axis)}" displayHidden="${Number(spark.showHidden)}"><x14:colorSeries rgb="FF${spark.color.slice(1).toUpperCase()}"/><x14:colorNegative rgb="FF${spark.negativeColor.slice(1).toUpperCase()}"/><x14:colorAxis rgb="FFA3A3A3"/><x14:colorMarkers rgb="FF${spark.color.slice(1).toUpperCase()}"/><x14:sparklines><x14:sparkline><xm:f>${escape(formula)}</xm:f><xm:sqref>${cellLabel}</xm:sqref></x14:sparkline></x14:sparklines></x14:sparklineGroup>`,
+        `<x14:sparklineGroup type="${spark.type === "winLoss" ? "stacked" : spark.type}" displayEmptyCellsAs="${spark.empty === "connect" ? "span" : spark.empty}" markers="${Number(spark.markers)}" negative="${Number(negative)}" displayXAxis="${Number(spark.axis)}" displayHidden="${Number(spark.showHidden)}"${pointAttributes}>${colorElement("colorSeries", spark.color)}${colorElement("colorNegative", spark.negativeColor)}${colorElement("colorAxis", "#a3a3a3")}${colorElement("colorMarkers", spark.markerColor ?? spark.color)}${pointColors}<x14:sparklines><x14:sparkline><xm:f>${escape(formula)}</xm:f><xm:sqref>${cellLabel}</xm:sqref></x14:sparkline></x14:sparklines></x14:sparklineGroup>`,
       ];
     });
     if (!groups.length) return;
@@ -65,6 +89,7 @@ export function readXlsxSparklines(
     )) {
       const attributes = group[1]!,
         body = group[2]!;
+      const hasColor = (name: string) => new RegExp(`<(?:\\w+:)?${name}\\b`).test(body);
       const color = (name: string, fallback: string) => {
         const match = new RegExp(`<(?:\\w+:)?${name}\\b([^>]*)`).exec(body);
         const rgb = match ? attr(match[1]!, "rgb") : undefined;
@@ -97,13 +122,21 @@ export function readXlsxSparklines(
           const type = attr(attributes, "type") ?? "line";
           const empty = attr(attributes, "displayEmptyCellsAs") ?? "zero";
           const flag = (name: string) => ["1", "true"].includes(attr(attributes, name) ?? "0");
+          const points: Partial<Record<SparklinePointKind, SparklinePointStyle>> = {};
+          for (const [field, attribute, element] of pointFields) {
+            if (attr(attributes, attribute) !== undefined || hasColor(element))
+              points[field] = { show: flag(attribute), color: color(element, "#ef4444") };
+          }
           const sparkline = normalizeCellSparkline({
             type: type === "stacked" ? "winLoss" : (type as CellSparkline["type"]),
             source: parsed?.target.range ?? null,
             color: color("colorSeries", "#2563eb"),
-            negativeColor: flag("negative")
-              ? color("colorNegative", "#ef4444")
-              : color("colorSeries", "#2563eb"),
+            negativeColor: color("colorNegative", "#ef4444"),
+            negativePoints: flag("negative"),
+            ...(hasColor("colorMarkers")
+              ? { markerColor: color("colorMarkers", color("colorSeries", "#2563eb")) }
+              : {}),
+            ...points,
             markers: flag("markers"),
             axis: flag("displayXAxis"),
             showHidden: flag("displayHidden"),
@@ -111,7 +144,7 @@ export function readXlsxSparklines(
           })!;
           result.set(reference.toUpperCase(), sparkline);
           if (
-            ["first", "last", "high", "low", "dateAxis", "rightToLeft"].some(flag) ||
+            ["dateAxis", "rightToLeft"].some(flag) ||
             attr(attributes, "manualMin") ||
             attr(attributes, "manualMax")
           )

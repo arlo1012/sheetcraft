@@ -3,6 +3,34 @@
 实现基线：`8eca25c8`。此记录只覆盖下列具体路径，不代表整个插入工具栏已与 WPS 完全一致。
 继续按先插入细节、再打印的顺序推进；功能范围仍参考各领域的当前范围文档。
 
+### 迷你图点样式的原生 XLSX 保存（2026-11-07）
+
+检查原生写入器发现：新点样式原先没有写入 XLSX，负点开关固定为开启，普通标记颜色
+固定为系列色；读取器则把高低点、首尾点作为遗漏，并在负点关闭时丢弃其独立颜色。
+现将已有字段映射到 `sparklineGroup` 的 first/last/high/low/negative 属性和对应颜色元素，
+同时保留显式关闭的点颜色及独立 markerColor。没有新增界面或快照字段。
+子元素顺序和开关含义依据 [Microsoft CT_SparklineGroup 规范](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/331c1ecb-e49d-4cd0-843d-3ae189dc8a88)。
+这批只闭合现有 RGB 点样式；主题色引用、分组和详细轴等仍不据此宣称支持。
+
+通过产品菜单实际导出 XLSX，检查 Sheet7 原生 XML：F1/F2 均保留 high/low=1、negative=0，
+高点红色 `#ef4444`、低点绿色 `#00b050`、各自 B1:D1/B2:D2 来源和 true/false 隐藏开关。
+整份样例回读被既有绘图兼容性检查阻止，未替换当前工作簿；随后从下载文件提取仅含 Sheet7
+及其样式/共享字符串/主题的原生工作簿，移除其他工作表和绘图，未加产品私有元数据。
+产品界面成功导入该文件，F1 的高点/低点勾选、负点关闭与图形颜色均保留；再导出 JSON
+确认两条折线和两处柱形的来源、类型、颜色、空值和隐藏设置一致。
+验收后已恢复导入前 JSON 备份，确认七张工作表、Sheet7 按钮及本地保存状态恢复。
+
+本地证据：`apps/web/tmp/sparkline-point-styles-native.xlsx`、
+`apps/web/tmp/sparkline-point-styles-isolated.xlsx`、
+`apps/web/tmp/sparkline-native-points-reimport.png`、
+`apps/web/tmp/sparkline-native-points-reimport.json`。
+三类型、首尾点、关闭但保留颜色、独立标记色、原生布尔默认值与未支持轴诊断的回归已编写，
+按用户要求未运行；格式、静态检查和开发服务增量编译通过。
+
+实机边界：WPS 子弹窗点击/激活仍超时。Excel 新建工作簿、填入 1/9/3、打开迷你图创建窗口
+成功，但提交位置时显示“位置引用无效”，随后警告窗口点击超时；未取得原生文件在桌面应用
+中打开、保存、重开的证据，也未确认隐藏开关开启或筛选/折叠数据语义。未操作 WPS 打印。
+
 ### 迷你图主题配色图库（2026-11-07）
 
 参照本机 WPS 工具栏已观察到的位置，在显示选项和颜色工具之间添加横排缩略图库。

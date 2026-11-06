@@ -1,3 +1,4 @@
+// 未执行：按用户要求仅编写测试，不运行检查。
 import { describe, expect, test } from "vitest";
 import { strFromU8, unzipSync } from "fflate/browser";
 import {
@@ -27,6 +28,14 @@ function sparkline(type: CellSparkline["type"], empty: CellSparkline["empty"]): 
     showHidden: true,
   };
 }
+
+function importedSparkline(
+  type: CellSparkline["type"],
+  empty: CellSparkline["empty"],
+): CellSparkline {
+  const value = sparkline(type, empty);
+  return { ...value, negativePoints: true, markerColor: value.color };
+}
 describe("native XLSX sparklines", () => {
   test.each(["line", "column", "winLoss"] as const)(
     "writes and imports %s with every empty-cell mode",
@@ -46,10 +55,12 @@ describe("native XLSX sparklines", () => {
       expect(xml).toContain("O&apos;&apos;Brien &amp; Sales");
       const native = readXlsxSparklines(entries, [sheet.name])[0]!;
       for (const [row, empty] of emptyModes.entries())
-        expect(native.get(`E${row + 1}`)).toEqual(sparkline(type, empty));
+        expect(native.get(`E${row + 1}`)).toEqual(importedSparkline(type, empty));
       const restored = getActiveSheet((await decodeXlsx(encoded.bytes)).workbook);
       for (const [row, empty] of emptyModes.entries())
-        expect(getCellSparkline(restored, { row, column: 4 })).toEqual(sparkline(type, empty));
+        expect(getCellSparkline(restored, { row, column: 4 })).toEqual(
+          importedSparkline(type, empty),
+        );
     },
   );
 
@@ -65,14 +76,14 @@ describe("native XLSX sparklines", () => {
     const restored = getActiveSheet(
       (await decodeXlsx((await encodeXlsx(workbook)).bytes)).workbook,
     );
-    expect(getCellSparkline(restored, only)).toEqual(sparkline("line", "gap"));
+    expect(getCellSparkline(restored, only)).toEqual(importedSparkline("line", "gap"));
     expect(getCellContent(restored, only)).toBeNull();
     expect(getCellContent(restored, decorated)).toEqual({ kind: "literal", value: "Revenue" });
     expect(getCellNote(restored, decorated)).toMatchObject({
       text: "Source note",
       author: "Analyst",
     });
-    expect(getCellSparkline(restored, decorated)).toEqual(sparkline("column", "zero"));
+    expect(getCellSparkline(restored, decorated)).toEqual(importedSparkline("column", "zero"));
   });
 
   test("preserves an invalidated source as a native REF reference", async () => {
