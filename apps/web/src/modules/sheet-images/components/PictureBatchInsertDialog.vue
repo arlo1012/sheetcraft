@@ -21,6 +21,16 @@ const order = ref(props.fileNames.map((_, index) => index));
 const arrangement = ref<PictureBatchArrangement>(props.mode === "cell" ? "vertical" : "cascade");
 const wrapEnabled = ref(false);
 const wrapAfter = ref(3);
+const namesEnabled = ref(false);
+const namePlacement = ref<"before" | "after">("after");
+const rowHeightEnabled = ref(false);
+const rowHeight = ref(100);
+const validRowHeight = computed(
+  () =>
+    !rowHeightEnabled.value ||
+    arrangement.value === "cascade" ||
+    (Number.isInteger(rowHeight.value) && rowHeight.value >= 16 && rowHeight.value <= 512),
+);
 const validWrap = computed(
   () =>
     !wrapEnabled.value ||
@@ -42,8 +52,14 @@ function move(index: number, delta: number): void {
   order.value.splice(next, 0, value);
 }
 function confirm(): void {
-  if (props.busy || !order.value.length || !validWrap.value) return;
+  if (props.busy || !order.value.length || !validWrap.value || !validRowHeight.value) return;
   emit("confirm", {
+    ...(arrangement.value !== "cascade" && namesEnabled.value
+      ? { namePlacement: namePlacement.value }
+      : {}),
+    ...(arrangement.value !== "cascade" && rowHeightEnabled.value
+      ? { rowHeight: rowHeight.value }
+      : {}),
     order: [...order.value],
     arrangement: arrangement.value,
     ...(wrapEnabled.value && arrangement.value !== "cascade" ? { wrapAfter: wrapAfter.value } : {}),
@@ -60,7 +76,7 @@ function confirm(): void {
     :confirm-on-enter="false"
     :confirm-btn="{
       content: t('drawing.insert'),
-      disabled: busy || !order.length || !validWrap,
+      disabled: busy || !order.length || !validWrap || !validRowHeight,
       loading: busy,
     }"
     :cancel-btn="t('picture.cancel')"
@@ -92,6 +108,48 @@ function confirm(): void {
           :aria-label="wrapLabel"
         />
       </div>
+      <template v-if="arrangement !== 'cascade'">
+        <div
+          class="picture-batch-insert__wrap"
+          role="group"
+          :aria-label="t('image.batchRowHeight')"
+        >
+          <Checkbox v-model="rowHeightEnabled" :disabled="busy">{{
+            t("image.batchRowHeight")
+          }}</Checkbox>
+          <InputNumber
+            v-model="rowHeight"
+            theme="column"
+            class="picture-batch-insert__count sheetcraft-input-number--persistent-controls"
+            :min="16"
+            :max="512"
+            :decimal-places="0"
+            :disabled="busy || !rowHeightEnabled"
+            :aria-label="t('image.batchRowHeight')"
+          />
+          <span>px</span>
+        </div>
+        <div
+          class="picture-batch-insert__wrap"
+          role="group"
+          :aria-label="t('image.batchShowNames')"
+        >
+          <Checkbox v-model="namesEnabled" :disabled="busy">{{
+            t("image.batchShowNames")
+          }}</Checkbox>
+          <RadioGroup v-model="namePlacement" :disabled="busy || !namesEnabled">
+            <Radio value="before">{{
+              t(arrangement === "horizontal" ? "image.batchNameAbove" : "image.batchNameLeft")
+            }}</Radio>
+            <Radio value="after">{{
+              t(arrangement === "horizontal" ? "image.batchNameBelow" : "image.batchNameRight")
+            }}</Radio>
+          </RadioGroup>
+        </div>
+        <p v-if="mode === 'floating' && (rowHeightEnabled || namesEnabled)">
+          {{ t("image.batchFitCellsHint") }}
+        </p>
+      </template>
       <div class="picture-batch-insert__table">
         <TableHeightWrapper v-slot="{ height }">
           <BaseTable

@@ -1,4 +1,8 @@
 import { assertPivotResultsAreWritable } from "./pivot-result-guard.js";
+import {
+  applyInsertPictureBatchCommand,
+  applyRestorePictureBatchCommand,
+} from "./picture-batch.js";
 import { prepareTableCalculatedColumnEdit } from "../table-calculated-columns.js";
 import { applySetPivotTableCommand, applyRemovePivotTableCommand } from "./pivot-tables.js";
 import { applySetCellSparklinesCommand } from "./sparklines.js";
@@ -320,6 +324,10 @@ export function applyWorkbookCommand(
       assertPivotResultsAreWritable(workbook, command);
     }
     switch (command.type) {
+      case "insertPictureBatch":
+        return applyInsertPictureBatchCommand(workbook, command, options.fromHistory);
+      case "restorePictureBatch":
+        return applyRestorePictureBatchCommand(workbook, command, options.fromHistory);
       case "setSheetProtection":
         return applySetSheetProtectionCommand(workbook, command, options.fromHistory);
       case "setWorkbookStructureProtection":

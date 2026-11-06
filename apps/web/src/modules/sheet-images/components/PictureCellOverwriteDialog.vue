@@ -14,7 +14,9 @@ const confirm = props.confirmation.confirm,
     :header="t('image.overwriteTitle')"
     width="440px"
     :close-on-overlay-click="false"
-    :confirm-btn="t('image.overwriteConfirm')"
+    :confirm-btn="
+      t(confirmation.insertionTargets ? 'image.insertOverwriteConfirm' : 'image.overwriteConfirm')
+    "
     :cancel-btn="t('picture.cancel')"
     :confirm-loading="confirmation.busy ?? false"
     @confirm="confirm"

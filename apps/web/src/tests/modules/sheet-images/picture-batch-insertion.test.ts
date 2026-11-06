@@ -20,6 +20,7 @@ import {
   getActiveSheet,
   getCellContent,
   insertSheet,
+  setCellContent,
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
   type CellAddress,
@@ -122,6 +123,218 @@ function fixture(address: CellAddress = { row: 2, column: 3 }) {
 
 describe("picture batch insertion configuration", () => {
   test.each(["cell", "floating"] as const)(
+    "commits %s pictures, ordered captions and row heights as one Undo/Redo transaction",
+    async (mode) => {
+      const f = fixture();
+      f.sheet.defaultColumnWidth = 120;
+      f.sheet.rowHeights.set(2, 40);
+      const before = serializeWorkbook(f.session.workbook);
+      await f.select(mode);
+      await f.actions.confirmBatchInsertion({
+        order: [2, 0, 1],
+        arrangement: "horizontal",
+        wrapAfter: 2,
+        namePlacement: "after",
+        rowHeight: 120,
+      });
+
+      for (const [index, address] of [
+        { row: 3, column: 3 },
+        { row: 3, column: 4 },
+        { row: 5, column: 3 },
+      ].entries())
+        expect(getCellContent(f.sheet, address)).toEqual({
+          kind: "literal",
+          value: ["c", "a", "b"][index],
+        });
+      const addresses = [
+        { row: 2, column: 3 },
+        { row: 2, column: 4 },
+        { row: 4, column: 3 },
+      ];
+      if (mode === "cell")
+        for (const [index, address] of addresses.entries())
+          expect(getCellContent(f.sheet, address)).toMatchObject({
+            kind: "image",
+            image: { assetId: ["batch-2", "batch-0", "batch-1"][index] },
+          });
+      else
+        expect(f.sheet.floatingImages).toMatchObject(
+          addresses.map((anchor, index) => ({
+            anchor,
+            assetId: ["batch-2", "batch-0", "batch-1"][index],
+          })),
+        );
+      expect(f.sheet.rowHeights.get(2)).toBe(120);
+      expect(f.sheet.rowHeights.get(4)).toBe(120);
+      expect(f.execute).toHaveBeenCalledTimes(1);
+      expect(f.execute.mock.calls[0]![0].type).toBe("insertPictureBatch");
+      expect(f.session.history.undoStack).toHaveLength(1);
+      const inserted = serializeWorkbook(f.session.workbook);
+      expect(undoWorkbookCommand(f.session)).toBe(true);
+      expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+      expect(redoWorkbookCommand(f.session)).toBe(true);
+      expect(serializeWorkbook(f.session.workbook)).toEqual(inserted);
+    },
+  );
+
+  test("waits for caption overwrite approval and cancels without applying pictures or row heights", async () => {
+    const f = fixture();
+    setCellContent(f.sheet, { row: 3, column: 4 }, { kind: "literal", value: "Keep this caption" });
+    const before = serializeWorkbook(f.session.workbook);
+    await f.select("cell");
+    await f.actions.confirmBatchInsertion({
+      order: [0, 1, 2],
+      arrangement: "horizontal",
+      namePlacement: "after",
+      rowHeight: 120,
+    });
+    const confirmation = f.actions.insertionConfirmation.value!;
+    expect(confirmation.occupiedTargetCount).toBe(1);
+    expect(confirmation.insertionTargets).toHaveLength(6);
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+
+    confirmation.cancel();
+    expect(await confirmation.confirm()).toBe(false);
+    expect(f.actions.insertionConfirmation.value).toBeNull();
+    expect(f.session.history.undoStack).toHaveLength(0);
+    expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+  });
+
+  test("retains a refused caption overwrite confirmation for an atomic successful retry", async () => {
+    const f = fixture();
+    const address = { row: 3, column: 3 };
+    setCellContent(f.sheet, address, { kind: "literal", value: "Old caption" });
+    const before = serializeWorkbook(f.session.workbook);
+    await f.select("cell");
+    await f.actions.confirmBatchInsertion({
+      order: [0, 1, 2],
+      arrangement: "horizontal",
+      namePlacement: "after",
+      rowHeight: 120,
+    });
+    f.execute.mockReturnValueOnce(false);
+    expect(await f.actions.insertionConfirmation.value!.confirm()).toBe(false);
+    expect(f.actions.insertionConfirmation.value).toMatchObject({
+      error: true,
+      errorReason: "command",
+    });
+    expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+    expect(f.session.history.undoStack).toHaveLength(0);
+
+    expect(await f.actions.insertionConfirmation.value!.confirm()).toBe(true);
+    expect(f.actions.insertionConfirmation.value).toBeNull();
+    expect(getCellContent(f.sheet, address)).toEqual({ kind: "literal", value: "a" });
+    expect(f.sheet.rowHeights.get(2)).toBe(120);
+    expect(f.session.history.undoStack).toHaveLength(1);
+  });
+
+  test("retains captions and row fitting when the batch selection is reduced to one file", async () => {
+    const f = fixture();
+    f.sheet.defaultColumnWidth = 120;
+    await f.select("floating");
+    await f.actions.confirmBatchInsertion({
+      order: [1],
+      arrangement: "horizontal",
+      namePlacement: "before",
+      rowHeight: 100,
+    });
+
+    expect(getCellContent(f.sheet, { row: 2, column: 3 })).toEqual({ kind: "literal", value: "b" });
+    expect(f.sheet.rowHeights.get(3)).toBe(100);
+    expect(f.sheet.floatingImages).toMatchObject([
+      {
+        assetId: "batch-1",
+        anchor: { row: 3, column: 3 },
+        offsetX: 28,
+        offsetY: 2,
+        width: 64,
+        height: 96,
+      },
+    ]);
+    expect(f.execute).toHaveBeenCalledTimes(1);
+    expect(f.execute.mock.calls[0]![0].type).toBe("insertPictureBatch");
+    expect(f.session.history.undoStack).toHaveLength(1);
+  });
+
+  test.each([
+    { phase: "decode", change: "caption" },
+    { phase: "decode", change: "row height" },
+    { phase: "decode", change: "column width" },
+    { phase: "store", change: "caption" },
+    { phase: "store", change: "row height" },
+    { phase: "store", change: "column width" },
+  ] as const)(
+    "refuses the entire batch when $change changes during $phase",
+    async ({ phase, change }) => {
+      const f = fixture();
+      let finishDecode!: (value: (typeof assets)[number]) => void;
+      let finishStore!: () => void;
+      const decoded = new Promise<(typeof assets)[number]>((resolve) => {
+        finishDecode = resolve;
+      });
+      const stored = new Promise<void>((resolve) => {
+        finishStore = resolve;
+      });
+      if (phase === "decode") vi.mocked(prepareImageAsset).mockReturnValueOnce(decoded);
+      else f.put.mockReturnValueOnce(stored);
+      await f.select("cell");
+      const pending = f.actions.confirmBatchInsertion({
+        order: [0, 1, 2],
+        arrangement: "horizontal",
+        namePlacement: "after",
+        rowHeight: 120,
+      });
+      if (phase === "store") {
+        await flushPromises();
+        expect(f.put).toHaveBeenCalledTimes(1);
+      }
+      if (change === "caption")
+        setCellContent(
+          f.sheet,
+          { row: 3, column: 4 },
+          { kind: "literal", value: "New user caption" },
+        );
+      else if (change === "row height") f.sheet.rowHeights.set(2, 88);
+      else f.sheet.columnWidths.set(3, 140);
+      const before = serializeWorkbook(f.session.workbook);
+      finishDecode(assets[0]!);
+      finishStore();
+      await pending;
+
+      expect(f.execute).not.toHaveBeenCalled();
+      expect(f.session.history.undoStack).toHaveLength(0);
+      expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+      expect(f.actions.feedback.value).toBe("image.insertTargetsChanged");
+      expect(f.actions.busy.value).toBe(false);
+    },
+  );
+
+  test("does not overwrite a caption edited after its overwrite confirmation opened", async () => {
+    const f = fixture();
+    const address = { row: 3, column: 3 };
+    setCellContent(f.sheet, address, { kind: "literal", value: "Original caption" });
+    await f.select("cell");
+    await f.actions.confirmBatchInsertion({
+      order: [0, 1, 2],
+      arrangement: "horizontal",
+      namePlacement: "after",
+      rowHeight: 120,
+    });
+    setCellContent(f.sheet, address, { kind: "literal", value: "Updated after prompt" });
+    const before = serializeWorkbook(f.session.workbook);
+
+    expect(await f.actions.insertionConfirmation.value!.confirm()).toBe(false);
+    expect(f.actions.insertionConfirmation.value).toMatchObject({
+      error: true,
+      errorReason: "targets",
+    });
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+  });
+
+  test.each(["cell", "floating"] as const)(
     "stages %s files and cancels without decoding, storage or workbook writes",
     async (mode) => {
       const f = fixture();
@@ -215,6 +428,7 @@ describe("picture batch insertion configuration", () => {
       { assetId: "batch-1", altText: "b.png", offsetX: 0, offsetY: 174, width: 80, height: 120 },
     ]);
     expect(f.execute).toHaveBeenCalledTimes(1);
+    expect(f.execute.mock.calls[0]![0].type).toBe("insertPictureBatch");
     expect(f.session.history.undoStack).toHaveLength(1);
     const inserted = serializeWorkbook(f.session.workbook);
     expect(undoWorkbookCommand(f.session)).toBe(true);

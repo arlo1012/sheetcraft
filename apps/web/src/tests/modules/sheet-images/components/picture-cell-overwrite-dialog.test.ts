@@ -1,3 +1,4 @@
+// 未执行：按用户要求仅编写测试，避免额外内存占用。
 import { afterEach, expect, test, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -37,8 +38,8 @@ function fixture(inserting = true) {
 test("insertion confirmation names every actual expanded destination and occupied count", () => {
   const f = fixture(),
     surface = document.body.textContent!;
-  expect(surface).toContain("2 张图片");
-  expect(surface).toContain("1 个目标区域");
+  expect(surface).toContain("2 个单元格区域");
+  expect(surface).toContain("1 个区域已有内容");
   expect(surface).toContain("Synthetic!A1:B2");
   expect(surface).toContain("Synthetic!A3");
   f.wrapper.getComponent(Dialog).vm.$emit("confirm");

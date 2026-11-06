@@ -6,6 +6,7 @@ export * from "./contracts.js";
 export * from "./dimensions.js";
 export * from "./formatting.js";
 export * from "./images.js";
+export { createInsertPictureBatchCommand } from "./picture-batch.js";
 export * from "./filter.js";
 export * from "./advanced-filter.js";
 export * from "./metadata.js";

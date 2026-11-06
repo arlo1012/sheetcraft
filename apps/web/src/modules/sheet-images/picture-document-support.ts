@@ -161,6 +161,8 @@ export function assertPictureCommandSupport(command: WorkbookCommand, workbook: 
     case "convertFloatingImageToCell":
     case "convertCellImageToFloating":
     case "restorePictureCellConversion":
+    case "insertPictureBatch":
+    case "restorePictureBatch":
       checkProjectedWorkbook();
       break;
     case "setSheetFloatingImages":

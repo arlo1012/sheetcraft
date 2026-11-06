@@ -1793,6 +1793,13 @@ export type MessageSchema = ToolMessageSchema & {
     batchVertical: string;
     batchHorizontal: string;
     batchCascade: string;
+    batchRowHeight: string;
+    batchShowNames: string;
+    batchNameAbove: string;
+    batchNameBelow: string;
+    batchNameLeft: string;
+    batchNameRight: string;
+    batchFitCellsHint: string;
     batchPerRow: string;
     batchPerColumn: string;
     batchUp: string;
@@ -1851,6 +1858,7 @@ export type MessageSchema = ToolMessageSchema & {
     overwriteTitle: string;
     overwriteMessage: string;
     overwriteConfirm: string;
+    insertOverwriteConfirm: string;
     insertOverwriteMessage: string;
     insertTargetsChanged: string;
     preview: string;

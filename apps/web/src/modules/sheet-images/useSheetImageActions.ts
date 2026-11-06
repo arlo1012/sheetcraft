@@ -24,6 +24,7 @@ import {
 } from "@sheetcraft/core/workbook";
 import {
   createSetSheetFloatingImagesCommand,
+  createInsertPictureBatchCommand,
   createBatchSetCellContentsCommand,
   type WorkbookCommand,
 } from "@sheetcraft/core/commands";
@@ -53,7 +54,8 @@ import {
 } from "./picture-cell-insertion-targets";
 import type { PictureCellOverwriteConfirmation } from "./picture-cell-overwrite-confirmation";
 import {
-  getPictureBatchCellAddresses,
+  getPictureBatchCellLayout,
+  getPictureBatchCellFrames,
   getPictureBatchFloatingOffsets,
   type PictureBatchArrangement,
   type PictureBatchInsertion,
@@ -309,20 +311,31 @@ export function useSheetImageActions(options: {
         feedback.value = accepted === true ? "image.inserted" : "image.insertionFailed";
       return accepted === true;
     };
-    if (!lease.occupiedAddresses.length) {
+    return confirmImageInsertion(target, [lease], valid, apply);
+  }
+
+  async function confirmImageInsertion(
+    target: ImageTarget,
+    leases: readonly PictureCellInsertionTargetLease[],
+    valid: () => boolean,
+    apply: () => Promise<boolean>,
+  ): Promise<boolean> {
+    const occupiedAddresses = leases.flatMap((lease) => [...lease.occupiedAddresses]);
+    const ranges = leases.flatMap((lease) => [...lease.ranges]);
+    if (!occupiedAddresses.length) {
       insertionConfirmation.value = null;
       return apply();
     }
     let committing = false;
     const current: PictureCellOverwriteConfirmation = {
       key: ++confirmationKey,
-      address: { ...lease.addresses[0]! },
+      address: { ...target.address },
       sheetName: target.sheet.name,
-      insertionTargets: lease.ranges.map((range) => ({
+      insertionTargets: ranges.map((range) => ({
         start: { ...range.start },
         end: { ...range.end },
       })),
-      occupiedTargetCount: lease.occupiedAddresses.length,
+      occupiedTargetCount: occupiedAddresses.length,
       error: false,
       confirm: async () => {
         if (insertionConfirmation.value?.key !== current.key || committing || busy.value)
@@ -603,9 +616,14 @@ export function useSheetImageActions(options: {
     target = captureTarget(options.getAddress(), mode),
     arrangement: PictureBatchArrangement = mode === "cell" ? "vertical" : "cascade",
     wrapAfter?: number,
+    layoutOptions: Pick<PictureBatchInsertion, "namePlacement" | "rowHeight"> = {},
   ): Promise<void> {
     files = files.slice();
-    if (files.length === 1) {
+    if (
+      files.length === 1 &&
+      !layoutOptions.namePlacement &&
+      layoutOptions.rowHeight === undefined
+    ) {
       await insertFile(files[0]!, mode, target);
       return;
     }
@@ -627,22 +645,47 @@ export function useSheetImageActions(options: {
     feedback.value = undefined;
     try {
       const sheet = target.workbook.sheets.get(target.sheetId)!;
-      const addresses =
-        mode === "cell"
-          ? getPictureBatchCellAddresses(
-              sheet,
-              target.address,
-              files.length,
-              arrangement,
-              wrapAfter,
-            )
-          : [];
+      const gridLayout =
+        mode === "cell" ||
+        (arrangement !== "cascade" &&
+          (layoutOptions.namePlacement !== undefined || layoutOptions.rowHeight !== undefined));
+      const layout = gridLayout
+        ? getPictureBatchCellLayout(
+            sheet,
+            target.address,
+            files.length,
+            arrangement,
+            wrapAfter,
+            layoutOptions.namePlacement,
+          )
+        : { pictures: [], names: [] };
       insertionConfirmation.value = null;
       const cellLease =
-        mode === "cell" ? capturePictureCellInsertionTargets(sheet, addresses) : undefined;
+        mode === "cell" ? capturePictureCellInsertionTargets(sheet, layout.pictures) : undefined;
+      const nameLease = layout.names.length
+        ? capturePictureCellInsertionTargets(sheet, layout.names)
+        : undefined;
+      const leases = [cellLease, nameLease].filter(
+        (lease): lease is PictureCellInsertionTargetLease => !!lease,
+      );
+      const rowHeight = arrangement === "cascade" ? undefined : layoutOptions.rowHeight;
+      const geometry = () =>
+        JSON.stringify([
+          [...sheet.rowHeights],
+          [...sheet.columnWidths],
+          [...(sheet.hiddenRows ?? [])],
+          [...(sheet.hiddenColumns ?? [])],
+          sheet.defaultRowHeight,
+          sheet.defaultColumnWidth,
+          sheet.mergedCells,
+        ]);
+      const originalGeometry = gridLayout ? geometry() : "";
       const valid = () => {
         if (!insertionOwnerValid(target, mode)) return false;
-        if (mode === "cell" && !isPictureCellInsertionTargetsCurrent(sheet, cellLease!)) {
+        if (
+          leases.some((lease) => !isPictureCellInsertionTargetsCurrent(sheet, lease)) ||
+          (gridLayout && geometry() !== originalGeometry)
+        ) {
           feedback.value = "image.insertTargetsChanged";
           return false;
         }
@@ -659,12 +702,15 @@ export function useSheetImageActions(options: {
           ? assets.map((asset) => initialFloatingSize(asset.width, asset.height))
           : [];
       const offsets = getPictureBatchFloatingOffsets(sizes, arrangement, wrapAfter);
+      const frames =
+        mode === "floating" && gridLayout
+          ? getPictureBatchCellFrames(sheet, layout.pictures, assets, rowHeight)
+          : [];
       for (const asset of assets) {
         await options.assetStore.put(asset);
         if (!valid()) return;
       }
-      let accepted: unknown;
-      if (mode === "cell") {
+      if (mode === "cell" && !nameLease && rowHeight === undefined) {
         await commitCellImages(
           target,
           cellLease!,
@@ -674,24 +720,57 @@ export function useSheetImageActions(options: {
           })),
         );
         return;
-      } else
-        accepted = await options.execute(
-          createSetSheetFloatingImagesCommand(target.sheetId, [
-            ...sheet.floatingImages,
-            ...assets.map((asset, index) => {
-              return {
-                id: idFactory("image"),
-                assetId: asset.id,
-                altText: files[index]!.name,
-                anchor: { ...target.address },
-                ...offsets[index]!,
-                ...sizes[index]!,
-              };
-            }),
-          ]),
-        );
-      if (accepted !== true) throw new Error("Picture batch insertion was refused.");
-      if (isOwnerCurrent(target)) feedback.value = "image.inserted";
+      }
+      const cells = [
+        ...(mode === "cell"
+          ? assets.map((asset, index) => ({
+              sheetId: sheet.id,
+              address: layout.pictures[index]!,
+              content: {
+                kind: "image" as const,
+                image: { assetId: asset.id, altText: files[index]!.name },
+              },
+            }))
+          : []),
+        ...layout.names.map((address, index) => ({
+          sheetId: sheet.id,
+          address,
+          content: { kind: "literal" as const, value: files[index]!.name.replace(/\.[^.]+$/, "") },
+        })),
+      ];
+      const images =
+        mode === "floating"
+          ? assets.map((asset, index) => ({
+              id: idFactory("image"),
+              assetId: asset.id,
+              altText: files[index]!.name,
+              ...(gridLayout
+                ? frames[index]!
+                : { anchor: { ...target.address }, ...offsets[index]!, ...sizes[index]! }),
+            }))
+          : [];
+      const rowHeights =
+        rowHeight === undefined
+          ? []
+          : [...new Set(layout.pictures.map((address) => address.row))].map((index) => ({
+              index,
+              size: rowHeight,
+            }));
+      const apply = async (): Promise<boolean> => {
+        if (!valid()) return false;
+        let accepted: unknown;
+        try {
+          accepted = await options.execute!(
+            createInsertPictureBatchCommand(sheet.id, { cells, rowHeights, images }),
+          );
+        } catch {
+          accepted = false;
+        }
+        if (isOwnerCurrent(target))
+          feedback.value = accepted === true ? "image.inserted" : "image.insertionFailed";
+        return accepted === true;
+      };
+      await confirmImageInsertion(target, leases, valid, apply);
     } catch (error) {
       if (isOwnerCurrent(target)) feedback.value = assetFailureFeedback(error);
     } finally {
@@ -752,6 +831,7 @@ export function useSheetImageActions(options: {
       batch.target,
       payload.arrangement,
       payload.wrapAfter,
+      { namePlacement: payload.namePlacement, rowHeight: payload.rowHeight },
     );
   }
 

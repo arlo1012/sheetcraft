@@ -580,6 +580,19 @@ export type SetSheetFloatingImagesCommand = {
   images: FloatingImage[];
 };
 
+export type InsertPictureBatchCommand = {
+  type: "insertPictureBatch";
+  sheetId: string;
+  cells: CellContentChange[];
+  rowHeights: Array<{ index: number; size: number }>;
+  images: FloatingImage[];
+};
+/** Internal inverse of a picture insertion, including captions and row sizes. */
+export type RestorePictureBatchCommand = {
+  type: "restorePictureBatch";
+  commands: WorkbookCommand[];
+};
+
 export type SetFloatingImageCommand = {
   type: "setFloatingImage";
   sheetId: string;
@@ -950,6 +963,8 @@ export type WorkbookCommand =
   | SetSheetDrawingsCommand
   | ReplaceSheetDrawingCollectionsCommand
   | SetSheetFloatingImagesCommand
+  | InsertPictureBatchCommand
+  | RestorePictureBatchCommand
   | SetFloatingImageCommand
   | DeleteFloatingImageCommand
   | ConvertFloatingImageToCellCommand
@@ -1140,6 +1155,7 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
     case "setSheetDrawings":
     case "replaceSheetDrawingCollections":
     case "setSheetFloatingImages":
+    case "insertPictureBatch":
     case "setFloatingImage":
       return "images.floating.set";
     case "deleteFloatingImage":
@@ -1150,6 +1166,7 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "images.cell.convert";
     case "restoreFloatingImageToCell":
     case "restorePictureCellConversion":
+    case "restorePictureBatch":
       return "history.restore";
     case "addSheet":
       return "sheets.add";

@@ -8,12 +8,184 @@ import {
 } from "@sheetcraft/core/workbook";
 import {
   getPictureBatchCellAddresses,
+  getPictureBatchCellLayout,
+  getPictureBatchCellFrames,
   getPictureBatchFloatingOffsets,
 } from "../../../modules/sheet-images/picture-batch-layout";
 
 function sheet() {
   return getActiveSheet(createWorkbook({ id: "batch-layout", sheetId: "sheet" }));
 }
+
+describe("batch picture caption reservations", () => {
+  test.each([
+    {
+      arrangement: "horizontal",
+      placement: "after",
+      pictures: [
+        { row: 2, column: 3 },
+        { row: 2, column: 4 },
+        { row: 4, column: 3 },
+      ],
+      names: [
+        { row: 3, column: 3 },
+        { row: 3, column: 4 },
+        { row: 5, column: 3 },
+      ],
+    },
+    {
+      arrangement: "horizontal",
+      placement: "before",
+      pictures: [
+        { row: 3, column: 3 },
+        { row: 3, column: 4 },
+        { row: 5, column: 3 },
+      ],
+      names: [
+        { row: 2, column: 3 },
+        { row: 2, column: 4 },
+        { row: 4, column: 3 },
+      ],
+    },
+    {
+      arrangement: "vertical",
+      placement: "after",
+      pictures: [
+        { row: 2, column: 3 },
+        { row: 3, column: 3 },
+        { row: 2, column: 5 },
+      ],
+      names: [
+        { row: 2, column: 4 },
+        { row: 3, column: 4 },
+        { row: 2, column: 6 },
+      ],
+    },
+    {
+      arrangement: "vertical",
+      placement: "before",
+      pictures: [
+        { row: 2, column: 4 },
+        { row: 3, column: 4 },
+        { row: 2, column: 6 },
+      ],
+      names: [
+        { row: 2, column: 3 },
+        { row: 3, column: 3 },
+        { row: 2, column: 5 },
+      ],
+    },
+  ] as const)(
+    "reserves $placement captions for $arrangement placement without colliding with the next band",
+    ({ arrangement, placement, pictures, names }) => {
+      expect(
+        getPictureBatchCellLayout(sheet(), { row: 2, column: 3 }, 3, arrangement, 2, placement),
+      ).toEqual({ pictures, names });
+    },
+  );
+
+  test("reserves full merged picture and caption regions before placing the next wrapped row", () => {
+    const source = sheet();
+    source.mergedCells = [
+      { start: { row: 1, column: 1 }, end: { row: 2, column: 2 } },
+      { start: { row: 3, column: 1 }, end: { row: 4, column: 2 } },
+      { start: { row: 2, column: 3 }, end: { row: 3, column: 4 } },
+    ];
+    expect(
+      getPictureBatchCellLayout(source, { row: 1, column: 1 }, 3, "horizontal", 2, "after"),
+    ).toEqual({
+      pictures: [
+        { row: 1, column: 1 },
+        { row: 1, column: 3 },
+        { row: 5, column: 1 },
+      ],
+      names: [
+        { row: 3, column: 1 },
+        { row: 2, column: 3 },
+        { row: 6, column: 1 },
+      ],
+    });
+  });
+
+  test.each([
+    ["horizontal", { row: MAX_SHEET_ROWS - 1, column: 0 }],
+    ["vertical", { row: 0, column: MAX_SHEET_COLUMNS - 1 }],
+  ] as const)(
+    "rejects %s placement when the caption would cross the sheet boundary",
+    (arrangement, start) => {
+      expect(() =>
+        getPictureBatchCellLayout(sheet(), start, 1, arrangement, undefined, "after"),
+      ).toThrow(RangeError);
+    },
+  );
+
+  test("keeps the original picture-only layout when captions are disabled", () => {
+    expect(getPictureBatchCellLayout(sheet(), { row: 2, column: 3 }, 2, "vertical")).toEqual({
+      pictures: [
+        { row: 2, column: 3 },
+        { row: 3, column: 3 },
+      ],
+      names: [],
+    });
+  });
+});
+
+describe("batch floating pictures fitted to cells", () => {
+  test("centers a proportional image inside a cell with a two-pixel minimum inset", () => {
+    const source = sheet();
+    source.defaultColumnWidth = 120;
+    source.defaultRowHeight = 80;
+    const [frame] = getPictureBatchCellFrames(
+      source,
+      [{ row: 2, column: 3 }],
+      [{ width: 200, height: 100 }],
+    );
+    expect(frame).toMatchObject({ anchor: { row: 2, column: 3 } });
+    expect(frame!.offsetX).toBeCloseTo(2);
+    expect(frame!.offsetY).toBeCloseTo(11);
+    expect(frame!.width).toBeCloseTo(116);
+    expect(frame!.height).toBeCloseTo(58);
+  });
+
+  test("fits the entire merged cell area using custom row and column sizes", () => {
+    const source = sheet();
+    source.columnWidths.set(1, 70);
+    source.columnWidths.set(2, 90);
+    source.rowHeights.set(1, 30);
+    source.rowHeights.set(2, 50);
+    source.mergedCells = [{ start: { row: 1, column: 1 }, end: { row: 2, column: 2 } }];
+    expect(
+      getPictureBatchCellFrames(source, [{ row: 1, column: 1 }], [{ width: 100, height: 100 }]),
+    ).toEqual([{ anchor: { row: 1, column: 1 }, offsetX: 42, offsetY: 2, width: 76, height: 76 }]);
+  });
+
+  test("uses the proposed row height for fitting without changing sheet geometry", () => {
+    const source = sheet();
+    source.defaultColumnWidth = 120;
+    source.rowHeights.set(2, 30);
+    const before = [...source.rowHeights];
+    const [frame] = getPictureBatchCellFrames(
+      source,
+      [{ row: 2, column: 3 }],
+      [{ width: 200, height: 100 }],
+      100,
+    );
+    expect(frame).toMatchObject({ anchor: { row: 2, column: 3 } });
+    expect(frame!.offsetX).toBeCloseTo(2);
+    expect(frame!.offsetY).toBeCloseTo(21);
+    expect(frame!.width).toBeCloseTo(116);
+    expect(frame!.height).toBeCloseTo(58);
+    expect([...source.rowHeights]).toEqual(before);
+  });
+
+  test("rejects a destination too small to retain the picture's inset", () => {
+    const source = sheet();
+    source.hiddenColumns = new Set([3]);
+    expect(() =>
+      getPictureBatchCellFrames(source, [{ row: 2, column: 3 }], [{ width: 200, height: 100 }]),
+    ).toThrow(RangeError);
+  });
+});
 
 describe("batch picture cell layout", () => {
   test.each([
