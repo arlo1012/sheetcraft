@@ -2,6 +2,8 @@ import type { PagePrintMessageSchema } from "./page-print-messages";
 
 export const pagePrintEnUS = {
   pagePrint: {
+    workbook: "Entire workbook",
+    preparingResources: "Preparing print resources…",
     scope: "Print scope",
     sheet: "Worksheet",
     selection: "Selection",

@@ -1,5 +1,7 @@
 export type PagePrintMessageSchema = {
   pagePrint: {
+    workbook: string;
+    preparingResources: string;
     scope: string;
     sheet: string;
     selection: string;

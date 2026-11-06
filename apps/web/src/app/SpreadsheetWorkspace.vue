@@ -2171,6 +2171,16 @@ function getShapePaintAssetSize(id: string) {
       : undefined);
   return image ? { width: image.naturalWidth, height: image.naturalHeight } : undefined;
 }
+const workbookPrintSheets = computed(() => {
+  void workbookRevision.value;
+  return [...session.workbook.sheets.values()].map((sheet) => ({
+    sheet,
+    evaluator:
+      activeSheetEvaluator.value.forSheet?.(sheet.id) ??
+      createWorkbookEvaluator(session.workbook, sheet.id),
+    setup: sheet.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP,
+  }));
+});
 const chartPrintSheetResolver = computed(() => {
   void workbookRevision.value;
   const workbook = session.workbook;
@@ -6953,6 +6963,7 @@ watch(
       @close="screenCapture = undefined"
     />
     <PagePrintPreview
+      :workbook-sheets="workbookPrintSheets"
       :selection="activeSelectionRange"
       :setup-disabled="activeSheet.properties.protected"
       @page-setup="openPrintPageSetup"

@@ -2,6 +2,8 @@ import type { PagePrintMessageSchema } from "./page-print-messages";
 
 export const pagePrintZhCN = {
   pagePrint: {
+    workbook: "整个工作簿",
+    preparingResources: "正在准备打印资源…",
     scope: "打印范围",
     sheet: "工作表",
     selection: "当前选区",
