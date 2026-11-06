@@ -225,6 +225,7 @@ const legacyBodyTransform = computed(() =>
       :drawing="drawing"
       :sheet="sheet"
       :evaluator="evaluator"
+      :resolve-sheet="resolveSheet"
       :revision="revision ?? 0"
       :theme="theme"
       :image-asset-urls="imageAssetUrls"

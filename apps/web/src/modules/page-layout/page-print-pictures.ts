@@ -22,6 +22,7 @@ export function getPrintPictureAssetIds(
   sheet: Sheet,
   shapeMetrics?: PictureSheetMetrics,
   renderPass?: ResolvedShapeForestForRender,
+  resolveSheet?: (sheetId: string) => Sheet | undefined,
 ): Set<string> {
   const ids = new Set<string>();
   for (const image of requireStandalonePictures(getPrintablePictureRoots(sheet))) {
@@ -32,10 +33,40 @@ export function getPrintPictureAssetIds(
   // A camera reproduces its visible cells, independently of each source
   // picture's direct-print flag. Prepare these sources before the final render.
   const cameraRanges = (sheet.drawings ?? []).flatMap((drawing) =>
-    drawing.kind === "camera" && isSheetDrawingVisible(drawing) && drawing.camera.range
+    drawing.kind === "camera" &&
+    isSheetDrawingVisible(drawing) &&
+    drawing.camera.range &&
+    (drawing.camera.sheetId === undefined || drawing.camera.sheetId === sheet.id)
       ? [drawing.camera.range]
       : [],
   );
+  for (const drawing of sheet.drawings ?? []) {
+    if (
+      drawing.kind !== "camera" ||
+      !isSheetDrawingVisible(drawing) ||
+      !drawing.camera.range ||
+      drawing.camera.sheetId === undefined ||
+      drawing.camera.sheetId === sheet.id
+    )
+      continue;
+    const source = resolveSheet?.(drawing.camera.sheetId);
+    if (!source) continue;
+    for (const [key, cell] of source.cells) {
+      if (cell.content?.kind !== "image") continue;
+      const [row, column] = key.split(":").map(Number);
+      const address = { row: row!, column: column! };
+      const sourceRange = getMergedCellRangeAtAddress(source.mergedCells, address) ?? {
+        start: address,
+        end: address,
+      };
+      if (!doMergedCellRangesIntersect(drawing.camera.range, sourceRange)) continue;
+      ids.add(cell.content.image.assetId);
+      for (const id of getDetailedPictureStyleAssetIds(
+        cell.content.image.transform?.appearance?.detailedStyle,
+      ))
+        ids.add(id);
+    }
+  }
   for (const [key, cell] of sheet.cells) {
     if (cell.content?.kind !== "image") continue;
     if (!getPictureProperties(cell.content.image).printObject) {

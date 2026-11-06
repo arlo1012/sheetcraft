@@ -112,7 +112,7 @@ export type SheetGraphicDrawing = DrawingBase & {
 export type SheetChartDrawing = DrawingBase & { kind: "chart"; chart: SheetChart };
 export type SheetCameraDrawing = DrawingBase & {
   kind: "camera";
-  camera: { range: CellRange | null; gridLines: boolean };
+  camera: { sheetId?: string; range: CellRange | null; gridLines: boolean };
 };
 export type SheetAttachmentDrawing = DrawingBase & {
   kind: "attachment";
@@ -228,7 +228,7 @@ export function mapDrawingSource(
       ...drawing,
       chart: mapChartRangeSeries(drawing.chart, bounded(drawing.chart.range, 10000), mapChartBand),
     };
-  if (drawing.kind === "camera")
+  if (drawing.kind === "camera" && drawing.camera.sheetId === undefined)
     return {
       ...drawing,
       camera: { ...drawing.camera, range: bounded(drawing.camera.range, 10000) },
@@ -323,6 +323,14 @@ function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance
   }
   if (value.kind === "camera" && (!value.camera || typeof value.camera.gridLines !== "boolean"))
     throw new RangeError("Invalid camera.");
+  if (
+    value.kind === "camera" &&
+    value.camera.sheetId !== undefined &&
+    (typeof value.camera.sheetId !== "string" ||
+      !value.camera.sheetId.trim() ||
+      value.camera.sheetId.length > 1024)
+  )
+    throw new RangeError("Invalid camera source sheet.");
   const styleField = Object.getOwnPropertyDescriptor(value, "shapeStyle");
   if (!styleField && "shapeStyle" in value)
     throw new TypeError("Shape styles must be own data fields.");
@@ -483,6 +491,7 @@ function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance
         ? ({
             kind: "camera",
             camera: {
+              ...(value.camera.sheetId !== undefined ? { sheetId: value.camera.sheetId } : {}),
               range: normalizeCameraRange(value.camera.range),
               gridLines: value.camera.gridLines,
             },

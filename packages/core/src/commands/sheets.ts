@@ -1,4 +1,6 @@
 import { mapSheetDrawingChartReferences } from "../chart-source-references.js";
+import { mapSheetCameraReferences } from "../camera-source-references.js";
+
 import {
   prepareExternalDrawingCollections,
   readExternalDrawingCollections,
@@ -51,6 +53,10 @@ import type {
   SetSheetPropertiesCommand,
 } from "./contracts.js";
 import { invalidCommandPayload } from "./helpers.js";
+
+function mapSheetDrawingDataReferences(...args: Parameters<typeof mapSheetDrawingChartReferences>) {
+  return mapSheetCameraReferences(mapSheetDrawingChartReferences(...args), args[2]);
+}
 
 function sheetNotFound(sheetId: unknown): WorkbookDomainError {
   return new WorkbookDomainError(
@@ -204,7 +210,7 @@ export function createDuplicateSheetCommand(
       sheetId: reference.sheetId === sourceSheetId ? sheetId : reference.sheetId,
     }));
   if (sheet.drawings?.length)
-    sheet.drawings = mapSheetDrawingChartReferences(
+    sheet.drawings = mapSheetDrawingDataReferences(
       sheet.drawings,
       (reference) => ({
         ...reference,
@@ -388,7 +394,7 @@ export function applyAddSheetCommand(
     readExternalDrawingCollections(command),
   );
   for (const entry of externalDrawings.next) {
-    const expected = mapSheetDrawingChartReferences(
+    const expected = mapSheetDrawingDataReferences(
       entry.drawings,
       (reference) => (reference.sheetId === sheet.id ? { ...reference, cell: null } : reference),
       (reference) => (reference.sheetId === sheet.id ? { ...reference, range: null } : reference),
@@ -400,7 +406,7 @@ export function applyAddSheetCommand(
       throw invalidCommandPayload(
         "externalDrawingCollections",
         entry.sheetId,
-        "Chart reference restore is not associated with this deleted source sheet.",
+        "Drawing source reference restore is not associated with this deleted source sheet.",
       );
   }
   const previousActiveSheetId = workbook.activeSheetId;
@@ -512,7 +518,7 @@ export function applyDeleteSheetCommand(
     command.sheetId,
     [...workbook.sheets.values()].flatMap((owner) => {
       if (owner.id === command.sheetId) return [];
-      const drawings = mapSheetDrawingChartReferences(
+      const drawings = mapSheetDrawingDataReferences(
         owner.drawings,
         (reference) =>
           reference.sheetId === command.sheetId ? { ...reference, cell: null } : reference,

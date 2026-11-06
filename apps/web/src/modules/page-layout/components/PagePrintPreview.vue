@@ -336,7 +336,12 @@ async function print(): Promise<void> {
       const renderer = rendererFor(source.sheet);
       const preview = previews[index]!;
       const urls = [
-        ...getPrintPictureAssetIds(preview.sheet, preview.shapeMetrics, preview.shapeRenderPass),
+        ...getPrintPictureAssetIds(
+          preview.sheet,
+          preview.shapeMetrics,
+          preview.shapeRenderPass,
+          resolveChartSheet,
+        ),
       ].map((id) => assetUrls?.get(id));
       if (urls.some((url) => !url)) throw new Error("Image assets are not ready.");
       await renderer.prepareImages(urls as string[], preview);
@@ -477,6 +482,7 @@ watch(
             document.sheet,
             document.shapeMetrics,
             document.shapeRenderPass,
+            props.resolveChartSheet,
           ),
         ].map((id) => props.imageAssetUrls?.get(id));
         if (urls.some((url) => !url)) throw new Error("Print paint resources are unavailable.");

@@ -2,6 +2,7 @@ import {
   mapSheetDrawingChartReferences,
   mapChartSourceVectorCells,
 } from "../chart-source-references.js";
+import { mapSheetCameraReferences, mapCameraSourceCells } from "../camera-source-references.js";
 import { MAX_SHEET_ROWS, MAX_SHEET_COLUMNS } from "../sheet-limits.js";
 import { readPictureDataArray } from "../picture-data-array.js";
 import { normalizeSheetDrawings, type SheetDrawing } from "../sheet-drawings.js";
@@ -86,14 +87,18 @@ function referenceMaintenanceSignature(
   targetSheetId: string,
 ): string {
   return JSON.stringify(
-    mapSheetDrawingChartReferences(
-      mapSheetDrawingTextReferences(drawings, (reference) =>
-        reference.sheetId === targetSheetId
-          ? { sheetId: reference.sheetId, cell: null }
-          : reference,
+    mapSheetCameraReferences(
+      mapSheetDrawingChartReferences(
+        mapSheetDrawingTextReferences(drawings, (reference) =>
+          reference.sheetId === targetSheetId
+            ? { sheetId: reference.sheetId, cell: null }
+            : reference,
+        ),
+        (reference) =>
+          reference.sheetId === targetSheetId ? { ...reference, cell: null } : reference,
+        (reference) =>
+          reference.sheetId === targetSheetId ? { ...reference, range: null } : reference,
       ),
-      (reference) =>
-        reference.sheetId === targetSheetId ? { ...reference, cell: null } : reference,
       (reference) =>
         reference.sheetId === targetSheetId ? { ...reference, range: null } : reference,
     ),
@@ -170,6 +175,7 @@ export function hasWorkbookTextReferencesToSheet(workbook: Workbook, sheetId: st
       inspect,
       inspect,
     );
+    mapSheetCameraReferences(sheet.drawings, inspect);
   }
   return found;
 }
@@ -205,24 +211,35 @@ export function mapLocalTextReferences(
   drawings: readonly SheetDrawing[] | undefined,
   targetSheetId: string,
   mapCell: (cell: CellAddress) => CellAddress | null,
-  mapRange: (range: CellRange) => CellRange | null = (range) =>
-    mapChartSourceVectorCells(range, mapCell),
+  mapRange?: (range: CellRange) => CellRange | null,
 ): SheetDrawing[] {
-  return mapSheetDrawingChartReferences(
-    mapSheetDrawingTextReferences(drawings, (reference) =>
-      reference.sheetId === targetSheetId && reference.cell !== null
-        ? { sheetId: reference.sheetId, cell: mapCell({ ...reference.cell }) }
-        : reference,
+  return mapSheetCameraReferences(
+    mapSheetDrawingChartReferences(
+      mapSheetDrawingTextReferences(drawings, (reference) =>
+        reference.sheetId === targetSheetId && reference.cell !== null
+          ? { sheetId: reference.sheetId, cell: mapCell({ ...reference.cell }) }
+          : reference,
+      ),
+      (reference) =>
+        reference.sheetId === targetSheetId && reference.cell !== null
+          ? { ...reference, cell: mapCell({ ...reference.cell }) }
+          : reference,
+      (reference) =>
+        reference.sheetId === targetSheetId && reference.range !== null
+          ? {
+              ...reference,
+              range: (mapRange ?? ((range) => mapChartSourceVectorCells(range, mapCell)))({
+                start: { ...reference.range.start },
+                end: { ...reference.range.end },
+              }),
+            }
+          : reference,
     ),
-    (reference) =>
-      reference.sheetId === targetSheetId && reference.cell !== null
-        ? { ...reference, cell: mapCell({ ...reference.cell }) }
-        : reference,
     (reference) =>
       reference.sheetId === targetSheetId && reference.range !== null
         ? {
             ...reference,
-            range: mapRange({
+            range: (mapRange ?? ((range) => mapCameraSourceCells(range, mapCell)))({
               start: { ...reference.range.start },
               end: { ...reference.range.end },
             }),

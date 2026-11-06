@@ -350,6 +350,8 @@ export type WorkbookSnapshotV92 = Omit<WorkbookSnapshotV91, "version"> & { versi
 export type WorkbookSnapshotV93 = Omit<WorkbookSnapshotV92, "version"> & { version: 93 };
 /** Independent sparkline point visibility and colors, including dormant choices. */
 export type WorkbookSnapshotV94 = Omit<WorkbookSnapshotV93, "version"> & { version: 94 };
+/** Explicit workbook sheet identity for camera sources. */
+export type WorkbookSnapshotV95 = Omit<WorkbookSnapshotV94, "version"> & { version: 95 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -402,8 +404,9 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV91
   | WorkbookSnapshotV92
   | WorkbookSnapshotV93
-  | WorkbookSnapshotV94;
-type WorkbookWritePayload = Omit<WorkbookSnapshotV94, "version"> & {
+  | WorkbookSnapshotV94
+  | WorkbookSnapshotV95;
+type WorkbookWritePayload = Omit<WorkbookSnapshotV95, "version"> & {
   version: WorkbookSnapshot["version"];
 };
 export type SheetSnapshot = SheetSnapshotV7 & {
@@ -517,9 +520,20 @@ type SnapshotVersion =
   | 91
   | 92
   | 93
-  | 94;
+  | 94
+  | 95;
 
 type UnknownRecord = Record<string, unknown>;
+
+function hasCameraSourceSheet(drawings: unknown): boolean {
+  return (
+    Array.isArray(drawings) &&
+    drawings.some(
+      (drawing) =>
+        drawing?.kind === "camera" && drawing.camera && Object.hasOwn(drawing.camera, "sheetId"),
+    )
+  );
+}
 
 function hasSparklinePointStyle(value: unknown): boolean {
   return (
@@ -1863,6 +1877,8 @@ function parseSparseState(
   path: string,
   version: SnapshotVersion,
 ): SheetSparseState {
+  if (version < 95 && hasCameraSourceSheet(record.drawings))
+    return fail(path, "Camera source sheet identities require snapshot version 95.");
   if (
     version < 44 &&
     Array.isArray(record.pivotTables) &&
@@ -2729,6 +2745,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       record.cells.some((cell) => hasSparklinePointStyle(asRecord(cell, path).sparkline))
     )
       version = 94;
+    if (hasCameraSourceSheet(record.drawings)) version = 95;
   }
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
@@ -3193,6 +3210,7 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     snapshot.version = 93;
   if (sheets.some((sheet) => sheet.cells.some((cell) => hasSparklinePointStyle(cell.sparkline))))
     snapshot.version = 94;
+  if (sheets.some((sheet) => hasCameraSourceSheet(sheet.drawings))) snapshot.version = 95;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -3294,7 +3312,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 91 &&
     record.version !== 92 &&
     record.version !== 93 &&
-    record.version !== 94
+    record.version !== 94 &&
+    record.version !== 95
   ) {
     throw new WorkbookDomainError(
       {

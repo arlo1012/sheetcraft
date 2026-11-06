@@ -114,6 +114,7 @@ export type PrintPreviewDocument = {
   equationPrintPass?: PrintEquationPass;
   chartPrintPass?: PrintChartPass;
   widgets: readonly PrintWidget[];
+  resolveCameraSheet?: (sheetId: string) => Sheet | undefined;
   noteBoxes: readonly PrintNoteBox[];
   evaluator: SheetEvaluator;
   sheetName: string;
@@ -470,6 +471,7 @@ export function createPrintPreviewDocument(options: {
     equationPrintPass,
     chartPrintPass,
     widgets,
+    resolveCameraSheet: options.resolveChartSheet,
     noteBoxes,
     evaluator: options.evaluator,
     sheetName: options.sheetName ?? options.sheet.name,
@@ -896,6 +898,7 @@ export function createPrintPreviewRenderer(
               viewport,
               sheet: document.sheet,
               evaluator: document.evaluator,
+              resolveSheet: document.resolveCameraSheet,
               revision: document.display.revision ?? 0,
               images,
               theme: options.theme,

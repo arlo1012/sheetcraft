@@ -178,14 +178,23 @@ describe("camera actions", () => {
     expect(f.actions.editing.value).toBeDefined();
   });
 
-  test("rejects a source from another sheet", () => {
+  test("accepts a source from another sheet and stores its explicit source ID on the owner", () => {
     const f = fixture();
     f.actions.open();
     const draft = f.actions.editing.value!;
     f.addOtherSheet();
     f.actions.confirm(draft, "Other!A1:B3");
-    expect(f.execute).not.toHaveBeenCalled();
-    expect(f.actions.error.value).toBe(true);
+    expect(f.execute).toHaveBeenCalledTimes(1);
+    expect(f.actions.error.value).toBe(false);
+    expect(f.sheet.drawings).toHaveLength(1);
+    expect(f.sheet.drawings![0]).toMatchObject({
+      camera: {
+        sheetId: "other",
+        gridLines: true,
+        range: { start: { row: 0, column: 0 }, end: { row: 2, column: 1 } },
+      },
+    });
+    expect(f.actions.editing.value).toBeUndefined();
   });
 
   test.each(["switchSheet", "replaceWorkbook", "setBusy", "protection"] as const)(

@@ -2,6 +2,7 @@ import { ref } from "vue";
 import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
 import { normalizeSheetDrawing, type SheetCameraDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
+  createWorkbookEvaluator,
   type Workbook,
   type Sheet,
   type CellRange,
@@ -56,7 +57,7 @@ export function useCameraActions(options: {
       bold: false,
       italic: false,
       rotation: 0,
-      camera: { range, gridLines: true },
+      camera: { sheetId: sheet.id, range, gridLines: true },
     };
     targets.open(target, initial, (current, next, source) => confirm(next, source, current));
   }
@@ -68,20 +69,23 @@ export function useCameraActions(options: {
         source,
         currentTarget.sheet.id,
       );
-      if (!reference || reference.sheetId !== currentTarget.sheet.id) {
+      const sourceSheet = reference && currentTarget.workbook.sheets.get(reference.sheetId);
+      if (!reference || !sourceSheet) {
         error.value = true;
         return;
       }
       try {
-        const layout = createCameraRangeLayout(
-          currentTarget.sheet,
-          reference.range,
-          options.getEvaluator?.(),
-        );
+        const evaluator = options.getEvaluator?.();
+        const sourceEvaluator =
+          sourceSheet === currentTarget.sheet && evaluator
+            ? evaluator
+            : (evaluator?.forSheet?.(sourceSheet.id) ??
+              createWorkbookEvaluator(currentTarget.workbook, sourceSheet.id));
+        const layout = createCameraRangeLayout(sourceSheet, reference.range, sourceEvaluator);
         const next = normalizeSheetDrawing({
           ...drawing,
           ...(!currentTarget.existing ? fitCameraSize(layout.width, layout.height) : {}),
-          camera: { ...drawing.camera, range: reference.range },
+          camera: { ...drawing.camera, sheetId: sourceSheet.id, range: reference.range },
         });
         const current = currentTarget.sheet.drawings ?? [];
         if (

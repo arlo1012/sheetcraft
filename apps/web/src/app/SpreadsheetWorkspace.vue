@@ -7357,7 +7357,10 @@ watch(
     v-if="cameraDialog"
     :key="cameraDialog.dialogId"
     :drawing="cameraDialog.initial"
-    :sheet-name="activeSheet.name"
+    :sheet-name="
+      session.workbook.sheets.get(cameraDialog.initial.camera.sheetId ?? activeSheet.id)?.name ??
+      '#REF!'
+    "
     :disabled="
       loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'editObjects')
     "

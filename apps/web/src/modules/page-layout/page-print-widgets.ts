@@ -209,6 +209,7 @@ export function paintPrintWidget(
     viewport: { x: number; y: number; width: number; height: number };
     sheet: Sheet;
     evaluator: SheetEvaluator;
+    resolveSheet?: (sheetId: string) => Sheet | undefined;
     revision: number;
     images: CanvasImageCache;
     theme?: WorkbookTheme;

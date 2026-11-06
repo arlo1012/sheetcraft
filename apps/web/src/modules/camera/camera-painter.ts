@@ -16,6 +16,7 @@ export type CameraPaintOptions = {
   drawing: SheetCameraDrawing;
   sheet: Sheet;
   evaluator: SheetEvaluator;
+  resolveSheet?: (sheetId: string) => Sheet | undefined;
   revision: number;
   theme?: WorkbookTheme;
   imageAssetUrls?: ReadonlyMap<string, string>;
@@ -31,13 +32,18 @@ export function paintCameraContent(
   const range = options.drawing.camera.range;
   const context = element.getContext("2d");
   if (!context) return;
-  const sheet = options.sheet;
+  const sheetId = options.drawing.camera.sheetId ?? options.sheet.id;
+  const sheet = sheetId === options.sheet.id ? options.sheet : options.resolveSheet?.(sheetId);
+  const evaluator =
+    sheetId === options.sheet.id
+      ? options.evaluator
+      : sheet && options.evaluator.forSheet?.(sheetId);
   const scale = Math.min(2, 4096 / Math.max(options.drawing.width, options.drawing.height));
   element.width = Math.max(1, Math.ceil(options.drawing.width * scale));
   element.height = Math.max(1, Math.ceil(options.drawing.height * scale));
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, element.width, element.height);
-  if (!range) {
+  if (!range || !sheet || !evaluator) {
     context.fillStyle = "#666666";
     context.font = "16px sans-serif";
     context.fillText("#REF!", 8, 24);
@@ -46,7 +52,7 @@ export function paintCameraContent(
   const { geometry, rows, columnCount, x, y, width, height } = createCameraRangeLayout(
     sheet,
     range,
-    options.evaluator,
+    evaluator,
   );
   if (width <= 0 || height <= 0) return;
   const layout = createSheetViewportLayout({
@@ -67,7 +73,7 @@ export function paintCameraContent(
   });
   const display = createSheetDisplaySnapshot({
     sheet,
-    evaluator: options.evaluator,
+    evaluator,
     theme: options.theme,
     revision: options.revision,
     dateSystem: options.dateSystem,

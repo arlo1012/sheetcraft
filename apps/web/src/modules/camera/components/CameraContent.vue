@@ -18,6 +18,8 @@ watch(
     canvas.value,
     props.drawing,
     props.sheet,
+    props.resolveSheet,
+    props.evaluator,
     props.sheet.defaultRowHeight,
     props.revision,
     props.imageAssetUrls,
