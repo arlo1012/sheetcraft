@@ -7571,6 +7571,12 @@ watch(
     :key="insertingAttachment.id"
     :display="insertingAttachment.display"
     :file-name="insertingAttachment.file?.name"
+    :file-disabled="!canUseSheetPermission(activeSheet, 'editObjects')"
+    :cloud-disabled="
+      !canUseSheetPermission(activeSheet, 'insertHyperlinks') ||
+      !canEditCell(activeSheet, insertingAttachment.address)
+    "
+    @choose-cloud="attachmentActions.chooseCloudDocument(hyperlinkActions.editCloudDocument)"
     :busy="attachmentBusy"
     :error="attachmentActions.insertError.value"
     @choose-file="attachmentActions.chooseFile"

@@ -32,7 +32,9 @@ const props = withDefaults(
 const emit = defineEmits<{ confirm: [value: HyperlinkInput]; remove: []; cancel: [] }>();
 const { t, locale } = useAppI18n();
 const initial = readHyperlinkTarget(props.draft.target, props.currentSheetName);
-const kind = ref<Page>(isCloudShareUrl(props.draft.target) ? "cloud" : initial.kind);
+const kind = ref<Page>(
+  props.draft.initialPage ?? (isCloudShareUrl(props.draft.target) ? "cloud" : initial.kind),
+);
 const pages = computed(() =>
   (["web", "location", "email", "cloud"] as const).map((value) => ({
     value,
@@ -40,7 +42,9 @@ const pages = computed(() =>
   })),
 );
 const webAddress = ref(kind.value === "web" ? initial.webAddress : "");
-const cloudAddress = ref(kind.value === "cloud" ? initial.webAddress : "");
+const cloudAddress = ref(
+  kind.value === "cloud" && /^https:\/\//i.test(initial.webAddress) ? initial.webAddress : "",
+);
 const sheetName = ref(initial.sheetName);
 const cellReference = ref(initial.cellReference);
 const selectedName = ref(

@@ -129,7 +129,7 @@ const { t, locale } = useAppI18n();
         variant="tall"
         :label="t('attachment.document')"
         :text="t('attachment.document')"
-        :disabled="imageDisabled"
+        :disabled="imageDisabled && hyperlinkDisabled"
         data-insert-tool="document"
         @activate="emit('insertAttachment', 'document')"
         ><FileText

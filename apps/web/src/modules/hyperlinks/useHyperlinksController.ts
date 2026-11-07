@@ -21,13 +21,18 @@ import { readHyperlinkTarget } from "./hyperlink-target";
 import { loadRecentEmailAddresses, rememberEmailAddress } from "./recent-email-addresses";
 
 export type HyperlinkInput = { target: string; displayText: string; tooltip: string };
-export type HyperlinkDraft = HyperlinkInput & { hasLink: boolean; canEditDisplay: boolean };
+export type HyperlinkDraft = HyperlinkInput & {
+  hasLink: boolean;
+  canEditDisplay: boolean;
+  initialPage?: "cloud";
+};
 type HyperlinkDialogTarget = {
   dialogId: number;
   workbook: Workbook;
   sheet: Sheet;
   address: CellAddress;
   generation: number;
+  originalDisplayText: string;
   initial: HyperlinkDraft;
   confirm: (value: HyperlinkInput) => void;
   remove: () => void;
@@ -98,6 +103,12 @@ export function useHyperlinksController(options: {
   );
 
   function edit(): void {
+    beginEdit();
+  }
+  function editCloudDocument(filename = ""): void {
+    beginEdit({ filename });
+  }
+  function beginEdit(cloudDocument?: { filename: string }): void {
     if (
       options.isBusy() ||
       !canUseSheetPermission(options.getSheet(), "insertHyperlinks") ||
@@ -117,10 +128,12 @@ export function useHyperlinksController(options: {
       sheet,
       address,
       generation: options.getGeneration(),
+      originalDisplayText: displayText,
       initial: {
         target: link?.target ?? (/^(https?:\/\/|mailto:|#)/i.test(displayText) ? displayText : ""),
         tooltip: link?.tooltip ?? "",
-        displayText,
+        displayText: displayText || (cloudDocument && !content ? cloudDocument.filename : ""),
+        ...(cloudDocument ? { initialPage: "cloud" as const } : {}),
         hasLink: Boolean(link),
         canEditDisplay:
           !content || (content.kind === "literal" && typeof content.value === "string"),
@@ -162,7 +175,7 @@ export function useHyperlinksController(options: {
     try {
       const displayText =
         target.initial.canEditDisplay &&
-        (value.displayText !== target.initial.displayText || !target.initial.displayText)
+        (value.displayText !== target.originalDisplayText || !target.originalDisplayText)
           ? value.displayText || address
           : undefined;
       const accepted = options.execute(
@@ -255,6 +268,7 @@ export function useHyperlinksController(options: {
     names,
     recentEmails,
     edit,
+    editCloudDocument,
     save,
     remove,
     removeFromMenu,

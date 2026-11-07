@@ -1,7 +1,7 @@
 import { wordAttachmentDimensions } from "./word-preview";
 import { createAttachmentDrawing } from "./create-attachment-drawing";
 import { ref, shallowRef } from "vue";
-import { canUseSheetPermission } from "@sheetcraft/core";
+import { canEditCell, canUseSheetPermission } from "@sheetcraft/core";
 import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
 import type { SheetAttachmentDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { Workbook, Sheet, CellAddress } from "@sheetcraft/core/workbook";
@@ -35,8 +35,17 @@ export function useAttachmentActions(options: {
   let pickerTarget: AttachmentInsertion | undefined;
   const allowed = () =>
     !options.isBusy() && canUseSheetPermission(options.getSheet(), "editObjects");
+  const cloudAllowed = () =>
+    !options.isBusy() &&
+    canUseSheetPermission(options.getSheet(), "insertHyperlinks") &&
+    canEditCell(options.getSheet(), options.getAddress());
   function requestInsert(display: "icon" | "document", file?: File) {
-    if (!allowed() || busy.value || !options.flush()) return;
+    if (
+      (!allowed() && (display !== "document" || !cloudAllowed())) ||
+      busy.value ||
+      !options.flush()
+    )
+      return;
     inserting.value = {
       id: ++sequence,
       workbook: options.getWorkbook(),
@@ -67,14 +76,32 @@ export function useAttachmentActions(options: {
     inserting.value = { ...pending, file };
     insertError.value = false;
   }
-  function isCurrent(pending: AttachmentInsertion) {
+  function ownsTarget(pending: AttachmentInsertion) {
     return (
       inserting.value === pending &&
       pending.workbook === options.getWorkbook() &&
       pending.sheet === options.getSheet() &&
-      pending.workbook.sheets.get(pending.sheet.id) === pending.sheet &&
-      allowed()
+      pending.workbook.sheets.get(pending.sheet.id) === pending.sheet
     );
+  }
+  function isCurrent(pending: AttachmentInsertion) {
+    return ownsTarget(pending) && allowed();
+  }
+  function chooseCloudDocument(open: (filename?: string) => void) {
+    const pending = inserting.value,
+      address = options.getAddress();
+    if (
+      !pending ||
+      pending.display !== "document" ||
+      !ownsTarget(pending) ||
+      busy.value ||
+      !cloudAllowed() ||
+      address.row !== pending.address.row ||
+      address.column !== pending.address.column
+    )
+      return;
+    close();
+    open(pending.file?.name);
   }
   async function confirmInsert(display: "icon" | "document") {
     const pending = inserting.value;
@@ -126,6 +153,7 @@ export function useAttachmentActions(options: {
     chooseFile,
     onFiles,
     confirmInsert,
+    chooseCloudDocument,
     download,
     close,
   };

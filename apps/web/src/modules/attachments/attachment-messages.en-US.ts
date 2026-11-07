@@ -3,6 +3,11 @@ export const attachmentsEnUS = {
   "attachment.wordUnavailable": "Preview unavailable. Download the original file to open it.",
   "attachment.title": "Attachment",
   "attachment.file": "File",
+  "attachment.documentMethodTitle": "Choose how to insert the document",
+  "attachment.insertMethod": "Insert as",
+  "attachment.fileAttachment": "File attachment",
+  "attachment.shareLinkHint":
+    "Enter an existing document share link in the next window to insert it in the current cell.",
   "attachment.insertObject": "Insert file object",
   "attachment.noFile": "No file selected",
   "attachment.browse": "Browse…",
