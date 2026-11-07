@@ -1,3 +1,4 @@
+import { isSheetIconId, type SheetIconId } from "./sheet-icons.js";
 import { readChartComboFeature } from "./chart-combo.js";
 import { mapChartRangeSeries } from "./chart-range-series.js";
 import { normalizeEquationFlipState, type EquationFlipState } from "./equation-flip.js";
@@ -80,6 +81,7 @@ type DrawingBase = {
 export type SheetShapeGeometry = ShapePresetParameters;
 export type SheetGraphicDrawing = DrawingBase & {
   kind: SheetGraphicKind;
+  iconId?: SheetIconId;
   /** Explicit structured math for kind=equation only; text is its exact generated LaTeX mirror. */
   equationDocument?: EquationDocument;
   /** Equation-only source identity; these never mirror a shape body. */
@@ -321,6 +323,9 @@ function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance
   ) {
     throw new RangeError("Invalid sheet drawing.");
   }
+  const iconId = "iconId" in value ? value.iconId : undefined;
+  if (iconId !== undefined && (value.kind !== "icon" || !isSheetIconId(iconId)))
+    throw new RangeError("Invalid drawing icon.");
   if (value.kind === "camera" && (!value.camera || typeof value.camera.gridLines !== "boolean"))
     throw new RangeError("Invalid camera.");
   if (
@@ -504,6 +509,7 @@ function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance
           : value.kind === "control"
             ? ({ kind: "control", control: normalizeFormControl(value.control) } as const)
             : { kind: value.kind }),
+    ...(iconId ? { iconId } : {}),
     ...(shapeGeometry ? { shapeGeometry } : {}),
     ...(shapePath ? { shapePath } : {}),
     ...(shapeLineEnds ? { shapeLineEnds } : {}),

@@ -229,6 +229,9 @@ const shapes: DrawingShape[] = [
 <template>
   <Dialog
     :visible="true"
+    role="dialog"
+    aria-modal="true"
+    :aria-label="t(`drawing.${drawing.kind}`)"
     :header="t(`drawing.${drawing.kind}`)"
     :width="drawing.kind === 'shape' ? '860px' : '660px'"
     :style="{ maxWidth: 'calc(100vw - 32px)' }"
@@ -273,7 +276,7 @@ const shapes: DrawingShape[] = [
             @update:model-value="setName"
         /></FormItem>
         <div
-          v-if="drawing.kind === 'icon'"
+          v-if="drawing.kind === 'icon' && !drawing.iconId"
           class="drawing-editor__shapes"
           role="group"
           :aria-label="t('drawing.shape')"

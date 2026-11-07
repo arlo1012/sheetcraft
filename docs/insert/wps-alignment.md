@@ -40,7 +40,7 @@ result. Native XLSX support is tracked separately from internal document support
    path; image import remains blocked. Sparklines and hyperlinks have native
    export; symbols commit as cell text. Extend WPS parity in small usable slices.
 5. **Drawing and advanced insertion.** Shapes, icons, WordArt, text boxes and
-   equations use the drawing editor/layer. Icons currently share shape selection.
+   equations use the drawing editor/layer. The local icon library supports categorized search, favorites, vector insertion and styling.
    Screenshot inserts a floating image; document/attachment, camera, controls and
    watermark have real owners and internal persistence. Their native drawing,
    embedded object, camera/control and watermark exports remain omissions.

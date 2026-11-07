@@ -362,6 +362,7 @@ export type WorkbookSnapshotV98 = Omit<WorkbookSnapshotV97, "version"> & { versi
 export type WorkbookSnapshotV99 = Omit<WorkbookSnapshotV98, "version"> & { version: 99 };
 export type WorkbookSnapshotV100 = Omit<WorkbookSnapshotV99, "version"> & { version: 100 };
 export type WorkbookSnapshotV101 = Omit<WorkbookSnapshotV100, "version"> & { version: 101 };
+export type WorkbookSnapshotV102 = Omit<WorkbookSnapshotV101, "version"> & { version: 102 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -421,7 +422,8 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV98
   | WorkbookSnapshotV99
   | WorkbookSnapshotV100
-  | WorkbookSnapshotV101;
+  | WorkbookSnapshotV101
+  | WorkbookSnapshotV102;
 type WorkbookWritePayload = Omit<WorkbookSnapshotV98, "version"> & {
   version: WorkbookSnapshot["version"];
 };
@@ -544,7 +546,8 @@ type SnapshotVersion =
   | 98
   | 99
   | 100
-  | 101;
+  | 101
+  | 102;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -560,6 +563,12 @@ function hasCameraSourceSheet(drawings: unknown): boolean {
 
 function hasSparklineGroup(value: unknown): boolean {
   return value !== null && typeof value === "object" && Object.hasOwn(value, "groupId");
+}
+function hasCatalogIcons(drawings: unknown): boolean {
+  return (
+    Array.isArray(drawings) &&
+    drawings.some((d) => d?.kind === "icon" && Object.hasOwn(d, "iconId"))
+  );
 }
 function hasExternalSparklineDates(value: unknown): boolean {
   return !!value && typeof value === "object" && Object.hasOwn(value, "dateSheetId");
@@ -2825,7 +2834,10 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       record.cells.some((cell) => hasExternalSparklineDates(asRecord(cell, path).sparkline))
     )
       version = 101;
+    if (hasCatalogIcons(record.drawings)) version = 102;
   }
+  if (version < 102 && hasCatalogIcons(record.drawings))
+    return fail(path + ".drawings", "Catalog icons require snapshot version 102.");
   if (Object.hasOwn(record, "dashboard") && version < 99)
     return fail(path + ".dashboard", "Dashboard worksheets require snapshot version 99.");
   if (version < 45 && Array.isArray(record.tables)) {
@@ -3305,6 +3317,7 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     snapshot.version = 100;
   if (sheets.some((sheet) => sheet.cells.some((cell) => hasExternalSparklineDates(cell.sparkline))))
     snapshot.version = 101;
+  if (sheets.some((sheet) => hasCatalogIcons(sheet.drawings))) snapshot.version = 102;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -3413,7 +3426,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 98 &&
     record.version !== 99 &&
     record.version !== 100 &&
-    record.version !== 101
+    record.version !== 101 &&
+    record.version !== 102
   ) {
     throw new WorkbookDomainError(
       {

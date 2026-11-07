@@ -1,3 +1,4 @@
+// 未执行：本轮更新本地图标库回归，按用户要求不运行测试。
 import { flushPromises, mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { afterEach, describe, expect, test } from "vitest";
@@ -13,6 +14,7 @@ import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { deserializeWorkbook, serializeWorkbook } from "@sheetcraft/core/serialization";
 import { createWorkbook, getActiveSheet } from "@sheetcraft/core/workbook";
 import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import { iconPaths } from "@sheetcraft/core/sheet-icons";
 import DrawingContent from "../../../modules/sheet-drawings/components/DrawingContent.vue";
 import DrawingEditorDialog from "../../../modules/sheet-drawings/components/DrawingEditorDialog.vue";
 import EquationContent from "../../../modules/sheet-drawings/components/EquationContent.vue";
@@ -28,6 +30,7 @@ function drawing(kind: "icon" | "equation"): SheetGraphicDrawing {
   return {
     id: kind,
     kind,
+    ...(kind === "icon" ? { iconId: "heart" as const } : {}),
     name: "Synthetic object",
     anchor: { row: 1, column: 1 },
     offsetX: 8,
@@ -81,13 +84,15 @@ describe("existing icon and equation objects", () => {
     expect(wrapper.emitted("confirm")?.[0]).toEqual([{ ...original, text: "x^3" }]);
     expect(original.text).toBe("\\frac{a}{b} + x^2");
   });
-  test("icons retain the fixed nine choices and effective SVG appearance and literal text", async () => {
+  test("local icons keep their vector identity and editable paint without exposing the old nine-shape picker", async () => {
     const original = drawing("icon");
     const wrapper = editor(original);
-    expect(wrapper.findAll(".drawing-editor__shapes button")).toHaveLength(9);
-    expect(wrapper.findAllComponents(ColorPaletteSelect)).toHaveLength(3);
-    expect(wrapper.text()).toContain("Bold");
-    expect(wrapper.text()).toContain("Italic");
+    expect(wrapper.find(".drawing-editor__shapes").exists()).toBe(false);
+    const palettes = wrapper.findAllComponents(ColorPaletteSelect);
+    const fill = palettes.find((palette) => palette.props("modelValue") === original.fill)!;
+    const stroke = palettes.find((palette) => palette.props("modelValue") === original.stroke)!;
+    expect(fill).toBeDefined();
+    expect(stroke).toBeDefined();
     const rendered = mount(DrawingContent, {
       props: { drawing: original },
       global: { plugins: [createAppI18n("en-US")] },
@@ -98,12 +103,20 @@ describe("existing icon and equation objects", () => {
       stroke: "#123456",
       "stroke-width": "3",
     });
-    expect(rendered.get("svg path").attributes("d")).toContain("C-30 40");
+    const glyph = rendered.get('[data-icon-glyph="heart"]');
+    const path = glyph.element.tagName.toLowerCase() === "path" ? glyph : glyph.get("path");
+    expect(path.attributes("d")).toBe(iconPaths.heart);
     expect(rendered.get(".drawing-content__text").text()).toBe(original.text);
     expect(rendered.find("script").exists()).toBe(false);
-    await wrapper.get('button[aria-label="Star"]').trigger("click");
+    fill.vm.$emit("select", "#ffcc00");
+    stroke.vm.$emit("select", "#334455");
+    await nextTick();
     wrapper.getComponent(Dialog).vm.$emit("confirm");
-    expect(wrapper.emitted("confirm")?.[0]).toEqual([{ ...original, shape: "star" }]);
+    expect(wrapper.emitted("confirm")?.[0]).toEqual([
+      { ...original, fill: "#ffcc00", stroke: "#334455" },
+    ]);
+    expect(original.fill).toBe("#abcdef");
+    expect(original.stroke).toBe("#123456");
   });
   test("equation renderer retains LaTeX source and uses bounded untrusted KaTeX", async () => {
     const original = drawing("equation");

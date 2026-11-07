@@ -11,7 +11,8 @@ import type { SymbolInsertion } from "../symbols/symbol-preferences";
 import PivotInsertTools from "../../pivot-tables/components/PivotInsertTools.vue";
 import ChartInsertTools from "../../charts/components/ChartInsertTools.vue";
 import type { ChartInsertIntent } from "../../charts/chart-design-intents";
-import type { DrawingShape, SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { SheetIconId } from "@sheetcraft/core/sheet-icons";
+import type { SheetGraphicDrawing } from "@sheetcraft/core/sheet-drawings";
 import IconInsertMenu from "../../sheet-drawings/components/IconInsertMenu.vue";
 import FormControlInsertMenu from "../../form-controls/components/FormControlInsertMenu.vue";
 import type { FormControlType } from "@sheetcraft/core/form-controls";
@@ -59,7 +60,7 @@ defineProps<{
   shapeOwnerId?: string | number;
   insertEquationHandler?: (choice: EquationPresetId | null) => boolean | Promise<boolean>;
   insertWordArtHandler?: (choice: WordArtStylePreset) => boolean | Promise<boolean>;
-  insertIconHandler?: (shape: DrawingShape) => boolean;
+  insertIconHandler?: (id: SheetIconId) => boolean;
 }>();
 const emit = defineEmits<{
   insertPivot: [chart: boolean];

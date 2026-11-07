@@ -1,3 +1,4 @@
+import type { SheetIconId } from "@sheetcraft/core/sheet-icons";
 import {
   assertChartDrawingPreserved,
   captureChartDrawingForest,
@@ -21,7 +22,6 @@ import {
   type SheetDrawing,
   type SheetGraphicDrawing,
   type SheetGraphicKind,
-  type DrawingShape,
   normalizeSheetDrawings,
   normalizeSheetDrawing,
   isFramedEquationDrawing,
@@ -85,6 +85,8 @@ export function useDrawingActions(options: {
   flush: () => boolean;
   execute: (command: WorkbookCommand) => unknown;
   isBusy: () => boolean;
+  iconName?: (id: SheetIconId) => string;
+  onIconInserted?: (drawingId: string) => void;
   name: (kind: SheetGraphicKind) => string;
   getMetrics?: () => PictureSheetMetrics | undefined;
   prepareDrawing?: (
@@ -188,7 +190,7 @@ export function useDrawingActions(options: {
     );
     targets.open(target, initial, (current, next) => confirm(next, current));
   }
-  function insertIcon(shape: DrawingShape): boolean {
+  function insertIcon(id: SheetIconId): boolean {
     const target = targets.prepare();
     if (!target) return false;
     const initial = createGraphicDrawing(
@@ -197,11 +199,16 @@ export function useDrawingActions(options: {
       options.name("icon"),
       options.getAddress(),
     );
-    initial.shape = shape;
+    initial.iconId = id;
+    initial.name = options.iconName?.(id) ?? options.name("icon");
+    initial.fill = "#2563eb";
+    initial.stroke = "#1e3a8a";
+    initial.strokeWidth = 0;
     targets.open(target, initial, (current, next) => confirm(next, current));
     const current = dialog.value;
     const accepted = confirm(initial, current);
-    if (!accepted) close(current);
+    if (accepted) options.onIconInserted?.(initial.id);
+    else close(current);
     return accepted;
   }
   function requestTextBox(direction: "horizontal" | "vertical", target = dialog.value): boolean {

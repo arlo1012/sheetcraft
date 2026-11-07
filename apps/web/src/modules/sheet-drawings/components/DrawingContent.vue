@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconGlyph from "./IconGlyph.vue";
 import { computed, defineAsyncComponent } from "vue";
 import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
@@ -133,6 +134,13 @@ const legacyBodyTransform = computed(() =>
       :density="density"
       :hide-text="hideText"
       @paint="emit('detailedPaint', $event)"
+    />
+    <IconGlyph
+      v-else-if="paintSource.kind === 'icon' && paintSource.iconId"
+      :id="paintSource.iconId"
+      :fill="paintSource.fill"
+      :stroke="paintSource.stroke"
+      :stroke-width="paintSource.strokeWidth"
     />
     <svg
       v-else-if="paintSource.kind === 'shape' || paintSource.kind === 'icon'"

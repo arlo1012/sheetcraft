@@ -61,31 +61,36 @@ function fixture() {
 }
 
 describe("drawing actions", () => {
-  test("inserts a selected icon through one undoable Core command without leaving an editor open", () => {
-    const f = fixture();
-    const session = createWorkbookSession({
-      workbook: f.getWorkbook(),
-      idFactory: createSequentialIdFactory(),
-    });
-    f.execute.mockImplementation((command) => executeWorkbookCommand(session, command));
+  test.each(["arrow-right", "letter-a", "factory"] as const)(
+    "inserts selected local icon %s through one undoable Core command without leaving an editor open",
+    (iconId) => {
+      const f = fixture();
+      const session = createWorkbookSession({
+        workbook: f.getWorkbook(),
+        idFactory: createSequentialIdFactory(),
+      });
+      f.execute.mockImplementation((command) => executeWorkbookCommand(session, command));
 
-    expect(f.actions.insertIcon("heart")).toBe(true);
+      expect(f.actions.insertIcon(iconId)).toBe(true);
 
-    expect(f.execute).toHaveBeenCalledTimes(1);
-    expect(f.getSheet().drawings).toHaveLength(1);
-    expect(f.getSheet().drawings![0]).toMatchObject({
-      kind: "icon",
-      shape: "heart",
-      anchor: { row: 2, column: 3 },
-    });
-    expect(f.actions.editing.value).toBeUndefined();
-    expect(f.actions.dialog.value).toBeUndefined();
-    expect(session.history.undoStack).toHaveLength(1);
+      expect(f.execute).toHaveBeenCalledTimes(1);
+      expect(f.getSheet().drawings).toHaveLength(1);
+      expect(f.getSheet().drawings![0]).toMatchObject({
+        kind: "icon",
+        iconId,
+        anchor: { row: 2, column: 3 },
+        width: 80,
+        height: 80,
+      });
+      expect(f.actions.editing.value).toBeUndefined();
+      expect(f.actions.dialog.value).toBeUndefined();
+      expect(session.history.undoStack).toHaveLength(1);
 
-    undoWorkbookCommand(session);
+      undoWorkbookCommand(session);
 
-    expect(f.getSheet().drawings ?? []).toEqual([]);
-  });
+      expect(f.getSheet().drawings ?? []).toEqual([]);
+    },
+  );
 
   test.each(["shape", "textBox", "wordArt", "icon", "equation"] as const)(
     "inserts and confirms %s through one Core command",

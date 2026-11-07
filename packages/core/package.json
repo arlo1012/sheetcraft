@@ -157,6 +157,10 @@
       "types": "./dist/pivot-table-styles.d.ts",
       "import": "./dist/pivot-table-styles.js"
     },
+    "./sheet-icons": {
+      "types": "./dist/sheet-icons.d.ts",
+      "import": "./dist/sheet-icons.js"
+    },
     "./sheet-drawings": {
       "types": "./dist/sheet-drawings.d.ts",
       "import": "./dist/sheet-drawings.js"

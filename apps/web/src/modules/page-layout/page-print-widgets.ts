@@ -1,3 +1,4 @@
+import { iconPaths } from "@sheetcraft/core/sheet-icons";
 import { getFormControlItems } from "@sheetcraft/core/form-controls";
 import {
   normalizeSheetDrawing,
@@ -272,7 +273,22 @@ export function paintPrintWidget(
       );
     } else if (drawing.kind === "control") paintControl(context, drawing, entry);
     else if (drawing.kind === "icon" || drawing.kind === "wordArt") {
-      if (drawing.kind === "icon") {
+      if (drawing.kind === "icon" && drawing.iconId) {
+        const side = Math.min(rect.width, rect.height);
+        context.save();
+        context.translate((rect.width - side) / 2, (rect.height - side) / 2);
+        context.scale(side / 24, side / 24);
+        const path = new Path2D(iconPaths[drawing.iconId]);
+        context.fillStyle = drawing.fill;
+        context.fill(path);
+        if (drawing.strokeWidth && drawing.stroke !== "transparent") {
+          context.strokeStyle = drawing.stroke;
+          context.lineJoin = "round";
+          context.lineWidth = (drawing.strokeWidth * 24) / side;
+          context.stroke(path);
+        }
+        context.restore();
+      } else if (drawing.kind === "icon") {
         const geometry = getLegacyShapeGeometry(drawing.shape, rect.width, rect.height);
         if (!geometry) throw new Error("Icon geometry is unavailable.");
         context.fillStyle = drawing.fill;

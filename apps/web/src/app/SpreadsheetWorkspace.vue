@@ -217,6 +217,7 @@ import type { CaptureShape } from "../modules/insert-tools/capture-region";
 import ScreenCaptureDialog from "../modules/insert-tools/components/ScreenCaptureDialog.vue";
 import { useShapeCreation } from "../modules/sheet-drawings/useShapeCreation";
 import type { ShapeGalleryChoice } from "../modules/sheet-drawings/shape-gallery";
+import { iconName } from "../modules/sheet-drawings/icon-catalog";
 import { useDrawingActions } from "../modules/sheet-drawings/useDrawingActions";
 import { prepareTextBoxReferenceUpdate } from "../modules/sheet-drawings/prepare-textbox-reference-update";
 import { createTextBoxReferenceResolver } from "../modules/sheet-drawings/textbox-reference-display";
@@ -2381,6 +2382,11 @@ const drawingActions = useDrawingActions({
   execute: executeCommand,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
   name: (kind) => t(`drawing.${kind}`),
+  iconName: (id) => iconName(id, locale.value),
+  onIconInserted: (id) => {
+    sheetGridRef.value?.selectDrawing(id);
+    void nextTick(() => sheetGridRef.value?.focusGrid());
+  },
   prepareDrawing: (next, owner, forest, preparationMode) =>
     prepareWorkspaceDrawing(
       activeSheet.value,
