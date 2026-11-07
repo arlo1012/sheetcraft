@@ -102,6 +102,11 @@ export const chartsZhCN = {
   "chart.xy.followTheme": "跟随主题",
   "chart.xy.more": "更多",
   "chart.xy.card": "{style}，配色 {index}",
+  "chart.bubble": "气泡图",
+  "chart.bubbleFlat": "气泡图",
+  "chart.bubbleShaded": "三维气泡图",
+  "chart.bubbleHint":
+    "单组 Y 值生成等大的气泡。多组数据依次配对 Y 值和气泡大小。奇数个数据列或行时，第一组提供共用 X；偶数个时，用点序号作 X。",
   "chart.scatter": "散点图",
   "chart.radar": "雷达图",
   "chart.treemap": "矩形树图",

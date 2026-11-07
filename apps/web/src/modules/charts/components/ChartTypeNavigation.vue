@@ -8,6 +8,7 @@ import {
   ChartBar,
   ChartArea,
   ChartScatter,
+  Bubbles,
   ChartNetwork,
   LayoutGrid,
   Layers,
@@ -29,6 +30,7 @@ const options = computed<readonly OptionListOption<ChartType>[]>(() => [
   { value: "bar", label: t("chart.bar"), disabled: props.disabled("bar") },
   { value: "area", label: t("chart.area"), disabled: props.disabled("area") },
   { value: "scatter", label: t("chart.scatter"), disabled: props.disabled("scatter") },
+  { value: "bubble", label: t("chart.bubble"), disabled: props.disabled("bubble") },
   { value: "radar", label: t("chart.radar"), disabled: props.disabled("radar") },
   { value: "treemap", label: t("chart.treemap"), disabled: props.disabled("treemap") },
   { value: "combo", label: t("chart.comboCategory"), disabled: props.disabled("combo") },
@@ -62,6 +64,7 @@ function choose(type: ChartType): void {
       <ChartBar v-else-if="option.value === 'bar'" aria-hidden="true" />
       <ChartArea v-else-if="option.value === 'area'" aria-hidden="true" />
       <ChartScatter v-else-if="option.value === 'scatter'" aria-hidden="true" />
+      <Bubbles v-else-if="option.value === 'bubble'" aria-hidden="true" />
       <ChartNetwork v-else-if="option.value === 'radar'" aria-hidden="true" />
       <LayoutGrid v-else-if="option.value === 'treemap'" aria-hidden="true" />
       <Layers v-else-if="option.value === 'combo'" aria-hidden="true" />

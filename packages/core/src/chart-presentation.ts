@@ -17,6 +17,7 @@ export type ChartPresentationSettings = {
   percentStacked?: true;
   lineMarkers?: boolean;
   scatterStyle?: ScatterStyle;
+  bubbleShading?: true;
   /** Start the series palette at this accent in the current workbook theme. */
   themeAccent?: number;
   /** Ordered opaque RGB colors, independent of source-series identities. */
@@ -29,6 +30,7 @@ const keys = [
   "percentStacked",
   "lineMarkers",
   "scatterStyle",
+  "bubbleShading",
   "themeAccent",
   "palette",
   "background",
@@ -78,6 +80,11 @@ export function normalizeChartPresentation(value: unknown): ChartPresentationSet
     if (typeof source.lineMarkers !== "boolean")
       throw new TypeError("Chart line markers must be a boolean.");
     result.lineMarkers = source.lineMarkers;
+  }
+  if (Object.hasOwn(source, "bubbleShading")) {
+    if (source.bubbleShading !== true)
+      throw new RangeError("Omit bubble shading for flat bubbles.");
+    result.bubbleShading = true;
   }
   if (Object.hasOwn(source, "scatterStyle")) {
     if (!isScatterStyle(source.scatterStyle)) throw new RangeError("Unknown XY scatter style.");

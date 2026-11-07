@@ -364,6 +364,8 @@ export type WorkbookSnapshotV100 = Omit<WorkbookSnapshotV99, "version"> & { vers
 export type WorkbookSnapshotV101 = Omit<WorkbookSnapshotV100, "version"> & { version: 101 };
 export type WorkbookSnapshotV102 = Omit<WorkbookSnapshotV101, "version"> & { version: 102 };
 export type WorkbookSnapshotV103 = Omit<WorkbookSnapshotV102, "version"> & { version: 103 };
+/** Editable bubble charts with paired size vectors. */
+export type WorkbookSnapshotV104 = Omit<WorkbookSnapshotV103, "version"> & { version: 104 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -425,7 +427,8 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV100
   | WorkbookSnapshotV101
   | WorkbookSnapshotV102
-  | WorkbookSnapshotV103;
+  | WorkbookSnapshotV103
+  | WorkbookSnapshotV104;
 type WorkbookWritePayload = Omit<WorkbookSnapshotV98, "version"> & {
   version: WorkbookSnapshot["version"];
 };
@@ -550,7 +553,8 @@ type SnapshotVersion =
   | 100
   | 101
   | 102
-  | 103;
+  | 103
+  | 104;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -566,6 +570,12 @@ function hasCameraSourceSheet(drawings: unknown): boolean {
 
 function hasSparklineGroup(value: unknown): boolean {
   return value !== null && typeof value === "object" && Object.hasOwn(value, "groupId");
+}
+function hasBubbleCharts(drawings: unknown): boolean {
+  return (
+    Array.isArray(drawings) &&
+    drawings.some((drawing) => drawing?.kind === "chart" && drawing.chart?.type === "bubble")
+  );
 }
 function hasScatterPresentation(drawings: unknown): boolean {
   return (
@@ -2851,7 +2861,10 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       version = 101;
     if (hasCatalogIcons(record.drawings)) version = 102;
     if (hasScatterPresentation(record.drawings)) version = 103;
+    if (hasBubbleCharts(record.drawings)) version = 104;
   }
+  if (version < 104 && hasBubbleCharts(record.drawings))
+    return fail(path + ".drawings", "Bubble charts require snapshot version 104.");
   if (version < 103 && hasScatterPresentation(record.drawings))
     return fail(
       path + ".drawings",
@@ -3340,6 +3353,7 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     snapshot.version = 101;
   if (sheets.some((sheet) => hasCatalogIcons(sheet.drawings))) snapshot.version = 102;
   if (sheets.some((sheet) => hasScatterPresentation(sheet.drawings))) snapshot.version = 103;
+  if (sheets.some((sheet) => hasBubbleCharts(sheet.drawings))) snapshot.version = 104;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -3450,7 +3464,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 100 &&
     record.version !== 101 &&
     record.version !== 102 &&
-    record.version !== 103
+    record.version !== 103 &&
+    record.version !== 104
   ) {
     throw new WorkbookDomainError(
       {

@@ -1,3 +1,4 @@
+import { chartPlotSeries, isXYChart } from "./chart-bubble";
 import { format as echartsFormat } from "echarts/core";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import {
@@ -316,7 +317,7 @@ export function applyChartCommonFormat(
   }
   const bars = chart.type === "bar" || chart.type === "column";
   const lines = chart.type === "line" || chart.type === "area";
-  const cartesian = bars || lines || combo || chart.type === "scatter";
+  const cartesian = bars || lines || combo || isXYChart(chart.type);
   const selectedFormat = (entry: ChartSeries | undefined) =>
     entry?.id !== undefined ? format.series?.find((item) => item.id === entry.id) : undefined;
   const secondary = (entry: ChartSeries) =>
@@ -363,7 +364,7 @@ export function applyChartCommonFormat(
     y = option.yAxis;
   if (!x || !y || Array.isArray(x) || Array.isArray(y)) return next;
   const horizontal = chart.type === "bar";
-  const valueSeries = chart.type === "scatter" ? data.series.slice(1) : data.series;
+  const valueSeries = chartPlotSeries(chart, data);
   const primary = valueSeries.filter((entry) => !secondary(entry));
   const secondaryEntries = data.series.filter(secondary);
   const hasSecondary = secondaryEntries.length > 0;
@@ -421,7 +422,7 @@ export function applyChartCommonFormat(
         : {}),
     };
   }
-  if (format.valueAxis?.reverse && chart.type !== "scatter")
+  if (format.valueAxis?.reverse && !isXYChart(chart.type))
     category = {
       ...category,
       position: horizontal ? "right" : "top",
@@ -466,7 +467,7 @@ export function applyChartCommonFormat(
   }
   if (Array.isArray(option.series))
     next.series = option.series.map((series, index): SeriesOption => {
-      const entry = chart.type === "scatter" ? data.series[index + 1] : data.series[index];
+      const entry = valueSeries[index];
       const settings = selectedFormat(entry);
       if (series.type !== "bar" && series.type !== "line") return series;
       const isSecondary = entry !== undefined && secondary(entry);

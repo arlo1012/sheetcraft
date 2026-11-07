@@ -1,3 +1,4 @@
+import { chartPlotSeries, bubbleSeries, bubbleFormats, isXYChart } from "./chart-bubble";
 import { specialtyOption } from "./chart-specialty-options";
 import { applyChartSeriesRenderOrder } from "./chart-series-render-order";
 import { reserveChartAxisTitles } from "./chart-axis-title-layout";
@@ -307,102 +308,117 @@ function buildChartOption(
     lastBarLabels && !lastBarLabels.some((value) => value < 0) ? 0 : labelClearance;
   const rightLabelSpace =
     lastBarLabels && !lastBarLabels.some((value) => value >= 0) ? 0 : labelClearance;
-  const series: SeriesOption[] = scatter
-    ? data.series.slice(1).map((series): SeriesOption => {
-        const style = presentation?.scatterStyle ?? "marker";
-        const coordinates: Array<[number, number | "-"]> = [];
-        series.values.forEach((y, index) => {
-          const x = data.series[0]?.values[index];
-          if (x == null || (style === "marker" && y === null)) return;
-          coordinates.push([x, y ?? "-"]);
-        });
-        const common = {
-          ...seriesAppearance(series, palette),
-          name: series.name,
-          data: coordinates,
-          label: { show: chart.labels },
-        };
-        if (style === "marker") return { ...common, type: "scatter" };
-        const markers = style === "lineMarker" || style === "smoothMarker";
-        return {
-          ...common,
-          type: "line",
-          smooth: style === "smooth" || style === "smoothMarker",
-          // Native line labels are attached to symbols. Zero-size symbols retain labels on line-only plots.
-          showSymbol: markers || chart.labels,
-          ...(!markers && chart.labels ? { symbolSize: 0 } : {}),
-          showAllSymbol: true,
-          connectNulls: false,
-          symbol: "circle",
-        };
-      })
-    : data.series.map((series) =>
-        chart.type === "line" ||
-        chart.type === "area" ||
-        (chart.type === "combo" &&
-          getChartComboDataSeriesSettings(chart, series, comboSeriesChanges).drawType === "line")
-          ? {
-              type: "line",
+  const series: SeriesOption[] =
+    chart.type === "bubble"
+      ? bubbleSeries(
+          chart,
+          data,
+          palette,
+          Math.max(
+            1,
+            Math.min(
+              layout?.plot.width ?? dimensions?.width ?? 480,
+              layout?.plot.height ?? dimensions?.height ?? 300,
+            ) * 0.16,
+          ),
+        )
+      : scatter
+        ? data.series.slice(1).map((series): SeriesOption => {
+            const style = presentation?.scatterStyle ?? "marker";
+            const coordinates: Array<[number, number | "-"]> = [];
+            series.values.forEach((y, index) => {
+              const x = data.series[0]?.values[index];
+              if (x == null || (style === "marker" && y === null)) return;
+              coordinates.push([x, y ?? "-"]);
+            });
+            const common = {
               ...seriesAppearance(series, palette),
               name: series.name,
-              data: series.values,
-              showSymbol:
-                chart.type === "combo"
-                  ? getChartComboDataSeriesSettings(chart, series, comboSeriesChanges).markers
-                  : (presentation?.lineMarkers ?? true),
-              ...(chart.type === "combo"
-                ? {
-                    symbol: getChartComboDataSeriesSettings(chart, series, comboSeriesChanges)
-                      .markers
-                      ? "circle"
-                      : "none",
-                    smooth: false,
-                  }
-                : presentation?.lineMarkers === false
-                  ? { symbol: "none" }
-                  : {}),
-              connectNulls: false,
-              ...(chart.type === "area"
-                ? {
-                    areaStyle:
-                      series.colorIndex === undefined
-                        ? {}
-                        : { color: palette[series.colorIndex % palette.length] },
-                  }
-                : {}),
-              ...(chart.stacked ? { stack: "total" } : {}),
+              data: coordinates,
               label: { show: chart.labels },
-            }
-          : {
-              type: "bar",
-              ...seriesAppearance(series, palette),
-              name: series.name,
-              data:
-                labelPosition !== undefined
-                  ? series.values.map((value) =>
-                      value === null
-                        ? null
-                        : {
-                            value,
-                            label: {
-                              position: getBarLabelPosition(
-                                horizontal ? "bar" : "column",
-                                labelPosition,
+            };
+            if (style === "marker") return { ...common, type: "scatter" };
+            const markers = style === "lineMarker" || style === "smoothMarker";
+            return {
+              ...common,
+              type: "line",
+              smooth: style === "smooth" || style === "smoothMarker",
+              // Native line labels are attached to symbols. Zero-size symbols retain labels on line-only plots.
+              showSymbol: markers || chart.labels,
+              ...(!markers && chart.labels ? { symbolSize: 0 } : {}),
+              showAllSymbol: true,
+              connectNulls: false,
+              symbol: "circle",
+            };
+          })
+        : data.series.map((series) =>
+            chart.type === "line" ||
+            chart.type === "area" ||
+            (chart.type === "combo" &&
+              getChartComboDataSeriesSettings(chart, series, comboSeriesChanges).drawType ===
+                "line")
+              ? {
+                  type: "line",
+                  ...seriesAppearance(series, palette),
+                  name: series.name,
+                  data: series.values,
+                  showSymbol:
+                    chart.type === "combo"
+                      ? getChartComboDataSeriesSettings(chart, series, comboSeriesChanges).markers
+                      : (presentation?.lineMarkers ?? true),
+                  ...(chart.type === "combo"
+                    ? {
+                        symbol: getChartComboDataSeriesSettings(chart, series, comboSeriesChanges)
+                          .markers
+                          ? "circle"
+                          : "none",
+                        smooth: false,
+                      }
+                    : presentation?.lineMarkers === false
+                      ? { symbol: "none" }
+                      : {}),
+                  connectNulls: false,
+                  ...(chart.type === "area"
+                    ? {
+                        areaStyle:
+                          series.colorIndex === undefined
+                            ? {}
+                            : { color: palette[series.colorIndex % palette.length] },
+                      }
+                    : {}),
+                  ...(chart.stacked ? { stack: "total" } : {}),
+                  label: { show: chart.labels },
+                }
+              : {
+                  type: "bar",
+                  ...seriesAppearance(series, palette),
+                  name: series.name,
+                  data:
+                    labelPosition !== undefined
+                      ? series.values.map((value) =>
+                          value === null
+                            ? null
+                            : {
                                 value,
-                              ),
-                            },
-                          },
-                    )
-                  : series.values,
-              ...(chart.stacked ? { stack: "total" } : {}),
-              label: {
-                show: chart.labels,
-                ...(outsideLabels && horizontal
-                  ? { width: Math.max(1, labelClearance - 5), overflow: "truncate" as const }
-                  : {}),
-              },
-            },
-      );
+                                label: {
+                                  position: getBarLabelPosition(
+                                    horizontal ? "bar" : "column",
+                                    labelPosition,
+                                    value,
+                                  ),
+                                },
+                              },
+                        )
+                      : series.values,
+                  ...(chart.stacked ? { stack: "total" } : {}),
+                  label: {
+                    show: chart.labels,
+                    ...(outsideLabels && horizontal
+                      ? { width: Math.max(1, labelClearance - 5), overflow: "truncate" as const }
+                      : {}),
+                  },
+                },
+          );
   return {
     ...common,
     grid: plotBounds
@@ -428,7 +444,7 @@ function buildChartOption(
           ),
         },
     xAxis:
-      horizontal || scatter
+      horizontal || isXYChart(chart.type)
         ? { type: "value" }
         : {
             type: "category",
@@ -464,7 +480,7 @@ export function createChartOption(
       ? formatCellNumberValue(value, format).text
       : String(value ?? "");
   };
-  const plotted = chart.type === "scatter" ? data.series.slice(1) : data.series;
+  const plotted = chartPlotSeries(chart, data);
   const cartesianLabels = ["column", "bar", "line", "area", "combo"].includes(chart.type);
   const customLabels =
     cartesianLabels &&
@@ -479,7 +495,8 @@ export function createChartOption(
   if (Array.isArray(option.series))
     option.series = option.series.map((series, index) => {
       const format = plotted[index]?.numberFormat;
-      if (!format && chart.type !== "radar" && !percent && !customLabels) return series;
+      if (!format && chart.type !== "radar" && chart.type !== "bubble" && !percent && !customLabels)
+        return series;
       const lastCategoryIndex =
         chart.type === "scatter" && "data" in series && Array.isArray(series.data)
           ? data.series[0]?.values.at(-1) != null && plotted[index]?.values.at(-1) != null
@@ -503,7 +520,7 @@ export function createChartOption(
           chart.type === "radar" ? data.series[params.dataIndex ?? 0]?.numberFormat : format;
         const value = percent
           ? plotted[index]?.values[params.dataIndex ?? 0]
-          : chart.type === "scatter" && Array.isArray(params.value)
+          : isXYChart(chart.type) && Array.isArray(params.value)
             ? params.value[1]
             : params.value;
         const text = formatValue(value, numberFormat);
@@ -519,6 +536,14 @@ export function createChartOption(
           ...series.tooltip,
           valueFormatter: (value: unknown, dataIndex: number) => {
             if (percent) return formatValue(plotted[index]?.values[dataIndex], format);
+            if (Array.isArray(value) && chart.type === "bubble") {
+              const formats = bubbleFormats(data, index);
+              return [
+                formatValue(value[0], formats.x),
+                formatValue(value[1], format),
+                formatValue(value[2], formats.size),
+              ].join(" / ");
+            }
             if (Array.isArray(value) && chart.type === "scatter")
               return `${formatValue(value[0], data.series[0]?.numberFormat)} / ${formatValue(value[1], format)}`;
             return formatValue(
@@ -531,6 +556,7 @@ export function createChartOption(
     });
   const valueAxis = (format?: CellNumberFormat) => ({
     type: "value" as const,
+    ...(chart.type === "bubble" ? { boundaryGap: ["8%", "8%"] as [string, string] } : {}),
     ...(percent ? chartPercentAxisDomain(renderedData.series) : {}),
     ...(format ? { axisLabel: { formatter: (value: number) => formatValue(value, format) } } : {}),
   });
@@ -540,7 +566,9 @@ export function createChartOption(
         ? { kind: "percent", fractionDigits: 0 }
         : chart.type === "scatter"
           ? data.series[0]?.numberFormat
-          : uniformFormat(plotted),
+          : chart.type === "bubble"
+            ? bubbleFormats(data, 0).x
+            : uniformFormat(plotted),
     );
   if (option.yAxis && !Array.isArray(option.yAxis) && option.yAxis.type === "value")
     option.yAxis = valueAxis(

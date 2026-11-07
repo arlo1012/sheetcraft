@@ -1,3 +1,4 @@
+import { chartPlotSeries } from "./chart-bubble";
 import type {
   EChartsOption,
   SeriesOption,
@@ -10,7 +11,7 @@ import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
 
 import { reversesBarLegendOrder } from "./chart-series-render-order";
 
-const seriesLegendTypes = new Set(["column", "bar", "line", "area", "combo", "scatter"]);
+const seriesLegendTypes = new Set(["column", "bar", "line", "area", "combo", "scatter", "bubble"]);
 
 /** A renderer-only name; never a Core ID or a saved source/series mutation. */
 function legendKey(entry: ChartData["series"][number], index: number): string {
@@ -42,7 +43,7 @@ export function applySeriesLegendIdentity(
 ): EChartsOption {
   if (!seriesLegendTypes.has(chart.type) || !Array.isArray(option.series) || !option.series.length)
     return option;
-  const entries = chart.type === "scatter" ? data.series.slice(1) : data.series;
+  const entries = chartPlotSeries(chart, data);
   if (option.series.length !== entries.length)
     throw new RangeError("Chart legend projection requires one series per source entry.");
   const keys = entries.map(legendKey);

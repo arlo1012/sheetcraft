@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { chartPlotSeries } from "../chart-bubble";
 import { computed, onBeforeUnmount, reactive, ref, useId, watch } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
@@ -573,10 +574,7 @@ function numericValue(field: ChartFormatNumericField | "decimals"): number | und
   }
 }
 const sourceSeries = computed(() =>
-  (chart.value.type === "scatter"
-    ? (props.visibleData ?? props.data).series.slice(1)
-    : (props.visibleData ?? props.data).series
-  ).filter((entry) => {
+  chartPlotSeries(chart.value, props.visibleData ?? props.data).filter((entry) => {
     const secondary =
       !!entry.id &&
       chart.value.format?.series?.some(

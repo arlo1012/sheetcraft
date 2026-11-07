@@ -51,7 +51,7 @@
 1. **计算列已闭合的有界范围**：全空列首次手工公式自动填充、例外保留、显式整列应用、
    新行继承、粘贴仅目标及历史/快照/有界原生 metadata；详见
    [计算列 GUI 验收](../acceptance/calculated-column-gui-20261011.md)。更广模板族不是自动支持。
-2. **原生图型缺口**：area/pie/doughnut/scatter/radar/treemap/sankey/river/wordCloud
+2. **原生图型缺口**：area/pie/doughnut/scatter/bubble/radar/treemap/sankey/river/wordCloud
    已有产品图型，但原生 I/O 尚未实现；现有堆叠、更多轴/来源/缓存变体也不能当作
    通过。当前 headerless 1×1 来源无法证明系列方向，继续保守省略。
 3. **对象原生交换缺口**：通用 drawing/image 导入；形状/图标/文本框/艺术字/

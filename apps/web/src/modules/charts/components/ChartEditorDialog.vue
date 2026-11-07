@@ -27,6 +27,7 @@ import {
 } from "../../../shared/range-reference/formatRangeReference";
 import ChartContent from "./ChartContent.vue";
 import ChartTypeNavigation from "./ChartTypeNavigation.vue";
+import BubbleThumbnail from "./BubbleThumbnail.vue";
 import ScatterThumbnail from "./ScatterThumbnail.vue";
 import {
   scatterStyles,
@@ -105,6 +106,13 @@ function selectScatterStyle(style: ScatterStyle) {
     ...draft.value.chart,
     presentation: { ...draft.value.chart.presentation, scatterStyle: style },
   });
+}
+function selectBubbleShading(shaded: boolean) {
+  if (props.disabled || draft.value.chart.type !== "bubble") return;
+  const presentation = { ...draft.value.chart.presentation };
+  if (shaded) presentation.bubbleShading = true;
+  else delete presentation.bubbleShading;
+  draft.value.chart = normalizeSheetChart({ ...draft.value.chart, presentation });
 }
 const scatterColors = computed(() => {
   const presentation = draft.value.chart.presentation;
@@ -309,6 +317,10 @@ function typeDisabled(type: ChartType): boolean {
 }
 const selectedSubtype = computed(() => {
   const type = commonType.value;
+  if (draft.value.chart.type === "bubble")
+    return t(
+      draft.value.chart.presentation?.bubbleShading ? "chart.bubbleShaded" : "chart.bubbleFlat",
+    );
   if (draft.value.chart.type === "scatter")
     return t(`chart.xy.variant.${draft.value.chart.presentation?.scatterStyle ?? "marker"}`);
   if (!type) return t(`chart.${draft.value.chart.type}`);
@@ -448,6 +460,26 @@ function onDialogKeydown(event: KeyboardEvent): void {
               @click="selectScatterStyle(style)"
             >
               <ScatterThumbnail :colors="scatterColors" :variant="style" />
+            </button>
+          </div>
+          <div
+            v-else-if="draft.chart.type === 'bubble'"
+            class="scatter-variants"
+            role="group"
+            :aria-label="t('chart.subtypes')"
+          >
+            <button
+              v-for="shaded in [false, true]"
+              :key="String(shaded)"
+              type="button"
+              :disabled="disabled"
+              :data-bubble-variant="shaded ? 'shaded' : 'flat'"
+              :aria-pressed="!!draft.chart.presentation?.bubbleShading === shaded"
+              :title="t(shaded ? 'chart.bubbleShaded' : 'chart.bubbleFlat')"
+              :aria-label="t(shaded ? 'chart.bubbleShaded' : 'chart.bubbleFlat')"
+              @click="selectBubbleShading(shaded)"
+            >
+              <BubbleThumbnail :shaded="shaded" :colors="scatterColors" />
             </button>
           </div>
           <div v-else class="chart-selector__single-type">
@@ -626,15 +658,17 @@ function onDialogKeydown(event: KeyboardEvent): void {
                 ? "chart.pivotSourceHint"
                 : draft.chart.type === "sankey"
                   ? "chart.sankeyHint"
-                  : draft.chart.type === "scatter"
-                    ? "chart.scatterHint"
-                    : draft.chart.type === "venn"
-                      ? "chart.vennHint"
-                      : draft.chart.type === "liquid" || draft.chart.type === "gauge"
-                        ? "chart.percentHint"
-                        : draft.chart.type === "waterfall"
-                          ? "chart.waterfallHint"
-                          : "chart.sourceHint",
+                  : draft.chart.type === "bubble"
+                    ? "chart.bubbleHint"
+                    : draft.chart.type === "scatter"
+                      ? "chart.scatterHint"
+                      : draft.chart.type === "venn"
+                        ? "chart.vennHint"
+                        : draft.chart.type === "liquid" || draft.chart.type === "gauge"
+                          ? "chart.percentHint"
+                          : draft.chart.type === "waterfall"
+                            ? "chart.waterfallHint"
+                            : "chart.sourceHint",
             )
           }}
         </p>

@@ -167,6 +167,7 @@ export function changeChartType(chart: SheetChart, type: ChartType): SheetChart 
     if (!isCommonChartType(type)) delete next.presentation.percentStacked;
     if (type !== "line") delete next.presentation.lineMarkers;
     if (type !== "scatter") delete next.presentation.scatterStyle;
+    if (type !== "bubble") delete next.presentation.bubbleShading;
     if (!Object.keys(next.presentation).length) delete next.presentation;
   }
   return normalizeSheetChart(next);

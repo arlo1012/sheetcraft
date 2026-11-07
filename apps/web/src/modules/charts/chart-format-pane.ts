@@ -1,3 +1,4 @@
+import { chartPlotSeries, isXYChart } from "./chart-bubble";
 import type {
   ChartAxisLineFormat,
   ChartLegendFormat,
@@ -131,7 +132,7 @@ export function getChartFormatCapabilities(
   data?: ChartData,
   target?: ChartFormatTarget,
 ) {
-  const plotSeries = chart.type === "scatter" ? data?.series.slice(1) : data?.series;
+  const plotSeries = data && chartPlotSeries(chart, data);
   const hasData = data === undefined || !!plotSeries?.some((entry) => entry.values.length > 0);
   const bars = chart.type === "column" || chart.type === "bar";
   const lines = chart.type === "line" || chart.type === "area";
@@ -143,7 +144,7 @@ export function getChartFormatCapabilities(
           target.rangeBand ? { rangeBand: target.rangeBand } : { seriesId: target.seriesId },
         )
       : undefined;
-  const cartesian = bars || lines || combo || chart.type === "scatter";
+  const cartesian = bars || lines || combo || isXYChart(chart.type);
   const series = data ? getChartFormatSeries(chart, data) : (chart.source?.series ?? []);
   const comboKinds = combo
     ? series.map(

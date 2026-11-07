@@ -1,3 +1,4 @@
+import { chartPlotSeries } from "./chart-bubble";
 import { createChartTextPlan, measureChartText, type ChartFontContext } from "./chart-script-fonts";
 import type { EChartsOption, LegendComponentOption } from "echarts";
 import { format } from "echarts/core";
@@ -115,7 +116,7 @@ export function createChartElementLayout(
   if (chart.legend && capabilities.legend) {
     const names = ["pie", "doughnut", "rose", "funnel"].includes(chart.type)
       ? data.categories
-      : data.series.slice(chart.type === "scatter" ? 1 : 0).map((entry) => entry.name);
+      : chartPlotSeries(chart, data).map((entry) => entry.name);
     const vertical = ["left", "right", "topRight"].includes(settings.legendPosition);
     const gap = Math.min(8, plot.width * 0.04, plot.height * 0.04);
     // A bounded scroll viewport and truncated one-line names keep even very long
@@ -197,7 +198,7 @@ export function getChartLegendLayout(
   data: ChartData,
   dimensions: ChartDimensions,
 ) {
-  const series = chart.type === "scatter" ? data.series.slice(1) : data.series;
+  const series = chartPlotSeries(chart, data);
   if (
     !chart.legend ||
     !getChartElementCapabilities(chart.type).legend ||

@@ -36,6 +36,7 @@ export const chartTypes = [
   "pie",
   "doughnut",
   "scatter",
+  "bubble",
   "radar",
   "treemap",
   "sankey",
@@ -173,6 +174,8 @@ export function normalizeSheetChart(chart: SheetChart): SheetChart {
     if (!field || !("value" in field))
       throw new TypeError("Chart presentation must be an own data field, not an accessor.");
     presentation = normalizeChartPresentation(field.value);
+    if (presentation.bubbleShading && chart.type !== "bubble")
+      throw new RangeError("Bubble shading requires a bubble chart.");
     if (presentation.scatterStyle !== undefined && chart.type !== "scatter")
       throw new RangeError("XY scatter styles require a scatter chart.");
     if (

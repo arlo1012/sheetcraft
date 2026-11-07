@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { chartPlotSeries } from "../chart-bubble";
 import ChartPreviewNotices from "./ChartPreviewNotices.vue";
 import type { ChartTextFormat } from "@sheetcraft/core/chart-format";
 import { formatCellNumberValue } from "@sheetcraft/core/number-format";
@@ -140,11 +141,12 @@ const scriptFontLimited = computed(() => {
   const limited = (text: ChartTextFormat | undefined, labels: string[]) =>
     !!text?.scriptFonts &&
     labels.some((label) => createChartTextPlan(label, text, props.theme).limitations.length > 0);
+  const plotted = chartPlotSeries(paintChart.value, data.value);
   const names = ["pie", "doughnut", "rose", "funnel"].includes(paintChart.value.type)
     ? data.value.categories
-    : data.value.series.map((series) => series.name);
+    : plotted.map((series) => series.name);
   const numeric = (axis: NonNullable<typeof f>["valueAxis"]) =>
-    data.value.series.flatMap((series) =>
+    plotted.flatMap((series) =>
       series.values
         .filter((value): value is number => value !== null)
         .map(

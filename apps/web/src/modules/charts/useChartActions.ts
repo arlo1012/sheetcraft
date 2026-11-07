@@ -214,7 +214,7 @@ export function useChartActions(options: {
         range: range ? { start: { ...range.start }, end: { ...range.end } } : null,
         title,
         headerRow: true,
-        headerColumn: type !== "scatter",
+        headerColumn: type !== "scatter" && type !== "bubble",
         seriesBy: "columns",
         legend: true,
         labels: false,

@@ -36,6 +36,7 @@ export function inferChartInsertHeaders(
         ),
       headerColumn:
         chart.type !== "scatter" &&
+        chart.type !== "bubble" &&
         end.column > start.column &&
         !(!chart.showHidden && sheet.hiddenColumns?.has(start.column)) &&
         textBand(

@@ -1,3 +1,4 @@
+import { chartPlotSeries } from "./chart-bubble";
 import type { ChartFormatSettings, ChartValueAxisFormat } from "@sheetcraft/core/chart-format";
 import type { ChartData, ChartSeries, SheetChart } from "@sheetcraft/core/sheet-charts";
 import {
@@ -179,9 +180,9 @@ export function chartMinorGridlinesForAxis(
 ): boolean {
   const format = chart.format;
   const settings = secondary ? format?.secondaryValueAxis : format?.valueAxis;
-  const entries = (
-    chart.type === "scatter" ? visibleData.series.slice(1) : visibleData.series
-  ).filter((entry) => isChartSecondaryAxisSeries(chart, entry, format) === secondary);
+  const entries = chartPlotSeries(chart, visibleData).filter(
+    (entry) => isChartSecondaryAxisSeries(chart, entry, format) === secondary,
+  );
   const stacked = chart.stacked && ["bar", "column", "line", "area"].includes(chart.type);
   const percent = getChartRenderPresentation(chart)?.percentStacked === true;
   const state = resolveChartValueAxisState(settings, entries, stacked, percent);
