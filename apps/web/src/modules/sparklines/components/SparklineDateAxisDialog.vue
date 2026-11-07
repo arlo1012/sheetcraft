@@ -11,7 +11,7 @@ const props = defineProps<{
   selectReference: (current: string) => Promise<string | undefined>;
 }>();
 const emit = defineEmits<{ confirm: [value: string]; close: [] }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const reference = ref(props.initial);
 </script>
 <template>
@@ -28,7 +28,11 @@ const reference = ref(props.initial);
     @confirm="emit('confirm', reference)"
     @close="emit('close')"
   >
-    <Form label-align="top" :prevent-submit-default="true">
+    <Form
+      :label-width="locale === 'zh-CN' ? 76 : 94"
+      label-align="right"
+      :prevent-submit-default="true"
+    >
       <FormItem :label="t('sparkline.dateRange')"
         ><RangeReferenceInput
           v-model="reference"

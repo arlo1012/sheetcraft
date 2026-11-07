@@ -43,7 +43,7 @@ export const sparklinesEnUS = {
   "sparkline.dateAxis": "Date axis type",
   "sparkline.dateAxisTitle": "Sparkline date range",
   "sparkline.dateRange": "Date range",
-  "sparkline.invalidDateRange": "Select one continuous row or column on this worksheet.",
+  "sparkline.invalidDateRange": "Select one continuous row or column in this workbook.",
   "sparkline.rightToLeft": "Plot data right to left",
   "sparkline.axisIndividual": "Automatic for each sparkline",
   "sparkline.axisGroup": "Same for all sparklines",

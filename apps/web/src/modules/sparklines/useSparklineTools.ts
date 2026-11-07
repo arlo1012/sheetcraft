@@ -47,6 +47,7 @@ export type SparklineToolContext = {
 const points = ["highPoint", "lowPoint", "firstPoint", "lastPoint"] as const;
 function mergeStyle(value: CellSparkline, patch: SparklineStylePatch): CellSparkline {
   const next = { ...value, ...patch, source: value.source } as CellSparkline;
+  if (next.dateRange === undefined) delete next.dateSheetId;
   for (const key of points) {
     if (patch[key]) next[key] = { show: false, color: "#ef4444", ...value[key], ...patch[key] };
   }
@@ -98,6 +99,7 @@ export function useSparklineTools(options: {
       "axis",
       "rightToLeft",
       "dateRange",
+      "dateSheetId",
       "minAxis",
       "maxAxis",
       "showHidden",

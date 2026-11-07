@@ -42,7 +42,7 @@ export const sparklinesZhCN = {
   "sparkline.dateAxis": "日期坐标轴类型",
   "sparkline.dateAxisTitle": "迷你图日期范围",
   "sparkline.dateRange": "日期范围",
-  "sparkline.invalidDateRange": "请选择本工作表中连续的一行或一列作为日期范围。",
+  "sparkline.invalidDateRange": "请选择工作簿中连续的一行或一列作为日期范围。",
   "sparkline.rightToLeft": "从右到左的绘图数据",
   "sparkline.axisIndividual": "自动设置每个迷你图",
   "sparkline.axisGroup": "适用于所有迷你图",

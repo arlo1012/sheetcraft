@@ -3,6 +3,7 @@ import { mapSheetCameraReferences } from "../camera-source-references.js";
 
 import {
   prepareExternalDrawingCollections,
+  mapExternalSparklineDates,
   readExternalDrawingCollections,
   commitExternalDrawingCollections,
 } from "./text-references.js";
@@ -205,6 +206,9 @@ export function createDuplicateSheetCommand(
   assertSheetNameAvailable(workbook, name);
   const sheetId = resolveSheetId(workbook, options);
   const sheet = serializeSheet(source);
+  for (const cell of sheet.cells) {
+    if (cell.sparkline?.dateSheetId === sourceSheetId) delete cell.sparkline.dateSheetId;
+  }
   if (sheet.drawings?.length)
     sheet.drawings = mapSheetDrawingTextReferences(sheet.drawings, (reference) => ({
       ...reference,
@@ -396,6 +400,13 @@ export function applyAddSheetCommand(
   );
   for (const entry of externalDrawings.next) {
     if (
+      entry.sparklineDates?.some(
+        ({ key }) =>
+          workbook.sheets.get(entry.sheetId)!.cells.get(key)?.sparkline?.dateRange !== null,
+      )
+    )
+      throw invalidCommandPayload("sparklineDates", entry.sheetId);
+    if (
       entry.dashboard &&
       JSON.stringify(
         mapDashboardReferences(
@@ -547,9 +558,19 @@ export function applyDeleteSheetCommand(
           () => null,
         );
       const changedBoard = board && JSON.stringify(board) !== JSON.stringify(owner.dashboard);
-      return JSON.stringify(drawings) === JSON.stringify(owner.drawings ?? []) && !changedBoard
+      const sparklineDates = mapExternalSparklineDates(owner, command.sheetId, () => null);
+      return !sparklineDates.length &&
+        JSON.stringify(drawings) === JSON.stringify(owner.drawings ?? []) &&
+        !changedBoard
         ? []
-        : [{ sheetId: owner.id, drawings, ...(changedBoard ? { dashboard: board } : {}) }];
+        : [
+            {
+              sheetId: owner.id,
+              drawings,
+              ...(sparklineDates.length ? { sparklineDates } : {}),
+              ...(changedBoard ? { dashboard: board } : {}),
+            },
+          ];
     }),
   );
   const removedSheetSnapshot = serializeSheet(workbook.sheets.get(command.sheetId)!);

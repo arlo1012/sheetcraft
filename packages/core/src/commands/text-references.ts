@@ -1,3 +1,4 @@
+import { mapSparklineDates, cloneSparklineRange } from "../sparklines.js";
 import {
   mapSheetDrawingChartReferences,
   mapChartSourceVectorCells,
@@ -38,7 +39,10 @@ export function cloneExternalDrawingCollections(
       throw new TypeError("External drawing collections require ordinary records.");
     for (const key of Reflect.ownKeys(entry)) {
       if (
-        (key !== "sheetId" && key !== "drawings" && key !== "dashboard") ||
+        (key !== "sheetId" &&
+          key !== "drawings" &&
+          key !== "dashboard" &&
+          key !== "sparklineDates") ||
         !("value" in Object.getOwnPropertyDescriptor(entry, key)!)
       )
         throw new TypeError(
@@ -63,6 +67,14 @@ export function cloneExternalDrawingCollections(
     return {
       sheetId,
       drawings: normalizeSheetDrawings(drawingsField.value as readonly SheetDrawing[]),
+      ...(entry.sparklineDates
+        ? {
+            sparklineDates: entry.sparklineDates.map(({ key, range }) => ({
+              key,
+              range: cloneSparklineRange(range),
+            })),
+          }
+        : {}),
       ...(entry.dashboard ? { dashboard: normalizeDashboard(entry.dashboard) } : {}),
     };
   });
@@ -117,6 +129,7 @@ export function prepareExternalDrawingCollections(
   association?: {
     mapCell: (cell: CellAddress) => CellAddress | null;
     mapRange?: (range: CellRange) => CellRange | null;
+    dateMap?: (range: CellRange) => CellRange | null;
     direction: "restore" | "reapply";
   },
 ): PreparedExternalDrawingCollections {
@@ -180,9 +193,24 @@ export function prepareExternalDrawingCollections(
           "External reference restore is not associated with this structural inverse.",
         );
     }
+    const previousDates = entry.sparklineDates?.map(({ key, range }) => {
+      const spark = sheet.cells.get(key)?.sparkline;
+      if (!spark || spark.dateSheetId !== ownSheetId || spark.dateRange === undefined)
+        throw invalidCommandPayload("sparklineDates", key);
+      const mapDates = association?.dateMap ?? association?.mapRange;
+      if (association && mapDates) {
+        const prior = association.direction === "restore" ? range : spark.dateRange;
+        const expected = mapSparklineDates(prior, mapDates);
+        const actual = association.direction === "restore" ? spark.dateRange : range;
+        if (JSON.stringify(actual) !== JSON.stringify(expected))
+          throw invalidCommandPayload("sparklineDates", key);
+      }
+      return { key, range: cloneSparklineRange(spark.dateRange) };
+    });
     // Locked external objects admit only this proven reference maintenance, like formula rewrites.
     assertShapeObjectsForSheet(entry.drawings, sheet);
     if (
+      !previousDates?.length &&
       JSON.stringify(original) === JSON.stringify(entry.drawings) &&
       (!entry.dashboard || JSON.stringify(sheet.dashboard) === JSON.stringify(entry.dashboard))
     )
@@ -190,6 +218,7 @@ export function prepareExternalDrawingCollections(
     previous.push({
       sheetId: sheet.id,
       drawings: original,
+      ...(previousDates?.length ? { sparklineDates: previousDates } : {}),
       ...(entry.dashboard ? { dashboard: normalizeDashboard(sheet.dashboard) } : {}),
     });
     next.push(entry);
@@ -200,6 +229,8 @@ export function prepareExternalDrawingCollections(
 export function hasWorkbookTextReferencesToSheet(workbook: Workbook, sheetId: string): boolean {
   let found = false;
   for (const sheet of workbook.sheets.values()) {
+    if ([...sheet.cells.values()].some((cell) => cell.sparkline?.dateSheetId === sheetId))
+      return true;
     if (sheet.dashboard?.widgets.some((w) => w.source?.sheetId === sheetId)) return true;
     const inspect = <T extends { sheetId: string }>(reference: T): T => {
       found ||= reference.sheetId === sheetId;
@@ -215,11 +246,24 @@ export function hasWorkbookTextReferencesToSheet(workbook: Workbook, sheetId: st
   return found;
 }
 
+export function mapExternalSparklineDates(
+  sheet: Sheet,
+  targetId: string,
+  mapRange: (range: CellRange) => CellRange | null,
+) {
+  return [...sheet.cells].flatMap(([key, cell]) => {
+    const spark = cell.sparkline;
+    if (!spark?.dateRange || spark.dateSheetId !== targetId) return [];
+    const range = mapSparklineDates(spark.dateRange, mapRange);
+    return JSON.stringify(range) === JSON.stringify(spark.dateRange) ? [] : [{ key, range }];
+  });
+}
 export function planExternalTextReferenceChanges(
   workbook: Workbook,
   targetSheetId: string,
   mapCell: (cell: CellAddress) => CellAddress | null,
   mapRange?: (range: CellRange) => CellRange | null,
+  dateMap = mapRange,
 ): PreparedExternalDrawingCollections {
   return prepareExternalDrawingCollections(
     workbook,
@@ -233,9 +277,21 @@ export function planExternalTextReferenceChanges(
         mapDashboardReferences(sheet.dashboard, targetSheetId, mapCell, mapRange);
       const changedBoard =
         dashboard && JSON.stringify(dashboard) !== JSON.stringify(sheet.dashboard);
-      return JSON.stringify(drawings) === JSON.stringify(original) && !changedBoard
+      const sparklineDates = dateMap
+        ? mapExternalSparklineDates(sheet, targetSheetId, dateMap)
+        : [];
+      return !sparklineDates.length &&
+        JSON.stringify(drawings) === JSON.stringify(original) &&
+        !changedBoard
         ? []
-        : [{ sheetId: sheet.id, drawings, ...(changedBoard ? { dashboard } : {}) }];
+        : [
+            {
+              sheetId: sheet.id,
+              drawings,
+              ...(sparklineDates.length ? { sparklineDates } : {}),
+              ...(changedBoard ? { dashboard } : {}),
+            },
+          ];
     }),
   );
 }
@@ -248,6 +304,10 @@ export function commitExternalDrawingCollections(
     const owner = workbook.sheets.get(entry.sheetId)!;
     owner.drawings = entry.drawings;
     if (entry.dashboard) owner.dashboard = entry.dashboard;
+    for (const { key, range } of entry.sparklineDates ?? []) {
+      const cell = owner.cells.get(key)!;
+      owner.cells.set(key, { ...cell, sparkline: { ...cell.sparkline!, dateRange: range } });
+    }
   }
   return prepared.next.length > 0;
 }

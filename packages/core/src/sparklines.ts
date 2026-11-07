@@ -1,4 +1,7 @@
-import { parseFormulaReference } from "./formula/reference-model.js";
+import {
+  parseFormulaReference,
+  type ParseFormulaReferenceOptions,
+} from "./formula/reference-model.js";
 import { getCellAddressLabel } from "./coordinates.js";
 import {
   MAX_SHEET_COLUMNS,
@@ -21,13 +24,9 @@ type DateAddress = CellAddress & { rowAbsolute?: boolean; columnAbsolute?: boole
 export type SparklineDateRange = { start: DateAddress; end: DateAddress };
 export function readSparklineDateRange(
   text: string,
-  sheetName: string,
-): SparklineDateRange | undefined {
-  const ref = parseFormulaReference(text.trim().replace(/^=/, ""), {
-    currentSheetId: sheetName,
-    resolveSheetId: (name) =>
-      name.toLowerCase() === sheetName.toLowerCase() ? sheetName : undefined,
-  });
+  options: ParseFormulaReferenceOptions,
+): Pick<CellSparkline, "dateSheetId" | "dateRange"> | undefined {
+  const ref = parseFormulaReference(text.trim().replace(/^=/, ""), options);
   if (!ref) return;
   const { startReference: start, endReference } = ref.source;
   const address = (ref: typeof start) => ({
@@ -38,7 +37,10 @@ export function readSparklineDateRange(
   });
   const range = { start: address(start), end: address(endReference ?? start) };
   try {
-    return cloneSparklineRange(range) as SparklineDateRange;
+    return {
+      dateRange: cloneSparklineRange(range),
+      dateSheetId: ref.target.sheetId === options.currentSheetId ? undefined : ref.target.sheetId,
+    };
   } catch {
     return;
   }
@@ -59,7 +61,9 @@ export type CellSparkline = {
   groupId?: string;
   type: "line" | "column" | "winLoss";
   source: CellRange | null;
-  /** Worksheet-local date labels; null is a broken date reference. */
+  /** Set for a date axis referencing another worksheet in this workbook. */
+  dateSheetId?: string;
+  /** Null represents a broken date reference. */
   dateRange?: SparklineDateRange | null;
   color: string;
   negativeColor: string;
@@ -77,7 +81,7 @@ export type CellSparkline = {
   negativePoints?: boolean;
   markerColor?: string;
 };
-function cloneSparklineRange(source: CellRange | null): CellRange | null {
+export function cloneSparklineRange(source: CellRange | null): CellRange | null {
   if (
     source !== null &&
     (!source ||
@@ -150,6 +154,13 @@ export function normalizeCellSparkline(
       throw new RangeError("Invalid sparkline point style.");
     points[key] = { show: point.show, color: point.color };
   }
+  if (
+    value.dateSheetId !== undefined &&
+    (typeof value.dateSheetId !== "string" ||
+      !value.dateSheetId.trim() ||
+      value.dateRange === undefined)
+  )
+    throw new RangeError("Invalid sparkline date sheet.");
   const source = cloneSparklineRange(value.source);
   const dateRange =
     value.dateRange === undefined ? undefined : cloneSparklineRange(value.dateRange);
@@ -157,7 +168,9 @@ export function normalizeCellSparkline(
     ...(value.groupId !== undefined ? { groupId: value.groupId } : {}),
     type: value.type,
     source,
-    ...(dateRange !== undefined ? { dateRange } : {}),
+    ...(dateRange !== undefined
+      ? { dateRange, ...(value.dateSheetId ? { dateSheetId: value.dateSheetId } : {}) }
+      : {}),
     color: value.color,
     negativeColor: value.negativeColor,
     markers: value.markers,
@@ -242,21 +255,24 @@ export function expandSparklineGroups(
       (value.groupId && groups.has(value.groupId)),
   );
 }
+export function mapSparklineDates(
+  dates: SparklineDateRange | null,
+  map: (range: CellRange) => CellRange | null,
+): SparklineDateRange | null {
+  if (!dates) return null;
+  const next = map(dates);
+  return next && { start: { ...dates.start, ...next.start }, end: { ...dates.end, ...next.end } };
+}
 export function mapSparklineRanges(
   value: CellSparkline,
   map: (range: CellRange) => CellRange | null,
+  ownerSheetId: string,
 ): CellSparkline {
-  const dates = value.dateRange && map(value.dateRange);
   return {
     ...value,
     source: value.source && map(value.source),
-    ...(value.dateRange !== undefined
-      ? {
-          dateRange: dates && {
-            start: { ...value.dateRange!.start, ...dates.start },
-            end: { ...value.dateRange!.end, ...dates.end },
-          },
-        }
+    ...(value.dateRange !== undefined && (!value.dateSheetId || value.dateSheetId === ownerSheetId)
+      ? { dateRange: mapSparklineDates(value.dateRange, map) }
       : {}),
   };
 }
@@ -410,6 +426,10 @@ export function createSparklineSeriesResolver(sheet: Sheet, evaluator: SheetEval
     const sparkline = normalizeCellSparkline(value)!;
     if (!sparkline.source || sparkline.dateRange === null) return { values: [] };
     const dates = sparkline.dateRange;
+    const dateEvaluator =
+      dates && sparkline.dateSheetId && sparkline.dateSheetId !== sheet.id
+        ? evaluator.forSheet?.(sparkline.dateSheetId)
+        : evaluator;
     const points: { date: number; value: number | null }[] = [];
     let ordinal = 0;
     const { start, end } = sparkline.source;
@@ -436,7 +456,7 @@ export function createSparklineSeriesResolver(sheet: Sheet, evaluator: SheetEval
             index > Math.max(dates.end.row - dates.start.row, dates.end.column - dates.start.column)
           )
             continue;
-          const date = evaluator.getComputedValue(address);
+          const date = dateEvaluator?.getComputedValue(address);
           if (typeof date === "number" && Number.isFinite(date))
             points.push({ date, value: numeric });
         } else values.push(numeric);

@@ -526,8 +526,10 @@ export function applyCellShiftCommand(
         ...(content === undefined ? {} : { content }),
         ...(cell.sparkline
           ? {
-              sparkline: mapSparklineRanges(cell.sparkline, (reference) =>
-                transformFormulaRange(reference, map, range, command.direction),
+              sparkline: mapSparklineRanges(
+                cell.sparkline,
+                (reference) => transformFormulaRange(reference, map, range, command.direction),
+                sheet.id,
               ),
             }
           : {}),

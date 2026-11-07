@@ -82,7 +82,7 @@
 - 现有超链接的有界闭合见 [Hyperlink 验收](../acceptance/hyperlink-20261011.md)。
   实际 Core 拒绝保留字段/快照/历史，陈旧 confirm/remove/cancel 及上下文失效回归通过；
   GUI 只走合成内部引用，不代表外链/保护/公式/native 全变体验收。
-- 同工作表迷你图的日期轴、选区及 WPS XLSX 往返见[日期轴验收](../acceptance/insert-print-20261107.md#迷你图日期轴)。同表 line 迷你图创建与编辑见 [Sparkline 验收](../acceptance/sparkline-20261011.md)。
+- 迷你图的同表与跨表日期轴、选区及 WPS XLSX 往返见[日期轴验收](../acceptance/insert-print-20261107.md#迷你图日期轴)。同表 line 迷你图创建与编辑见 [Sparkline 验收](../acceptance/sparkline-20261011.md)。
   Core 合法无变化 false 仍关闭，实际拒绝变更保留字段；range picker 替换及旧回调
   已实证修复。普通受保护锁定目标原本被预检阻断；不虚称 GUI 保护竞态漏洞。
 - 符号和图片的当前实现已交用户细节验收；形状常用阶段收口后，按艺术字、文本框、公式、统计图

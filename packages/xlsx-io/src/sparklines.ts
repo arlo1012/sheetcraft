@@ -46,6 +46,7 @@ function attr(value: string, name: string): string | undefined {
 }
 export function writeXlsxSparklines(entries: Unzipped, sheets: readonly Sheet[]): void {
   const parts = readXlsxWorksheetPartTargets(entries);
+  const sheetNamesById = new Map(sheets.map((sheet) => [sheet.id, sheet.name]));
   sheets.forEach((sheet, index) => {
     const part = parts[index];
     if (!part || !entries[part]) return;
@@ -95,7 +96,7 @@ export function writeXlsxSparklines(entries: Unzipped, sheets: readonly Sheet[])
       const dates =
         spark.dateRange === undefined
           ? ""
-          : `<xm:f>${escape(spark.dateRange ? formatSparklineDateRange(spark.dateRange, sheet.name) : "#REF!")}</xm:f>`;
+          : `<xm:f>${escape(spark.dateRange && (!spark.dateSheetId || sheetNamesById.has(spark.dateSheetId)) ? formatSparklineDateRange(spark.dateRange, (spark.dateSheetId && sheetNamesById.get(spark.dateSheetId)) || sheet.name) : "#REF!")}</xm:f>`;
       const negative = spark.negativePoints ?? (spark.type !== "line" || spark.markers);
       return `<x14:sparklineGroup type="${spark.type === "winLoss" ? "stacked" : spark.type}" ${dates ? 'dateAxis="1" ' : ""}displayEmptyCellsAs="${spark.empty === "connect" ? "span" : spark.empty}" markers="${Number(spark.markers)}" negative="${Number(negative)}" displayXAxis="${Number(spark.axis)}" displayHidden="${Number(spark.showHidden)}"${axisAttributes}${directionAttribute}${pointAttributes}>${colorElement("colorSeries", spark.color)}${colorElement("colorNegative", spark.negativeColor)}${colorElement("colorAxis", "#a3a3a3")}${colorElement("colorMarkers", spark.markerColor ?? spark.color)}${pointColors}${dates}<x14:sparklines>${members.join("")}</x14:sparklines></x14:sparklineGroup>`;
     });
@@ -156,12 +157,23 @@ export function readXlsxSparklines(
           const type = attr(attributes, "type") ?? "line";
           const empty = attr(attributes, "displayEmptyCellsAs") ?? "zero";
           const flag = (name: string) => ["1", "true"].includes(attr(attributes, name) ?? "0");
-          let dateRange: CellSparkline["dateRange"];
+          let dateAxis: Pick<CellSparkline, "dateRange" | "dateSheetId"> | undefined;
           if (flag("dateAxis")) {
             const groupSettings = body.slice(0, body.search(/<(?:\w+:)?sparklines\b/));
             const ref = decode(/<(?:\w+:)?f>([^<]*)<\//.exec(groupSettings)?.[1] ?? "");
-            dateRange = ref === "#REF!" ? null : readSparklineDateRange(ref, sheetNames[index]!);
-            if (dateRange === undefined) throw new Error("Unsupported sparkline date range.");
+            dateAxis =
+              ref === "#REF!"
+                ? { dateRange: null }
+                : readSparklineDateRange(ref, {
+                    currentSheetId: `xlsx-sheet-${index + 1}`,
+                    resolveSheetId: (name) => {
+                      const target = sheetNames.findIndex(
+                        (s) => s.toLowerCase() === name.toLowerCase(),
+                      );
+                      return target < 0 ? undefined : `xlsx-sheet-${target + 1}`;
+                    },
+                  });
+            if (!dateAxis) throw new Error("Unsupported sparkline date range.");
           }
           const points: Partial<Record<SparklinePointKind, SparklinePointStyle>> = {};
           const limits: Pick<CellSparkline, "minAxis" | "maxAxis"> = {};
@@ -189,7 +201,7 @@ export function readXlsxSparklines(
             ...(items.length > 1 ? { groupId } : {}),
             type: type === "stacked" ? "winLoss" : (type as CellSparkline["type"]),
             source: parsed?.target.range ?? null,
-            ...(dateRange === undefined ? {} : { dateRange }),
+            ...dateAxis,
             color: color("colorSeries", "#2563eb"),
             negativeColor: color("colorNegative", "#ef4444"),
             negativePoints: flag("negative"),

@@ -1186,8 +1186,10 @@ function transformSheetAxis(
   for (const [key, originalCell] of sheet.cells) {
     let cell = originalCell;
     if (cell.sparkline) {
-      const sparkline = mapSparklineRanges(cell.sparkline, (range) =>
-        transformRangeForAxis(range, axis, index, count, maximum, operation),
+      const sparkline = mapSparklineRanges(
+        cell.sparkline,
+        (range) => transformRangeForAxis(range, axis, index, count, maximum, operation),
+        sheet.id,
       );
       if (JSON.stringify(sparkline) !== JSON.stringify(cell.sparkline)) {
         cell = { ...cell, sparkline };
@@ -1535,15 +1537,18 @@ function validateSheetAxisSlice(
     );
     if (index === null) continue;
     const current = getCellSparkline(sheet, setAxisIndex(entry.address, command.axis, index));
-    const expected = mapSparklineRanges(sparkline, (range) =>
-      transformRangeForAxis(
-        range,
-        command.axis,
-        command.index,
-        command.count,
-        maximum,
-        command.operation,
-      ),
+    const expected = mapSparklineRanges(
+      sparkline,
+      (range) =>
+        transformRangeForAxis(
+          range,
+          command.axis,
+          command.index,
+          command.count,
+          maximum,
+          command.operation,
+        ),
+      sheet.id,
     );
     if (JSON.stringify(current) !== JSON.stringify(expected))
       throw invalidCommandPayload("slice.sparklineSources", entry);
@@ -1771,12 +1776,28 @@ export function applyRestoreSheetStateCommand(
       }))
     : undefined;
   const referenceTransform = readTextReferenceTransform(command, sheet.id);
+  const movement = referenceTransform?.transform.operation;
+  const dateMap =
+    movement?.type === "moveSheetAxis"
+      ? (range: CellRange) =>
+          transformRangeForAxisMove(
+            range,
+            movement.axis,
+            movement.index,
+            movement.count,
+            movement.toIndex,
+          )
+      : undefined;
   const externalDrawings = prepareExternalDrawingCollections(
     workbook,
     sheet.id,
     readExternalDrawingCollections(command),
     referenceTransform
-      ? { mapCell: referenceTransform.mapCell, direction: referenceTransform.transform.direction }
+      ? {
+          mapCell: referenceTransform.mapCell,
+          dateMap,
+          direction: referenceTransform.transform.direction,
+        }
       : undefined,
   );
   if (!referenceTransform && externalDrawings.next.length)
@@ -2464,14 +2485,17 @@ export function applyMoveSheetAxisCommand(
         address: mapAddress(cell.address),
         ...(cell.sparkline
           ? {
-              sparkline: mapSparklineRanges(cell.sparkline, (range) =>
-                transformRangeForAxisMove(
-                  range,
-                  command.axis,
-                  command.index,
-                  command.count,
-                  command.toIndex,
-                ),
+              sparkline: mapSparklineRanges(
+                cell.sparkline,
+                (range) =>
+                  transformRangeForAxisMove(
+                    range,
+                    command.axis,
+                    command.index,
+                    command.count,
+                    command.toIndex,
+                  ),
+                sheet.id,
               ),
             }
           : {}),
@@ -2560,7 +2584,14 @@ export function applyMoveSheetAxisCommand(
     }),
   };
   state.drawings = mapLocalTextReferences(state.drawings, sheet.id, mapAddress);
-  const externalDrawings = planExternalTextReferenceChanges(workbook, sheet.id, mapAddress);
+  const externalDrawings = planExternalTextReferenceChanges(
+    workbook,
+    sheet.id,
+    mapAddress,
+    undefined,
+    (range) =>
+      transformRangeForAxisMove(range, command.axis, command.index, command.count, command.toIndex),
+  );
   preflightTextReferenceSparseState(sheet, state);
   const stateChanged = replaceSheetSparseState(sheet, state);
   const externalChanged = commitExternalDrawingCollections(workbook, externalDrawings);

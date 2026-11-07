@@ -1247,6 +1247,10 @@ function clearConditionalFormatRules(scope: "selection" | "sheet"): void {
 }
 
 function onSelectSheet(sheetId: string): void {
+  if (sparklineDates.picking.value) {
+    sparklineDates.selectPickerSheet(sheetId);
+    return;
+  }
   if (sheetGridRef.value?.flushPendingShapeTextEdit() === false) return;
   if (cellEditSession.state.composing) return;
   if (cellEditSession.state.active && cellEditSession.state.draft.startsWith("=")) {
@@ -1666,7 +1670,13 @@ const sparklineSettings = {
   flush: () => cellEditSession.finish(),
 };
 const sparklineDataOptions = useSparklineDataOptions(sparklineSettings);
-const sparklineDates = useSparklineDateAxis(sparklineSettings, () => activeSheet.value.name);
+const sparklineDates = useSparklineDateAxis({
+  ...sparklineSettings,
+  workbook: () => session.workbook,
+  sheet: () => activeSheet.value,
+  revision: () => workbookRevision.value,
+  selectSheet,
+});
 const sparklineAxisLimit = useSparklineAxisLimit(sparklineSettings);
 const { active: pickingSparklineRange, reference: pickedSparklineReference } = sparklineRangePicker;
 let sparklinePickerSequence = 0;
@@ -1677,7 +1687,8 @@ const selectSparklineReference = computed(() => {
   const currentOwner = () => (dates ? sparklineDates.dialog.value === dates : dialog?.isCurrent());
   return async (current: string): Promise<string | undefined> => {
     if (!currentOwner()) return undefined;
-    const selection = sparklineRangePicker.selectReference(current);
+    const select = () => sparklineRangePicker.selectReference(current);
+    const selection = dates ? sparklineDates.pick(select) : select();
     const picker = {
       id: ++sparklinePickerSequence,
       confirm: () => {
@@ -7319,7 +7330,7 @@ watch(
       :sheet-tabs-disabled="
         pickingTableRange ||
         (pickingChartRange && !chartSourceDialog) ||
-        pickingSparklineRange ||
+        (pickingSparklineRange && !sparklineDates.picking.value) ||
         pickingCameraRange ||
         pickingControlRange
       "

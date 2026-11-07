@@ -71,6 +71,7 @@ export type TextReferenceDrawingState = {
   sheetId: string;
   drawings: SheetDrawing[];
   dashboard?: import("./dashboard.js").SheetDashboard;
+  sparklineDates?: { key: string; range: import("./sparklines.js").SparklineDateRange | null }[];
 };
 /** Changed owners only; neither the workbook nor the callback's input aliases are mutated. */
 export function mapWorkbookTextReferences(
