@@ -41,7 +41,12 @@ export function createGroupCellSparklinesCommand(
     sheetId,
     entries.map(({ address, value }) => ({
       address,
-      sparkline: { ...first.value, groupId, source: value.source },
+      sparkline: {
+        ...first.value,
+        groupId,
+        source: value.source,
+        sourceSheetId: value.sourceSheetId,
+      },
     })),
   );
 }

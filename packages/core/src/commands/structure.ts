@@ -1777,7 +1777,7 @@ export function applyRestoreSheetStateCommand(
     : undefined;
   const referenceTransform = readTextReferenceTransform(command, sheet.id);
   const movement = referenceTransform?.transform.operation;
-  const dateMap =
+  const sparklineMap =
     movement?.type === "moveSheetAxis"
       ? (range: CellRange) =>
           transformRangeForAxisMove(
@@ -1795,7 +1795,7 @@ export function applyRestoreSheetStateCommand(
     referenceTransform
       ? {
           mapCell: referenceTransform.mapCell,
-          dateMap,
+          sparklineMap,
           direction: referenceTransform.transform.direction,
         }
       : undefined,

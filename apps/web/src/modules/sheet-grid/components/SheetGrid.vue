@@ -4324,7 +4324,6 @@ function restoreViewState(viewState?: SheetGridViewState): void {
   stopAxisMoveDrag();
   axisContextMenu.value = undefined;
   cellContextMenu.value = undefined;
-  clearPendingClipboard();
   cancelEdit(false);
   ensureGridExtentContains(nextViewState.selection.active);
   ensureGridExtentContains(nextViewState.selection.anchor);

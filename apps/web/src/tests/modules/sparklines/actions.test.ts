@@ -58,6 +58,43 @@ function fixture(range: CellRange = { start: { row: 0, column: 0 }, end: { row: 
 }
 
 describe("sparkline actions", () => {
+  test.each(["rows", "columns"] as const)(
+    "creates cross-sheet main data by %s on the normal destination sheet",
+    (direction) => {
+      const f = fixture();
+      const source = createSheet("External Data", "external");
+      insertSheet(f.session.workbook, source);
+      f.actions.open();
+      f.actions.confirm({
+        ...f.actions.draft.value!,
+        source: "'External Data'!$A1:C$2",
+        destination: direction === "rows" ? "E1:E2" : "E4:G4",
+      });
+      expect(f.execute).toHaveBeenCalledTimes(1);
+      expect(source.cells.size).toBe(0);
+      if (direction === "rows")
+        for (let row = 0; row < 2; row++)
+          expect(getCellSparkline(f.sheet, { row, column: 4 })).toMatchObject({
+            sourceSheetId: source.id,
+            source: {
+              start: { row, column: 0, columnAbsolute: true },
+              end: { row, column: 2, rowAbsolute: true },
+            },
+          });
+      else
+        for (let column = 0; column < 3; column++)
+          expect(getCellSparkline(f.sheet, { row: 3, column: 4 + column })).toMatchObject({
+            sourceSheetId: source.id,
+            source: {
+              start: { row: 0, column, columnAbsolute: true },
+              end: { row: 1, column, rowAbsolute: true },
+            },
+          });
+      undoWorkbookCommand(f.session);
+      expect(f.sheet.cells.size).toBe(0);
+    },
+  );
+
   test.each(["line", "column", "winLoss"] as const)(
     "creates the selected %s sparkline type",
     (type) => {
@@ -104,7 +141,7 @@ describe("sparkline actions", () => {
       const draft = f.actions.draft.value!;
       expect(f.actions.dialog.value?.editing).toBe(true);
       expect(draft.sparkline).toEqual({ ...existing, type });
-      expect(draft.source).toMatch(/!\$B\$4:\$D\$4$/);
+      expect(draft.source).toMatch(/!B4:D4$/);
       expect(draft.destination).toMatch(/!\$A\$1$/);
       expect(getCellSparkline(f.sheet, address)).toEqual(existing);
       expect(f.execute).not.toHaveBeenCalled();
@@ -138,7 +175,7 @@ describe("sparkline actions", () => {
     f.actions.open();
 
     expect(f.actions.draft.value?.sparkline).toEqual(existing);
-    expect(f.actions.draft.value?.source).toMatch(/!\$A\$5:\$C\$5$/);
+    expect(f.actions.draft.value?.source).toMatch(/!A5:C5$/);
     expect(f.actions.draft.value?.destination).toMatch(/!\$A\$1$/);
     expect(f.actions.dialog.value?.editing).toBe(true);
     expect(f.execute).not.toHaveBeenCalled();

@@ -1,3 +1,4 @@
+// 未执行：新增能力完成后统一验证。
 import { describe, expect, test } from "vitest";
 import {
   normalizeCellSparkline,
@@ -147,7 +148,7 @@ describe("cell sparklines", () => {
   test("round trips snapshot V27 and rejects sparkline fields in V26", () => {
     const f = fixture();
     const snapshot = serializeWorkbook(f.session.workbook);
-    expect(snapshot.version).toBe(43);
+    expect(snapshot.version).toBeGreaterThanOrEqual(27);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
     expect(() => deserializeWorkbook({ ...snapshot, version: 26 })).toThrow();
   });

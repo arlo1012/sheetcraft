@@ -1,7 +1,7 @@
 import {
   prepareExternalDrawingCollections,
   mapSheetDrawingDataReferences,
-  mapExternalSparklineDates,
+  mapExternalSparklineReferences,
   readExternalDrawingCollections,
   commitExternalDrawingCollections,
 } from "./text-references.js";
@@ -203,6 +203,7 @@ export function createDuplicateSheetCommand(
   const sheet = serializeSheet(source);
   for (const cell of sheet.cells) {
     if (cell.sparkline?.dateSheetId === sourceSheetId) delete cell.sparkline.dateSheetId;
+    if (cell.sparkline?.sourceSheetId === sourceSheetId) delete cell.sparkline.sourceSheetId;
   }
   if (sheet.drawings?.length)
     sheet.drawings = mapSheetDrawingTextReferences(sheet.drawings, (reference) => ({
@@ -395,12 +396,12 @@ export function applyAddSheetCommand(
   );
   for (const entry of externalDrawings.next) {
     if (
-      entry.sparklineDates?.some(
-        ({ key }) =>
-          workbook.sheets.get(entry.sheetId)!.cells.get(key)?.sparkline?.dateRange !== null,
+      entry.sparklineReferences?.some(
+        ({ key, field }) =>
+          workbook.sheets.get(entry.sheetId)!.cells.get(key)?.sparkline?.[field] !== null,
       )
     )
-      throw invalidCommandPayload("sparklineDates", entry.sheetId);
+      throw invalidCommandPayload("sparklineReferences", entry.sheetId);
     if (
       entry.dashboard &&
       JSON.stringify(
@@ -553,8 +554,12 @@ export function applyDeleteSheetCommand(
           () => null,
         );
       const changedBoard = board && JSON.stringify(board) !== JSON.stringify(owner.dashboard);
-      const sparklineDates = mapExternalSparklineDates(owner, command.sheetId, () => null);
-      return !sparklineDates.length &&
+      const sparklineReferences = mapExternalSparklineReferences(
+        owner,
+        command.sheetId,
+        () => null,
+      );
+      return !sparklineReferences.length &&
         JSON.stringify(drawings) === JSON.stringify(owner.drawings ?? []) &&
         !changedBoard
         ? []
@@ -562,7 +567,7 @@ export function applyDeleteSheetCommand(
             {
               sheetId: owner.id,
               drawings,
-              ...(sparklineDates.length ? { sparklineDates } : {}),
+              ...(sparklineReferences.length ? { sparklineReferences } : {}),
               ...(changedBoard ? { dashboard: board } : {}),
             },
           ];

@@ -12,7 +12,7 @@ import {
   restorePivotTables,
   transformPivotReferences,
 } from "../pivot-tables.js";
-import { cloneCellSparkline, translateCellSparkline, type CellSparkline } from "../sparklines.js";
+import { cloneCellSparkline, mapSparklineRanges, type CellSparkline } from "../sparklines.js";
 import { getCellSparkline, setCellSparkline } from "../workbook.js";
 import { getCellMatrixSize } from "../clipboard.js";
 import {
@@ -1016,17 +1016,18 @@ export function applyMoveCellRangeCommand(
     setCellNamedStyle(sheet, address, cell.style ?? null, cell.namedStyle ?? null);
     setCellHyperlink(sheet, address, cell.hyperlink ?? null);
     setCellNote(sheet, address, cell.note ?? null);
-    setCellSparkline(
-      sheet,
-      address,
-      translateCellSparkline(cell.sparkline, {
-        row: address.row - cell.address.row,
-        column: address.column - cell.address.column,
-      }),
-    );
+    setCellSparkline(sheet, address, cell.sparkline);
     affected.set(`${address.row}:${address.column}`, address);
   }
-  for (const [key, cell] of sheet.cells)
+  for (const [key, cell] of sheet.cells) {
+    if (cell.sparkline) {
+      const sparkline = mapSparklineRanges(
+        cell.sparkline,
+        (range) => mapChartSourceVectorCells(range, moveAddress),
+        sheet.id,
+      );
+      sheet.cells.set(key, { ...cell, sparkline });
+    }
     if (cell.content?.kind === "formula") {
       const next = transformFormulaForMove(
         cell.content.formula.source,
@@ -1035,10 +1036,11 @@ export function applyMoveCellRangeCommand(
       );
       if (next !== cell.content.formula.source)
         sheet.cells.set(key, {
-          ...cell,
+          ...sheet.cells.get(key)!,
           content: { kind: "formula", formula: { source: next } },
         });
     }
+  }
   const targets = new Map<string, { address: CellAddress; patch: CellBorderPatch }>();
   for (const address of affected.values())
     targets.set(getCellBorderTargetKey(address), {

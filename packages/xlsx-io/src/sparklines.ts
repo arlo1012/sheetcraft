@@ -1,10 +1,10 @@
 import { strFromU8, strToU8, type Unzipped } from "fflate/browser";
-import { parseFormulaReference } from "@sheetcraft/core/formula";
 import { getCellAddressLabel, parseCellAddress } from "@sheetcraft/core/coordinates";
 import {
   normalizeCellSparkline,
   readSparklineDateRange,
-  formatSparklineDateRange,
+  formatSparklineReference,
+  readSparklineReference,
   type CellSparkline,
   type SparklinePointKind,
   type SparklinePointStyle,
@@ -56,10 +56,14 @@ export function writeXlsxSparklines(entries: Unzipped, sheets: readonly Sheet[])
       const spark = normalizeCellSparkline(cell.sparkline)!;
       const [row, column] = key.split(":").map(Number);
       const cellLabel = getCellAddressLabel({ row: row!, column: column! });
-      const formula = spark.source
-        ? `'${sheet.name.replaceAll("'", "''")}'!${getCellAddressLabel(spark.source.start)}:${getCellAddressLabel(spark.source.end)}`
-        : "#REF!";
-      const { source: _source, groupId: _groupId, ...style } = spark;
+      const dataSheetName = spark.sourceSheetId
+        ? sheetNamesById.get(spark.sourceSheetId)
+        : sheet.name;
+      const formula =
+        spark.source && dataSheetName
+          ? formatSparklineReference(spark.source, dataSheetName)
+          : "#REF!";
+      const { source: _source, sourceSheetId: _sourceSheetId, groupId: _groupId, ...style } = spark;
       const groupKey = JSON.stringify([
         spark.groupId ? "group" : "cell",
         spark.groupId ?? key,
@@ -96,7 +100,7 @@ export function writeXlsxSparklines(entries: Unzipped, sheets: readonly Sheet[])
       const dates =
         spark.dateRange === undefined
           ? ""
-          : `<xm:f>${escape(spark.dateRange && (!spark.dateSheetId || sheetNamesById.has(spark.dateSheetId)) ? formatSparklineDateRange(spark.dateRange, (spark.dateSheetId && sheetNamesById.get(spark.dateSheetId)) || sheet.name) : "#REF!")}</xm:f>`;
+          : `<xm:f>${escape(spark.dateRange && (!spark.dateSheetId || sheetNamesById.has(spark.dateSheetId)) ? formatSparklineReference(spark.dateRange, (spark.dateSheetId && sheetNamesById.get(spark.dateSheetId)) || sheet.name) : "#REF!")}</xm:f>`;
       const negative = spark.negativePoints ?? (spark.type !== "line" || spark.markers);
       return `<x14:sparklineGroup type="${spark.type === "winLoss" ? "stacked" : spark.type}" ${dates ? 'dateAxis="1" ' : ""}displayEmptyCellsAs="${spark.empty === "connect" ? "span" : spark.empty}" markers="${Number(spark.markers)}" negative="${Number(negative)}" displayXAxis="${Number(spark.axis)}" displayHidden="${Number(spark.showHidden)}"${axisAttributes}${directionAttribute}${pointAttributes}>${colorElement("colorSeries", spark.color)}${colorElement("colorNegative", spark.negativeColor)}${colorElement("colorAxis", "#a3a3a3")}${colorElement("colorMarkers", spark.markerColor ?? spark.color)}${pointColors}${dates}<x14:sparklines>${members.join("")}</x14:sparklines></x14:sparklineGroup>`;
     });
@@ -117,6 +121,14 @@ export function readXlsxSparklines(
     if (!bytes) return result;
     const xml = strFromU8(bytes);
     let groupSequence = 0;
+    const currentSheetId = `xlsx-sheet-${index + 1}`;
+    const referenceOptions = {
+      currentSheetId,
+      resolveSheetId: (name: string) => {
+        const target = sheetNames.findIndex((s) => s.toLowerCase() === name.toLowerCase());
+        return target < 0 ? undefined : `xlsx-sheet-${target + 1}`;
+      },
+    };
     for (const group of xml.matchAll(
       /<(?:\w+:)?sparklineGroup\b([^>]*)>([\s\S]*?)<\/(?:\w+:)?sparklineGroup>/g,
     )) {
@@ -141,19 +153,11 @@ export function readXlsxSparklines(
           if (!parseCellAddress(reference)) throw new Error("Invalid target.");
           const formula = decode(/<(?:\w+:)?f>([^<]*)<\//.exec(item[1]!)?.[1] ?? "");
           const parsed =
-            formula === "#REF!"
-              ? undefined
-              : parseFormulaReference(formula, {
-                  currentSheetId: String(index),
-                  resolveSheetId: (name) => {
-                    const found = sheetNames.findIndex(
-                      (sheetName) => sheetName.toLowerCase() === name.toLowerCase(),
-                    );
-                    return found < 0 ? undefined : String(found);
-                  },
-                });
-          if (formula !== "#REF!" && (!parsed || parsed.target.sheetId !== String(index)))
-            throw new Error("External source.");
+            formula && formula !== "#REF!"
+              ? readSparklineReference(formula, referenceOptions)
+              : undefined;
+          if (formula && formula !== "#REF!" && !parsed)
+            throw new Error("Invalid sparkline source.");
           const type = attr(attributes, "type") ?? "line";
           const empty = attr(attributes, "displayEmptyCellsAs") ?? "zero";
           const flag = (name: string) => ["1", "true"].includes(attr(attributes, name) ?? "0");
@@ -162,17 +166,7 @@ export function readXlsxSparklines(
             const groupSettings = body.slice(0, body.search(/<(?:\w+:)?sparklines\b/));
             const ref = decode(/<(?:\w+:)?f>([^<]*)<\//.exec(groupSettings)?.[1] ?? "");
             dateAxis =
-              ref === "#REF!"
-                ? { dateRange: null }
-                : readSparklineDateRange(ref, {
-                    currentSheetId: `xlsx-sheet-${index + 1}`,
-                    resolveSheetId: (name) => {
-                      const target = sheetNames.findIndex(
-                        (s) => s.toLowerCase() === name.toLowerCase(),
-                      );
-                      return target < 0 ? undefined : `xlsx-sheet-${target + 1}`;
-                    },
-                  });
+              ref === "#REF!" ? { dateRange: null } : readSparklineDateRange(ref, referenceOptions);
             if (!dateAxis) throw new Error("Unsupported sparkline date range.");
           }
           const points: Partial<Record<SparklinePointKind, SparklinePointStyle>> = {};
@@ -200,7 +194,8 @@ export function readXlsxSparklines(
           const sparkline = normalizeCellSparkline({
             ...(items.length > 1 ? { groupId } : {}),
             type: type === "stacked" ? "winLoss" : (type as CellSparkline["type"]),
-            source: parsed?.target.range ?? null,
+            source: parsed?.range ?? null,
+            sourceSheetId: parsed && parsed.sheetId !== currentSheetId ? parsed.sheetId : undefined,
             ...dateAxis,
             color: color("colorSeries", "#2563eb"),
             negativeColor: color("colorNegative", "#ef4444"),

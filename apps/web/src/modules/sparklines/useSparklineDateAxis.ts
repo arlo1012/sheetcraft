@@ -1,6 +1,6 @@
 import { onScopeDispose, ref, shallowRef, watch } from "vue";
 import type { Sheet, Workbook } from "@sheetcraft/core/workbook";
-import { formatSparklineDateRange, readSparklineDateRange } from "@sheetcraft/core/sparklines";
+import { formatSparklineReference, readSparklineDateRange } from "@sheetcraft/core/sparklines";
 import type { SparklineDialogOptions } from "./useSparklineSettingsDialog";
 
 export function useSparklineDateAxis(
@@ -55,7 +55,7 @@ export function useSparklineDateAxis(
     if (!context.mixed.includes("dateRange") && !context.mixed.includes("dateSheetId")) {
       if (axis.dateRange === null) initial = "#REF!";
       else if (source && axis.dateRange)
-        initial = "=" + formatSparklineDateRange(axis.dateRange, source.name);
+        initial = "=" + formatSparklineReference(axis.dateRange, source.name);
     }
     const draft: Draft = {
       key: `${context.key}:${++sequence}`,

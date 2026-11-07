@@ -373,6 +373,7 @@ export type WorkbookSnapshotV107 = Omit<WorkbookSnapshotV106, "version"> & { ver
 export type WorkbookSnapshotV108 = Omit<WorkbookSnapshotV107, "version"> & { version: 108 };
 export type WorkbookSnapshotV109 = Omit<WorkbookSnapshotV108, "version"> & { version: 109 };
 export type WorkbookSnapshotV110 = Omit<WorkbookSnapshotV109, "version"> & { version: 110 };
+export type WorkbookSnapshotV111 = Omit<WorkbookSnapshotV110, "version"> & { version: 111 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -441,7 +442,8 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV107
   | WorkbookSnapshotV108
   | WorkbookSnapshotV109
-  | WorkbookSnapshotV110;
+  | WorkbookSnapshotV110
+  | WorkbookSnapshotV111;
 type WorkbookWritePayload = Omit<WorkbookSnapshotV98, "version"> & {
   version: WorkbookSnapshot["version"];
 };
@@ -573,7 +575,8 @@ type SnapshotVersion =
   | 107
   | 108
   | 109
-  | 110;
+  | 110
+  | 111;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -675,6 +678,16 @@ function hasCatalogIcons(drawings: unknown): boolean {
 }
 function hasExternalSparklineDates(value: unknown): boolean {
   return !!value && typeof value === "object" && Object.hasOwn(value, "dateSheetId");
+}
+function hasSparklineDataReference(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  if (Object.hasOwn(value, "sourceSheetId")) return true;
+  const range = (value as CellSparkline).source;
+  return [range?.start, range?.end].some(
+    (address) =>
+      address &&
+      (Object.hasOwn(address, "rowAbsolute") || Object.hasOwn(address, "columnAbsolute")),
+  );
 }
 function hasSparklineDates(value: unknown): boolean {
   return value !== null && typeof value === "object" && Object.hasOwn(value, "dateRange");
@@ -1719,6 +1732,11 @@ function parseCell(value: unknown, path: string, version: SnapshotVersion): Cell
   if (version < 27 && Object.hasOwn(record, "sparkline"))
     return fail(path, "Sparklines require snapshot version 27.");
   const hasSparkline = version >= 27 && Object.hasOwn(record, "sparkline");
+  if (hasSparkline && version < 111 && hasSparklineDataReference(record.sparkline))
+    return fail(
+      path + ".sparkline",
+      "Sparkline data sheet and anchor flags require snapshot version 111.",
+    );
   if (hasSparkline && version < 101 && hasExternalSparklineDates(record.sparkline))
     return fail(`${path}.sparkline`, "External sparkline dates require snapshot version 101.");
   if (hasSparkline && version < 100 && hasSparklineDates(record.sparkline))
@@ -2946,6 +2964,11 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasLocalControlValue(record.drawings)) version = 108;
     if (hasRadioOrdering(record.drawings)) version = 109;
     if (hasCrossSheetControls(record.drawings)) version = 110;
+    if (
+      Array.isArray(record.cells) &&
+      record.cells.some((cell) => hasSparklineDataReference(asRecord(cell, path).sparkline))
+    )
+      version = 111;
   }
   if (version < 110 && hasCrossSheetControls(record.drawings))
     return fail(path + ".drawings", "Cross-sheet form controls require snapshot version 110.");
@@ -3457,6 +3480,8 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   if (sheets.some((sheet) => hasLocalControlValue(sheet.drawings))) snapshot.version = 108;
   if (sheets.some((sheet) => hasRadioOrdering(sheet.drawings))) snapshot.version = 109;
   if (sheets.some((sheet) => hasCrossSheetControls(sheet.drawings))) snapshot.version = 110;
+  if (sheets.some((sheet) => sheet.cells.some((cell) => hasSparklineDataReference(cell.sparkline))))
+    snapshot.version = 111;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -3574,7 +3599,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 107 &&
     record.version !== 108 &&
     record.version !== 109 &&
-    record.version !== 110
+    record.version !== 110 &&
+    record.version !== 111
   ) {
     throw new WorkbookDomainError(
       {
@@ -3640,6 +3666,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
   for (const sheet of sheets) {
     for (const cell of sheet.cells.values()) {
       const spark = cell.sparkline;
+      if (spark?.source && spark.sourceSheetId && !sheetIds.has(spark.sourceSheetId))
+        return fail("$.sheets", "Missing sparkline data source worksheet.");
       if (spark?.dateRange && spark.dateSheetId && !sheetIds.has(spark.dateSheetId))
         return fail("$.sheets", "Missing sparkline date source worksheet.");
     }

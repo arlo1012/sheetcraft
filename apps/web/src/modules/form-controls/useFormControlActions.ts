@@ -1,4 +1,4 @@
-import { nextTick, ref, shallowRef } from "vue";
+import { ref } from "vue";
 import { canEditCell } from "@sheetcraft/core";
 import { canEditShapeObject } from "@sheetcraft/core/shape-protection";
 import {
@@ -25,6 +25,7 @@ import { getCellContent } from "@sheetcraft/core/workbook";
 import { useDrawingDialogTarget } from "../../shared/drawing-dialog/useDrawingDialogTarget";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { resolveRangeReference } from "../../shared/range-reference/formatRangeReference";
+import { useReferencePickerOwner } from "../../shared/range-reference/useReferencePickerOwner";
 export function useFormControlActions(options: {
   getWorkbook: () => Workbook;
   getSheet: () => Sheet;
@@ -41,7 +42,7 @@ export function useFormControlActions(options: {
 }) {
   const error = ref(false);
   const idFactory = createBrowserIdFactory();
-  const pickerOwner = shallowRef<Sheet>();
+  const { owner: pickerOwner, pick } = useReferencePickerOwner(options.selectSheet);
   const targets = useDrawingDialogTarget<SheetControlDrawing, [linked: string, source: string]>({
     ...options,
     getSheet: () => pickerOwner.value ?? options.getSheet(),
@@ -52,27 +53,16 @@ export function useFormControlActions(options: {
   const { dialog, editing, close } = targets;
   async function pickReference(select: () => Promise<string | undefined>) {
     const target = dialog.value;
-    if (!target || pickerOwner.value) return;
-    pickerOwner.value = target.sheet;
-    try {
-      const result = await select();
-      return dialog.value === target ? result : undefined;
-    } finally {
-      try {
-        if (
-          dialog.value === target &&
-          target.workbook === options.getWorkbook() &&
-          target.workbook.sheets.get(target.sheet.id) === target.sheet
-        ) {
-          options.selectSheet?.(target.sheet.id);
-          await nextTick();
-          if (target.existing && dialog.value === target)
-            options.selectDrawing?.(target.initial.id);
-        }
-      } finally {
-        pickerOwner.value = undefined;
-      }
-    }
+    if (!target) return;
+    return pick(
+      target.sheet,
+      () =>
+        dialog.value === target &&
+        target.workbook === options.getWorkbook() &&
+        target.workbook.sheets.get(target.sheet.id) === target.sheet,
+      select,
+      target.existing ? () => options.selectDrawing?.(target.initial.id) : undefined,
+    );
   }
   function open(drawing?: SheetControlDrawing, type: FormControlType = "checkbox") {
     if (pickerOwner.value) return;

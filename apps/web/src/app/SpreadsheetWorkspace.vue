@@ -1248,6 +1248,11 @@ function clearConditionalFormatRules(scope: "selection" | "sheet"): void {
 }
 
 function onSelectSheet(sheetId: string): void {
+  if (sparklineActions.pickerOwner.value) {
+    const target = sparklineDialog.value?.workbook.sheets.get(sheetId);
+    if (target && !target.dashboard && !target.properties.hidden) selectSheet(sheetId);
+    return;
+  }
   if (pickingControlRange.value) {
     const target = controlDialog.value?.workbook.sheets.get(sheetId);
     if (target && !target.dashboard && !target.properties.hidden) selectSheet(sheetId);
@@ -1655,6 +1660,7 @@ const sparklineActions = useSparklineActions({
   flush: () => cellEditSession.finish(),
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
   execute: executeCommand,
+  selectSheet,
 });
 const {
   dialog: sparklineDialog,
@@ -1698,7 +1704,7 @@ const selectSparklineReference = computed(() => {
   return async (current: string): Promise<string | undefined> => {
     if (!currentOwner()) return undefined;
     const select = () => sparklineRangePicker.selectReference(current);
-    const selection = dates ? sparklineDates.pick(select) : select();
+    const selection = dates ? sparklineDates.pick(select) : sparklineActions.pickReference(select);
     const picker = {
       id: ++sparklinePickerSequence,
       confirm: () => {
@@ -7347,7 +7353,9 @@ watch(
       :sheet-tabs-disabled="
         pickingTableRange ||
         (pickingChartRange && !chartSourceDialog) ||
-        (pickingSparklineRange && !sparklineDates.picking.value) ||
+        (pickingSparklineRange &&
+          !sparklineDates.picking.value &&
+          !sparklineActions.pickerOwner.value) ||
         pickingCameraRange
       "
       :view-mode="activeViewMode"

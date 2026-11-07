@@ -12,6 +12,8 @@ import {
 } from "@sheetcraft/core/commands";
 import {
   normalizeCellSparkline,
+  readSparklineReference,
+  formatSparklineReference,
   getSheetSparklines,
   type CellSparkline,
 } from "@sheetcraft/core/sparklines";
@@ -27,6 +29,7 @@ import {
   resolveRangeReference,
 } from "../../shared/range-reference/formatRangeReference";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
+import { useReferencePickerOwner } from "../../shared/range-reference/useReferencePickerOwner";
 export type SparklineDraft = { source: string; destination: string; sparkline: CellSparkline };
 function hasSelectedContent(sheet: Sheet, range: CellRange): boolean {
   // Inspect stored cells so whole-row/column selections do not scan empty coordinates.
@@ -67,11 +70,14 @@ export function useSparklineActions(options: {
   flush: () => boolean;
   isBusy: () => boolean;
   execute: (command: WorkbookCommand) => boolean;
+  selectSheet?: (id: string) => void;
 }) {
   const idFactory = createBrowserIdFactory();
   const dialog = shallowRef<SparklineDialogTarget>();
   const draft = computed(() => dialog.value?.initial);
   const error = ref(false);
+  const picker = useReferencePickerOwner(options.selectSheet);
+  const owner = () => picker.owner.value ?? options.getSheet();
   const errorKind = ref<"invalid" | "failed">("invalid");
   const failed = computed(() => error.value && errorKind.value === "failed");
   let dialogSequence = 0;
@@ -80,18 +86,18 @@ export function useSparklineActions(options: {
       dialog.value === target &&
       target.workbook === options.getWorkbook() &&
       target.generation === options.getGeneration() &&
-      target.sheet === options.getSheet() &&
+      target.sheet === owner() &&
       target.workbook.sheets.get(target.sheet.id) === target.sheet
     );
   }
-  watch([options.getWorkbook, options.getSheet, options.getGeneration], () => close(), {
+  watch([options.getWorkbook, owner, options.getGeneration], () => close(), {
     flush: "sync",
   });
   function allowed() {
     return !options.isBusy() && canUseSheetPermission(options.getSheet(), "formatCells");
   }
   function open(type?: CellSparkline["type"], address?: CellAddress) {
-    if (!allowed() || !options.flush()) return;
+    if (picker.owner.value || !allowed() || !options.flush()) return;
     const sheet = options.getSheet();
     if (!canUseSheetPermission(sheet, "formatCells")) return;
     const range = address ? { start: address, end: address } : options.getRange();
@@ -101,10 +107,16 @@ export function useSparklineActions(options: {
     error.value = false;
     const initial: SparklineDraft = {
       source: existing?.source
-        ? formatRangeReference(sheet.name, existing.source)
-        : useSelectionAsSource
-          ? formatRangeReference(sheet.name, range)
-          : "",
+        ? "=" +
+          formatSparklineReference(
+            existing.source,
+            options.getWorkbook().sheets.get(existing.sourceSheetId ?? sheet.id)!.name,
+          )
+        : existing
+          ? "#REF!"
+          : useSelectionAsSource
+            ? formatRangeReference(sheet.name, range)
+            : "",
       destination: useSelectionAsSource ? "" : formatRangeReference(sheet.name, destination),
       sparkline: existing
         ? normalizeCellSparkline(existing)!
@@ -135,16 +147,26 @@ export function useSparklineActions(options: {
     dialog.value = target;
   }
   function confirm(value: SparklineDraft, target = dialog.value) {
-    if (!target || !isCurrent(target) || !allowed()) return;
-    const sheet = target.sheet;
+    if (!target || picker.owner.value || !isCurrent(target) || !allowed()) return;
     errorKind.value = "invalid";
-    const source = resolveRangeReference(target.workbook, value.source, sheet.id);
-    const destination = resolveRangeReference(target.workbook, value.destination, sheet.id);
+    const source =
+      readSparklineReference(value.source, {
+        currentSheetId: target.sheet.id,
+        resolveSheetId: (name) =>
+          [...target.workbook.sheets.values()].find(
+            (s) => s.name.toLowerCase() === name.toLowerCase(),
+          )?.id,
+      }) ?? resolveRangeReference(target.workbook, value.source, target.sheet.id);
+    const destination = resolveRangeReference(target.workbook, value.destination, target.sheet.id);
+    const sheet = destination && target.workbook.sheets.get(destination.sheetId);
     if (
       !source ||
       !destination ||
-      source.sheetId !== sheet.id ||
-      destination.sheetId !== sheet.id ||
+      !sheet ||
+      sheet.dashboard ||
+      target.workbook.sheets.get(source.sheetId)?.dashboard ||
+      (target.editing && sheet !== target.sheet) ||
+      !canUseSheetPermission(sheet, "formatCells") ||
       !canEditRange(sheet, destination.range) ||
       sheet.mergedCells.some((merge) => doMergedCellRangesIntersect(merge, destination.range))
     ) {
@@ -157,6 +179,8 @@ export function useSparklineActions(options: {
       targetColumns = destination.range.end.column - destination.range.start.column + 1;
     if (
       rows * columns > 10000 ||
+      rows < 1 ||
+      columns < 1 ||
       targetRows * targetColumns > 10000 ||
       !(
         (targetColumns === 1 && targetRows === rows) ||
@@ -180,22 +204,26 @@ export function useSparklineActions(options: {
             ? source.range
             : targetColumns === 1
               ? {
-                  start: { row: source.range.start.row + row, column: source.range.start.column },
-                  end: { row: source.range.start.row + row, column: source.range.end.column },
+                  start: { ...source.range.start, row: source.range.start.row + row },
+                  end: { ...source.range.end, row: source.range.start.row + row },
                 }
               : {
                   start: {
-                    row: source.range.start.row,
+                    ...source.range.start,
                     column: source.range.start.column + column,
                   },
-                  end: { row: source.range.end.row, column: source.range.start.column + column },
+                  end: { ...source.range.end, column: source.range.start.column + column },
                 };
           changes.push({
             address: {
               row: destination.range.start.row + row,
               column: destination.range.start.column + column,
             },
-            sparkline: normalizeCellSparkline({ ...definition, source: range })!,
+            sparkline: normalizeCellSparkline({
+              ...definition,
+              source: range,
+              sourceSheetId: source.sheetId === sheet.id ? undefined : source.sheetId,
+            })!,
           });
         }
       if (target.editing && groupId) {
@@ -213,7 +241,11 @@ export function useSparklineActions(options: {
           }
           changes.push({
             address: entry.address,
-            sparkline: normalizeCellSparkline({ ...definition, source: entry.value.source })!,
+            sparkline: normalizeCellSparkline({
+              ...definition,
+              source: entry.value.source,
+              sourceSheetId: entry.value.sourceSheetId,
+            })!,
           });
         }
       }
@@ -233,6 +265,7 @@ export function useSparklineActions(options: {
         return;
       }
       close(target);
+      if (sheet !== target.sheet) options.selectSheet?.(sheet.id);
     } catch {
       if (isCurrent(target)) {
         errorKind.value = "failed";
@@ -254,5 +287,22 @@ export function useSparklineActions(options: {
     error.value = false;
   }
   onScopeDispose(() => close(), true);
-  return { dialog, draft, error, failed, open, confirm, remove, close };
+  function pickReference(select: () => Promise<string | undefined>) {
+    const target = dialog.value;
+    return target
+      ? picker.pick(target.sheet, target.isCurrent, select)
+      : Promise.resolve(undefined);
+  }
+  return {
+    dialog,
+    draft,
+    error,
+    failed,
+    open,
+    confirm,
+    remove,
+    close,
+    pickReference,
+    pickerOwner: picker.owner,
+  };
 }

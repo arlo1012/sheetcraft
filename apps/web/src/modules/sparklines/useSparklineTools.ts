@@ -25,7 +25,7 @@ import {
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 
 export type SparklineStylePatch = Partial<
-  Omit<CellSparkline, "source" | "groupId" | SparklinePointKind>
+  Omit<CellSparkline, "source" | "sourceSheetId" | "groupId" | SparklinePointKind>
 > &
   Partial<Record<SparklinePointKind, Partial<SparklinePointStyle>>>;
 export type SparklineToolContext = {

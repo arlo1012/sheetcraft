@@ -597,7 +597,7 @@ export function useGridClipboard(options: {
     const pending = pendingClipboard.value;
     const isMatchingLocalClipboard = Boolean(
       pending &&
-      pending.sheetId === options.getSheet().id &&
+      (pending.mode === "copy" || pending.sheetId === options.getSheet().id) &&
       localToken &&
       localToken === pending.token,
     );
@@ -923,8 +923,7 @@ export function useGridClipboard(options: {
       const pending = pendingClipboard.value;
       if (
         pending &&
-        pending.sheetId === sheetId &&
-        (pending.mode === "copy" || pending.revision === revision)
+        (pending.mode === "copy" || (pending.sheetId === sheetId && pending.revision === revision))
       ) {
         pasteTransfer({ text: pending.text, localToken: pending.token }, selection, kind);
       } else if (!options.onReadUnavailable?.(selection)) {
@@ -957,18 +956,23 @@ export function useGridClipboard(options: {
 
   watch(
     () => options.getSheet().id,
-    () => clearPendingClipboard(),
+    () => {
+      clipboardOperation++;
+      if (pendingClipboard.value?.mode === "cut") pendingClipboard.value = null;
+    },
   );
 
   return {
-    hasPendingClipboard: computed(() => pendingClipboard.value?.sheetId === options.getSheet().id),
+    hasPendingClipboard: computed(() =>
+      Boolean(
+        pendingClipboard.value &&
+        (pendingClipboard.value.mode === "copy" ||
+          pendingClipboard.value.sheetId === options.getSheet().id),
+      ),
+    ),
     canPasteFormats: computed(() => {
       const pending = pendingClipboard.value;
-      return Boolean(
-        pending?.sheetId === options.getSheet().id &&
-        pending.mode === "copy" &&
-        pending.localTokenWritten,
-      );
+      return Boolean(pending?.mode === "copy" && pending.localTokenWritten);
     }),
     clipboardMode,
     clipboardRange,

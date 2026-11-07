@@ -20,12 +20,13 @@ export type SparklineAxisLimit =
   | { type: "individual" | "group" }
   | { type: "custom"; value: number };
 export type SparklineScale = { min: number; max: number };
-type DateAddress = CellAddress & { rowAbsolute?: boolean; columnAbsolute?: boolean };
-export type SparklineDateRange = { start: DateAddress; end: DateAddress };
-export function readSparklineDateRange(
+type SparklineAddress = CellAddress & { rowAbsolute?: boolean; columnAbsolute?: boolean };
+export type SparklineReferenceRange = { start: SparklineAddress; end: SparklineAddress };
+export type SparklineDateRange = SparklineReferenceRange;
+export function readSparklineReference(
   text: string,
   options: ParseFormulaReferenceOptions,
-): Pick<CellSparkline, "dateSheetId" | "dateRange"> | undefined {
+): { sheetId: string; range: SparklineReferenceRange } | undefined {
   const ref = parseFormulaReference(text.trim().replace(/^=/, ""), options);
   if (!ref) return;
   const { startReference: start, endReference } = ref.source;
@@ -35,18 +36,31 @@ export function readSparklineDateRange(
     ...(ref.rowAbsolute ? { rowAbsolute: true } : {}),
     ...(ref.columnAbsolute ? { columnAbsolute: true } : {}),
   });
-  const range = { start: address(start), end: address(endReference ?? start) };
+  return {
+    sheetId: ref.target.sheetId,
+    range: { start: address(start), end: address(endReference ?? start) },
+  };
+}
+export function readSparklineDateRange(
+  text: string,
+  options: ParseFormulaReferenceOptions,
+): Pick<CellSparkline, "dateSheetId" | "dateRange"> | undefined {
+  const ref = readSparklineReference(text, options);
+  if (!ref) return;
   try {
     return {
-      dateRange: cloneSparklineRange(range),
-      dateSheetId: ref.target.sheetId === options.currentSheetId ? undefined : ref.target.sheetId,
+      dateRange: cloneSparklineRange(ref.range),
+      dateSheetId: ref.sheetId === options.currentSheetId ? undefined : ref.sheetId,
     };
   } catch {
     return;
   }
 }
-export function formatSparklineDateRange(range: SparklineDateRange, sheetName: string): string {
-  const address = (p: DateAddress) =>
+export function formatSparklineReference(
+  range: SparklineReferenceRange,
+  sheetName: string,
+): string {
+  const address = (p: SparklineAddress) =>
     getCellAddressLabel(p).replace(
       /^([A-Z]+)([0-9]+)$/,
       (_match, col: string, row: string) =>
@@ -60,7 +74,8 @@ export type CellSparkline = {
   /** Group identities are scoped to the owning worksheet. */
   groupId?: string;
   type: "line" | "column" | "winLoss";
-  source: CellRange | null;
+  source: SparklineReferenceRange | null;
+  sourceSheetId?: string;
   /** Set for a date axis referencing another worksheet in this workbook. */
   dateSheetId?: string;
   /** Null represents a broken date reference. */
@@ -81,7 +96,9 @@ export type CellSparkline = {
   negativePoints?: boolean;
   markerColor?: string;
 };
-export function cloneSparklineRange(source: CellRange | null): CellRange | null {
+export function cloneSparklineRange(
+  source: SparklineReferenceRange | null,
+): SparklineReferenceRange | null {
   if (
     source !== null &&
     (!source ||
@@ -89,6 +106,11 @@ export function cloneSparklineRange(source: CellRange | null): CellRange | null 
       !source.end ||
       [source.start.row, source.start.column, source.end.row, source.end.column].some(
         (index) => !Number.isInteger(index) || index < 0,
+      ) ||
+      [source.start, source.end].some((p) =>
+        [p.rowAbsolute, p.columnAbsolute].some(
+          (flag) => flag !== undefined && typeof flag !== "boolean",
+        ),
       ) ||
       source.end.row >= MAX_SHEET_ROWS ||
       source.end.column >= MAX_SHEET_COLUMNS ||
@@ -162,12 +184,18 @@ export function normalizeCellSparkline(
   )
     throw new RangeError("Invalid sparkline date sheet.");
   const source = cloneSparklineRange(value.source);
+  if (
+    value.sourceSheetId !== undefined &&
+    (typeof value.sourceSheetId !== "string" || !value.sourceSheetId.trim())
+  )
+    throw new RangeError("Invalid sparkline data sheet.");
   const dateRange =
     value.dateRange === undefined ? undefined : cloneSparklineRange(value.dateRange);
   return {
     ...(value.groupId !== undefined ? { groupId: value.groupId } : {}),
     type: value.type,
     source,
+    ...(value.sourceSheetId ? { sourceSheetId: value.sourceSheetId } : {}),
     ...(dateRange !== undefined
       ? { dateRange, ...(value.dateSheetId ? { dateSheetId: value.dateSheetId } : {}) }
       : {}),
@@ -255,13 +283,21 @@ export function expandSparklineGroups(
       (value.groupId && groups.has(value.groupId)),
   );
 }
-export function mapSparklineDates(
+export function mapSparklineReferenceRange(
   dates: SparklineDateRange | null,
   map: (range: CellRange) => CellRange | null,
 ): SparklineDateRange | null {
   if (!dates) return null;
   const next = map(dates);
-  return next && { start: { ...dates.start, ...next.start }, end: { ...dates.end, ...next.end } };
+  if (!next) return null;
+  try {
+    return cloneSparklineRange({
+      start: { ...dates.start, ...next.start },
+      end: { ...dates.end, ...next.end },
+    });
+  } catch {
+    return null;
+  }
 }
 export function mapSparklineRanges(
   value: CellSparkline,
@@ -270,9 +306,12 @@ export function mapSparklineRanges(
 ): CellSparkline {
   return {
     ...value,
-    source: value.source && map(value.source),
+    source:
+      !value.sourceSheetId || value.sourceSheetId === ownerSheetId
+        ? mapSparklineReferenceRange(value.source, map)
+        : value.source,
     ...(value.dateRange !== undefined && (!value.dateSheetId || value.dateSheetId === ownerSheetId)
-      ? { dateRange: mapSparklineDates(value.dateRange, map) }
+      ? { dateRange: mapSparklineReferenceRange(value.dateRange, map) }
       : {}),
   };
 }
@@ -282,38 +321,26 @@ export function translateCellSparkline(
 ): CellSparkline | undefined {
   const sparkline = cloneCellSparkline(value);
   if (!sparkline) return;
-  const shift = (range: CellRange) => {
-    const start = { row: range.start.row + delta.row, column: range.start.column + delta.column };
-    const end = { row: range.end.row + delta.row, column: range.end.column + delta.column };
-    return start.row < 0 ||
-      start.column < 0 ||
-      end.row >= MAX_SHEET_ROWS ||
-      end.column >= MAX_SHEET_COLUMNS
-      ? null
-      : { start, end };
-  };
-  const dateRange = sparkline.dateRange;
-  const shiftDate = (p: DateAddress) => ({
+  const shiftAddress = (p: SparklineAddress) => ({
     ...p,
     row: p.row + (p.rowAbsolute ? 0 : delta.row),
     column: p.column + (p.columnAbsolute ? 0 : delta.column),
   });
-  const shiftedDates = dateRange && {
-    start: shiftDate(dateRange.start),
-    end: shiftDate(dateRange.end),
-  };
-  let translated = shiftedDates;
-  if (shiftedDates) {
+  const translate = (range: SparklineReferenceRange | null) => {
+    if (!range) return null;
     try {
-      cloneSparklineRange(shiftedDates);
+      return cloneSparklineRange({
+        start: shiftAddress(range.start),
+        end: shiftAddress(range.end),
+      });
     } catch {
-      translated = null;
+      return null;
     }
-  }
+  };
   return {
     ...sparkline,
-    source: sparkline.source && shift(sparkline.source),
-    ...(dateRange !== undefined ? { dateRange: translated } : {}),
+    source: translate(sparkline.source),
+    ...(sparkline.dateRange !== undefined ? { dateRange: translate(sparkline.dateRange) } : {}),
   };
 }
 export function getSparklineValues(
@@ -394,7 +421,7 @@ export function createSparklineValueResolver(sheet: Sheet, evaluator: SheetEvalu
   const series = createSparklineSeriesResolver(sheet, evaluator);
   return (sparkline: CellSparkline) => series(sparkline).values;
 }
-export function createSparklineSeriesResolver(sheet: Sheet, evaluator: SheetEvaluator) {
+function sparklineHiddenCells(sheet: Sheet, evaluator: SheetEvaluator) {
   let hiddenRows: HiddenAxisInterval[] | undefined;
   let hiddenColumns: HiddenAxisInterval[] | undefined;
   let filteredRows: HiddenAxisInterval[] | undefined;
@@ -410,7 +437,7 @@ export function createSparklineSeriesResolver(sheet: Sheet, evaluator: SheetEval
     }
     return false;
   }
-  function isHidden(row: number, column: number): boolean {
+  return (row: number, column: number): boolean => {
     filteredRows ??= createSheetFilterHiddenRowIntervals(sheet, evaluator);
     hiddenRows ??= getOutlineHiddenIntervals(sheet.outlineGroups ?? [], "row");
     hiddenColumns ??= getOutlineHiddenIntervals(sheet.outlineGroups ?? [], "column");
@@ -421,10 +448,32 @@ export function createSparklineSeriesResolver(sheet: Sheet, evaluator: SheetEval
       contains(hiddenRows, row) ||
       contains(hiddenColumns, column)
     );
+  };
+}
+export function createSparklineSeriesResolver(sheet: Sheet, evaluator: SheetEvaluator) {
+  const sources = new Map<
+    string,
+    { evaluator: SheetEvaluator; isHidden: (row: number, column: number) => boolean }
+  >();
+  function dataSource(id: string) {
+    let source = sources.get(id);
+    if (!source) {
+      const data = id === sheet.id ? evaluator : evaluator.forSheet?.(id);
+      const owner = id === sheet.id ? sheet : data?.sheet;
+      if (!data) return;
+      source = {
+        evaluator: data,
+        isHidden: owner ? sparklineHiddenCells(owner, data) : () => false,
+      };
+      sources.set(id, source);
+    }
+    return source;
   }
   return (value: CellSparkline): { values: Array<number | null>; dates?: number[] } => {
     const sparkline = normalizeCellSparkline(value)!;
     if (!sparkline.source || sparkline.dateRange === null) return { values: [] };
+    const source = dataSource(sparkline.sourceSheetId ?? sheet.id);
+    if (!source) return { values: [] };
     const dates = sparkline.dateRange;
     const dateEvaluator =
       dates && sparkline.dateSheetId && sparkline.dateSheetId !== sheet.id
@@ -437,8 +486,8 @@ export function createSparklineSeriesResolver(sheet: Sheet, evaluator: SheetEval
     for (let row = start.row; row <= end.row; row++)
       for (let column = start.column; column <= end.column; column++) {
         const index = ordinal++;
-        if (!sparkline.showHidden && isHidden(row, column)) continue;
-        const value = evaluator.getComputedValue({ row, column });
+        if (!sparkline.showHidden && source.isHidden(row, column)) continue;
+        const value = source.evaluator.getComputedValue({ row, column });
         const numeric =
           typeof value === "number" && Number.isFinite(value)
             ? value
