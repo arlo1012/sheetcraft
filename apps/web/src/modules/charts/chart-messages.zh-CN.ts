@@ -96,6 +96,8 @@ export const chartsZhCN = {
   "chart.pie.pieOfPie": "复合饼图",
   "chart.pie.barOfPie": "复合条饼图",
   "chart.pie.doughnut": "圆环图",
+  "chart.pie.moreStyles": "请到更多查询",
+  "chart.pie.sampleCategory": "类别{index}",
   "chart.pie.card": "{family}，样式 {index}",
   "chart.xy.family.marker": "仅标记",
   "chart.xy.family.smooth": "平滑线",

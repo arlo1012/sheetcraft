@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import { computed, ref, useId } from "vue";
+import { defineAsyncComponent, computed, ref, useId } from "vue";
 import { ChartPie, ChevronRight } from "lucide-vue-next";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { DEFAULT_WORKBOOK_THEME } from "@sheetcraft/core/workbook-theme";
 import { pieFamilies, type PieFamily } from "@sheetcraft/core/chart-presentation";
 import type { ChartInsertIntent } from "../chart-design-intents";
-import { pieCardColors, pieCards } from "../chart-pie-cards";
+import { pieCardsByFamily } from "../chart-pie-cards";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import RibbonSplitButton from "../../../shared/ribbon/RibbonSplitButton.vue";
 import PieThumbnail from "./PieThumbnail.vue";
+const PieCardPreview = defineAsyncComponent(() => import("./PieCardPreview.vue"));
 const props = defineProps<{ disabled: boolean; themeColors?: readonly string[] }>();
 const emit = defineEmits<{ insert: [intent: ChartInsertIntent] }>();
 const { t } = useAppI18n(),
@@ -71,31 +72,33 @@ function choose(index?: number, more = false) {
     >
       <template #header
         ><div class="pie-gallery__head">
-          <strong>{{ t("chart.pie") }}</strong
+          <strong>{{ t(`chart.pie.${family}`) }}</strong
           ><button type="button" @click="choose(undefined, true)">
             {{ t("chart.xy.more") }}<ChevronRight :size="14" />
           </button></div
       ></template>
       <template #body
         ><div class="pie-gallery__body">
-          <div role="group" :aria-label="t('chart.subtypes')" class="pie-gallery__families">
-            <button
-              v-for="tab in pieFamilies"
-              :key="tab"
-              type="button"
-              :title="t(`chart.pie.${tab}`)"
-              :aria-label="t(`chart.pie.${tab}`)"
-              :aria-pressed="family === tab"
-              :data-pie-family="tab"
-              @click="family = tab"
-            >
-              <PieThumbnail :family="tab" :colors="palette" />
-            </button>
+          <div class="pie-gallery__controls">
+            <div role="group" :aria-label="t('chart.subtypes')" class="pie-gallery__families">
+              <button
+                v-for="tab in pieFamilies"
+                :key="tab"
+                type="button"
+                :title="t(`chart.pie.${tab}`)"
+                :aria-label="t(`chart.pie.${tab}`)"
+                :aria-pressed="family === tab"
+                :data-pie-family="tab"
+                @click="family = tab"
+              >
+                <PieThumbnail :family="tab" :colors="palette" />
+              </button>
+            </div>
+            <Checkbox v-model="followTheme">{{ t("chart.xy.followTheme") }}</Checkbox>
           </div>
-          <Checkbox v-model="followTheme">{{ t("chart.xy.followTheme") }}</Checkbox>
-          <div class="pie-gallery__cards">
+          <div :key="family" class="pie-gallery__cards">
             <button
-              v-for="(card, index) in pieCards"
+              v-for="(card, index) in pieCardsByFamily[family]"
               :key="index"
               type="button"
               role="menuitem"
@@ -106,12 +109,22 @@ function choose(index?: number, more = false) {
               "
               @click="choose(index)"
             >
-              <PieThumbnail
+              <PieCardPreview
                 :family="family"
-                :colors="pieCardColors(index, followTheme, palette)"
-                :labels="card.labels"
-                :exploded="card.exploded"
+                :card="card"
+                :index="index"
+                :theme-colors="palette"
+                :follow-theme="followTheme"
               />
+            </button>
+            <button
+              data-pie-more
+              type="button"
+              role="menuitem"
+              class="pie-gallery__more"
+              @click="choose(undefined, true)"
+            >
+              {{ t("chart.pie.moreStyles") }}<ChevronRight :size="14" />
             </button>
           </div></div
       ></template> </MenuSurface
@@ -119,7 +132,7 @@ function choose(index?: number, more = false) {
 </template>
 <style scoped lang="scss">
 .pie-gallery {
-  width: min(548px, calc(100vw - 16px));
+  width: min(596px, calc(100vw - 16px));
   max-width: calc(100vw - 16px);
 }
 .pie-gallery__head,
@@ -165,10 +178,25 @@ function choose(index?: number, more = false) {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin: 12px 0 4px;
+  max-height: min(422px, calc(100dvh - 200px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 .pie-gallery__cards button {
   padding: 4px;
   border-color: var(--td-component-border);
+}
+.pie-gallery__cards .pie-gallery__more {
+  grid-column: 1/-1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-color: transparent;
+  color: var(--sheetcraft-text-secondary);
+}
+.pie-gallery__cards .pie-gallery__more svg {
+  width: 14px;
 }
 .pie-gallery__cards button:hover {
   border-color: var(--td-brand-color);

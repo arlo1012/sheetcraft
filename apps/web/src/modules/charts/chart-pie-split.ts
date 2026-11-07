@@ -1,3 +1,10 @@
+import type { PieGalleryFormat } from "@sheetcraft/core/chart-presentation";
+import {
+  pieLabelPaint,
+  pieSectorPaint,
+  piePathPaint,
+  pieOutsideLabels,
+} from "./chart-pie-appearance";
 import { color } from "echarts/core";
 import type { EChartsOption, PieSeriesOption, CustomSeriesOption } from "echarts";
 import type { PieSector } from "./chart-pie-perspective";
@@ -10,23 +17,30 @@ export function splitPieOption(
   bars: boolean,
   showLabels: boolean,
   percentLabels: boolean,
+  format?: PieGalleryFormat,
 ): Pick<EChartsOption, "series" | "graphic"> {
   // WPS automatic position split places the final third (rounded up) on the right.
   const first = sectors.length - Math.ceil(sectors.length / 3);
   const tail = sectors.slice(first);
   const sum = tail.reduce((n, s) => n + (s.value === "-" ? 0 : s.value), 0);
   const share = tail.reduce((n, s) => n + s.fraction, 0);
-  const radius = Math.max(1, Math.min(plot.height * 0.4, plot.width * 0.24)),
+  const outside = showLabels && pieOutsideLabels(format);
+  const radius = Math.max(
+      1,
+      Math.min(plot.height * (outside ? 0.31 : 0.4), plot.width * (outside ? 0.17 : 0.24)),
+    ),
     small = radius * 0.75;
   const cy = plot.y + plot.height / 2,
     left = plot.x + plot.width * 0.27,
     right = plot.x + plot.width * 0.76;
+  const outsideLabel = outside ? { bleedMargin: 2, distanceToLabelLine: 2, fontSize: 11 } : {};
   const aggregateColor = color.lerp(0.56, [sectors[0]?.color ?? "#4472c4", "#ffffff"])!;
   const totalLabel = percentLabels
     ? `${Math.round(share * 100)}%`
     : String(Number(sum.toPrecision(12)));
   const pie: PieSeriesOption = {
     ...main,
+    label: { ...main.label, ...outsideLabel },
     center: [left, cy],
     left: 0,
     top: 0,
@@ -39,14 +53,22 @@ export function splitPieOption(
         name: s.name,
         value: i < first ? s.value : 0,
         selected: !!main.selectedMode && i < first,
-        itemStyle: { color: s.color },
-        label: { show: showLabels && i < first, formatter: () => s.label },
+        itemStyle: pieSectorPaint(s.color, format),
+        label: {
+          ...pieLabelPaint(s.color, format),
+          show: showLabels && i < first,
+          formatter: () => s.label,
+        },
       })),
       {
         name: "Σ",
         value: sum,
-        itemStyle: { color: aggregateColor },
-        label: { show: showLabels, formatter: () => totalLabel },
+        itemStyle: pieSectorPaint(aggregateColor, format),
+        label: {
+          ...pieLabelPaint(aggregateColor, format),
+          show: showLabels,
+          formatter: () => totalLabel,
+        },
       },
     ],
     tooltip: {
@@ -58,6 +80,7 @@ export function splitPieOption(
   };
   const secondPie: PieSeriesOption = {
     ...main,
+    label: { ...main.label, ...outsideLabel },
     center: [right, cy],
     left: 0,
     top: 0,
@@ -68,8 +91,8 @@ export function splitPieOption(
       name: s.name,
       value: s.value,
       selected: !!main.selectedMode,
-      itemStyle: { color: s.color },
-      label: { show: showLabels, formatter: () => s.label },
+      itemStyle: pieSectorPaint(s.color, format),
+      label: { ...pieLabelPaint(s.color, format), show: showLabels, formatter: () => s.label },
     })),
     tooltip: {
       formatter: (params) => {
@@ -97,25 +120,27 @@ export function splitPieOption(
       const y = cy - small + 2 * small * segment.top,
         height = 2 * small * segment.height;
       if (!height) return;
+      const { color: ink, ...labelPaint } = pieLabelPaint(s.color, format);
       return {
         type: "group",
         children: [
           {
             type: "rect",
             shape: { x: right - barWidth / 2, y, width: barWidth, height },
-            style: { fill: s.color },
+            style: piePathPaint(s.color, format),
           },
           ...(showLabels
             ? [
                 {
                   type: "text" as const,
                   style: {
-                    x: right,
+                    x: outside ? right + barWidth / 2 + 4 : right,
                     y: y + height / 2,
                     text: s.label,
-                    align: "center" as const,
+                    align: outside ? ("left" as const) : ("center" as const),
                     verticalAlign: "middle" as const,
-                    fill: "#ffffff",
+                    fill: ink,
+                    ...labelPaint,
                   },
                 },
               ]

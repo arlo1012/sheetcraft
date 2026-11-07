@@ -1,9 +1,10 @@
-import { pieCards } from "./chart-pie-cards";
+import { pieCardsByFamily } from "./chart-pie-cards";
 import {
   isScatterStyle,
   rotateChartPalette,
   DEFAULT_CHART_PALETTE,
   pieFamilies,
+  pieGalleryFields,
   type PieFamily,
   type ScatterStyle,
 } from "@sheetcraft/core/chart-presentation";
@@ -105,7 +106,7 @@ export function normalizeChartInsertIntent(value: unknown): ChartInsertIntent {
       typeof data.card !== "number" ||
       !Number.isInteger(data.card) ||
       data.card < 0 ||
-      data.card >= pieCards.length ||
+      data.card >= pieCardsByFamily[data.pieFamily as PieFamily].length ||
       typeof data.followTheme !== "boolean"
     )
       throw new RangeError("Invalid pie insertion choice.");
@@ -174,7 +175,10 @@ export function changePieFamily(chart: SheetChart, family: PieFamily): SheetChar
 export function applyPieInsertChoice(chart: SheetChart, choice: PieInsertChoice): SheetChart {
   const next = changePieFamily(chart, choice.pieFamily);
   const presentation = { ...next.presentation };
-  const card = pieCards[choice.card]!;
+  const card = pieCardsByFamily[choice.pieFamily][choice.card]!;
+  for (const key of pieGalleryFields) delete presentation[key];
+  delete presentation.pieExploded;
+  Object.assign(presentation, card.format);
   if (choice.followTheme) {
     delete presentation.palette;
     presentation.themeAccent = choice.card % 6;
@@ -184,8 +188,6 @@ export function applyPieInsertChoice(chart: SheetChart, choice: PieInsertChoice)
   }
   if (card.labels !== "none") presentation.pieLabels = card.labels;
   else delete presentation.pieLabels;
-  if (card.exploded) presentation.pieExploded = true;
-  else delete presentation.pieExploded;
   return normalizeSheetChart({ ...next, labels: card.labels !== "none", presentation });
 }
 /** Existing line charts retain their marker-on default until an explicit choice. */
@@ -222,6 +224,11 @@ export function changeChartType(chart: SheetChart, type: ChartType): SheetChart 
     if (type !== "pie" && type !== "doughnut") {
       delete next.presentation.pieLabels;
       delete next.presentation.pieExploded;
+      for (const key of pieGalleryFields) delete next.presentation[key];
+    }
+    if (type !== "doughnut") {
+      delete next.presentation.doughnutHole;
+      delete next.presentation.doughnutRim;
     }
     if (type !== "bubble") delete next.presentation.bubbleShading;
     if (!Object.keys(next.presentation).length) delete next.presentation;

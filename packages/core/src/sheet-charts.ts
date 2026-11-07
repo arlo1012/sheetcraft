@@ -13,6 +13,7 @@ import { getChartSourceData } from "./chart-source-data.js";
 import { normalizeChartFormat, type ChartFormatSettings } from "./chart-format.js";
 import {
   normalizeChartPresentation,
+  pieGalleryFields,
   type ChartPresentationSettings,
 } from "./chart-presentation.js";
 import {
@@ -173,25 +174,30 @@ export function normalizeSheetChart(chart: SheetChart): SheetChart {
     const field = Object.getOwnPropertyDescriptor(chart, "presentation");
     if (!field || !("value" in field))
       throw new TypeError("Chart presentation must be an own data field, not an accessor.");
-    presentation = normalizeChartPresentation(field.value);
-    if (presentation.pieStyle && chart.type !== "pie")
+    const settings = normalizeChartPresentation(field.value);
+    presentation = settings;
+    if (settings.pieStyle && chart.type !== "pie")
       throw new RangeError("Pie subtypes require a pie chart.");
     if (
-      (presentation.pieLabels || presentation.pieExploded) &&
+      (settings.pieLabels ||
+        settings.pieExploded ||
+        pieGalleryFields.some((key) => Object.hasOwn(settings, key))) &&
       chart.type !== "pie" &&
       chart.type !== "doughnut"
     )
-      throw new RangeError("Pie labels and explosion require a pie or doughnut chart.");
-    if (presentation.bubbleShading && chart.type !== "bubble")
+      throw new RangeError("Pie appearance requires a pie or doughnut chart.");
+    if ((settings.doughnutHole !== undefined || settings.doughnutRim) && chart.type !== "doughnut")
+      throw new RangeError("Ring geometry requires a doughnut chart.");
+    if (settings.bubbleShading && chart.type !== "bubble")
       throw new RangeError("Bubble shading requires a bubble chart.");
-    if (presentation.scatterStyle !== undefined && chart.type !== "scatter")
+    if (settings.scatterStyle !== undefined && chart.type !== "scatter")
       throw new RangeError("XY scatter styles require a scatter chart.");
     if (
-      presentation.percentStacked === true &&
+      settings.percentStacked === true &&
       (chart.stacked !== true || !["column", "bar", "line", "area"].includes(chart.type))
     )
       throw new RangeError("Percent stacking requires a stacked column, bar, line or area chart.");
-    if (presentation.lineMarkers !== undefined && chart.type !== "line")
+    if (settings.lineMarkers !== undefined && chart.type !== "line")
       throw new RangeError("Line markers require a line chart.");
   }
   let source: ChartSeriesSource | undefined;

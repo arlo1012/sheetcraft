@@ -108,6 +108,8 @@ export const chartsEnUS = {
   "chart.pie.pieOfPie": "Pie of pie",
   "chart.pie.barOfPie": "Bar of pie",
   "chart.pie.doughnut": "Doughnut",
+  "chart.pie.moreStyles": "More chart options",
+  "chart.pie.sampleCategory": "Category {index}",
   "chart.pie.card": "{family}, style {index}",
   "chart.xy.family.marker": "Markers",
   "chart.xy.family.smooth": "Smooth",

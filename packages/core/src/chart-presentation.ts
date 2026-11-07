@@ -5,6 +5,32 @@ export const pieFamilies = ["pie", "threeD", "pieOfPie", "barOfPie", "doughnut"]
 export type PieFamily = (typeof pieFamilies)[number];
 export type PieStyle = Exclude<PieFamily, "pie" | "doughnut">;
 export type PieLabel = "percent" | "categoryPercent";
+export const pieGalleryFields = [
+  "pieLabelPlacement",
+  "pieFill",
+  "pieStroke",
+  "pieFocusFirst",
+  "doughnutHole",
+  "doughnutRim",
+] as const;
+export type PieLabelPlacement = "outside" | "boxedOutside" | "boxedInside";
+export const pieFills = [
+  "gradient",
+  "hatch",
+  "dots",
+  "checker",
+  "hatchGradient",
+  "outline",
+] as const;
+export type PieFill = (typeof pieFills)[number];
+export type PieGalleryFormat = {
+  pieLabelPlacement?: PieLabelPlacement;
+  pieFill?: PieFill;
+  pieStroke?: "light" | "dark";
+  pieFocusFirst?: true;
+  doughnutHole?: number;
+  doughnutRim?: true;
+};
 export type ScatterStyle = (typeof scatterStyles)[number];
 export function isScatterStyle(value: unknown): value is ScatterStyle {
   return scatterStyles.includes(value as ScatterStyle);
@@ -15,7 +41,7 @@ export function rotateChartPalette(palette: readonly string[], accent: number): 
 }
 
 /** Sparse chart-wide choices; omission retains the chart's existing presentation. */
-export type ChartPresentationSettings = {
+export type ChartPresentationSettings = PieGalleryFormat & {
   /** A rendering choice only; worksheet and cached values remain unchanged. */
   animated?: true;
   percentStacked?: true;
@@ -41,6 +67,7 @@ const keys = [
   "pieStyle",
   "pieLabels",
   "pieExploded",
+  ...pieGalleryFields,
   "themeAccent",
   "palette",
   "background",
@@ -109,6 +136,34 @@ export function normalizeChartPresentation(value: unknown): ChartPresentationSet
     if (source.pieLabels !== "percent" && source.pieLabels !== "categoryPercent")
       throw new RangeError("Unknown pie chart labels.");
     result.pieLabels = source.pieLabels;
+  }
+  if (Object.hasOwn(source, "pieLabelPlacement")) {
+    const placement = source.pieLabelPlacement;
+    if (placement !== "outside" && placement !== "boxedInside" && placement !== "boxedOutside")
+      throw new RangeError("Unknown pie label placement.");
+    result.pieLabelPlacement = placement;
+  }
+  if (Object.hasOwn(source, "pieFill")) {
+    if (!pieFills.includes(source.pieFill as PieFill))
+      throw new RangeError("Unknown pie sector fill.");
+    result.pieFill = source.pieFill as PieFill;
+  }
+  if (Object.hasOwn(source, "pieStroke")) {
+    if (source.pieStroke !== "light" && source.pieStroke !== "dark")
+      throw new RangeError("Unknown pie sector border.");
+    result.pieStroke = source.pieStroke;
+  }
+  if (Object.hasOwn(source, "doughnutHole")) {
+    const hole = source.doughnutHole;
+    if (typeof hole !== "number" || !Number.isInteger(hole) || hole < 10 || hole > 90)
+      throw new RangeError("Doughnut hole size requires 10–90 percent.");
+    result.doughnutHole = hole;
+  }
+  for (const key of ["pieFocusFirst", "doughnutRim"] as const) {
+    if (Object.hasOwn(source, key)) {
+      if (source[key] !== true) throw new RangeError("Omit disabled pie appearance settings.");
+      result[key] = true;
+    }
   }
   if (Object.hasOwn(source, "pieExploded")) {
     if (source.pieExploded !== true) throw new RangeError("Omit pie explosion for joined sectors.");

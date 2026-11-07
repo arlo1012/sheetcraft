@@ -1,3 +1,5 @@
+import type { PieGalleryFormat } from "@sheetcraft/core/chart-presentation";
+import { pieLabelPaint, piePathPaint, pieOutsideLabels } from "./chart-pie-appearance";
 import { color } from "echarts/core";
 import type { CustomSeriesOption } from "echarts";
 
@@ -19,6 +21,7 @@ export function perspectivePie(
   radius: number,
   exploded: boolean,
   showLabels: boolean,
+  format?: PieGalleryFormat,
 ): CustomSeriesOption {
   const ry = radius * 0.54,
     depth = radius * 0.24;
@@ -67,6 +70,11 @@ export function perspectivePie(
         if (Math.cos(start) < 0) walls.push(cut(start));
         if (Math.cos(end) > 0) walls.push(cut(end));
       }
+      const outside = pieOutsideLabels(format),
+        scale = outside ? 1.12 : 0.68;
+      const labelX = x + radius * scale * Math.cos(middle),
+        labelY = y + ry * scale * Math.sin(middle);
+      const { color: ink, ...labelPaint } = pieLabelPaint(s.color, format);
       return {
         type: "group",
         children: [
@@ -90,18 +98,38 @@ export function perspectivePie(
             },
             z2: 0,
           })),
-          { type: "path", shape: { pathData: top }, style: { fill: s.color }, z2: 1 },
+          { type: "path", shape: { pathData: top }, style: piePathPaint(s.color, format), z2: 1 },
+          ...(outside && showLabels && s.label
+            ? [
+                {
+                  type: "line" as const,
+                  shape: {
+                    x1: x + radius * Math.cos(middle),
+                    y1: y + ry * Math.sin(middle),
+                    x2: labelX,
+                    y2: labelY,
+                  },
+                  style: { stroke: s.color, lineWidth: 1 },
+                  z2: 1,
+                },
+              ]
+            : []),
           ...(showLabels && s.label
             ? [
                 {
                   type: "text" as const,
                   style: {
                     text: s.label,
-                    x: x + radius * 0.68 * Math.cos(middle),
-                    y: y + ry * 0.68 * Math.sin(middle),
-                    align: "center" as const,
+                    x: labelX,
+                    y: labelY,
+                    align: outside
+                      ? Math.cos(middle) > 0
+                        ? ("left" as const)
+                        : ("right" as const)
+                      : ("center" as const),
                     verticalAlign: "middle" as const,
-                    fill: "#ffffff",
+                    fill: ink,
+                    ...labelPaint,
                     fontSize: 11,
                   },
                   z2: 2,

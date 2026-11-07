@@ -1,3 +1,4 @@
+import { pieOutsideLabels, pieLabelPaint, pieSectorPaint } from "./chart-pie-appearance";
 import type { EChartsOption, LegendComponentOption, PieSeriesOption } from "echarts";
 import { formatCellNumberValue } from "@sheetcraft/core/number-format";
 import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
@@ -18,8 +19,10 @@ export function pieChartOption(
   const style = chart.presentation?.pieStyle;
   const split = style === "pieOfPie" || style === "barOfPie";
   const entries = rings ? data.series : data.series.slice(0, 1);
-  const outer = 82;
-  const hole = rings ? outer / 2 : 0;
+  const format = chart.presentation;
+  const outside = chart.labels && pieOutsideLabels(format);
+  const outer = outside ? 63 : 82;
+  const hole = rings ? (outer * (format?.doughnutHole ?? 50)) / 100 : 0;
   const thickness = entries.length ? (outer - hole) / entries.length : 0;
   const names = data.categories;
   // Native pie legends match sectors by name. Give duplicate and empty category
@@ -63,7 +66,7 @@ export function pieChartOption(
       return {
         name,
         value: raw == null ? "-" : amount,
-        color: palette[index % palette.length]!,
+        color: format?.pieFocusFirst && index > 0 ? "#d9dce2" : palette[index % palette.length]!,
         text: `${entry.name}\n${names[index]}: ${text}`,
         label: raw == null ? "" : label,
         fraction,
@@ -86,7 +89,7 @@ export function pieChartOption(
       selectedOffset: Math.min(plot.width, plot.height) * 0.035,
       label: {
         show: chart.labels,
-        position: "inside",
+        position: outside ? "outside" : "inside",
         formatter: (p) => sectors[p.dataIndex]?.label ?? "",
       },
       tooltip: {
@@ -95,12 +98,13 @@ export function pieChartOption(
           return p ? (sectors[p.dataIndex]?.text ?? "") : "";
         },
       },
+      labelLine: { show: outside, length: 8, length2: 6 },
       data: sectors.map((s) => ({
         name: s.name,
         value: s.value,
-        itemStyle: { color: s.color },
+        itemStyle: pieSectorPaint(s.color, format),
+        label: { ...pieLabelPaint(s.color, format), ...(s.value === "-" ? { show: false } : {}) },
         ...(chart.presentation?.pieExploded ? { selected: true } : {}),
-        ...(s.value === "-" ? { label: { show: false } } : {}),
       })),
     };
   });
@@ -110,7 +114,10 @@ export function pieChartOption(
   if (style === "threeD") {
     // The zero-radius pie supplies the native per-category legend provider.
     // The visible series draws the projected sector surfaces.
-    const radius = Math.max(1, Math.min(plot.width * 0.45, plot.height * 0.68));
+    const radius = Math.max(
+      1,
+      Math.min(plot.width * (outside ? 0.33 : 0.45), plot.height * (outside ? 0.52 : 0.68)),
+    );
     return {
       ...common,
       legend,
@@ -131,6 +138,7 @@ export function pieChartOption(
           radius,
           !!chart.presentation?.pieExploded,
           chart.labels,
+          format,
         ),
       ],
     };
@@ -146,7 +154,23 @@ export function pieChartOption(
         style === "barOfPie",
         chart.labels,
         !!chart.presentation?.pieLabels,
+        format,
       ),
     };
+  if (rings && format?.doughnutRim) {
+    const radius = Math.min(plot.width, plot.height) / 200;
+    return {
+      ...common,
+      legend,
+      series,
+      graphic: [outer + 2.5, hole - 1.5].map((r) => ({
+        type: "circle" as const,
+        silent: true,
+        shape: { cx: plot.x + plot.width / 2, cy: plot.y + plot.height / 2, r: r * radius },
+        style: { fill: "none", stroke: palette[0], lineWidth: 1 },
+        z: 3,
+      })),
+    };
+  }
   return { ...common, legend, series };
 }
