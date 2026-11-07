@@ -185,7 +185,7 @@ function printOption(
       case "line":
         return { ...entry, ...noninteractive, label: withFamily(entry.label) };
       case "custom":
-        if (drawing.chart.type !== "pie")
+        if (drawing.chart.type !== "pie" && drawing.chart.type !== "stock")
           throw new RangeError("Unsupported native chart print series.");
         return { ...entry, ...noninteractive };
       case "pie":

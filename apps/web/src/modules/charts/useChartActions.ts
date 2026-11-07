@@ -218,7 +218,7 @@ export function useChartActions(options: {
         headerColumn: type !== "scatter" && type !== "bubble",
         seriesBy: "columns",
         legend: true,
-        ...(type === "pie" || type === "doughnut"
+        ...(type === "pie" || type === "doughnut" || type === "stock"
           ? { elements: { legendPosition: "right" as const } }
           : {}),
         labels: false,

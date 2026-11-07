@@ -28,10 +28,15 @@ import {
 import ChartContent from "./ChartContent.vue";
 import ChartTypeNavigation from "./ChartTypeNavigation.vue";
 import BubbleThumbnail from "./BubbleThumbnail.vue";
+import { inferChartInsertHeaders } from "../chart-insert-headers";
+import StockThumbnail from "./StockThumbnail.vue";
 import PieThumbnail from "./PieThumbnail.vue";
 import ScatterThumbnail from "./ScatterThumbnail.vue";
 import {
   scatterStyles,
+  stockStyles,
+  stockSeriesCount,
+  type StockStyle,
   pieFamilies,
   type PieFamily,
   DEFAULT_CHART_PALETTE,
@@ -112,6 +117,19 @@ function selectScatterStyle(style: ScatterStyle) {
     presentation: { ...draft.value.chart.presentation, scatterStyle: style },
   });
 }
+function selectStockStyle(style: StockStyle) {
+  if (props.disabled || draft.value.chart.type !== "stock") return;
+  draft.value.chart = normalizeSheetChart({
+    ...draft.value.chart,
+    presentation: { ...draft.value.chart.presentation, stockStyle: style },
+  });
+}
+function setSeriesBy(rows: boolean) {
+  const chart = draft.value.chart;
+  chart.seriesBy = rows ? "rows" : "columns";
+  if (chart.type === "stock" && props.mode === "insert")
+    Object.assign(chart, inferChartInsertHeaders(props.sheet, chart, props.evaluator));
+}
 function selectPieFamily(family: PieFamily) {
   if (props.disabled || (draft.value.chart.type !== "pie" && draft.value.chart.type !== "doughnut"))
     return;
@@ -147,6 +165,8 @@ function changeType(value: unknown): void {
   try {
     const next = changeChartType(draft.value.chart, type);
     const previousType = draft.value.chart.type;
+    if (type === "stock" && previousType !== "stock" && props.mode === "insert")
+      Object.assign(next, inferChartInsertHeaders(props.sheet, next, props.evaluator));
     draft.value.chart = normalizeSheetChart(next);
     if (type === "combo" && previousType !== "combo" && !comboInitialized.value) {
       initialComboRecipePending.value = true;
@@ -223,6 +243,11 @@ const previewStatus = computed<"ready" | "empty" | "invalid">(() => {
       data.diagnostics?.some(
         (entry) => entry.code === "broken-reference" || entry.code === "length-mismatch",
       )
+    )
+      return "invalid";
+    if (
+      chart.type === "stock" &&
+      data.series.length !== stockSeriesCount(chart.presentation?.stockStyle ?? "hlc")
     )
       return "invalid";
     const available =
@@ -333,6 +358,8 @@ const selectedSubtype = computed(() => {
     return t(
       draft.value.chart.presentation?.bubbleShading ? "chart.bubbleShaded" : "chart.bubbleFlat",
     );
+  if (draft.value.chart.type === "stock")
+    return t(`chart.stock.${draft.value.chart.presentation?.stockStyle ?? "hlc"}`);
   if (draft.value.chart.type === "scatter")
     return t(`chart.xy.variant.${draft.value.chart.presentation?.scatterStyle ?? "marker"}`);
   if (!type) return t(`chart.${draft.value.chart.type}`);
@@ -455,6 +482,26 @@ function onDialogKeydown(event: KeyboardEvent): void {
             :apply="applyDesign"
           />
           <div
+            v-else-if="draft.chart.type === 'stock'"
+            class="scatter-variants"
+            role="group"
+            :aria-label="t('chart.subtypes')"
+          >
+            <button
+              v-for="style in stockStyles"
+              :key="style"
+              type="button"
+              :disabled="disabled"
+              :aria-pressed="(draft.chart.presentation?.stockStyle ?? 'hlc') === style"
+              :data-stock-variant="style"
+              :aria-label="t(`chart.stock.${style}`)"
+              :title="t(`chart.stock.${style}`)"
+              @click="selectStockStyle(style)"
+            >
+              <StockThumbnail :variant="style" />
+            </button>
+          </div>
+          <div
             v-else-if="draft.chart.type === 'scatter'"
             class="scatter-variants"
             role="group"
@@ -526,7 +573,14 @@ function onDialogKeydown(event: KeyboardEvent): void {
           :aria-label="t('chart.dataPreview')"
         >
           <p v-if="previewStatus !== 'ready'" class="chart-selector__empty" role="status">
-            {{ t(previewStatus === "invalid" ? "chart.invalidSource" : "chart.previewNoData") }}
+            {{
+              draft.chart.type === "stock" && previewStatus === "invalid"
+                ? t("chart.stockSourceHint", {
+                    count: stockSeriesCount(draft.chart.presentation?.stockStyle ?? "hlc"),
+                    order: selectedSubtype,
+                  })
+                : t(previewStatus === "invalid" ? "chart.invalidSource" : "chart.previewNoData")
+            }}
           </p>
           <ChartContent
             v-else
@@ -660,7 +714,7 @@ function onDialogKeydown(event: KeyboardEvent): void {
               <Checkbox
                 :checked="draft.chart.seriesBy === 'rows'"
                 :disabled="sourceLocked"
-                @change="draft.chart.seriesBy = $event ? 'rows' : 'columns'"
+                @change="setSeriesBy(!!$event)"
                 >{{ t("chart.seriesByRows") }}</Checkbox
               >
               <Checkbox
@@ -690,17 +744,19 @@ function onDialogKeydown(event: KeyboardEvent): void {
                 ? "chart.pivotSourceHint"
                 : draft.chart.type === "sankey"
                   ? "chart.sankeyHint"
-                  : draft.chart.type === "bubble"
-                    ? "chart.bubbleHint"
-                    : draft.chart.type === "scatter"
-                      ? "chart.scatterHint"
-                      : draft.chart.type === "venn"
-                        ? "chart.vennHint"
-                        : draft.chart.type === "liquid" || draft.chart.type === "gauge"
-                          ? "chart.percentHint"
-                          : draft.chart.type === "waterfall"
-                            ? "chart.waterfallHint"
-                            : "chart.sourceHint",
+                  : draft.chart.type === "stock"
+                    ? "chart.stockHint"
+                    : draft.chart.type === "bubble"
+                      ? "chart.bubbleHint"
+                      : draft.chart.type === "scatter"
+                        ? "chart.scatterHint"
+                        : draft.chart.type === "venn"
+                          ? "chart.vennHint"
+                          : draft.chart.type === "liquid" || draft.chart.type === "gauge"
+                            ? "chart.percentHint"
+                            : draft.chart.type === "waterfall"
+                              ? "chart.waterfallHint"
+                              : "chart.sourceHint",
             )
           }}
         </p>

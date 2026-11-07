@@ -1,5 +1,10 @@
 import { readPictureDataArray } from "./picture-data-array.js";
 
+export const stockStyles = ["hlc", "ohlc", "vhlc", "vohlc"] as const;
+export type StockStyle = (typeof stockStyles)[number];
+export function stockSeriesCount(style: StockStyle): number {
+  return style === "hlc" ? 3 : style === "vohlc" ? 5 : 4;
+}
 export const scatterStyles = ["marker", "smoothMarker", "smooth", "lineMarker", "line"] as const;
 export const pieFamilies = ["pie", "threeD", "pieOfPie", "barOfPie", "doughnut"] as const;
 export type PieFamily = (typeof pieFamilies)[number];
@@ -47,6 +52,7 @@ export type ChartPresentationSettings = PieGalleryFormat & {
   percentStacked?: true;
   lineMarkers?: boolean;
   scatterStyle?: ScatterStyle;
+  stockStyle?: StockStyle;
   bubbleShading?: true;
   pieStyle?: PieStyle;
   pieLabels?: PieLabel;
@@ -63,6 +69,7 @@ const keys = [
   "percentStacked",
   "lineMarkers",
   "scatterStyle",
+  "stockStyle",
   "bubbleShading",
   "pieStyle",
   "pieLabels",
@@ -168,6 +175,11 @@ export function normalizeChartPresentation(value: unknown): ChartPresentationSet
   if (Object.hasOwn(source, "pieExploded")) {
     if (source.pieExploded !== true) throw new RangeError("Omit pie explosion for joined sectors.");
     result.pieExploded = true;
+  }
+  if (Object.hasOwn(source, "stockStyle")) {
+    if (!stockStyles.includes(source.stockStyle as StockStyle))
+      throw new RangeError("Unknown stock chart subtype.");
+    result.stockStyle = source.stockStyle as StockStyle;
   }
   if (Object.hasOwn(source, "scatterStyle")) {
     if (!isScatterStyle(source.scatterStyle)) throw new RangeError("Unknown XY scatter style.");

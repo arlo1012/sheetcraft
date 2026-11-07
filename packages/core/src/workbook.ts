@@ -796,6 +796,8 @@ export function getCellContent(sheet: Sheet, address: CellAddress): CellContent 
 
 /** Evaluates a cell against the current sparse sheet state. */
 export type SheetEvaluator = {
+  /** Calendar used when interpreting numeric dates from this workbook. */
+  readonly dateSystem?: ExcelDateSystem;
   getComputedValue: (address: CellAddress) => FormulaValue;
   /** Evaluates a formula in the context of an address without persisting a cell. */
   evaluateFormula?: (source: string, address: CellAddress) => FormulaValue;
@@ -1608,6 +1610,7 @@ export function createWorkbookEvaluator(
     if (!workbook.sheets.has(targetSheetId))
       throw new Error(`Sheet ${targetSheetId} does not exist.`);
     return {
+      dateSystem: workbook.dateSystem,
       getComputedValue: (address) => compute(targetSheetId, address),
       evaluateFormula: (source, address) =>
         scalarize(

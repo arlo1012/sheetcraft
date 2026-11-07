@@ -191,6 +191,15 @@ export function toCellNumberFormatCode(
     : accountingCode(currency, format.fractionDigits, format.negativeStyle);
 }
 
+/** Recognize both date presets and custom codes that display calendar components. */
+export function calendarDateFormat(
+  format: CellNumberFormat | undefined,
+): Extract<CellNumberFormat, { kind: "date" }> | undefined {
+  if (format?.kind === "date") return format;
+  if (format?.kind !== "custom") return;
+  const parts = getFormatDateInfo(format.code);
+  return parts.year || parts.month || parts.day ? { ...format, kind: "date" } : undefined;
+}
 /**
  * Formats a core value without depending on DOM, Vue, Intl browser state, or
  * the host time zone.  Fill directives are surfaced, not expanded, because

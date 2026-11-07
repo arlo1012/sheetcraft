@@ -243,6 +243,7 @@ function insert(type: ChartType) {
         <MenuItem data-chart-combo-recipe @select="insert('combo')">{{
           t("chart.combo")
         }}</MenuItem>
+        <MenuItem data-chart-stock @select="insert('stock')">{{ t("chart.stock") }}</MenuItem>
         <MenuItem @select="insert('doughnut')">{{ t("chart.doughnut") }}</MenuItem
         ><MenuItem @select="insert('radar')">{{ t("chart.radar") }}</MenuItem>
         <MenuItem @select="insert('treemap')">{{ t("chart.treemap") }}</MenuItem

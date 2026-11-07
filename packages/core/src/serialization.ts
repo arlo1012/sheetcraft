@@ -369,6 +369,7 @@ export type WorkbookSnapshotV103 = Omit<WorkbookSnapshotV102, "version"> & { ver
 export type WorkbookSnapshotV104 = Omit<WorkbookSnapshotV103, "version"> & { version: 104 };
 export type WorkbookSnapshotV105 = Omit<WorkbookSnapshotV104, "version"> & { version: 105 };
 export type WorkbookSnapshotV106 = Omit<WorkbookSnapshotV105, "version"> & { version: 106 };
+export type WorkbookSnapshotV107 = Omit<WorkbookSnapshotV106, "version"> & { version: 107 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -433,7 +434,8 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV103
   | WorkbookSnapshotV104
   | WorkbookSnapshotV105
-  | WorkbookSnapshotV106;
+  | WorkbookSnapshotV106
+  | WorkbookSnapshotV107;
 type WorkbookWritePayload = Omit<WorkbookSnapshotV98, "version"> & {
   version: WorkbookSnapshot["version"];
 };
@@ -561,7 +563,8 @@ type SnapshotVersion =
   | 103
   | 104
   | 105
-  | 106;
+  | 106
+  | 107;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -589,6 +592,16 @@ function hasPiePresentation(
         d?.kind === "chart" &&
         d.chart?.presentation &&
         fields.some((key) => Object.hasOwn(d.chart.presentation, key)),
+    )
+  );
+}
+function hasStockCharts(drawings: unknown): boolean {
+  return (
+    Array.isArray(drawings) &&
+    drawings.some(
+      (drawing) =>
+        drawing?.kind === "chart" &&
+        (drawing.chart?.type === "stock" || drawing.chart?.dataCache?.stockDateAxis !== undefined),
     )
   );
 }
@@ -2885,7 +2898,10 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasBubbleCharts(record.drawings)) version = 104;
     if (hasPiePresentation(record.drawings)) version = 105;
     if (hasPiePresentation(record.drawings, pieGalleryFields)) version = 106;
+    if (hasStockCharts(record.drawings)) version = 107;
   }
+  if (version < 107 && hasStockCharts(record.drawings))
+    return fail(path + ".drawings", "Stock charts require snapshot version 107.");
   if (version < 106 && hasPiePresentation(record.drawings, pieGalleryFields))
     return fail(path + ".drawings", "Pie gallery appearance requires snapshot version 106.");
   if (version < 105 && hasPiePresentation(record.drawings))
@@ -3384,6 +3400,7 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   if (sheets.some((sheet) => hasPiePresentation(sheet.drawings))) snapshot.version = 105;
   if (sheets.some((sheet) => hasPiePresentation(sheet.drawings, pieGalleryFields)))
     snapshot.version = 106;
+  if (sheets.some((sheet) => hasStockCharts(sheet.drawings))) snapshot.version = 107;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -3497,7 +3514,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 103 &&
     record.version !== 104 &&
     record.version !== 105 &&
-    record.version !== 106
+    record.version !== 106 &&
+    record.version !== 107
   ) {
     throw new WorkbookDomainError(
       {

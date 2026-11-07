@@ -1,3 +1,4 @@
+import { stockChartOption } from "./chart-stock";
 import { pieChartOption } from "./chart-pie";
 import { chartPlotSeries, bubbleSeries, bubbleFormats, isXYChart } from "./chart-bubble";
 import { specialtyOption } from "./chart-specialty-options";
@@ -121,6 +122,7 @@ function buildChartOption(
     textStyle: { fontFamily: "Arial, sans-serif" },
     ...(layout ? { title: layout.title, legend: layout.legend } : {}),
   };
+  if (chart.type === "stock") return stockChartOption(chart, data, common, palette, plotBounds);
   const special = specialtyOption(
     chart,
     data,
@@ -504,7 +506,8 @@ export function createChartOption(
   };
   if (Array.isArray(option.series))
     option.series = option.series.map((series, index) => {
-      if (chart.type === "pie" || chart.type === "doughnut") return series;
+      if (chart.type === "pie" || chart.type === "doughnut" || chart.type === "stock")
+        return series;
       const format = plotted[index]?.numberFormat;
       if (!format && chart.type !== "radar" && chart.type !== "bubble" && !percent && !customLabels)
         return series;

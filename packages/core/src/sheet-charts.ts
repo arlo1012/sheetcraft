@@ -1,3 +1,5 @@
+import { normalizeExcelDateSystem, type ExcelDateSystem } from "./formula/date-system.js";
+import { calendarDateFormat, formatCellNumberValue } from "./number-format.js";
 import { readChartComboFeature } from "./chart-combo.js";
 import {
   normalizeChartSource,
@@ -38,6 +40,7 @@ export const chartTypes = [
   "doughnut",
   "scatter",
   "bubble",
+  "stock",
   "radar",
   "treemap",
   "sankey",
@@ -176,6 +179,8 @@ export function normalizeSheetChart(chart: SheetChart): SheetChart {
       throw new TypeError("Chart presentation must be an own data field, not an accessor.");
     const settings = normalizeChartPresentation(field.value);
     presentation = settings;
+    if (settings.stockStyle && chart.type !== "stock")
+      throw new RangeError("Stock subtypes require a stock chart.");
     if (settings.pieStyle && chart.type !== "pie")
       throw new RangeError("Pie subtypes require a pie chart.");
     if (
@@ -306,7 +311,13 @@ export type ChartSeries = {
   values: Array<number | null>;
   numberFormat?: CellNumberFormat;
 };
+export type StockDateAxis = {
+  values: Array<number | null>;
+  format: Extract<CellNumberFormat, { kind: "date" }>;
+  dateSystem: ExcelDateSystem;
+};
 export type ChartData = {
+  stockDateAxis?: StockDateAxis;
   /** Derived only; not part of static caches or snapshots. */
   diagnostics?: ChartSourceDiagnostic[];
   categories: string[];
@@ -343,8 +354,26 @@ export function normalizeChartDataCache(data: ChartData): ChartData {
     data.records.reduce((count, row) => count + row.length, 0) > 10000
   )
     throw new RangeError("Invalid cached chart data.");
+  let stockDateAxis: StockDateAxis | undefined;
+  if (data.stockDateAxis !== undefined) {
+    const axis = data.stockDateAxis,
+      format = normalizeCellNumberFormat(axis.format);
+    if (
+      format.kind !== "date" ||
+      !Array.isArray(axis.values) ||
+      axis.values.length !== data.categories.length ||
+      !axis.values.every(number)
+    )
+      throw new RangeError("Invalid stock date axis cache.");
+    stockDateAxis = {
+      values: [...axis.values],
+      format,
+      dateSystem: normalizeExcelDateSystem(axis.dateSystem),
+    };
+  }
   return {
     categories: [...data.categories],
+    ...(stockDateAxis ? { stockDateAxis } : {}),
     series: data.series.map((entry) => ({
       name: entry.name,
       values: [...entry.values],
@@ -461,7 +490,13 @@ export function getSheetChartSourceData(
     index: number,
     addresses: CellAddress[],
   ): Pick<ChartSeries, "values" | "numberFormat"> {
-    const samples = addresses.map(({ row, column }) => read(row, column));
+    const samples = addresses.map((address) => {
+      if (chart.type !== "stock") return read(address.row, address.column);
+      const value = evaluator.getComputedValue(address);
+      if (typeof value === "boolean") return Number(value);
+      if (typeof value === "string") return 0;
+      return typeof value === "number" && Number.isFinite(value) ? value : null;
+    });
     if (
       chart.type === "scatter" &&
       hasSharedX &&
@@ -500,10 +535,38 @@ export function getSheetChartSourceData(
           rangeBand: { seriesBy: chart.seriesBy, index },
           ...(identities.has(index) ? { id: identities.get(index)! } : {}),
         };
+  function categoryBand(
+    addresses: CellAddress[],
+    hasLabels: boolean,
+  ): Pick<ChartData, "categories" | "stockDateAxis"> {
+    if (!hasLabels) return { categories: addresses.map((_, i) => String(i + 1)) };
+    const values = addresses.map((address) => read(address.row, address.column));
+    if (chart.type === "stock") {
+      const first = values.findIndex((value) => value !== null);
+      const format =
+        first >= 0
+          ? calendarDateFormat(getCellStyle(sheet, addresses[first]!)?.numberFormat)
+          : undefined;
+      if (
+        format?.kind === "date" &&
+        values.every((value): value is number | null => value === null || typeof value === "number")
+      ) {
+        const dateSystem = evaluator.dateSystem ?? "1900";
+        return {
+          categories: values.map((value) =>
+            value === null ? "" : formatCellNumberValue(value, format, { dateSystem }).text,
+          ),
+          stockDateAxis: { values, format: { ...format }, dateSystem },
+        };
+      }
+    }
+    return { categories: values.map((value) => String(value ?? "")) };
+  }
   if (chart.seriesBy === "rows")
     return {
-      categories: columns.map((column, index) =>
-        chart.headerRow ? String(read(range.start.row, column) ?? "") : String(index + 1),
+      ...categoryBand(
+        columns.map((column) => ({ row: range.start.row, column })),
+        chart.headerRow,
       ),
       series: xySeries(
         rows.map((row, index) => ({
@@ -520,8 +583,9 @@ export function getSheetChartSourceData(
       records,
     };
   return {
-    categories: rows.map((row, index) =>
-      chart.headerColumn ? String(read(row, range.start.column) ?? "") : String(index + 1),
+    ...categoryBand(
+      rows.map((row) => ({ row, column: range.start.column })),
+      chart.headerColumn,
     ),
     series: xySeries(
       columns.map((column, index) => ({

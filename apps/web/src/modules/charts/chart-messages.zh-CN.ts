@@ -115,6 +115,13 @@ export const chartsZhCN = {
   "chart.bubbleShaded": "三维气泡图",
   "chart.bubbleHint":
     "单组 Y 值生成等大的气泡。多组数据依次配对 Y 值和气泡大小。奇数个数据列或行时，第一组提供共用 X；偶数个时，用点序号作 X。",
+  "chart.stock": "股价图",
+  "chart.stock.hlc": "盘高-盘低-收盘图",
+  "chart.stock.ohlc": "开盘-盘高-盘低-收盘图",
+  "chart.stock.vhlc": "成交量-盘高-盘低-收盘图",
+  "chart.stock.vohlc": "成交量-开盘-盘高-盘低-收盘图",
+  "chart.stockHint": "按子型名称的顺序选择数据系列。日期类别按日历间隔排列。",
+  "chart.stockSourceHint": "{order}需要 {count} 个数值系列。请检查所选区域、类别行列和系列顺序。",
   "chart.scatter": "散点图",
   "chart.radar": "雷达图",
   "chart.treemap": "矩形树图",

@@ -1,5 +1,11 @@
+import { calendarDateFormat } from "@sheetcraft/core/number-format";
 import type { SheetChart } from "@sheetcraft/core/sheet-charts";
-import type { CellAddress, Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
+import {
+  getCellStyle,
+  type CellAddress,
+  type Sheet,
+  type SheetEvaluator,
+} from "@sheetcraft/core/workbook";
 
 /** Conservative initial interpretation for new range charts only; never used on edit. */
 export function inferChartInsertHeaders(
@@ -20,6 +26,27 @@ export function inferChartInsertHeaders(
       nonblank.every((value) => typeof value === "string" && value.trim() !== "")
     );
   }
+  function dateLabels(axis: "rows" | "columns") {
+    if (chart.type !== "stock" || chart.seriesBy !== axis || !range) return false;
+    const vertical = axis === "columns";
+    const length = vertical
+      ? range.end.row - range.start.row + 1
+      : range.end.column - range.start.column + 1;
+    for (let i = 0; i < Math.min(32, length); i++) {
+      const address = {
+        row: range.start.row + (vertical ? i : 0),
+        column: range.start.column + (vertical ? 0 : i),
+      };
+      if (!visible(address)) continue;
+      const value = evaluator.getComputedValue(address);
+      if (value === null || value === "" || (i === 0 && typeof value === "string")) continue;
+      return (
+        typeof value === "number" &&
+        !!calendarDateFormat(getCellStyle(sheet, address)?.numberFormat)
+      );
+    }
+    return false;
+  }
   const { start, end } = range;
   try {
     // Read evaluated values, not raw formulas or formatted date strings. Blank,
@@ -28,23 +55,25 @@ export function inferChartInsertHeaders(
       headerRow:
         end.row > start.row &&
         !(!chart.showHidden && sheet.hiddenRows?.has(start.row)) &&
-        textBand(
-          Array.from({ length: Math.min(32, end.column - start.column + 1) }, (_, index) => ({
-            row: start.row,
-            column: start.column + index,
-          })),
-        ),
+        (dateLabels("rows") ||
+          textBand(
+            Array.from({ length: Math.min(32, end.column - start.column + 1) }, (_, index) => ({
+              row: start.row,
+              column: start.column + index,
+            })),
+          )),
       headerColumn:
         chart.type !== "scatter" &&
         chart.type !== "bubble" &&
         end.column > start.column &&
         !(!chart.showHidden && sheet.hiddenColumns?.has(start.column)) &&
-        textBand(
-          Array.from({ length: Math.min(32, end.row - start.row + 1) }, (_, index) => ({
-            row: start.row + index,
-            column: start.column,
-          })),
-        ),
+        (dateLabels("columns") ||
+          textBand(
+            Array.from({ length: Math.min(32, end.row - start.row + 1) }, (_, index) => ({
+              row: start.row + index,
+              column: start.column,
+            })),
+          )),
     };
   } catch {
     // Do not consume an unknown first band as a header. Existing source

@@ -230,6 +230,7 @@ export function changeChartType(chart: SheetChart, type: ChartType): SheetChart 
       delete next.presentation.doughnutHole;
       delete next.presentation.doughnutRim;
     }
+    if (type !== "stock") delete next.presentation.stockStyle;
     if (type !== "bubble") delete next.presentation.bubbleShading;
     if (!Object.keys(next.presentation).length) delete next.presentation;
   }

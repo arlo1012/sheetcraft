@@ -127,6 +127,15 @@ export const chartsEnUS = {
   "chart.bubbleShaded": "3-D Bubble",
   "chart.bubbleHint":
     "A single Y band gives equal bubbles. With multiple bands, each series uses a pair of Y and size values. An odd number of bands supplies shared X values in the first band. An even number uses point ordinals for X.",
+  "chart.stock": "Stock",
+  "chart.stock.hlc": "High-low-close",
+  "chart.stock.ohlc": "Open-high-low-close",
+  "chart.stock.vhlc": "Volume-high-low-close",
+  "chart.stock.vohlc": "Volume-open-high-low-close",
+  "chart.stockHint":
+    "Arrange the series in the order shown by the subtype. Dates are spaced on a calendar axis.",
+  "chart.stockSourceHint":
+    "{order} requires {count} numeric series. Check the source range, category headers and series order.",
   "chart.scatter": "Scatter",
   "chart.radar": "Radar",
   "chart.treemap": "Treemap",
