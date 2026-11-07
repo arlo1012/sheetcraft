@@ -38,7 +38,11 @@ import {
   normalizeShapeFreePath,
   type ShapeFreePath,
 } from "./shape-free-path.js";
-import { normalizeFormControl, type SheetFormControl } from "./form-controls.js";
+import {
+  normalizeFormControl,
+  formControlListRange,
+  type SheetFormControl,
+} from "./form-controls.js";
 import {
   normalizeSheetAttachment,
   MAX_SHEET_ATTACHMENT_BYTES,
@@ -236,15 +240,20 @@ export function mapDrawingSource(
       camera: { ...drawing.camera, range: bounded(drawing.camera.range, 10000) },
     };
   if (drawing.kind === "control") {
-    const linked = drawing.control.linkedCell
-      ? map({ start: drawing.control.linkedCell, end: drawing.control.linkedCell })
-      : null;
+    const linked =
+      !drawing.control.linkedSheetId && drawing.control.linkedCell
+        ? map({ start: drawing.control.linkedCell, end: drawing.control.linkedCell })
+        : null;
     return {
       ...drawing,
       control: {
         ...drawing.control,
-        linkedCell: linked?.start ?? null,
-        source: bounded(drawing.control.source, 1000),
+        linkedCell: drawing.control.linkedSheetId
+          ? drawing.control.linkedCell
+          : (linked?.start ?? null),
+        source: drawing.control.sourceSheetId
+          ? drawing.control.source
+          : formControlListRange(drawing.control.source && map(drawing.control.source)),
       },
     };
   }

@@ -15,10 +15,12 @@ import { formatRangeReference } from "../../../shared/range-reference/formatRang
 const props = defineProps<{
   drawing: SheetControlDrawing;
   sheetName: string;
+  linkedSheetName?: string;
+  sourceSheetName?: string;
   disabled: boolean;
   error: boolean;
   suspended: boolean;
-  selectReference: (current: string) => Promise<string | undefined>;
+  selectReference: (current: string, singleCell?: boolean) => Promise<string | undefined>;
 }>();
 const emit = defineEmits<{
   confirm: [drawing: SheetControlDrawing, linked: string, source: string];
@@ -29,19 +31,23 @@ const draft = ref({
   ...props.drawing,
   control: { ...props.drawing.control, items: [...props.drawing.control.items] },
 });
+function referenceText(
+  range: SheetControlDrawing["control"]["source"],
+  sheetId?: string,
+  sheetName?: string,
+) {
+  if (sheetId && (!range || !sheetName)) return "#REF!";
+  return range ? formatRangeReference(sheetName ?? props.sheetName, range) : "";
+}
+const initial = props.drawing.control;
 const linked = ref(
-  props.drawing.control.linkedCell
-    ? formatRangeReference(props.sheetName, {
-        start: props.drawing.control.linkedCell,
-        end: props.drawing.control.linkedCell,
-      })
-    : "",
+  referenceText(
+    initial.linkedCell && { start: initial.linkedCell, end: initial.linkedCell },
+    initial.linkedSheetId,
+    props.linkedSheetName,
+  ),
 );
-const source = ref(
-  props.drawing.control.source
-    ? formatRangeReference(props.sheetName, props.drawing.control.source)
-    : "",
-);
+const source = ref(referenceText(initial.source, initial.sourceSheetId, props.sourceSheetName));
 const items = ref(props.drawing.control.items.join("\n"));
 type ResetValueType = "empty" | "text" | "number" | "boolean";
 const initialReset = props.drawing.control.resetValue;
@@ -182,7 +188,7 @@ function confirm() {
           <RangeReferenceInput
             v-model="linked"
             :label="t('control.linked')"
-            :select-reference="selectReference"
+            :select-reference="(current) => selectReference(current, true)"
           />
         </div>
       </FormItem>

@@ -226,6 +226,7 @@ const legacyBodyTransform = computed(() =>
       :drawing="drawing"
       :radio-group="radioGroup"
       :sheet="sheet"
+      :resolve-sheet="resolveSheet"
       :evaluator="evaluator"
       :revision="revision ?? 0"
       @change="emit('controlChange', $event)"

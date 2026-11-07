@@ -1248,6 +1248,11 @@ function clearConditionalFormatRules(scope: "selection" | "sheet"): void {
 }
 
 function onSelectSheet(sheetId: string): void {
+  if (pickingControlRange.value) {
+    const target = controlDialog.value?.workbook.sheets.get(sheetId);
+    if (target && !target.dashboard && !target.properties.hidden) selectSheet(sheetId);
+    return;
+  }
   if (sparklineDates.picking.value) {
     sparklineDates.selectPickerSheet(sheetId);
     return;
@@ -1579,6 +1584,10 @@ const controlActions = useFormControlActions({
   getRevision: () => workbookRevision.value,
   getAddress: () => activeAddress.value,
   getEvaluator: () => activeSheetEvaluator.value,
+  selectSheet,
+  selectDrawing: (id) => {
+    sheetGridRef.value?.selectShapeObjects([[id]]);
+  },
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
   flush: () => cellEditSession.finish(),
   execute: executeCommand,
@@ -7339,8 +7348,7 @@ watch(
         pickingTableRange ||
         (pickingChartRange && !chartSourceDialog) ||
         (pickingSparklineRange && !sparklineDates.picking.value) ||
-        pickingCameraRange ||
-        pickingControlRange
+        pickingCameraRange
       "
       :view-mode="activeViewMode"
       @update:view-mode="setViewMode"
@@ -7622,13 +7630,26 @@ watch(
     v-if="controlDialog"
     :key="controlDialog.dialogId"
     :drawing="controlDialog.initial"
-    :sheet-name="activeSheet.name"
+    :sheet-name="controlDialog.sheet.name"
+    :linked-sheet-name="
+      controlDialog.initial.control.linkedSheetId
+        ? controlDialog.workbook.sheets.get(controlDialog.initial.control.linkedSheetId)?.name
+        : undefined
+    "
+    :source-sheet-name="
+      controlDialog.initial.control.sourceSheetId
+        ? controlDialog.workbook.sheets.get(controlDialog.initial.control.sourceSheetId)?.name
+        : undefined
+    "
     :disabled="
       loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'editObjects')
     "
     :error="controlError"
     :suspended="pickingControlRange"
-    :select-reference="controlRangePicker.selectReference"
+    :select-reference="
+      (text, singleCell) =>
+        controlActions.pickReference(() => controlRangePicker.selectReference(text, { singleCell }))
+    "
     @confirm="controlDialog.confirm"
     @close="controlDialog.close"
   />

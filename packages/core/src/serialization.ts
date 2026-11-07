@@ -372,6 +372,7 @@ export type WorkbookSnapshotV106 = Omit<WorkbookSnapshotV105, "version"> & { ver
 export type WorkbookSnapshotV107 = Omit<WorkbookSnapshotV106, "version"> & { version: 107 };
 export type WorkbookSnapshotV108 = Omit<WorkbookSnapshotV107, "version"> & { version: 108 };
 export type WorkbookSnapshotV109 = Omit<WorkbookSnapshotV108, "version"> & { version: 109 };
+export type WorkbookSnapshotV110 = Omit<WorkbookSnapshotV109, "version"> & { version: 110 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -439,7 +440,8 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV106
   | WorkbookSnapshotV107
   | WorkbookSnapshotV108
-  | WorkbookSnapshotV109;
+  | WorkbookSnapshotV109
+  | WorkbookSnapshotV110;
 type WorkbookWritePayload = Omit<WorkbookSnapshotV98, "version"> & {
   version: WorkbookSnapshot["version"];
 };
@@ -570,7 +572,8 @@ type SnapshotVersion =
   | 106
   | 107
   | 108
-  | 109;
+  | 109
+  | 110;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -609,6 +612,18 @@ function hasLocalControlValue(drawings: unknown): boolean {
         drawing?.kind === "control" &&
         drawing.control &&
         Object.hasOwn(drawing.control, "localValue"),
+    )
+  );
+}
+function hasCrossSheetControls(drawings: unknown): boolean {
+  return (
+    Array.isArray(drawings) &&
+    drawings.some(
+      (item) =>
+        item?.kind === "control" &&
+        item.control &&
+        (Object.hasOwn(item.control, "linkedSheetId") ||
+          Object.hasOwn(item.control, "sourceSheetId")),
     )
   );
 }
@@ -2930,7 +2945,10 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasStockCharts(record.drawings)) version = 107;
     if (hasLocalControlValue(record.drawings)) version = 108;
     if (hasRadioOrdering(record.drawings)) version = 109;
+    if (hasCrossSheetControls(record.drawings)) version = 110;
   }
+  if (version < 110 && hasCrossSheetControls(record.drawings))
+    return fail(path + ".drawings", "Cross-sheet form controls require snapshot version 110.");
   if (version < 109 && hasRadioOrdering(record.drawings))
     return fail(path + ".drawings", "Option button groups require snapshot version 109.");
   if (version < 108 && hasLocalControlValue(record.drawings))
@@ -3438,6 +3456,7 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   if (sheets.some((sheet) => hasStockCharts(sheet.drawings))) snapshot.version = 107;
   if (sheets.some((sheet) => hasLocalControlValue(sheet.drawings))) snapshot.version = 108;
   if (sheets.some((sheet) => hasRadioOrdering(sheet.drawings))) snapshot.version = 109;
+  if (sheets.some((sheet) => hasCrossSheetControls(sheet.drawings))) snapshot.version = 110;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -3554,7 +3573,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 106 &&
     record.version !== 107 &&
     record.version !== 108 &&
-    record.version !== 109
+    record.version !== 109 &&
+    record.version !== 110
   ) {
     throw new WorkbookDomainError(
       {

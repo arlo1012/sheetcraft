@@ -1,11 +1,13 @@
 import { createPictureSheetMetrics, type PictureSheetMetrics } from "./picture-axis-metrics.js";
 import type { SheetControlDrawing, SheetDrawing } from "./sheet-drawings.js";
 import type { CellAddress, Sheet, SheetEvaluator } from "./workbook.js";
+import { getFormControlValue } from "./form-controls.js";
 
 export type FormRadioGroup = {
   boxId?: string;
   members: SheetControlDrawing[];
   linkedCell: CellAddress | null;
+  linkedSheetId?: string;
   localSelection?: string;
 };
 
@@ -65,8 +67,15 @@ export function getFormRadioGroups(
       groups.set(boxId, group);
     }
     group.members.push(radio);
-    if (radio.control.radioGroupId === boxId && radio.control.linkedCell)
-      group.linkedCell ??= radio.control.linkedCell;
+    if (
+      !group.linkedCell &&
+      !group.linkedSheetId &&
+      radio.control.radioGroupId === boxId &&
+      (radio.control.linkedCell || radio.control.linkedSheetId)
+    ) {
+      group.linkedCell = radio.control.linkedCell;
+      group.linkedSheetId = radio.control.linkedSheetId;
+    }
     if (radio.control.localValue !== undefined) group.localSelection ??= radio.id;
   }
   return groups;
@@ -78,8 +87,8 @@ export function findFormRadioGroup(groups: Map<string | undefined, FormRadioGrou
 }
 
 export function selectedFormRadio(group: FormRadioGroup, evaluator: SheetEvaluator) {
-  if (!group.linkedCell) return group.localSelection;
-  const value = evaluator.getComputedValue(group.linkedCell);
+  if (!group.linkedCell) return group.linkedSheetId ? undefined : group.localSelection;
+  const value = getFormControlValue(group, evaluator);
   return typeof value === "number" && Number.isInteger(value)
     ? group.members[value - 1]?.id
     : undefined;
@@ -90,7 +99,12 @@ export function selectedFormRadio(group: FormRadioGroup, evaluator: SheetEvaluat
 export function prepareFormRadioDrawings(
   sheet: Sheet,
   proposed: readonly SheetDrawing[],
-  edit?: { id: string; linkedCell: CellAddress | null; evaluator: SheetEvaluator },
+  edit?: {
+    id: string;
+    linkedCell: CellAddress | null;
+    linkedSheetId?: string;
+    evaluator: SheetEvaluator;
+  },
 ): SheetDrawing[] {
   if (!proposed.some(participatesInGrouping)) return [...proposed];
   const previous = sheet.drawings ?? [];
@@ -114,20 +128,30 @@ export function prepareFormRadioDrawings(
   const updates = new Map<string, SheetControlDrawing>();
   for (const group of getFormRadioGroups(sheet, next, metrics).values()) {
     const oldGroup = oldGroups.get(group.boxId);
-    let link = oldGroup?.linkedCell ?? group.linkedCell;
+    const binding = oldGroup && (oldGroup.linkedCell || oldGroup.linkedSheetId) ? oldGroup : group;
+    let link = binding.linkedCell;
+    let linkedSheetId = binding.linkedSheetId;
     let selected = group.localSelection;
     if (edit && group.members.some((item) => item.id === edit.id)) {
       if (oldGroup && !edit.linkedCell && oldGroup.linkedCell)
         selected = selectedFormRadio(oldGroup, edit.evaluator);
       // A newly inserted option inherits the link of its destination group.
-      if (edit.linkedCell || previousControls.some((item) => item.id === edit.id && isRadio(item)))
+      if (
+        edit.linkedCell ||
+        edit.linkedSheetId ||
+        previousControls.some((item) => item.id === edit.id && isRadio(item))
+      ) {
         link = edit.linkedCell;
+        linkedSheetId = edit.linkedSheetId;
+      }
     }
     group.members.forEach((item, index) => {
       const control = { ...item.control, optionValue: index + 1, linkedCell: link };
+      if (linkedSheetId) control.linkedSheetId = linkedSheetId;
+      else delete control.linkedSheetId;
       if (group.boxId) control.radioGroupId = group.boxId;
       else delete control.radioGroupId;
-      if (!link && item.id === selected) control.localValue = index + 1;
+      if (!link && !linkedSheetId && item.id === selected) control.localValue = index + 1;
       else delete control.localValue;
       updates.set(item.id, { ...item, control });
     });

@@ -1,8 +1,6 @@
-import { mapSheetDrawingChartReferences } from "../chart-source-references.js";
-import { mapSheetCameraReferences } from "../camera-source-references.js";
-
 import {
   prepareExternalDrawingCollections,
+  mapSheetDrawingDataReferences,
   mapExternalSparklineDates,
   readExternalDrawingCollections,
   commitExternalDrawingCollections,
@@ -56,9 +54,6 @@ import type {
 import { invalidCommandPayload } from "./helpers.js";
 
 import { mapDashboardReferences } from "../dashboard.js";
-function mapSheetDrawingDataReferences(...args: Parameters<typeof mapSheetDrawingChartReferences>) {
-  return mapSheetCameraReferences(mapSheetDrawingChartReferences(...args), args[2]);
-}
 
 function sheetNotFound(sheetId: unknown): WorkbookDomainError {
   return new WorkbookDomainError(

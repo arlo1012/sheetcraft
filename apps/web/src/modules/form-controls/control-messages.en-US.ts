@@ -26,7 +26,7 @@ export const controlsEnUS = {
   "control.hint":
     "Drag the caption to move the control or double-click to edit. Choose a linked cell to write the control's value to it.",
   "control.invalid":
-    "Check the linked cell, single-row or single-column item source and numeric limits. References must use this sheet.",
+    "Check the linked cell, single-row or single-column item source and numeric limits.",
   "control.checkbox": "Checkbox",
   "control.radio": "Option button",
   "control.combo": "Combo box",

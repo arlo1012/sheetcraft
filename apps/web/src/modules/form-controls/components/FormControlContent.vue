@@ -21,6 +21,7 @@ const props = defineProps<{
   drawing: SheetControlDrawing;
   radioGroup?: FormRadioGroup;
   sheet: Sheet;
+  resolveSheet?: (id: string) => Sheet | undefined;
   evaluator: SheetEvaluator;
   revision: number;
 }>();
@@ -52,8 +53,16 @@ const options = computed(() => {
 const disabled = computed(() => {
   void props.revision;
   const linkedCell = radioGroup.value ? radioGroup.value.linkedCell : control.value.linkedCell;
+  const linkedSheetId = radioGroup.value
+    ? radioGroup.value.linkedSheetId
+    : control.value.linkedSheetId;
+  const linkedSheet =
+    linkedSheetId && linkedSheetId !== props.sheet.id
+      ? props.resolveSheet?.(linkedSheetId)
+      : props.sheet;
+  if (!linkedSheet || (linkedSheetId && !linkedCell)) return true;
   return linkedCell
-    ? !canEditCell(props.sheet, linkedCell)
+    ? !canEditCell(linkedSheet, linkedCell)
     : control.value.type === "button" || !canEditShapeObject(props.sheet, props.drawing);
 });
 const number = computed(() => (typeof value.value === "number" ? value.value : control.value.min));

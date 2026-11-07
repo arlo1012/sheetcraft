@@ -20,8 +20,10 @@ export type SheetFormControl = {
   type: FormControlType;
   label: string;
   linkedCell: CellAddress | null;
+  linkedSheetId?: string;
   localValue?: number | boolean;
   source: CellRange | null;
+  sourceSheetId?: string;
   items: string[];
   min: number;
   max: number;
@@ -31,6 +33,13 @@ export type SheetFormControl = {
   radioGroupId?: string;
   resetValue: CellValue;
 };
+/** Ownership transforms may invalidate a formerly contiguous list. */
+export function formControlListRange(range: CellRange | null): CellRange | null {
+  if (!range) return null;
+  const rows = range.end.row - range.start.row + 1;
+  const columns = range.end.column - range.start.column + 1;
+  return (rows === 1 || columns === 1) && rows * columns <= 1000 ? range : null;
+}
 const types = new Set([
   "checkbox",
   "radio",
@@ -57,6 +66,9 @@ export function normalizeFormControl(value: SheetFormControl): SheetFormControl 
     typeof value.label !== "string" ||
     value.label.length > 1000 ||
     (value.linkedCell !== null && !address(value.linkedCell)) ||
+    [value.linkedSheetId, value.sourceSheetId].some(
+      (id) => id !== undefined && (typeof id !== "string" || !id.trim() || id.length > 1024),
+    ) ||
     !Array.isArray(value.items) ||
     value.items.length > 1000 ||
     value.items.some((item) => typeof item !== "string" || item.length > 1000) ||
@@ -85,9 +97,7 @@ export function normalizeFormControl(value: SheetFormControl): SheetFormControl 
       !address(source.end) ||
       source.start.row > source.end.row ||
       source.start.column > source.end.column ||
-      (source.start.row !== source.end.row && source.start.column !== source.end.column) ||
-      (source.end.row - source.start.row + 1) * (source.end.column - source.start.column + 1) >
-        1000)
+      !formControlListRange(source))
   )
     throw new RangeError("Control items require a single row or column of at most 1,000 cells.");
   if (
@@ -96,15 +106,18 @@ export function normalizeFormControl(value: SheetFormControl): SheetFormControl 
     (typeof value.localValue !== "number" || !Number.isFinite(value.localValue))
   )
     throw new RangeError("Invalid form control value.");
-  const localValue = value.linkedCell
-    ? undefined
-    : normalizeLocalControlValue(value, value.localValue);
+  const localValue =
+    value.linkedCell || value.linkedSheetId
+      ? undefined
+      : normalizeLocalControlValue(value, value.localValue);
   return {
     type: value.type,
     label: value.label,
     linkedCell: value.linkedCell ? { ...value.linkedCell } : null,
+    ...(value.linkedSheetId ? { linkedSheetId: value.linkedSheetId } : {}),
     ...(localValue === undefined ? {} : { localValue }),
     source: source ? { start: { ...source.start }, end: { ...source.end } } : null,
+    ...(value.sourceSheetId ? { sourceSheetId: value.sourceSheetId } : {}),
     items: [...value.items],
     min: value.min,
     max: value.max,
@@ -144,20 +157,34 @@ export function normalizeLocalControlValue(
       return undefined;
   }
 }
-export function getFormControlValue(control: SheetFormControl, evaluator: SheetEvaluator) {
-  return control.linkedCell
-    ? evaluator.getComputedValue(control.linkedCell)
-    : (control.localValue ?? null);
+function controlEvaluator(evaluator: SheetEvaluator, sheetId?: string) {
+  if (!sheetId) return evaluator;
+  try {
+    return evaluator.forSheet?.(sheetId);
+  } catch {
+    return undefined;
+  }
+}
+export function getFormControlValue(
+  control: Pick<SheetFormControl, "linkedCell" | "linkedSheetId" | "localValue">,
+  evaluator: SheetEvaluator,
+) {
+  if (!control.linkedCell) return control.linkedSheetId ? null : (control.localValue ?? null);
+  return (
+    controlEvaluator(evaluator, control.linkedSheetId)?.getComputedValue(control.linkedCell) ?? null
+  );
 }
 export function getFormControlItems(
   control: SheetFormControl,
   evaluator: SheetEvaluator,
 ): string[] {
-  if (!control.source) return [...control.items];
+  if (!control.source) return control.sourceSheetId ? [] : [...control.items];
+  const source = controlEvaluator(evaluator, control.sourceSheetId);
+  if (!source) return [];
   const values: string[] = [];
   for (let row = control.source.start.row; row <= control.source.end.row; row++)
     for (let column = control.source.start.column; column <= control.source.end.column; column++) {
-      const value = evaluator.getComputedValue({ row, column });
+      const value = source.getComputedValue({ row, column });
       values.push(value === null || typeof value === "object" ? "" : String(value));
     }
   return values;

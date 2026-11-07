@@ -22,7 +22,7 @@ export const controlsZhCN = {
   "control.invalidResetNumber": "请输入有效的数字。",
   "control.hint":
     "拖动标题可移动控件，双击标题可编辑设置。指定关联单元格后，操作控件会更新该单元格。",
-  "control.invalid": "请检查关联单元格、单行或单列选项来源及数值范围。仅支持当前工作表。",
+  "control.invalid": "请检查关联单元格、单行或单列选项来源及数值范围。",
   "control.invalidBounds": "最小值和最大值必须是数字，且最小值不能大于最大值。",
   "control.invalidStep": "步长必须是大于零的数字。",
   "control.checkbox": "复选框",

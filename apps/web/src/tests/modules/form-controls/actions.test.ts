@@ -15,9 +15,10 @@ import {
   getActiveSheet,
   getCellContent,
   setCellContent,
-  createSheetEvaluator,
+  createWorkbookEvaluator,
   insertSheet,
 } from "@sheetcraft/core/workbook";
+import { getFormControlItems } from "@sheetcraft/core/form-controls";
 import type { SheetControlDrawing } from "@sheetcraft/core/sheet-drawings";
 import { useFormControlActions } from "../../../modules/form-controls/useFormControlActions";
 import { controlDrawing } from "./fixture";
@@ -39,7 +40,7 @@ function fixture() {
     getGeneration: () => generation.value,
     getRevision: () => revision.value,
     getAddress: () => ({ row: 1, column: 1 }),
-    getEvaluator: () => createSheetEvaluator(sheet),
+    getEvaluator: () => createWorkbookEvaluator(workbook, sheet.id),
     isBusy: () => busy,
     flush,
     execute,
@@ -51,6 +52,9 @@ function fixture() {
     revision,
     execute,
     session,
+    get workbook() {
+      return workbook;
+    },
     flush,
     get sheet() {
       return sheet;
@@ -378,6 +382,132 @@ describe("form control actions", () => {
       kind: "literal",
       value: true,
     });
+  });
+
+  test.each(["checkbox", "list", "button"] as const)(
+    "%s writes to an external linked sheet",
+    (type) => {
+      const f = fixture();
+      const target = createSheet("Write back", "write");
+      insertSheet(f.workbook, target);
+      const drawing = controlDrawing(type);
+      drawing.control.resetValue = 7;
+      f.sheet.drawings = [drawing];
+      f.actions.open(drawing);
+      f.actions.confirm(f.actions.editing.value!, "'Write back'!B2", "");
+      const current = f.sheet.drawings![0] as SheetControlDrawing;
+      expect(current.control).toMatchObject({
+        linkedSheetId: target.id,
+        linkedCell: { row: 1, column: 1 },
+      });
+      f.actions.change(drawing.id, type === "checkbox" ? true : type === "list" ? 2 : null);
+      expect(getCellContent(target, { row: 1, column: 1 })).toEqual({
+        kind: "literal",
+        value: type === "checkbox" ? true : type === "list" ? 2 : 7,
+      });
+      expect(f.sheet.cells.size).toBe(0);
+      undoWorkbookCommand(f.session);
+      expect(getCellContent(target, { row: 1, column: 1 })).toBeNull();
+    },
+  );
+
+  test("list source and write-back sheets resolve independently and survive a source rename", () => {
+    const f = fixture();
+    const source = createSheet("Choices", "choices"),
+      target = createSheet("Results", "results");
+    insertSheet(f.workbook, source);
+    insertSheet(f.workbook, target);
+    setCellContent(source, { row: 0, column: 0 }, { kind: "formula", formula: { source: "=1+1" } });
+    setCellContent(source, { row: 1, column: 0 }, { kind: "literal", value: "Second" });
+    const drawing = controlDrawing("list");
+    f.sheet.drawings = [drawing];
+    f.actions.open(drawing);
+    f.actions.confirm(f.actions.editing.value!, "Results!B1", "Choices!A1:A2");
+    const current = f.sheet.drawings![0] as SheetControlDrawing;
+    expect(current.control).toMatchObject({ linkedSheetId: target.id, sourceSheetId: source.id });
+    expect(
+      getFormControlItems(current.control, createWorkbookEvaluator(f.workbook, f.sheet.id)),
+    ).toEqual(["2", "Second"]);
+    source.name = "Renamed Choices";
+    expect(
+      getFormControlItems(current.control, createWorkbookEvaluator(f.workbook, f.sheet.id)),
+    ).toEqual(["2", "Second"]);
+    f.actions.change(current.id, 2);
+    expect(getCellContent(target, { row: 0, column: 1 })).toEqual({ kind: "literal", value: 2 });
+    expect(getCellContent(source, { row: 1, column: 0 })).toEqual({
+      kind: "literal",
+      value: "Second",
+    });
+    expect(f.sheet.cells.size).toBe(0);
+  });
+
+  test("changing only a radio link's sheet reinitializes the new cell and undo restores both links and formula", () => {
+    const f = fixture();
+    const old = createSheet("Old", "old"),
+      target = createSheet("New", "new");
+    insertSheet(f.workbook, old);
+    insertSheet(f.workbook, target);
+    setCellContent(old, { row: 0, column: 0 }, { kind: "literal", value: 1 });
+    const formula = { kind: "formula" as const, formula: { source: "=40+2" } };
+    setCellContent(target, { row: 0, column: 0 }, formula);
+    const drawing = controlDrawing("radio");
+    drawing.control = {
+      ...drawing.control,
+      linkedSheetId: old.id,
+      optionValue: 1,
+      creationOrder: 1,
+    };
+    const second = {
+      ...drawing,
+      id: "second",
+      control: { ...drawing.control, optionValue: 2, creationOrder: 2 },
+    };
+    f.sheet.drawings = [drawing, second];
+    f.actions.open(drawing);
+    f.actions.confirm(f.actions.editing.value!, "New!A1", "");
+    for (const item of f.sheet.drawings as SheetControlDrawing[])
+      expect(item.control.linkedSheetId).toBe(target.id);
+    expect(getCellContent(target, { row: 0, column: 0 })).toEqual({ kind: "literal", value: 1 });
+    undoWorkbookCommand(f.session);
+    expect(f.sheet.drawings).toEqual([drawing, second]);
+    expect(getCellContent(target, { row: 0, column: 0 })).toEqual(formula);
+    expect(getCellContent(old, { row: 0, column: 0 })).toEqual({ kind: "literal", value: 1 });
+  });
+
+  test("an external linked sheet's protection rejects interaction without writing locally", () => {
+    const f = fixture();
+    const target = createSheet("Locked", "locked");
+    insertSheet(f.workbook, target);
+    const drawing = controlDrawing("checkbox");
+    drawing.control.linkedSheetId = target.id;
+    f.sheet.drawings = [drawing];
+    target.properties.protected = true;
+    f.actions.change(drawing.id, true);
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(target.cells.size).toBe(0);
+    expect(f.sheet.cells.size).toBe(0);
+  });
+
+  test("broken external links cannot fall back to local state or worksheet writes", () => {
+    const f = fixture();
+    const drawing = controlDrawing("checkbox");
+    drawing.control = { ...drawing.control, linkedSheetId: "deleted", linkedCell: null };
+    f.sheet.drawings = [drawing];
+    f.actions.change(drawing.id, true);
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(f.sheet.cells.size).toBe(0);
+    expect((f.sheet.drawings![0] as SheetControlDrawing).control.localValue).toBeUndefined();
+  });
+
+  test("explicit current-sheet references omit external sheet IDs", () => {
+    const f = fixture();
+    const drawing = controlDrawing("list");
+    f.sheet.drawings = [drawing];
+    f.actions.open(drawing);
+    f.actions.confirm(f.actions.editing.value!, `${f.sheet.name}!A1`, `${f.sheet.name}!B1:B2`);
+    const current = (f.sheet.drawings![0] as SheetControlDrawing).control;
+    expect(current.linkedSheetId).toBeUndefined();
+    expect(current.sourceSheetId).toBeUndefined();
   });
 
   test("rejects invalid unlinked item indexes before changing local state", () => {

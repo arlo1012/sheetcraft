@@ -1,4 +1,4 @@
-import { ref } from "vue";
+import { nextTick, ref, shallowRef } from "vue";
 import { canEditCell } from "@sheetcraft/core";
 import { canEditShapeObject } from "@sheetcraft/core/shape-protection";
 import {
@@ -32,6 +32,8 @@ export function useFormControlActions(options: {
   getRevision?: () => number;
   getAddress: () => CellAddress;
   getEvaluator: () => SheetEvaluator;
+  selectSheet?: (id: string) => void;
+  selectDrawing?: (id: string) => void;
   isBusy: () => boolean;
   flush: () => boolean;
   execute: (command: WorkbookCommand) => unknown;
@@ -39,14 +41,41 @@ export function useFormControlActions(options: {
 }) {
   const error = ref(false);
   const idFactory = createBrowserIdFactory();
+  const pickerOwner = shallowRef<Sheet>();
   const targets = useDrawingDialogTarget<SheetControlDrawing, [linked: string, source: string]>({
     ...options,
+    getSheet: () => pickerOwner.value ?? options.getSheet(),
     onReset: () => {
       error.value = false;
     },
   });
   const { dialog, editing, close } = targets;
+  async function pickReference(select: () => Promise<string | undefined>) {
+    const target = dialog.value;
+    if (!target || pickerOwner.value) return;
+    pickerOwner.value = target.sheet;
+    try {
+      const result = await select();
+      return dialog.value === target ? result : undefined;
+    } finally {
+      try {
+        if (
+          dialog.value === target &&
+          target.workbook === options.getWorkbook() &&
+          target.workbook.sheets.get(target.sheet.id) === target.sheet
+        ) {
+          options.selectSheet?.(target.sheet.id);
+          await nextTick();
+          if (target.existing && dialog.value === target)
+            options.selectDrawing?.(target.initial.id);
+        }
+      } finally {
+        pickerOwner.value = undefined;
+      }
+    }
+  }
   function open(drawing?: SheetControlDrawing, type: FormControlType = "checkbox") {
+    if (pickerOwner.value) return;
     const target = targets.prepare(drawing);
     if (!target) return;
     let initial: SheetControlDrawing = drawing ?? {
@@ -101,6 +130,7 @@ export function useFormControlActions(options: {
     sourceReference: string,
     target = dialog.value,
   ) {
+    if (pickerOwner.value) return;
     targets.run(target, (currentTarget) => {
       const sheet = currentTarget.sheet;
       if (drawing.id !== currentTarget.initial.id || drawing.kind !== "control") return;
@@ -114,13 +144,27 @@ export function useFormControlActions(options: {
         hasItems && sourceReference.trim()
           ? resolveRangeReference(currentTarget.workbook, sourceReference, sheet.id)
           : undefined;
+      const initial = currentTarget.initial.control;
+      const keepBrokenLink =
+        !passive &&
+        linkedReference.trim() === "#REF!" &&
+        initial.linkedSheetId &&
+        (!initial.linkedCell || !currentTarget.workbook.sheets.has(initial.linkedSheetId));
+      const keepBrokenSource =
+        hasItems &&
+        sourceReference.trim() === "#REF!" &&
+        initial.sourceSheetId &&
+        (!initial.source || !currentTarget.workbook.sheets.has(initial.sourceSheetId));
       if (
-        (!passive && linkedReference.trim() && !linked) ||
+        (!passive && linkedReference.trim() && !linked && !keepBrokenLink) ||
         (linked &&
-          (linked.sheetId !== sheet.id ||
+          (currentTarget.workbook.sheets.get(linked.sheetId)?.dashboard ||
             linked.range.start.row !== linked.range.end.row ||
             linked.range.start.column !== linked.range.end.column)) ||
-        (hasItems && sourceReference.trim() && (!source || source.sheetId !== sheet.id))
+        (hasItems &&
+          sourceReference.trim() &&
+          !keepBrokenSource &&
+          (!source || currentTarget.workbook.sheets.get(source.sheetId)?.dashboard))
       ) {
         error.value = true;
         return;
@@ -129,7 +173,17 @@ export function useFormControlActions(options: {
         const control = {
           ...drawing.control,
           linkedCell: linked?.range.start ?? null,
+          linkedSheetId: keepBrokenLink
+            ? initial.linkedSheetId
+            : linked && linked.sheetId !== sheet.id
+              ? linked.sheetId
+              : undefined,
           source: source?.range ?? null,
+          sourceSheetId: keepBrokenSource
+            ? initial.sourceSheetId
+            : source && source.sheetId !== sheet.id
+              ? source.sheetId
+              : undefined,
           items: hasItems ? drawing.control.items : [],
         };
         const previous = currentTarget.existing && currentTarget.initial.control;
@@ -153,7 +207,12 @@ export function useFormControlActions(options: {
           sheet,
           proposed,
           control.type === "radio"
-            ? { id: drawing.id, linkedCell: control.linkedCell, evaluator: options.getEvaluator() }
+            ? {
+                id: drawing.id,
+                linkedCell: control.linkedCell,
+                linkedSheetId: control.linkedSheetId,
+                evaluator: options.getEvaluator(),
+              }
             : undefined,
         );
         const command = createSetSheetDrawingsCommand(sheet.id, drawings);
@@ -162,12 +221,20 @@ export function useFormControlActions(options: {
           const previousGroup = getFormRadioGroups(sheet).get(group.boxId);
           const address = linked.range.start;
           const oldLink = previousGroup?.linkedCell;
-          if (!oldLink || address.row !== oldLink.row || address.column !== oldLink.column) {
+          if (
+            !oldLink ||
+            address.row !== oldLink.row ||
+            address.column !== oldLink.column ||
+            previousGroup?.linkedSheetId !== control.linkedSheetId
+          ) {
             const selected =
               previousGroup && selectedFormRadio(previousGroup, options.getEvaluator());
             const index = group.members.findIndex((item) => item.id === selected) + 1;
-            if (index || getCellContent(sheet, address) !== null)
-              command.radioLinkWrite = createSetCellContentCommand(sheet.id, address, {
+            if (
+              index ||
+              getCellContent(currentTarget.workbook.sheets.get(linked.sheetId)!, address) !== null
+            )
+              command.radioLinkWrite = createSetCellContentCommand(linked.sheetId, address, {
                 kind: "literal",
                 value: index,
               });
@@ -191,7 +258,15 @@ export function useFormControlActions(options: {
         ? findFormRadioGroup(getFormRadioGroups(sheet), id)
         : undefined;
     const linkedCell = radioGroup ? radioGroup.linkedCell : drawing.control.linkedCell;
-    if (linkedCell ? !canEditCell(sheet, linkedCell) : !canEditShapeObject(sheet, drawing)) return;
+    const linkedSheetId = radioGroup ? radioGroup.linkedSheetId : drawing.control.linkedSheetId;
+    const linkedSheet = linkedSheetId ? options.getWorkbook().sheets.get(linkedSheetId) : sheet;
+    if (
+      !linkedSheet ||
+      (linkedCell
+        ? !canEditCell(linkedSheet, linkedCell)
+        : linkedSheetId || !canEditShapeObject(sheet, drawing))
+    )
+      return;
     const value = radioGroup
       ? radioGroup.members.findIndex((item) => item.id === id) + 1
       : resolveFormControlValue(
@@ -228,7 +303,7 @@ export function useFormControlActions(options: {
     }
     options.execute(
       createSetCellContentCommand(
-        sheet.id,
+        linkedSheet.id,
         linkedCell,
         value === null ? null : { kind: "literal", value },
       ),
@@ -242,6 +317,7 @@ export function useFormControlActions(options: {
     insert: (type: FormControlType) => open(undefined, type),
     confirm,
     change,
+    pickReference,
     close,
   };
 }
