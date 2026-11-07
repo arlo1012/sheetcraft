@@ -2,7 +2,7 @@ export const controlsZhCN = {
   "control.title": "窗体",
   "control.type": "控件类型",
   "control.labelText": "显示文字",
-  "control.linked": "关联单元格",
+  "control.linked": "关联单元格（可选）",
   "control.source": "选项来源区域（可选）",
   "control.items": "手动选项（每行一个）",
   "control.listHint": "有来源区域时优先使用来源；关联单元格写入所选项序号，从 1 开始。",
@@ -19,7 +19,7 @@ export const controlsZhCN = {
   "control.emptyValueHint": "点击按钮时清空关联单元格的内容。",
   "control.invalidResetNumber": "请输入有效的数字。",
   "control.hint":
-    "拖动标题可移动控件，双击标题可编辑设置。关联单元格需可编辑；按钮用于设置单元格值。",
+    "拖动标题可移动控件，双击标题可编辑设置。指定关联单元格后，操作控件会更新该单元格。",
   "control.invalid": "请检查关联单元格、单行或单列选项来源及数值范围。仅支持当前工作表。",
   "control.invalidBounds": "最小值和最大值必须是数字，且最小值不能大于最大值。",
   "control.invalidStep": "步长必须是大于零的数字。",

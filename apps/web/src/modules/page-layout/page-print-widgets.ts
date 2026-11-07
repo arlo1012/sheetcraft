@@ -1,5 +1,5 @@
 import { iconPaths } from "@sheetcraft/core/sheet-icons";
-import { getFormControlItems } from "@sheetcraft/core/form-controls";
+import { getFormControlItems, getFormControlValue } from "@sheetcraft/core/form-controls";
 import {
   normalizeSheetDrawing,
   isSheetDrawingVisible,
@@ -50,10 +50,7 @@ export function capturePrintWidgets(
         drawing,
         order,
         layout,
-        value:
-          drawing.kind === "control" && drawing.control.linkedCell
-            ? evaluator.getComputedValue(drawing.control.linkedCell)
-            : null,
+        value: drawing.kind === "control" ? getFormControlValue(drawing.control, evaluator) : null,
         items: drawing.kind === "control" ? getFormControlItems(drawing.control, evaluator) : [],
       },
     ];

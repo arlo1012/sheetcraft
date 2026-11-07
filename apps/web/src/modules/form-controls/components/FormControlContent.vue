@@ -7,7 +7,8 @@ import { InputNumber } from "tdesign-vue-next/es/input-number";
 import { Slider } from "tdesign-vue-next/es/slider";
 import { Button } from "tdesign-vue-next/es/button";
 import { canEditCell } from "@sheetcraft/core";
-import { getFormControlItems } from "@sheetcraft/core/form-controls";
+import { canEditShapeObject } from "@sheetcraft/core/shape-protection";
+import { getFormControlItems, getFormControlValue } from "@sheetcraft/core/form-controls";
 import type { SheetControlDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 const props = defineProps<{
@@ -20,9 +21,7 @@ const emit = defineEmits<{ change: [value: unknown] }>();
 const control = computed(() => props.drawing.control);
 const value = computed(() => {
   void props.revision;
-  return control.value.linkedCell
-    ? props.evaluator.getComputedValue(control.value.linkedCell)
-    : null;
+  return getFormControlValue(control.value, props.evaluator);
 });
 const options = computed(() => {
   void props.revision;
@@ -33,9 +32,30 @@ const options = computed(() => {
 });
 const disabled = computed(() => {
   void props.revision;
-  return !control.value.linkedCell || !canEditCell(props.sheet, control.value.linkedCell);
+  return control.value.linkedCell
+    ? !canEditCell(props.sheet, control.value.linkedCell)
+    : control.value.type === "button" || !canEditShapeObject(props.sheet, props.drawing);
 });
 const number = computed(() => (typeof value.value === "number" ? value.value : control.value.min));
+function scrollByKey(event: KeyboardEvent) {
+  const { min, max, step } = control.value;
+  const current = number.value;
+  const targets: Record<string, number> = {
+    ArrowRight: current + step,
+    ArrowUp: current + step,
+    ArrowLeft: current - step,
+    ArrowDown: current - step,
+    Home: min,
+    End: max,
+    PageUp: current + 10,
+    PageDown: current - 10,
+  };
+  const target = targets[event.key];
+  if (disabled.value || target === undefined) return;
+  event.preventDefault();
+  event.stopPropagation();
+  emit("change", Math.min(max, Math.max(min, target)));
+}
 </script>
 <template>
   <div class="form-control-content">
@@ -108,6 +128,7 @@ const number = computed(() => (typeof value.value === "number" ? value.value : c
           :step="control.step"
           :disabled="disabled"
           :aria-label="control.label"
+          @keydown.capture="scrollByKey"
           @change-end="emit('change', $event)"
         />
         <Button

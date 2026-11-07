@@ -5,7 +5,7 @@ export const controlsEnUS = {
   "control.title": "Form controls",
   "control.type": "Control type",
   "control.labelText": "Label",
-  "control.linked": "Linked cell",
+  "control.linked": "Linked cell (optional)",
   "control.source": "Item source range (optional)",
   "control.items": "Manual items (one per line)",
   "control.listHint":
@@ -23,7 +23,7 @@ export const controlsEnUS = {
   "control.emptyValueHint": "Clicking the button clears the linked cell's contents.",
   "control.invalidResetNumber": "Enter a valid number.",
   "control.hint":
-    "Drag the caption to move; double-click it to edit. The linked cell must be editable. Buttons set a cell value.",
+    "Drag the caption to move the control or double-click to edit. Choose a linked cell to write the control's value to it.",
   "control.invalid":
     "Check the linked cell, single-row or single-column item source and numeric limits. References must use this sheet.",
   "control.checkbox": "Checkbox",

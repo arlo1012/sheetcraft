@@ -20,6 +20,7 @@ export type SheetFormControl = {
   type: FormControlType;
   label: string;
   linkedCell: CellAddress | null;
+  localValue?: number | boolean;
   source: CellRange | null;
   items: string[];
   min: number;
@@ -83,10 +84,20 @@ export function normalizeFormControl(value: SheetFormControl): SheetFormControl 
         1000)
   )
     throw new RangeError("Control items require a single row or column of at most 1,000 cells.");
+  if (
+    value.localValue !== undefined &&
+    typeof value.localValue !== "boolean" &&
+    (typeof value.localValue !== "number" || !Number.isFinite(value.localValue))
+  )
+    throw new RangeError("Invalid form control value.");
+  const localValue = value.linkedCell
+    ? undefined
+    : normalizeLocalControlValue(value, value.localValue);
   return {
     type: value.type,
     label: value.label,
     linkedCell: value.linkedCell ? { ...value.linkedCell } : null,
+    ...(localValue === undefined ? {} : { localValue }),
     source: source ? { start: { ...source.start }, end: { ...source.end } } : null,
     items: [...value.items],
     min: value.min,
@@ -95,6 +106,36 @@ export function normalizeFormControl(value: SheetFormControl): SheetFormControl 
     optionValue: value.optionValue,
     resetValue: value.resetValue,
   };
+}
+/** Keep only a standalone value the configured control can display. */
+export function normalizeLocalControlValue(
+  control: SheetFormControl,
+  value: unknown,
+): number | boolean | undefined {
+  if (control.type === "checkbox") return typeof value === "boolean" ? value : undefined;
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  switch (control.type) {
+    case "radio":
+      return value === control.optionValue ? value : undefined;
+    case "combo":
+    case "list": {
+      const { source } = control;
+      const count = source
+        ? Math.max(source.end.row - source.start.row, source.end.column - source.start.column) + 1
+        : control.items.length;
+      return Number.isInteger(value) && value >= 1 && value <= count ? value : undefined;
+    }
+    case "spinner":
+    case "scrollbar":
+      return Math.min(control.max, Math.max(control.min, value));
+    default:
+      return undefined;
+  }
+}
+export function getFormControlValue(control: SheetFormControl, evaluator: SheetEvaluator) {
+  return control.linkedCell
+    ? evaluator.getComputedValue(control.linkedCell)
+    : (control.localValue ?? null);
 }
 export function getFormControlItems(
   control: SheetFormControl,

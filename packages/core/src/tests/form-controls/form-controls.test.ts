@@ -1,3 +1,4 @@
+// 未执行：按用户约定仅编写回归，待插入与打印功能完成后统一运行。
 import { describe, expect, test } from "vitest";
 import {
   normalizeFormControl,
@@ -112,6 +113,80 @@ describe("form controls", () => {
   ] as const)("accepts %s", (type) => {
     expect(normalizeFormControl({ ...control(), type }).type).toBe(type);
   });
+  test.each([
+    { type: "checkbox", localValue: false },
+    { type: "radio", localValue: 3 },
+    { type: "combo", localValue: 2 },
+    { type: "list", localValue: 1 },
+    { type: "spinner", localValue: 0 },
+    { type: "scrollbar", localValue: 4 },
+  ] as const)(
+    "retains unlinked $type local state including false and zero",
+    ({ type, localValue }) => {
+      const original: SheetFormControl = { ...control(), type, linkedCell: null, localValue };
+      expect(normalizeFormControl(original).localValue).toBe(localValue);
+      expect(original.localValue).toBe(localValue);
+    },
+  );
+
+  test.each(["button", "label", "group"] as const)(
+    "drops inapplicable local state from %s",
+    (type) => {
+      const normalized = normalizeFormControl({
+        ...control(),
+        type,
+        linkedCell: null,
+        localValue: 2,
+      });
+      expect(normalized.localValue).toBeUndefined();
+    },
+  );
+
+  test("a linked control takes its value from the cell and discards stale local state", () => {
+    const normalized = normalizeFormControl({ ...control(), localValue: 2 });
+    expect(normalized.linkedCell).toEqual(control().linkedCell);
+    expect(normalized.localValue).toBeUndefined();
+  });
+
+  test.each(["text", null, NaN, Infinity, {}, []])(
+    "rejects invalid unlinked local state %j",
+    (localValue) => {
+      expect(() =>
+        normalizeFormControl({
+          ...control(),
+          linkedCell: null,
+          localValue,
+        } as SheetFormControl),
+      ).toThrow();
+    },
+  );
+
+  test.each([false, 0, 2] as const)(
+    "round trips an unlinked control local value %s in V108 and rejects it in V107",
+    (localValue) => {
+      const f = fixture();
+      const unlinked = drawing();
+      unlinked.control = {
+        ...unlinked.control,
+        type: typeof localValue === "boolean" ? "checkbox" : "spinner",
+        linkedCell: null,
+        localValue,
+      };
+      executeWorkbookCommand(f.session, createSetSheetDrawingsCommand(f.sheet.id, [unlinked]));
+      const before = structuredClone(unlinked);
+      const snapshot = serializeWorkbook(f.session.workbook);
+      expect(snapshot.version).toBe(108);
+      expect(() => deserializeWorkbook({ ...snapshot, version: 107 })).toThrow();
+      const restored = deserializeWorkbook(snapshot);
+      expect(restored.sheets.get(f.sheet.id)!.drawings).toEqual([before]);
+      expect(serializeWorkbook(restored)).toEqual(snapshot);
+      expect(serializeSheet(deserializeSheet(serializeSheet(f.sheet)))).toEqual(
+        serializeSheet(f.sheet),
+      );
+      expect(unlinked).toEqual(before);
+    },
+  );
+
   test("clones linked coordinates, source coordinates and explicit items", () => {
     const original = control();
     const clone = normalizeFormControl(original);
@@ -201,10 +276,10 @@ describe("form controls", () => {
     undoWorkbookCommand(f.session);
     expect(f.current()).toEqual(control());
   });
-  test("round trips V30 controls and rejects their payload in V29", () => {
+  test("round trips controls in the current format and rejects their payload in V29", () => {
     const f = fixture();
     const snapshot = serializeWorkbook(f.session.workbook);
-    expect(snapshot.version).toBe(43);
+    expect(snapshot.version).toBeGreaterThanOrEqual(30);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
     expect(() => deserializeWorkbook({ ...snapshot, version: 29 })).toThrow();
     const standalone = serializeSheet(f.sheet);

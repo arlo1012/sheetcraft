@@ -370,6 +370,7 @@ export type WorkbookSnapshotV104 = Omit<WorkbookSnapshotV103, "version"> & { ver
 export type WorkbookSnapshotV105 = Omit<WorkbookSnapshotV104, "version"> & { version: 105 };
 export type WorkbookSnapshotV106 = Omit<WorkbookSnapshotV105, "version"> & { version: 106 };
 export type WorkbookSnapshotV107 = Omit<WorkbookSnapshotV106, "version"> & { version: 107 };
+export type WorkbookSnapshotV108 = Omit<WorkbookSnapshotV107, "version"> & { version: 108 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -435,7 +436,8 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV104
   | WorkbookSnapshotV105
   | WorkbookSnapshotV106
-  | WorkbookSnapshotV107;
+  | WorkbookSnapshotV107
+  | WorkbookSnapshotV108;
 type WorkbookWritePayload = Omit<WorkbookSnapshotV98, "version"> & {
   version: WorkbookSnapshot["version"];
 };
@@ -564,7 +566,8 @@ type SnapshotVersion =
   | 104
   | 105
   | 106
-  | 107;
+  | 107
+  | 108;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -592,6 +595,17 @@ function hasPiePresentation(
         d?.kind === "chart" &&
         d.chart?.presentation &&
         fields.some((key) => Object.hasOwn(d.chart.presentation, key)),
+    )
+  );
+}
+function hasLocalControlValue(drawings: unknown): boolean {
+  return (
+    Array.isArray(drawings) &&
+    drawings.some(
+      (drawing) =>
+        drawing?.kind === "control" &&
+        drawing.control &&
+        Object.hasOwn(drawing.control, "localValue"),
     )
   );
 }
@@ -2899,7 +2913,10 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasPiePresentation(record.drawings)) version = 105;
     if (hasPiePresentation(record.drawings, pieGalleryFields)) version = 106;
     if (hasStockCharts(record.drawings)) version = 107;
+    if (hasLocalControlValue(record.drawings)) version = 108;
   }
+  if (version < 108 && hasLocalControlValue(record.drawings))
+    return fail(path + ".drawings", "Standalone control values require snapshot version 108.");
   if (version < 107 && hasStockCharts(record.drawings))
     return fail(path + ".drawings", "Stock charts require snapshot version 107.");
   if (version < 106 && hasPiePresentation(record.drawings, pieGalleryFields))
@@ -3401,6 +3418,7 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   if (sheets.some((sheet) => hasPiePresentation(sheet.drawings, pieGalleryFields)))
     snapshot.version = 106;
   if (sheets.some((sheet) => hasStockCharts(sheet.drawings))) snapshot.version = 107;
+  if (sheets.some((sheet) => hasLocalControlValue(sheet.drawings))) snapshot.version = 108;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -3515,7 +3533,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 104 &&
     record.version !== 105 &&
     record.version !== 106 &&
-    record.version !== 107
+    record.version !== 107 &&
+    record.version !== 108
   ) {
     throw new WorkbookDomainError(
       {

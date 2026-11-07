@@ -1,5 +1,6 @@
 import { ref } from "vue";
 import { canEditCell } from "@sheetcraft/core";
+import { canEditShapeObject } from "@sheetcraft/core/shape-protection";
 import {
   createSetSheetDrawingsCommand,
   createSetCellContentCommand,
@@ -8,6 +9,8 @@ import {
 import { normalizeSheetDrawing, type SheetControlDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
   getFormControlItems,
+  getFormControlValue,
+  normalizeLocalControlValue,
   resolveFormControlValue,
   type FormControlType,
 } from "@sheetcraft/core/form-controls";
@@ -61,7 +64,7 @@ export function useFormControlActions(options: {
       control: {
         type,
         label: options.name(type),
-        linkedCell: type === "label" || type === "group" ? null : { ...options.getAddress() },
+        linkedCell: null,
         source: null,
         items: [],
         min: 0,
@@ -95,7 +98,7 @@ export function useFormControlActions(options: {
           ? resolveRangeReference(currentTarget.workbook, sourceReference, sheet.id)
           : undefined;
       if (
-        (!passive && !linked) ||
+        (!passive && linkedReference.trim() && !linked) ||
         (linked &&
           (linked.sheetId !== sheet.id ||
             linked.range.start.row !== linked.range.end.row ||
@@ -106,14 +109,22 @@ export function useFormControlActions(options: {
         return;
       }
       try {
+        const control = {
+          ...drawing.control,
+          linkedCell: linked?.range.start ?? null,
+          source: source?.range ?? null,
+          items: hasItems ? drawing.control.items : [],
+        };
+        const previous = currentTarget.existing && currentTarget.initial.control;
+        if (previous && !linked && previous.type === control.type)
+          control.localValue = normalizeLocalControlValue(
+            control,
+            getFormControlValue(previous, options.getEvaluator()),
+          );
+        else delete control.localValue;
         const next = normalizeSheetDrawing({
           ...drawing,
-          control: {
-            ...drawing.control,
-            linkedCell: linked?.range.start ?? null,
-            source: source?.range ?? null,
-            items: hasItems ? drawing.control.items : [],
-          },
+          control,
         });
         const current = sheet.drawings ?? [];
         if (
@@ -136,25 +147,36 @@ export function useFormControlActions(options: {
   }
   function change(id: string, requested: unknown) {
     const sheet = options.getSheet();
-    const drawing = sheet.drawings?.find((item) => item.id === id);
-    if (
-      options.isBusy() ||
-      drawing?.kind !== "control" ||
-      !drawing.control.linkedCell ||
-      !canEditCell(sheet, drawing.control.linkedCell) ||
-      !options.flush()
-    )
-      return;
+    if (options.isBusy() || !options.flush() || sheet !== options.getSheet()) return;
+    const drawings = sheet.drawings ?? [];
+    const drawing = drawings.find((item) => item.id === id);
+    if (drawing?.kind !== "control") return;
+    const { linkedCell } = drawing.control;
+    if (linkedCell ? !canEditCell(sheet, linkedCell) : !canEditShapeObject(sheet, drawing)) return;
     const value = resolveFormControlValue(
       drawing.control,
       requested,
       getFormControlItems(drawing.control, options.getEvaluator()).length,
     );
     if (value === undefined) return;
+    if (!linkedCell) {
+      if (drawing.control.type === "button") return;
+      const localValue = normalizeLocalControlValue(drawing.control, value);
+      if (localValue === drawing.control.localValue) return;
+      options.execute(
+        createSetSheetDrawingsCommand(
+          sheet.id,
+          drawings.map((item) =>
+            item === drawing ? { ...drawing, control: { ...drawing.control, localValue } } : item,
+          ),
+        ),
+      );
+      return;
+    }
     options.execute(
       createSetCellContentCommand(
         sheet.id,
-        drawing.control.linkedCell,
+        linkedCell,
         value === null ? null : { kind: "literal", value },
       ),
     );

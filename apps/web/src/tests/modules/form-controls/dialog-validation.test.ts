@@ -7,6 +7,7 @@ import { InputNumber } from "tdesign-vue-next/es/input-number";
 import { Select } from "tdesign-vue-next/es/select";
 import type { FormControlType } from "@sheetcraft/core/form-controls";
 import type { SheetControlDrawing } from "@sheetcraft/core/sheet-drawings";
+import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import FormControlDialog from "../../../modules/form-controls/components/FormControlDialog.vue";
 import { createAppI18n } from "../../../shared/i18n";
 import { controlDrawing } from "./fixture";
@@ -90,6 +91,20 @@ describe.each(["spinner", "scrollbar"] as const)("%s editor numeric validation",
     confirm(wrapper);
     expect(confirmedDrawing(wrapper).control).toMatchObject({ type, min: 20, max: 30, step: 0.5 });
   });
+});
+
+describe("optional control cell links", () => {
+  test.each(["checkbox", "radio", "combo", "list", "spinner", "scrollbar", "button"] as const)(
+    "can submit a %s after clearing the linked-cell field",
+    async (type) => {
+      const wrapper = fixture(type);
+      wrapper.findAllComponents(RangeReferenceInput)[0]!.vm.$emit("update:modelValue", "");
+      await nextTick();
+      expect(wrapper.getComponent(Dialog).props("confirmBtn")).toMatchObject({ disabled: false });
+      confirm(wrapper);
+      expect(wrapper.emitted("confirm")!.at(-1)![1]).toBe("");
+    },
+  );
 });
 
 describe("form control editor type-specific validation", () => {
