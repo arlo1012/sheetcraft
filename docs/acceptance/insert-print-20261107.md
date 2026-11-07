@@ -3,6 +3,24 @@
 实现基线：`8eca25c8`。此记录只覆盖下列具体路径，不代表整个插入工具栏已与 WPS 完全一致。
 继续按先插入细节、再打印的顺序推进；功能范围仍参考各领域的当前范围文档。
 
+### 附件文本预览编码与截断（2026-11-07）
+
+现有预览一律按 UTF-8 解码，并在 120000 字节处直接截断，导致带 BOM 的 UTF-16
+文本乱码，或把边界处未读完的中文/emoji 显示成替换字符。现在按 BOM 识别
+UTF-16LE/BE，其余按 UTF-8 解码；仅在预览被截断时保留解码器的未完成字符，
+避免生成错误尾字。原附件内容、元数据、下载字节及保存协议不变。
+查看窗口会注明仅展示开头部分，并补齐对话框名称、模态语义和窄屏宽度限制。
+
+解码模块通过严格 TypeScript 检查，查看组件通过 Vue SFC 编译，格式及静态检查通过。
+回归由子代理编写，标记未运行。浏览器能读取工作簿，但点击“插入”仍报
+`Input.dispatchMouseEvent` 超时，因此本批尚未完成实际导入、中文显示、下载及重载验收。
+本地待验样例：`apps/web/tmp/attachment-preview-utf16le.txt`、
+`apps/web/tmp/attachment-preview-utf16be.txt`、`apps/web/tmp/attachment-preview-cut.txt`。
+
+附件插入后切换“图标/文档”的入口仍待 WPS 对照，本批没有扩展该界面。
+重新读取 WPS 时仍处于“隐藏和空单元格设置”；点击“取消”返回
+`computer-use request timed out: click_element`。没有操作 WPS 打印。
+
 ### 图片点击透明色：实现与待验项（2026-11-07）
 
 依据 [WPS 设置图片透明色说明](https://www.wps.cn/learning/question/detail/id/2905.html)，

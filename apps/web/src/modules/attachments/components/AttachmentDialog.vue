@@ -3,7 +3,7 @@ import { computed } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import type { SheetAttachmentDrawing } from "@sheetcraft/core/sheet-drawings";
 import { useAppI18n } from "../../../shared/i18n";
-import { attachmentText } from "../attachment-file";
+import { attachmentText, ATTACHMENT_TEXT_PREVIEW_BYTES } from "../attachment-file";
 const props = defineProps<{ drawing: SheetAttachmentDrawing }>();
 const emit = defineEmits<{ download: []; close: [] }>();
 const { t } = useAppI18n();
@@ -12,8 +12,11 @@ const text = computed(() => attachmentText(props.drawing.attachment));
 <template>
   <Dialog
     :visible="true"
+    role="dialog"
+    aria-modal="true"
+    :aria-label="drawing.attachment.filename"
     :header="drawing.attachment.filename"
-    width="680px"
+    width="min(680px, calc(100vw - 32px))"
     :confirm-btn="t('attachment.download')"
     :cancel-btn="t('picture.cancel')"
     @confirm="emit('download')"
@@ -23,6 +26,9 @@ const text = computed(() => attachmentText(props.drawing.attachment));
       <pre v-if="text !== undefined">{{ text }}</pre>
       <p v-else>
         {{ drawing.attachment.mimeType }} · {{ (drawing.attachment.size / 1024).toFixed(1) }} KB
+      </p>
+      <p v-if="text !== undefined && drawing.attachment.size > ATTACHMENT_TEXT_PREVIEW_BYTES">
+        {{ t("attachment.previewTruncated") }}
       </p>
     </div></Dialog
   >

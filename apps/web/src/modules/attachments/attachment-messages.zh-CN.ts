@@ -6,6 +6,7 @@ export const attachmentsZhCN = {
   "attachment.browse": "浏览…",
   "attachment.displayAsIcon": "显示为图标",
   "attachment.preview": "显示方式预览",
+  "attachment.previewTruncated": "这里只显示文件开头的部分内容，下载文件可查看完整内容。",
   "attachment.insertHint":
     "文件将嵌入工作簿。文本文件支持内容预览，其他格式以文件卡片显示，可下载后打开。",
   "attachment.document": "文档",

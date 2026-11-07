@@ -3,6 +3,8 @@ import {
   MAX_ATTACHMENT_BYTES,
   type SheetAttachment,
 } from "@sheetcraft/core/sheet-attachments";
+
+export const ATTACHMENT_TEXT_PREVIEW_BYTES = 120000;
 export async function prepareAttachment(
   file: File,
   display: SheetAttachment["display"],
@@ -34,6 +36,14 @@ export function attachmentText(attachment: SheetAttachment): string | undefined 
     )
   )
     return undefined;
-  const raw = atob(attachment.data.slice(0, 160000));
-  return new TextDecoder().decode(Uint8Array.from(raw, (char) => char.charCodeAt(0)));
+  const raw = atob(attachment.data.slice(0, (ATTACHMENT_TEXT_PREVIEW_BYTES / 3) * 4));
+  const bytes = Uint8Array.from(raw, (char) => char.charCodeAt(0));
+  const encoding =
+    bytes[0] === 0xff && bytes[1] === 0xfe
+      ? "utf-16le"
+      : bytes[0] === 0xfe && bytes[1] === 0xff
+        ? "utf-16be"
+        : "utf-8";
+  // A bounded preview must not turn a code point cut at its boundary into a replacement glyph.
+  return new TextDecoder(encoding).decode(bytes, { stream: attachment.size > bytes.length });
 }
