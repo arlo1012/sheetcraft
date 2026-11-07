@@ -1,3 +1,4 @@
+import { wordAttachmentDimensions } from "./word-preview";
 import { createAttachmentDrawing } from "./create-attachment-drawing";
 import { ref, shallowRef } from "vue";
 import { canUseSheetPermission } from "@sheetcraft/core";
@@ -84,6 +85,9 @@ export function useAttachmentActions(options: {
       const attachment = await prepareAttachment(pending.file, display);
       if (!isCurrent(pending)) return;
       const drawing = createAttachmentDrawing(idFactory("attachment"), pending.address, attachment);
+      const dimensions = await wordAttachmentDimensions(attachment);
+      if (!isCurrent(pending)) return;
+      if (dimensions) Object.assign(drawing, dimensions);
       const accepted = options.execute(
         createSetSheetDrawingsCommand(pending.sheet.id, [
           ...(options.getSheet().drawings ?? []),

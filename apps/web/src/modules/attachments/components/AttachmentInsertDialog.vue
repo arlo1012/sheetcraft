@@ -21,6 +21,9 @@ const asIcon = ref(props.display === "icon");
 <template>
   <Dialog
     :visible="true"
+    role="dialog"
+    aria-modal="true"
+    :aria-label="t('attachment.insertObject')"
     :header="t('attachment.insertObject')"
     width="min(520px, calc(100vw - 32px))"
     :close-on-overlay-click="false"

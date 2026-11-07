@@ -3,6 +3,8 @@ import { decodeFlowchartAttachment, FLOWCHART_MIME } from "../../flowcharts/flow
 import { decodeMindMapAttachment, MIND_MAP_MIME } from "../../mind-maps/mind-map-document";
 import MindMapCanvas from "../../mind-maps/MindMapCanvas.vue";
 import FlowchartCanvas from "../../flowcharts/FlowchartCanvas.vue";
+import WordAttachmentPreview from "./WordAttachmentPreview.vue";
+import { isWordAttachment } from "../word-preview";
 import { computed } from "vue";
 import { FileText, Paperclip } from "lucide-vue-next";
 import type { SheetAttachmentDrawing } from "@sheetcraft/core/sheet-drawings";
@@ -29,6 +31,11 @@ const text = computed(() =>
 <template>
   <FlowchartCanvas v-if="chart" :document="chart" />
   <MindMapCanvas v-else-if="map" :document="map" />
+  <WordAttachmentPreview
+    v-else-if="drawing.attachment.display === 'document' && isWordAttachment(drawing.attachment)"
+    :attachment="drawing.attachment"
+    inline
+  />
   <div v-else class="attachment-content">
     <div class="attachment-content__heading">
       <FileText v-if="drawing.attachment.display === 'document'" :size="28" /><Paperclip

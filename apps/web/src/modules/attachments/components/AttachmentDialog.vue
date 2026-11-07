@@ -3,6 +3,8 @@ import { computed, watchEffect, ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import type { SheetAttachmentDrawing } from "@sheetcraft/core/sheet-drawings";
 import { useAppI18n } from "../../../shared/i18n";
+import WordAttachmentPreview from "./WordAttachmentPreview.vue";
+import { isWordAttachment } from "../word-preview";
 import { attachmentBlob, attachmentText, ATTACHMENT_TEXT_PREVIEW_BYTES } from "../attachment-file";
 const props = defineProps<{ drawing: SheetAttachmentDrawing }>();
 const emit = defineEmits<{ download: []; close: [] }>();
@@ -40,6 +42,10 @@ watchEffect((onCleanup) => {
         :aria-label="drawing.attachment.filename"
         controls
         playsinline
+      />
+      <WordAttachmentPreview
+        v-else-if="isWordAttachment(drawing.attachment)"
+        :attachment="drawing.attachment"
       />
       <pre v-else-if="text !== undefined">{{ text }}</pre>
       <p v-else>
