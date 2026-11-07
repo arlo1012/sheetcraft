@@ -27,6 +27,7 @@ function createContext(patch: Partial<SparklineToolContext> = {}) {
     value,
     mixed: [],
     mixedPointVisibility: [],
+    mixedAxisModes: [],
     disabled: false,
     apply: vi.fn((_patch: SparklineStylePatch) => true),
     edit: vi.fn(),

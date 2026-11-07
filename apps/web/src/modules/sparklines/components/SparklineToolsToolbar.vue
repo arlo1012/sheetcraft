@@ -4,7 +4,6 @@ import {
   Activity,
   ChartColumn,
   ChartNoAxesColumnIncreasing,
-  Axis3D,
   Group,
   Ungroup,
 } from "lucide-vue-next";
@@ -15,11 +14,13 @@ import { useAppI18n } from "../../../shared/i18n";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import SparklineClearMenu from "./SparklineClearMenu.vue";
+import SparklineAxisMenu from "./SparklineAxisMenu.vue";
+import type { SparklineAxisEnd } from "../useSparklineAxisLimit";
 import SparklineColorMenu from "./SparklineColorMenu.vue";
 import SparklineDataMenu from "./SparklineDataMenu.vue";
 import SparklineStyleGallery from "./SparklineStyleGallery.vue";
 const props = defineProps<{ context: SparklineToolContext }>();
-const emit = defineEmits<{ dataOptions: [] }>();
+const emit = defineEmits<{ dataOptions: []; customAxis: [end: SparklineAxisEnd] }>();
 const { t } = useAppI18n();
 const failed = ref(false);
 function apply(patch: SparklineStylePatch): void {
@@ -131,16 +132,12 @@ function point(key: SparklinePointKind, show: boolean): void {
         />
       </div>
     </section>
-    <section class="sparkline-tools__group" role="group" :aria-label="t('sparkline.axis')">
-      <RibbonButton
-        variant="tall"
-        :label="t('sparkline.axis')"
-        :text="t('sparkline.axis')"
-        :pressed="context.mixed.includes('axis') ? 'mixed' : context.value.axis"
-        :disabled="context.disabled"
-        @activate="apply({ axis: context.mixed.includes('axis') || !context.value.axis })"
-        ><Axis3D
-      /></RibbonButton>
+    <section class="sparkline-tools__group" role="group" :aria-label="t('sparkline.axisMenu')">
+      <SparklineAxisMenu
+        :context="context"
+        @custom="emit('customAxis', $event)"
+        @failed="failed = true"
+      />
       <div class="sparkline-tools__stack">
         <RibbonButton
           :label="t('sparkline.group')"

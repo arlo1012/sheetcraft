@@ -146,6 +146,55 @@ describe("sparkline selection tools", () => {
     expect(f.tools.value!.mixedPointVisibility).toEqual(["highPoint"]);
   });
 
+  test("distinguishes different custom axis values from different axis modes", () => {
+    const f = fixture();
+    setCellSparkline(f.sheet.value, firstAddress, {
+      ...f.first,
+      minAxis: { type: "custom", value: -10 },
+      maxAxis: { type: "group" },
+    });
+    setCellSparkline(f.sheet.value, secondAddress, {
+      ...f.second,
+      minAxis: { type: "custom", value: -20 },
+      maxAxis: { type: "group" },
+    });
+
+    expect(f.tools.value!.mixed).toContain("minAxis");
+    expect(f.tools.value!.mixed).not.toContain("maxAxis");
+    expect(f.tools.value!.mixedAxisModes).toEqual([]);
+  });
+
+  test.each(["minAxis", "maxAxis"] as const)(
+    "marks only %s as a mixed axis mode when its selected modes differ",
+    (end) => {
+      const f = fixture();
+      setCellSparkline(f.sheet.value, firstAddress, { ...f.first, [end]: { type: "group" } });
+      setCellSparkline(f.sheet.value, secondAddress, {
+        ...f.second,
+        [end]: { type: "custom", value: 5 },
+      });
+
+      expect(f.tools.value!.mixed).toContain(end);
+      expect(f.tools.value!.mixedAxisModes).toEqual([end]);
+    },
+  );
+
+  test("treats omitted axis limits as individual modes without persisting defaults", () => {
+    const f = fixture();
+    setCellSparkline(f.sheet.value, secondAddress, {
+      ...f.second,
+      minAxis: { type: "individual" },
+      maxAxis: { type: "individual" },
+    });
+
+    expect(f.tools.value!.mixedAxisModes).toEqual([]);
+    expect(f.tools.value!.mixed).not.toContain("minAxis");
+    expect(f.tools.value!.mixed).not.toContain("maxAxis");
+    expect(f.tools.value!.apply({ axis: true })).toBe(true);
+    expect(getCellSparkline(f.sheet.value, firstAddress)!.minAxis).toBeUndefined();
+    expect(getCellSparkline(f.sheet.value, firstAddress)!.maxAxis).toBeUndefined();
+  });
+
   test.each([
     { type: "line" as const, markers: false, effectiveNegative: false },
     { type: "line" as const, markers: true, effectiveNegative: true },

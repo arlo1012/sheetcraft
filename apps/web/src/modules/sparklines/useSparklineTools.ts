@@ -33,6 +33,7 @@ export type SparklineToolContext = {
   value: CellSparkline;
   mixed: readonly (keyof CellSparkline)[];
   mixedPointVisibility: readonly SparklinePointKind[];
+  mixedAxisModes: readonly ("minAxis" | "maxAxis")[];
   disabled: boolean;
   apply: (patch: SparklineStylePatch) => boolean;
   edit: () => void;
@@ -180,6 +181,12 @@ export function useSparklineTools(options: {
         negativePoints: comparable(primary.value, "negativePoints") as boolean,
       },
       mixed,
+      mixedAxisModes: (["minAxis", "maxAxis"] as const).filter((end) =>
+        affected.some(
+          (item) =>
+            (item.value[end]?.type ?? "individual") !== (primary.value[end]?.type ?? "individual"),
+        ),
+      ),
       mixedPointVisibility: points.filter((key) =>
         affected.some((item) => !!item.value[key]?.show !== !!primary.value[key]?.show),
       ),

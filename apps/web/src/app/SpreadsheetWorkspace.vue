@@ -132,6 +132,8 @@ import { createCanvasImageCache } from "../modules/sheet-grid/canvas/image-paint
 import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
 import { useSparklineTools } from "../modules/sparklines/useSparklineTools";
 import { useSparklineDataOptions } from "../modules/sparklines/useSparklineDataOptions";
+import { useSparklineAxisLimit } from "../modules/sparklines/useSparklineAxisLimit";
+import SparklineAxisLimitDialog from "../modules/sparklines/components/SparklineAxisLimitDialog.vue";
 import SparklineDataOptionsDialog from "../modules/sparklines/components/SparklineDataOptionsDialog.vue";
 import SparklineToolsToolbar from "../modules/sparklines/components/SparklineToolsToolbar.vue";
 import PivotGroupingDialog from "../modules/pivot-tables/components/PivotGroupingDialog.vue";
@@ -1621,10 +1623,12 @@ const sparklineToolContext = useSparklineTools({
   edit: (address) => sparklineActions.open(undefined, address),
 });
 const sparklineRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
-const sparklineDataOptions = useSparklineDataOptions({
+const sparklineSettings = {
   getContext: () => sparklineToolContext.value,
   flush: () => cellEditSession.finish(),
-});
+};
+const sparklineDataOptions = useSparklineDataOptions(sparklineSettings);
+const sparklineAxisLimit = useSparklineAxisLimit(sparklineSettings);
 const { active: pickingSparklineRange, reference: pickedSparklineReference } = sparklineRangePicker;
 let sparklinePickerSequence = 0;
 const sparklinePicker = shallowRef<{ id: number; confirm: () => void; cancel: () => void }>();
@@ -5028,6 +5032,7 @@ const gridInert = computed(
     ((!!editingChart.value || !!chartSourceDialog.value) && !pickingChartRange.value) ||
     (!!sparklineDraft.value && !pickingSparklineRange.value) ||
     !!sparklineDataOptions.dialog.value ||
+    !!sparklineAxisLimit.dialog.value ||
     cellStylesModalOpen.value ||
     (tableModalOpen.value && !pickingTableRange.value) ||
     formulaEditorVisible.value ||
@@ -5530,6 +5535,7 @@ watch(
           :key="sparklineToolContext.key"
           :context="sparklineToolContext"
           @data-options="sparklineDataOptions.open"
+          @custom-axis="sparklineAxisLimit.open"
         />
       </template>
       <template #insert-tools>
@@ -7390,6 +7396,14 @@ watch(
     :edit-session-id="cellEditSession.id"
     @confirm="cameraRangePicker.confirm"
     @cancel="cameraRangePicker.cancel"
+  />
+  <SparklineAxisLimitDialog
+    v-if="sparklineAxisLimit.dialog.value"
+    :key="sparklineAxisLimit.dialog.value.key"
+    :initial="sparklineAxisLimit.dialog.value.initial"
+    :failed="sparklineAxisLimit.failed.value"
+    @confirm="sparklineAxisLimit.dialog.value.confirm"
+    @close="sparklineAxisLimit.dialog.value.close"
   />
   <SparklineDataOptionsDialog
     v-if="sparklineDataOptions.dialog.value"
