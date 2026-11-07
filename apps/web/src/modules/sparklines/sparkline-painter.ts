@@ -1,10 +1,15 @@
-import type { CellSparkline } from "@sheetcraft/core/sparklines";
+import {
+  resolveSparklineScale,
+  type CellSparkline,
+  type SparklineScale,
+} from "@sheetcraft/core/sparklines";
 import type { Rect } from "@sheetcraft/sheet-engine/geometry";
 export function paintSparkline(
   context: CanvasRenderingContext2D,
   rect: Rect,
   sparkline: CellSparkline,
   values: readonly (number | null)[],
+  scale = resolveSparklineScale(sparkline, values),
 ): void {
   const numbers = values.filter((value): value is number => value !== null);
   if (!numbers.length || rect.width < 4 || rect.height < 4) return;
@@ -32,16 +37,29 @@ export function paintSparkline(
     top = rect.y + 3,
     width = rect.width - 6,
     height = rect.height - 6;
-  const min = sparkline.type === "line" ? Math.min(...numbers) : Math.min(0, ...numbers);
-  const max = sparkline.type === "line" ? Math.max(...numbers) : Math.max(0, ...numbers);
+  const { min, max }: SparklineScale = scale;
   const y = (value: number) =>
-    max === min ? top + height / 2 : top + height - ((value - min) / (max - min)) * height;
+    max === min
+      ? value === min
+        ? top + height / 2
+        : value > max
+          ? rect.y - 4
+          : rect.y + rect.height + 4
+      : top + height - ((value - min) / (max - min)) * height;
   const zero =
     sparkline.type === "winLoss" ? top + height / 2 : Math.max(top, Math.min(top + height, y(0)));
   context.save();
   context.beginPath();
   context.rect(rect.x, rect.y, rect.width, rect.height);
   context.clip();
+  if (
+    sparkline.type !== "winLoss" &&
+    (sparkline.minAxis?.type === "custom" || sparkline.maxAxis?.type === "custom")
+  ) {
+    context.beginPath();
+    context.rect(left, top, width, height);
+    context.clip();
+  }
   if (sparkline.axis && min <= 0 && max >= 0) {
     context.strokeStyle = "#a3a3a3";
     context.lineWidth = 0.5;

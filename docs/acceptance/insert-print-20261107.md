@@ -3,6 +3,36 @@
 实现基线：`8eca25c8`。此记录只覆盖下列具体路径，不代表整个插入工具栏已与 WPS 完全一致。
 继续按先插入细节、再打印的顺序推进；功能范围仍参考各领域的当前范围文档。
 
+### 迷你图原生文件纵轴尺度（2026-11-07）
+
+Core 增加独立的最小/最大边界：单图自动、组内统一、自定义有限数值。
+同组尺度按整张工作表的成员计算，包含屏幕外成员，并沿用各自的隐藏/空值取数规则。
+柱形自动范围包含零，盈亏图保持固定正负半高；自定义范围裁切绘图区域。
+双自定义边界拒绝最小值大于最大值，单侧自定义越过自动边界时将自动侧收至同值，
+相等边界绘制不会产生非有限坐标。新增字段使用快照 V97。
+
+原生 XLSX 读写 `minAxisType`、`maxAxisType`、`manualMin`、`manualMax`，
+属性语义依据 [CT_SparklineGroup](https://learn.microsoft.com/en-us/openspecs/office_standards/MS-XLSX/331c1ecb-e49d-4cd0-843d-3ae189dc8a88)。
+这批接通文件和绘制能力；坐标轴菜单与自定义输入界面尚未加入。
+
+实际网页验证：导入仅含原生 OOXML 的尺度对比样例，D2/D3 单图自动等高；
+E2/E3 同组保留幅度差；F2/F3 使用 0..100；G2 的尺度纳入 G101；
+H2/H3 的 5..20 柱形范围裁掉低于下界及高于上界的部分。
+将 A101:C101 从 100/900/300 改为 1/9/3，G2 立即改为满幅，撤销后恢复。
+导出 JSON 为 V97，本地重载成功；网页导出的 XLSX 经 XML 检查保留两组的成员与全部轴属性。
+验证前导出九张工作表的 JSON 备份，结束后恢复。
+
+证据：`apps/web/tmp/sparkline-axis-native.xlsx`、`sparkline-axis-native-verified.png`、
+`sparkline-axis-group-updated.png`、`sparkline-axis-group-undo.png`、
+`sparkline-axis-v97.json`、`sparkline-axis-exported.xlsx`（后五项同目录）。
+Core/XLSX 增量编译及相关格式、静态检查通过。
+子代理补写 Core、XLSX、绘制器回归，均未运行，遵守功能完成后再统一执行的要求。
+
+WPS 本轮仍停留在“隐藏和空单元格设置”。遮挡它的 `pwsh.exe - 系统警告`
+已关闭，但随后点击返回 `coordinate input geometry is unavailable`，Escape 超时。
+没有取得坐标轴菜单布局或桌面文件显示的验收证据；详细轴界面、日期轴、逆序轴及 WPS
+一致性对照仍待，打印阶段保持最后。
+
 ### 迷你图持久分组（2026-11-07）
 
 迷你图工具增加“组合／取消组合”，清除菜单区分选中迷你图和整个组。

@@ -11,6 +11,10 @@ import { getOutlineHiddenIntervals, type HiddenAxisInterval } from "./data-outli
 import type { IdFactory } from "./runtime.js";
 export type SparklinePointStyle = { show: boolean; color: string };
 export type SparklinePointKind = "highPoint" | "lowPoint" | "firstPoint" | "lastPoint";
+export type SparklineAxisLimit =
+  | { type: "individual" | "group" }
+  | { type: "custom"; value: number };
+export type SparklineScale = { min: number; max: number };
 export type CellSparkline = {
   /** Group identities are scoped to the owning worksheet. */
   groupId?: string;
@@ -20,6 +24,8 @@ export type CellSparkline = {
   negativeColor: string;
   markers: boolean;
   axis: boolean;
+  minAxis?: SparklineAxisLimit;
+  maxAxis?: SparklineAxisLimit;
   showHidden: boolean;
   empty: "gap" | "zero" | "connect";
   highPoint?: SparklinePointStyle;
@@ -33,6 +39,21 @@ export function normalizeCellSparkline(
   value: CellSparkline | null | undefined,
 ): CellSparkline | undefined {
   if (value == null) return undefined;
+  for (const limit of [value.minAxis, value.maxAxis]) {
+    if (
+      limit !== undefined &&
+      (!limit ||
+        !["individual", "group", "custom"].includes(limit.type) ||
+        (limit.type === "custom" && !Number.isFinite(limit.value)))
+    )
+      throw new RangeError("Invalid sparkline axis limit.");
+  }
+  if (
+    value.minAxis?.type === "custom" &&
+    value.maxAxis?.type === "custom" &&
+    value.minAxis.value > value.maxAxis.value
+  )
+    throw new RangeError("Sparkline minimum exceeds maximum.");
   if (value.groupId !== undefined && (typeof value.groupId !== "string" || !value.groupId.trim()))
     throw new RangeError("Invalid sparkline group identity.");
   if (
@@ -91,6 +112,22 @@ export function normalizeCellSparkline(
     negativeColor: value.negativeColor,
     markers: value.markers,
     axis: value.axis,
+    ...(value.minAxis
+      ? {
+          minAxis:
+            value.minAxis.type === "custom"
+              ? { type: "custom", value: value.minAxis.value }
+              : { type: value.minAxis.type },
+        }
+      : {}),
+    ...(value.maxAxis
+      ? {
+          maxAxis:
+            value.maxAxis.type === "custom"
+              ? { type: "custom", value: value.maxAxis.value }
+              : { type: value.maxAxis.type },
+        }
+      : {}),
     showHidden: value.showHidden,
     empty: value.empty,
     ...points,
@@ -187,6 +224,71 @@ export function getSparklineValues(
   evaluator: SheetEvaluator,
 ): Array<number | null> {
   return createSparklineValueResolver(sheet, evaluator)(value);
+}
+
+/** Resolve each boundary independently; a missing group falls back to this sparkline. */
+export function resolveSparklineScale(
+  sparkline: CellSparkline,
+  values: readonly (number | null)[],
+  group?: SparklineScale,
+): SparklineScale {
+  if (sparkline.type === "winLoss") return { min: -1, max: 1 };
+  let min = Infinity,
+    max = -Infinity;
+  for (const value of values) {
+    if (value === null) continue;
+    min = Math.min(min, value);
+    max = Math.max(max, value);
+  }
+  if (min === Infinity) {
+    min = 0;
+    max = 0;
+  }
+  if (sparkline.minAxis?.type === "group" && group) min = group.min;
+  if (sparkline.maxAxis?.type === "group" && group) max = group.max;
+  if (sparkline.type === "column") {
+    min = Math.min(0, min);
+    max = Math.max(0, max);
+  }
+  if (sparkline.minAxis?.type === "custom") min = sparkline.minAxis.value;
+  if (sparkline.maxAxis?.type === "custom") max = sparkline.maxAxis.value;
+  if (min > max) {
+    if (sparkline.minAxis?.type === "custom") max = min;
+    else min = max;
+  }
+  return { min, max };
+}
+
+/** One resolver per display snapshot, including group members outside the viewport. */
+export function createSparklineScaleResolver(sheet: Sheet, evaluator: SheetEvaluator) {
+  const valuesOf = createSparklineValueResolver(sheet, evaluator);
+  let groups: Map<string, SparklineScale> | undefined;
+  return (
+    sparkline: CellSparkline,
+    values: readonly (number | null)[] = valuesOf(sparkline),
+  ): SparklineScale => {
+    if (
+      sparkline.groupId &&
+      (sparkline.minAxis?.type === "group" || sparkline.maxAxis?.type === "group")
+    ) {
+      if (!groups) {
+        groups = new Map();
+        for (const cell of sheet.cells.values()) {
+          const member = cell.sparkline;
+          if (!member?.groupId) continue;
+          for (const value of valuesOf(member)) {
+            if (value === null) continue;
+            const bounds = groups.get(member.groupId) ?? { min: value, max: value };
+            bounds.min = Math.min(bounds.min, value);
+            bounds.max = Math.max(bounds.max, value);
+            groups.set(member.groupId, bounds);
+          }
+        }
+      }
+      return resolveSparklineScale(sparkline, values, groups.get(sparkline.groupId));
+    }
+    return resolveSparklineScale(sparkline, values);
+  };
 }
 
 /** Recreate with the document display snapshot; share visibility work across its sparklines. */

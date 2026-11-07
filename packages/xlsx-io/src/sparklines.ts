@@ -72,6 +72,14 @@ export function writeXlsxSparklines(entries: Unzipped, sheets: readonly Sheet[])
       );
     }
     const groups = [...grouped.values()].map(({ spark, members }) => {
+      const axisAttributes = (["min", "max"] as const)
+        .map((end) => {
+          const limit = spark[end === "min" ? "minAxis" : "maxAxis"];
+          return limit
+            ? ` ${end}AxisType="${limit.type}"${limit.type === "custom" ? ` manual${end === "min" ? "Min" : "Max"}="${limit.value}"` : ""}`
+            : "";
+        })
+        .join("");
       const pointAttributes = pointFields
         .filter(([field]) => spark[field] !== undefined)
         .map(([field, attribute]) => ` ${attribute}="${Number(spark[field]!.show)}"`)
@@ -81,7 +89,7 @@ export function writeXlsxSparklines(entries: Unzipped, sheets: readonly Sheet[])
         .map(([field, , element]) => colorElement(element, spark[field]!.color))
         .join("");
       const negative = spark.negativePoints ?? (spark.type !== "line" || spark.markers);
-      return `<x14:sparklineGroup type="${spark.type === "winLoss" ? "stacked" : spark.type}" displayEmptyCellsAs="${spark.empty === "connect" ? "span" : spark.empty}" markers="${Number(spark.markers)}" negative="${Number(negative)}" displayXAxis="${Number(spark.axis)}" displayHidden="${Number(spark.showHidden)}"${pointAttributes}>${colorElement("colorSeries", spark.color)}${colorElement("colorNegative", spark.negativeColor)}${colorElement("colorAxis", "#a3a3a3")}${colorElement("colorMarkers", spark.markerColor ?? spark.color)}${pointColors}<x14:sparklines>${members.join("")}</x14:sparklines></x14:sparklineGroup>`;
+      return `<x14:sparklineGroup type="${spark.type === "winLoss" ? "stacked" : spark.type}" displayEmptyCellsAs="${spark.empty === "connect" ? "span" : spark.empty}" markers="${Number(spark.markers)}" negative="${Number(negative)}" displayXAxis="${Number(spark.axis)}" displayHidden="${Number(spark.showHidden)}"${axisAttributes}${pointAttributes}>${colorElement("colorSeries", spark.color)}${colorElement("colorNegative", spark.negativeColor)}${colorElement("colorAxis", "#a3a3a3")}${colorElement("colorMarkers", spark.markerColor ?? spark.color)}${pointColors}<x14:sparklines>${members.join("")}</x14:sparklines></x14:sparklineGroup>`;
     });
     if (!groups.length) return;
     const xml = strFromU8(entries[part]!);
@@ -141,6 +149,23 @@ export function readXlsxSparklines(
           const empty = attr(attributes, "displayEmptyCellsAs") ?? "zero";
           const flag = (name: string) => ["1", "true"].includes(attr(attributes, name) ?? "0");
           const points: Partial<Record<SparklinePointKind, SparklinePointStyle>> = {};
+          const limits: Pick<CellSparkline, "minAxis" | "maxAxis"> = {};
+          for (const end of ["min", "max"] as const) {
+            const type = attr(attributes, `${end}AxisType`);
+            if (type === undefined) continue;
+            if (!["individual", "group", "custom"].includes(type))
+              throw new Error("Invalid axis type.");
+            const manual = attr(attributes, end === "min" ? "manualMin" : "manualMax");
+            if (
+              type === "custom" &&
+              (manual === undefined || !manual.trim() || !Number.isFinite(Number(manual)))
+            )
+              throw new Error("Invalid axis value.");
+            limits[end === "min" ? "minAxis" : "maxAxis"] =
+              type === "custom"
+                ? { type, value: Number(manual) }
+                : { type: type as "individual" | "group" };
+          }
           for (const [field, attribute, element] of pointFields) {
             if (attr(attributes, attribute) !== undefined || hasColor(element))
               points[field] = { show: flag(attribute), color: color(element, "#ef4444") };
@@ -156,18 +181,14 @@ export function readXlsxSparklines(
               ? { markerColor: color("colorMarkers", color("colorSeries", "#2563eb")) }
               : {}),
             ...points,
+            ...limits,
             markers: flag("markers"),
             axis: flag("displayXAxis"),
             showHidden: flag("displayHidden"),
             empty: empty === "span" ? "connect" : (empty as CellSparkline["empty"]),
           })!;
           result.set(reference.toUpperCase(), sparkline);
-          if (
-            ["dateAxis", "rightToLeft"].some(flag) ||
-            attr(attributes, "manualMin") ||
-            attr(attributes, "manualMax")
-          )
-            omitted?.(index, reference);
+          if (["dateAxis", "rightToLeft"].some(flag)) omitted?.(index, reference);
         } catch {
           omitted?.(index, reference);
         }

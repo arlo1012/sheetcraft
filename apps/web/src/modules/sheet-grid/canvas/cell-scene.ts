@@ -1,4 +1,9 @@
-import { createSparklineValueResolver, type CellSparkline } from "@sheetcraft/core/sparklines";
+import {
+  createSparklineValueResolver,
+  createSparklineScaleResolver,
+  type CellSparkline,
+  type SparklineScale,
+} from "@sheetcraft/core/sparklines";
 import type { Cell, CellAddress, CellRange } from "@sheetcraft/core/workbook";
 import type { CellTextFontRun } from "@sheetcraft/core/formula";
 import type { ExcelDateSystem, FormulaValue } from "@sheetcraft/core/formula";
@@ -17,7 +22,7 @@ import { getConditionalFormatIconSlot } from "../../../shared/conditional-format
 export const SHEET_PANE_IDS = ["topLeft", "top", "left", "body"] as const;
 
 export type CanvasCellContent = {
-  sparkline?: { definition: CellSparkline; values: Array<number | null> };
+  sparkline?: { definition: CellSparkline; values: Array<number | null>; scale?: SparklineScale };
   text: string;
   fontRuns?: readonly CellTextFontRun[];
   fontProjectionUnavailable?: true;
@@ -68,9 +73,14 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
   let previousMerges: readonly CellRange[] | undefined;
   let previousColumnCount = 0;
   let resolveSparklineValues: ReturnType<typeof createSparklineValueResolver>;
+  let resolveSparklineScale: ReturnType<typeof createSparklineScaleResolver>;
 
   function prepare(options: PresentationOptions, layout: SheetViewportLayout, columnCount: number) {
     if (previous?.display !== options.display) {
+      resolveSparklineScale = createSparklineScaleResolver(
+        options.display.sheet,
+        options.display.evaluator,
+      );
       resolveSparklineValues = createSparklineValueResolver(
         options.display.sheet,
         options.display.evaluator,
@@ -160,6 +170,9 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
       conditionalFormatVisual?.iconSet?.showValue === false;
     const iconSlot = getConditionalFormatIconSlot(rect, conditionalFormatVisual);
     const textWidth = Math.max(0, rect.width - 1 - iconSlot);
+    const sparklineValues = displayCell?.sparkline
+      ? resolveSparklineValues(displayCell.sparkline)
+      : undefined;
     const content: CanvasCellContent = {
       text: hideValue ? "" : presentation.text,
       ...(!hideValue && presentation.fontRuns ? { fontRuns: presentation.fontRuns } : {}),
@@ -173,7 +186,8 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
         ? {
             sparkline: {
               definition: displayCell.sparkline,
-              values: resolveSparklineValues(displayCell.sparkline),
+              values: sparklineValues!,
+              scale: resolveSparklineScale(displayCell.sparkline, sparklineValues!),
             },
           }
         : {}),
