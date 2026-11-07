@@ -16,7 +16,8 @@ export function paintSparkline(
   const dataMin = Math.min(...numbers);
   const dataMax = Math.max(...numbers);
   const first = values.findIndex((value) => value !== null);
-  const last = values.findLastIndex((value) => value !== null);
+  let last = values.length - 1;
+  while (last >= 0 && values[last] === null) last--;
   const pointColor = (value: number, index: number): string | undefined => {
     if (sparkline.highPoint?.show && value === dataMax) return sparkline.highPoint.color;
     if (sparkline.lowPoint?.show && value === dataMin) return sparkline.lowPoint.color;
