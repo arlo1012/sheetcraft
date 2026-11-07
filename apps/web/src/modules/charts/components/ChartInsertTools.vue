@@ -25,8 +25,8 @@ import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import { useAppI18n } from "../../../shared/i18n";
-const props = defineProps<{ disabled: boolean }>();
-const emit = defineEmits<{ insert: [intent: ChartInsertIntent] }>();
+const props = defineProps<{ disabled: boolean; dashboardDisabled?: boolean }>();
+const emit = defineEmits<{ insert: [intent: ChartInsertIntent]; dashboard: [] }>();
 const { t } = useAppI18n();
 const triggerComponent = ref<InstanceType<typeof RibbonMenuButton>>();
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
@@ -105,10 +105,10 @@ function insert(type: ChartType) {
   <section class="chart-insert-tools" role="group" :aria-label="t('chart.tools')">
     <RibbonButton
       variant="tall"
-      :label="t('chart.dashboard')"
-      :text="t('chart.dashboard')"
-      :disabled="disabled"
-      @activate="emit('insert', 'dashboard')"
+      :label="t('dashboard.title')"
+      :text="t('dashboard.title')"
+      :disabled="dashboardDisabled ?? disabled"
+      @activate="emit('dashboard')"
       ><LayoutDashboard
     /></RibbonButton>
     <div class="chart-insert-tools__columns">

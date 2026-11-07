@@ -781,6 +781,11 @@ export type SetSheetConditionalFormatsCommand = {
   sheetId: string;
   rules: SheetConditionalFormatRule[];
 };
+export type SetDashboardCommand = {
+  type: "setDashboard";
+  sheetId: string;
+  dashboard: import("../dashboard.js").SheetDashboard;
+};
 export type SetSheetPageSetupCommand = {
   type: "setSheetPageSetup";
   sheetId: string;
@@ -947,6 +952,7 @@ export type WorkbookCommand =
   | SetSheetDuplicateRulesCommand
   | ClearSheetDuplicateRulesCommand
   | SetSheetConditionalFormatsCommand
+  | SetDashboardCommand
   | SetSheetPageSetupCommand
   | SetSheetPageDecorationCommand
   | SetSheetsWatermarkCommand
@@ -1112,6 +1118,8 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "history.restore";
     case "setSheetFreezePanes":
       return "view.freeze";
+    case "setDashboard":
+      return "sheets.properties";
     case "setSheetPageSetup":
       return "page.setup";
     case "setSheetPageDecoration":

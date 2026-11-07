@@ -24,10 +24,7 @@ export type ChartStyleId =
 export type ChartDesignIntent =
   | { kind: "variant"; variant: ChartVariant }
   | { kind: "style"; style: ChartStyleId };
-export type ChartInsertIntent =
-  | ChartType
-  | "dashboard"
-  | { type: CommonChartType; variant: ChartVariant };
+export type ChartInsertIntent = ChartType | { type: CommonChartType; variant: ChartVariant };
 
 const variants: readonly ChartVariant[] = [
   "standard",
@@ -37,7 +34,7 @@ const variants: readonly ChartVariant[] = [
   "stackedMarkers",
   "percentStackedMarkers",
 ];
-const chartTypes: readonly (ChartType | "dashboard")[] = [
+const chartTypes: readonly ChartType[] = [
   "column",
   "bar",
   "line",
@@ -51,7 +48,6 @@ const chartTypes: readonly (ChartType | "dashboard")[] = [
   "sankey",
   "river",
   "wordCloud",
-  "dashboard",
 ];
 export function isCommonChartType(type: ChartType): type is CommonChartType {
   return type === "column" || type === "bar" || type === "line" || type === "area";
@@ -84,9 +80,9 @@ function normalizeVariant(value: unknown, type: ChartType): ChartVariant {
 }
 export function normalizeChartInsertIntent(value: unknown): ChartInsertIntent {
   if (typeof value === "string") {
-    if (!chartTypes.includes(value as ChartType | "dashboard"))
+    if (!chartTypes.includes(value as ChartType))
       throw new RangeError("Unknown chart insertion type.");
-    return value as ChartType | "dashboard";
+    return value as ChartType;
   }
   const data = dataRecord(value, ["type", "variant"]);
   if (typeof data.type !== "string" || !isCommonChartType(data.type as ChartType))

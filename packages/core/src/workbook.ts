@@ -420,6 +420,7 @@ export type SheetProperties = {
 };
 
 export type Sheet = {
+  dashboard?: import("./dashboard.js").SheetDashboard;
   id: string;
   name: string;
   properties: SheetProperties;

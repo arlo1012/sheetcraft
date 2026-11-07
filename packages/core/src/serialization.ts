@@ -1,3 +1,4 @@
+import { normalizeDashboard, type SheetDashboard } from "./dashboard.js";
 import { readChartComboFeature } from "./chart-combo.js";
 import { normalizeCellImage } from "./cell-picture-frame.js";
 import {
@@ -358,6 +359,7 @@ export type WorkbookSnapshotV96 = Omit<WorkbookSnapshotV95, "version"> & { versi
 export type WorkbookSnapshotV97 = Omit<WorkbookSnapshotV96, "version"> & { version: 97 };
 /** Explicit horizontal plotting direction for sparklines. */
 export type WorkbookSnapshotV98 = Omit<WorkbookSnapshotV97, "version"> & { version: 98 };
+export type WorkbookSnapshotV99 = Omit<WorkbookSnapshotV98, "version"> & { version: 99 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -414,11 +416,13 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV95
   | WorkbookSnapshotV96
   | WorkbookSnapshotV97
-  | WorkbookSnapshotV98;
+  | WorkbookSnapshotV98
+  | WorkbookSnapshotV99;
 type WorkbookWritePayload = Omit<WorkbookSnapshotV98, "version"> & {
   version: WorkbookSnapshot["version"];
 };
 export type SheetSnapshot = SheetSnapshotV7 & {
+  dashboard?: SheetDashboard;
   hiddenRows?: number[];
   hiddenColumns?: number[];
   defaultRowHeight?: number;
@@ -533,7 +537,8 @@ type SnapshotVersion =
   | 95
   | 96
   | 97
-  | 98;
+  | 98
+  | 99;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -2793,7 +2798,10 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       record.cells.some((cell) => hasSparklineDirection(asRecord(cell, path).sparkline))
     )
       version = 98;
+    if (Object.hasOwn(record, "dashboard")) version = 99;
   }
+  if (Object.hasOwn(record, "dashboard") && version < 99)
+    return fail(path + ".dashboard", "Dashboard worksheets require snapshot version 99.");
   if (version < 45 && Array.isArray(record.tables)) {
     for (const [index, table] of record.tables.entries()) {
       const columns = asRecord(table, `${path}.tables[${index}]`).columns;
@@ -2851,6 +2859,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
   const sheet = createSheet(name, id);
   try {
     replaceSheetSparseState(sheet, parseSparseState(record, path, version));
+    if (Object.hasOwn(record, "dashboard")) sheet.dashboard = normalizeDashboard(record.dashboard);
     if (version >= 7)
       sheet.properties = parseSheetProperties(record.properties, `${path}.properties`);
   } catch (error) {
@@ -2865,6 +2874,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
 export function serializeSheet(sheet: Sheet): SheetSnapshot {
   const { drawings, pivotTables, defaultRowHeight, ...state } = createSheetSparseState(sheet);
   return {
+    ...(sheet.dashboard ? { dashboard: normalizeDashboard(sheet.dashboard) } : {}),
     ...(drawings?.length ? { drawings } : {}),
     ...(pivotTables?.length ? { pivotTables } : {}),
     id: sheet.id,
@@ -3264,6 +3274,7 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     snapshot.version = 97;
   if (sheets.some((sheet) => sheet.cells.some((cell) => hasSparklineDirection(cell.sparkline))))
     snapshot.version = 98;
+  if (sheets.some((sheet) => sheet.dashboard)) snapshot.version = 99;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -3369,7 +3380,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 95 &&
     record.version !== 96 &&
     record.version !== 97 &&
-    record.version !== 98
+    record.version !== 98 &&
+    record.version !== 99
   ) {
     throw new WorkbookDomainError(
       {

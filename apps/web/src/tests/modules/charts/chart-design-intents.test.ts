@@ -307,7 +307,6 @@ describe("strict pure chart design intents", () => {
   });
   test("insertion accepts legacy string entries and strict detached typed variants", () => {
     expect(normalizeChartInsertIntent("line")).toBe("line");
-    expect(normalizeChartInsertIntent("dashboard")).toBe("dashboard");
     const input = { type: "line", variant: "percentStackedMarkers" };
     expect(normalizeChartInsertIntent(input)).toEqual(input);
     expect(normalizeChartInsertIntent(input)).not.toBe(input);
@@ -319,6 +318,7 @@ describe("strict pure chart design intents", () => {
     ).toThrow();
     expect(getter).not.toHaveBeenCalled();
     for (const invalid of [
+      "dashboard",
       "unknown",
       { type: "pie", variant: "standard" },
       { type: "bar", variant: "stackedMarkers" },

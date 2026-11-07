@@ -35,7 +35,6 @@ import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory"
 import { resolveRangeReference } from "../../shared/range-reference/formatRangeReference";
 import {
   applyChartDesignIntent,
-  changeChartType,
   normalizeChartInsertIntent,
   type ChartInsertIntent,
 } from "./chart-design-intents";
@@ -52,7 +51,6 @@ type ChartDialog = ChartTarget & {
   dialogId: number;
   drawingId: string;
   initial: SheetChartDrawing;
-  dashboard: boolean;
   comboRecipe: boolean;
   sourceFingerprint: string;
   isCurrent: () => boolean;
@@ -164,18 +162,12 @@ export function useChartActions(options: {
       allowed(target.sheet)
     );
   }
-  function open(
-    target: ChartTarget,
-    initial: SheetChartDrawing,
-    dashboard = false,
-    comboRecipe = false,
-  ): void {
+  function open(target: ChartTarget, initial: SheetChartDrawing, comboRecipe = false): void {
     const next: ChartDialog = {
       ...target,
       dialogId: ++dialogId,
       drawingId: initial.id,
       initial,
-      dashboard,
       comboRecipe,
       sourceFingerprint: JSON.stringify(normalizeSheetChart(initial.chart).source ?? null),
       isCurrent: () => isCurrent(next),
@@ -243,13 +235,7 @@ export function useChartActions(options: {
     const selection = options.getRange();
     const range = resolveDataRange(target.sheet, selection) ?? selection;
     const type = typeof request === "string" ? request : request.type;
-    const drawing = createDrawing(
-      type === "dashboard" ? "column" : type,
-      options.name(),
-      range,
-      selection.start,
-      options.title?.(),
-    );
+    const drawing = createDrawing(type, options.name(), range, selection.start, options.title?.());
     let invalidSelection = false;
     try {
       drawing.chart = normalizeSheetChart({
@@ -267,7 +253,7 @@ export function useChartActions(options: {
         kind: "variant",
         variant: request.variant,
       });
-    open(target, drawing, type === "dashboard", type === "combo");
+    open(target, drawing, type === "combo");
     if (invalidSelection) error.value = true;
   }
   function insertPivot(id: string) {
@@ -413,18 +399,7 @@ export function useChartActions(options: {
       let drawings: SheetDrawing[];
       if (target.existing) {
         drawings = current.map((item) => (item === target.existing ? next : item));
-      } else if (target.dashboard)
-        drawings = [
-          ...current,
-          ...(["column", "line", "pie", "bar"] as const).map((type, index) => ({
-            ...next,
-            id: index ? idFactory("chart") : next.id,
-            offsetX: next.offsetX + (index % 2) * 500,
-            offsetY: next.offsetY + Math.floor(index / 2) * 320,
-            chart: changeChartType(next.chart, type),
-          })),
-        ];
-      else {
+      } else {
         if (current.some((item) => item.id === next.id)) {
           error.value = true;
           return;

@@ -114,15 +114,6 @@ describe("successful chart insertion view selection", () => {
     expect(f.onInserted).not.toHaveBeenCalled();
     expect(f.sheet.drawings).toHaveLength(1);
   });
-  test("dashboard selects only the first new drawing after its one command", () => {
-    const f = fixture();
-    f.actions.insert("dashboard");
-    const id = f.actions.dialog.value!.drawingId;
-    f.confirm();
-    expect(f.sheet.drawings).toHaveLength(4);
-    expect(f.onInserted).toHaveBeenCalledExactlyOnceWith(id);
-    expect(f.execute).toHaveBeenCalledTimes(1);
-  });
   test("invalid data cannot trigger an inserted view action", () => {
     const f = fixture();
     f.actions.insert("column");

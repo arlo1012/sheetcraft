@@ -3,6 +3,7 @@ import {
   mapChartSourceVectorCells,
 } from "../chart-source-references.js";
 import { mapSheetCameraReferences, mapCameraSourceCells } from "../camera-source-references.js";
+import { normalizeDashboard, mapDashboardReferences } from "../dashboard.js";
 import { MAX_SHEET_ROWS, MAX_SHEET_COLUMNS } from "../sheet-limits.js";
 import { readPictureDataArray } from "../picture-data-array.js";
 import { normalizeSheetDrawings, type SheetDrawing } from "../sheet-drawings.js";
@@ -37,7 +38,7 @@ export function cloneExternalDrawingCollections(
       throw new TypeError("External drawing collections require ordinary records.");
     for (const key of Reflect.ownKeys(entry)) {
       if (
-        (key !== "sheetId" && key !== "drawings") ||
+        (key !== "sheetId" && key !== "drawings" && key !== "dashboard") ||
         !("value" in Object.getOwnPropertyDescriptor(entry, key)!)
       )
         throw new TypeError(
@@ -62,6 +63,7 @@ export function cloneExternalDrawingCollections(
     return {
       sheetId,
       drawings: normalizeSheetDrawings(drawingsField.value as readonly SheetDrawing[]),
+      ...(entry.dashboard ? { dashboard: normalizeDashboard(entry.dashboard) } : {}),
     };
   });
 }
@@ -138,6 +140,30 @@ export function prepareExternalDrawingCollections(
         entry.sheetId,
         "Structural reference maintenance cannot change owner identity, target sheet, geometry, text, runs, or appearance.",
       );
+    if (entry.dashboard) {
+      if (!sheet.dashboard) throw invalidCommandPayload("dashboard", entry.sheetId);
+      const signature = (board: typeof entry.dashboard) =>
+        JSON.stringify(
+          mapDashboardReferences(
+            board,
+            ownSheetId,
+            () => null,
+            () => null,
+          ),
+        );
+      if (signature(sheet.dashboard) !== signature(entry.dashboard))
+        throw invalidCommandPayload("externalDrawingCollections", entry.sheetId);
+      if (association) {
+        const prior = association.direction === "restore" ? entry.dashboard : sheet.dashboard;
+        const current = association.direction === "restore" ? sheet.dashboard : entry.dashboard;
+        if (
+          JSON.stringify(
+            mapDashboardReferences(prior, ownSheetId, association.mapCell, association.mapRange),
+          ) !== JSON.stringify(current)
+        )
+          throw invalidCommandPayload("externalDrawingCollections", entry.sheetId);
+      }
+    }
     if (association) {
       const prior = association.direction === "restore" ? entry.drawings : original;
       const expected = mapLocalTextReferences(
@@ -156,8 +182,16 @@ export function prepareExternalDrawingCollections(
     }
     // Locked external objects admit only this proven reference maintenance, like formula rewrites.
     assertShapeObjectsForSheet(entry.drawings, sheet);
-    if (JSON.stringify(original) === JSON.stringify(entry.drawings)) continue;
-    previous.push({ sheetId: sheet.id, drawings: original });
+    if (
+      JSON.stringify(original) === JSON.stringify(entry.drawings) &&
+      (!entry.dashboard || JSON.stringify(sheet.dashboard) === JSON.stringify(entry.dashboard))
+    )
+      continue;
+    previous.push({
+      sheetId: sheet.id,
+      drawings: original,
+      ...(entry.dashboard ? { dashboard: normalizeDashboard(sheet.dashboard) } : {}),
+    });
     next.push(entry);
   }
   return { previous, next };
@@ -166,6 +200,7 @@ export function prepareExternalDrawingCollections(
 export function hasWorkbookTextReferencesToSheet(workbook: Workbook, sheetId: string): boolean {
   let found = false;
   for (const sheet of workbook.sheets.values()) {
+    if (sheet.dashboard?.widgets.some((w) => w.source?.sheetId === sheetId)) return true;
     const inspect = <T extends { sheetId: string }>(reference: T): T => {
       found ||= reference.sheetId === sheetId;
       return reference;
@@ -193,9 +228,14 @@ export function planExternalTextReferenceChanges(
       if (sheet.id === targetSheetId) return [];
       const original = normalizeSheetDrawings(sheet.drawings);
       const drawings = mapLocalTextReferences(original, targetSheetId, mapCell, mapRange);
-      return JSON.stringify(drawings) === JSON.stringify(original)
+      const dashboard =
+        sheet.dashboard &&
+        mapDashboardReferences(sheet.dashboard, targetSheetId, mapCell, mapRange);
+      const changedBoard =
+        dashboard && JSON.stringify(dashboard) !== JSON.stringify(sheet.dashboard);
+      return JSON.stringify(drawings) === JSON.stringify(original) && !changedBoard
         ? []
-        : [{ sheetId: sheet.id, drawings }];
+        : [{ sheetId: sheet.id, drawings, ...(changedBoard ? { dashboard } : {}) }];
     }),
   );
 }
@@ -204,7 +244,11 @@ export function commitExternalDrawingCollections(
   prepared: PreparedExternalDrawingCollections,
 ): boolean {
   // All IDs and forests were admitted together, before the first own-sheet write.
-  for (const entry of prepared.next) workbook.sheets.get(entry.sheetId)!.drawings = entry.drawings;
+  for (const entry of prepared.next) {
+    const owner = workbook.sheets.get(entry.sheetId)!;
+    owner.drawings = entry.drawings;
+    if (entry.dashboard) owner.dashboard = entry.dashboard;
+  }
   return prepared.next.length > 0;
 }
 export function mapLocalTextReferences(

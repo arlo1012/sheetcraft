@@ -78,6 +78,7 @@ import NewTableStyleDialog from "../modules/table-styles/components/NewTableStyl
 import HyperlinkDialog from "../modules/hyperlinks/components/HyperlinkDialog.vue";
 import type { DiagramWorkspace } from "../modules/attachments/useDiagramActions";
 import { useMindMapActions } from "../modules/mind-maps/useMindMapActions";
+import { useDashboardActions } from "../modules/dashboards/useDashboardActions";
 import { useFlowchartActions } from "../modules/flowcharts/useFlowchartActions";
 import AttachmentInsertDialog from "../modules/attachments/components/AttachmentInsertDialog.vue";
 import { useHyperlinksController } from "../modules/hyperlinks/useHyperlinksController";
@@ -177,6 +178,15 @@ import {
 } from "../modules/charts/chart-source-editor";
 import ChartElementsToolbar from "../modules/charts/components/ChartElementsToolbar.vue";
 import { defineAsyncComponent } from "vue";
+const DashboardPanel = defineAsyncComponent(
+  () => import("../modules/dashboards/DashboardPanel.vue"),
+);
+const DashboardCreateDialog = defineAsyncComponent(
+  () => import("../modules/dashboards/DashboardCreateDialog.vue"),
+);
+const DashboardWidgetDialog = defineAsyncComponent(
+  () => import("../modules/dashboards/DashboardWidgetDialog.vue"),
+);
 const MindMapDialog = defineAsyncComponent(() => import("../modules/mind-maps/MindMapDialog.vue"));
 const FlowchartDialog = defineAsyncComponent(
   () => import("../modules/flowcharts/FlowchartDialog.vue"),
@@ -1696,6 +1706,24 @@ watch(
   },
   { flush: "sync" },
 );
+const dashboards = useDashboardActions({
+  workbook: () => session.workbook,
+  sheet: () => activeSheet.value,
+  range: () => activeSelectionRange.value,
+  selectSheet,
+  busy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  flush: () => cellEditSession.finish(),
+  execute: executeCommand,
+  title: () => t("dashboard.title"),
+  widgetTitle: (kind) => t(`dashboard.${kind}`),
+});
+const {
+  creating: creatingDashboard,
+  editing: editingDashboard,
+  error: dashboardError,
+} = dashboards;
+const { active: pickingDashboardRange, reference: dashboardReference } = dashboards.picker;
+watch(workbookGeneration, dashboards.close);
 const chartActions = useChartActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -2194,6 +2222,11 @@ const fileActions = useWorkbookFileActions({
 });
 const { busy: fileBusy, confirmation, feedback } = fileActions;
 const xlsxActions = useWorkbookXlsxActions({
+  dashboardLabels: () => ({
+    records: t("dashboard.records"),
+    blank: t("dashboard.blank"),
+    noSource: t("dashboard.noSource"),
+  }),
   assetStore,
   persistence,
   getWorkbook: () => session.workbook,
@@ -4558,6 +4591,7 @@ watch(protectionDialog, (dialog) => {
 const nameRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingNameRange, reference: pickedNameReference } = nameRangePicker;
 const activeRangePicker = computed(() => {
+  if (pickingDashboardRange.value) return dashboards.picker;
   if (pickingTextBoxReference.value) return textBoxReferencePicker;
   if (pickingProtectionRange.value) return protectionRangePicker;
   if (pickingTableRange.value) return tableRangePicker;
@@ -4686,6 +4720,23 @@ function onWorkspaceNativeTextCopy(event: ClipboardEvent): void {
   });
 }
 function onWorkspaceKeydown(event: KeyboardEvent): void {
+  if (activeSheet.value.dashboard) {
+    const target = event.target;
+    if (
+      !editingDashboard.value &&
+      !(
+        target instanceof HTMLElement && target.closest("input,textarea,select,[contenteditable]")
+      ) &&
+      (event.ctrlKey || event.metaKey)
+    ) {
+      if (event.key.toLowerCase() === "z" || event.key.toLowerCase() === "y") {
+        event.preventDefault();
+        if (event.key.toLowerCase() === "y" || event.shiftKey) redo();
+        else undo();
+      }
+    }
+    return;
+  }
   const effectsFocusReturn = pictureEffectsFocusReturn.value;
   const effectsTrigger = effectsFocusReturn();
   const fromEffectsTrigger = event.target instanceof Node && effectsTrigger?.contains(event.target);
@@ -5050,6 +5101,8 @@ const gridInert = computed(
     !!pictureAnnotation.value ||
     !!viewingAttachment.value ||
     !!mindMapEditor.value ||
+    !!creatingDashboard.value ||
+    (!!editingDashboard.value && !pickingDashboardRange.value) ||
     !!flowchartEditor.value ||
     !!insertingAttachment.value ||
     !!editingDrawing.value ||
@@ -5086,6 +5139,7 @@ watch(
     class="spreadsheet-workspace"
     :class="{
       'is-formula-bar-hidden': !showFormulaBar,
+      'is-dashboard': !!activeSheet.dashboard,
     }"
     :aria-label="t('workspace.editor')"
     :aria-busy="loading || fileBusy || imageBusy || xlsxBusy"
@@ -5107,6 +5161,7 @@ watch(
       @cancel="imageActions.onFileCancel"
     />
     <SpreadsheetRibbon
+      v-if="!activeSheet.dashboard"
       :print-disabled="loading || fileBusy || xlsxBusy"
       :has-chart="!!chartObjectContext"
       :has-sparkline="!!sparklineToolContext"
@@ -5595,6 +5650,10 @@ watch(
           :insert-equation-handler="equationInsertHandler"
           :shape-owner-id="`${workbookGeneration}:${activeSheet.id}:${workbookRevision}`"
           @insert-camera="cameraActions.open()"
+          :dashboard-disabled="
+            loading || fileBusy || xlsxBusy || !!session.workbook.structureProtected
+          "
+          @insert-dashboard="dashboards.openCreate"
           @insert-chart="chartActions.insert"
           :sparkline-disabled="
             loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'formatCells')
@@ -6481,7 +6540,53 @@ watch(
         @dismiss="xlsxActions.dismissFeedback"
       />
     </div>
+    <DashboardPanel
+      v-if="activeSheet.dashboard"
+      :key="activeSheet.id"
+      :sheet="activeSheet"
+      :workbook="session.workbook"
+      :revision="workbookRevision"
+      :evaluator="activeSheetEvaluator"
+      :disabled="loading || fileBusy || xlsxBusy || activeSheet.properties.protected"
+      :can-undo="session.history.undoStack.length > 0"
+      :can-redo="session.history.redoStack.length > 0"
+      :update="dashboards.update"
+      @add="dashboards.edit($event)"
+      @edit="dashboards.edit($event.kind, $event)"
+      @undo="undo"
+      @redo="redo"
+      @xlsx="xlsxActions.exportXlsx()"
+    />
+    <DashboardCreateDialog
+      v-if="creatingDashboard"
+      :error="dashboardError"
+      @create="dashboards.create"
+      @close="dashboards.close"
+    />
+    <DashboardWidgetDialog
+      v-if="editingDashboard"
+      :key="editingDashboard.initial.id"
+      :initial="editingDashboard.initial"
+      :workbook="session.workbook"
+      :evaluator="activeSheetEvaluator"
+      :revision="workbookRevision"
+      :error="dashboardError"
+      :picking="pickingDashboardRange"
+      :pick="dashboards.pick"
+      @save="dashboards.save"
+      @close="dashboards.close"
+    />
+    <RangeReferencePicker
+      v-if="pickingDashboardRange"
+      :reference="dashboardReference"
+      :title="t('dashboard.pick')"
+      :hint="t('dashboard.pickHint')"
+      :edit-session-id="cellEditSession.id"
+      @confirm="dashboards.picker.confirm"
+      @cancel="dashboards.picker.cancel"
+    />
     <WorkbookFormulaBar
+      v-if="!activeSheet.dashboard"
       @clipboard-copy="clearCompetingShapeClipboard"
       v-show="showFormulaBar"
       :read-only="formulaReadOnly"
@@ -6621,6 +6726,7 @@ watch(
       @cancel="findFormatDraft = undefined"
     />
     <div
+      v-if="!activeSheet.dashboard"
       class="spreadsheet-workspace__grid"
       :class="{ 'is-eye-comfort': eyeComfortEnabled }"
       :inert="gridInert"
@@ -7508,6 +7614,9 @@ watch(
     grid-template-rows: auto auto minmax(0, 1fr) 49px;
   }
 
+  &.is-dashboard {
+    grid-template-rows: auto minmax(0, 1fr) 49px;
+  }
   &__image-input {
     display: none;
   }

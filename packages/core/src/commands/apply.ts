@@ -46,6 +46,7 @@ import {
   applySetSheetDimensionSizesCommand,
 } from "./dimensions.js";
 import { applySetSheetFilterCommand } from "./filter.js";
+import { applySetDashboardCommand } from "./dashboard.js";
 import { applySetSheetPageSetupCommand } from "./page-setup.js";
 import {
   applySetSheetPageDecorationCommand,
@@ -246,6 +247,7 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "setSheetDefaultColumnWidth":
     case "restoreSheetDimensionState":
     case "setSheetFreezePanes":
+    case "setDashboard":
     case "setSheetPageSetup":
     case "setSheetPageDecoration":
     case "setSheetsWatermark":
@@ -417,6 +419,8 @@ export function applyWorkbookCommand(
         return applyRestoreSheetDimensionStateCommand(workbook, command);
       case "setSheetFreezePanes":
         return applySetSheetFreezePanesCommand(workbook, command);
+      case "setDashboard":
+        return applySetDashboardCommand(workbook, command);
       case "setSheetPageSetup":
         return applySetSheetPageSetupCommand(workbook, command);
       case "setSheetPageDecoration":

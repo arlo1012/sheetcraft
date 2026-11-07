@@ -42,6 +42,7 @@ import SparklineInsertMenu from "../../sparklines/components/SparklineInsertMenu
 import type { CellSparkline } from "@sheetcraft/core/sparklines";
 defineProps<{
   disabled: boolean;
+  dashboardDisabled?: boolean;
   pivotDisabled: boolean;
   pivotChartDisabled?: boolean;
   pivotManageDisabled: boolean;
@@ -64,6 +65,7 @@ const emit = defineEmits<{
   refreshPivot: [];
   editPivot: [];
   removePivot: [];
+  insertDashboard: [];
   insertChart: [intent: ChartInsertIntent];
   insertMindMap: [start: MindMapStart];
   insertFlowchart: [start: FlowchartStart];
@@ -228,7 +230,12 @@ const { t, locale } = useAppI18n();
         /></DiagramInsertMenu>
       </div>
     </section>
-    <ChartInsertTools :disabled="imageDisabled" @insert="emit('insertChart', $event)" />
+    <ChartInsertTools
+      :disabled="imageDisabled"
+      :dashboard-disabled="dashboardDisabled"
+      @dashboard="emit('insertDashboard')"
+      @insert="emit('insertChart', $event)"
+    />
     <section class="insert-toolbar__group" role="group" :aria-label="t('sparkline.title')">
       <SparklineInsertMenu
         :disabled="sparklineDisabled"

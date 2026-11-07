@@ -54,6 +54,7 @@ import type {
 } from "./contracts.js";
 import { invalidCommandPayload } from "./helpers.js";
 
+import { mapDashboardReferences } from "../dashboard.js";
 function mapSheetDrawingDataReferences(...args: Parameters<typeof mapSheetDrawingChartReferences>) {
   return mapSheetCameraReferences(mapSheetDrawingChartReferences(...args), args[2]);
 }
@@ -394,6 +395,18 @@ export function applyAddSheetCommand(
     readExternalDrawingCollections(command),
   );
   for (const entry of externalDrawings.next) {
+    if (
+      entry.dashboard &&
+      JSON.stringify(
+        mapDashboardReferences(
+          entry.dashboard,
+          sheet.id,
+          () => null,
+          () => null,
+        ),
+      ) !== JSON.stringify(workbook.sheets.get(entry.sheetId)!.dashboard)
+    )
+      throw invalidCommandPayload("externalDrawingCollections", entry.sheetId);
     const expected = mapSheetDrawingDataReferences(
       entry.drawings,
       (reference) => (reference.sheetId === sheet.id ? { ...reference, cell: null } : reference),
@@ -525,9 +538,18 @@ export function applyDeleteSheetCommand(
         (reference) =>
           reference.sheetId === command.sheetId ? { ...reference, range: null } : reference,
       );
-      return JSON.stringify(drawings) === JSON.stringify(owner.drawings ?? [])
+      const board =
+        owner.dashboard &&
+        mapDashboardReferences(
+          owner.dashboard,
+          command.sheetId,
+          () => null,
+          () => null,
+        );
+      const changedBoard = board && JSON.stringify(board) !== JSON.stringify(owner.dashboard);
+      return JSON.stringify(drawings) === JSON.stringify(owner.drawings ?? []) && !changedBoard
         ? []
-        : [{ sheetId: owner.id, drawings }];
+        : [{ sheetId: owner.id, drawings, ...(changedBoard ? { dashboard: board } : {}) }];
     }),
   );
   const removedSheetSnapshot = serializeSheet(workbook.sheets.get(command.sheetId)!);

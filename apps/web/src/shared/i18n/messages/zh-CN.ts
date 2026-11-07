@@ -3,6 +3,7 @@ import { symbolsZhCN } from "../../../modules/insert-tools/symbol-messages.zh-CN
 import { pivotsZhCN } from "../../../modules/pivot-tables/pivot-messages.zh-CN";
 import { controlsZhCN } from "../../../modules/form-controls/control-messages.zh-CN";
 import { attachmentsZhCN } from "../../../modules/attachments/attachment-messages.zh-CN";
+import { dashboardZhCN } from "../../../modules/dashboards/dashboard-messages";
 import { mindMapsZhCN } from "../../../modules/mind-maps/mind-map-messages";
 import { flowchartsZhCN } from "../../../modules/flowcharts/flowchart-messages";
 import { cameraZhCN } from "../../../modules/camera/camera-messages.zh-CN";
@@ -32,6 +33,7 @@ export const zhCN = {
   ...pivotsZhCN,
   ...controlsZhCN,
   ...attachmentsZhCN,
+  ...dashboardZhCN,
   ...mindMapsZhCN,
   ...flowchartsZhCN,
   ...cameraZhCN,

@@ -67,7 +67,11 @@ export function mapSheetDrawingTextReferences(
   return normalizeSheetDrawings(forest.map((node) => visit(node)));
 }
 
-export type TextReferenceDrawingState = { sheetId: string; drawings: SheetDrawing[] };
+export type TextReferenceDrawingState = {
+  sheetId: string;
+  drawings: SheetDrawing[];
+  dashboard?: import("./dashboard.js").SheetDashboard;
+};
 /** Changed owners only; neither the workbook nor the callback's input aliases are mutated. */
 export function mapWorkbookTextReferences(
   workbook: Workbook,

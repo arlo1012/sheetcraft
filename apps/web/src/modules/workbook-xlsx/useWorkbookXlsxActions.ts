@@ -4,6 +4,7 @@ import {
   serializeWorkbook,
   type WorkbookSnapshot,
 } from "@sheetcraft/core/serialization";
+import { downloadBlob } from "../../shared/files/download";
 import type { Workbook } from "@sheetcraft/core/workbook";
 import type { ImageAsset, ImageAssetStore } from "../image-assets/imageAssetStore";
 import {
@@ -62,22 +63,19 @@ function hasBlockingIssue(report: XlsxCompatibilityReport): boolean {
 }
 
 function downloadXlsx(bytes: Uint8Array, filename: string): void {
-  const url = URL.createObjectURL(
+  downloadBlob(
     new Blob([new Uint8Array(bytes)], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     }),
+    filename,
   );
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
 }
 
 export function useWorkbookXlsxActions(options: {
   persistence: ReturnType<typeof useWorkbookPersistence>;
   getWorkbook: () => Workbook;
   getRevision: () => number;
+  dashboardLabels?: () => { records: string; blank: string; noSource: string };
   flushPendingEdits: () => boolean;
   hasPendingEdits: () => boolean;
   assetStore?: ImageAssetStore;
@@ -398,14 +396,31 @@ export function useWorkbookXlsxActions(options: {
       controller.abort();
     }, timeoutMs);
     try {
-      const images = await prepareXlsxImages(snapshot, options.assetStore, controller.signal);
+      const images = [
+        ...(await prepareXlsxImages(snapshot, options.assetStore, controller.signal)),
+      ];
+      let excelSnapshot = snapshot;
+      if (snapshot.sheets.some((sheet) => "dashboard" in sheet && !!sheet.dashboard)) {
+        const { prepareDashboardXlsx } = await import("../dashboards/dashboard-xlsx");
+        const result = await prepareDashboardXlsx(
+          snapshot,
+          options.dashboardLabels?.() ?? {
+            records: "Record count",
+            blank: "(blank)",
+            noSource: "No data",
+          },
+          controller.signal,
+        );
+        excelSnapshot = result.snapshot;
+        images.push(...result.images);
+      }
       if (controller.signal.aborted) throw new XlsxWorkerAbortError();
       const response = await runXlsxWorker(
         workerFactory,
         {
           id: requestId,
           type: "encode",
-          snapshot,
+          snapshot: excelSnapshot,
           images,
           filename,
           ...(password ? { password } : {}),

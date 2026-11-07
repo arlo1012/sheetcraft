@@ -10,7 +10,6 @@ import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import { applyWorkbookCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import { useChartActions } from "../../../modules/charts/useChartActions";
-import { applyChartDesignIntent } from "../../../modules/charts/chart-design-intents";
 function fixture(range = { start: { row: 0, column: 0 }, end: { row: 2, column: 1 } }) {
   let workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
   let sheet = getActiveSheet(workbook);
@@ -85,21 +84,6 @@ describe("chart actions", () => {
     });
     expect(f.actions.editing.value).toBeUndefined();
   });
-  test("creates four dashboard charts in one collection command", () => {
-    const f = fixture();
-    f.actions.insert("dashboard");
-    f.actions.confirm(f.actions.editing.value!, "A1:B3");
-    expect(f.execute).toHaveBeenCalledTimes(1);
-    const drawings = f.getSheet().drawings! as SheetChartDrawing[];
-    expect(drawings.map((drawing) => drawing.chart.type)).toEqual(["column", "line", "pie", "bar"]);
-    expect(new Set(drawings.map((drawing) => drawing.id)).size).toBe(4);
-    expect(drawings.map((drawing) => [drawing.offsetX, drawing.offsetY])).toEqual([
-      [8, 8],
-      [508, 8],
-      [8, 328],
-      [508, 328],
-    ]);
-  });
   test.each(["sheet", "workbook", "protection"] as const)(
     "rejects confirmation after %s changes",
     (change) => {
@@ -145,46 +129,6 @@ describe("chart subtype insertion", () => {
     },
   );
 
-  test("dashboard line markers apply only to the line child", () => {
-    const f = fixture();
-    f.actions.insert("dashboard");
-    const draft = f.actions.editing.value!;
-    const line = applyChartDesignIntent(
-      { ...draft.chart, type: "line" },
-      { kind: "variant", variant: "stackedMarkers" },
-    );
-    f.actions.confirm({ ...draft, chart: line }, "A1:B3");
-    expect(f.getSheet().drawings).toHaveLength(4);
-    for (const node of f.getSheet().drawings ?? []) {
-      if (node.kind !== "chart") throw Error("dashboard child is not a chart");
-      expect(node.chart.presentation?.lineMarkers).toBe(
-        node.chart.type === "line" ? true : undefined,
-      );
-    }
-  });
-  test("dashboard confirmation retires incompatible subtype flags per child and retains owned appearance", () => {
-    const f = fixture();
-    f.actions.insert("dashboard");
-    const draft = f.actions.editing.value!;
-    const styled = applyChartDesignIntent(
-      applyChartDesignIntent(draft.chart, { kind: "variant", variant: "percentStacked" }),
-      { kind: "style", style: "dark" },
-    );
-    f.actions.confirm({ ...draft, chart: styled }, "A1:B3");
-    const drawings = f.getSheet().drawings;
-    expect(drawings).toHaveLength(4);
-    expect(f.actions.error.value).toBe(false);
-    expect(f.execute).toHaveBeenCalledTimes(1);
-    for (const node of drawings ?? []) {
-      if (node.kind !== "chart") throw Error("dashboard child is not a chart");
-      expect(node.chart.presentation?.background).toBe("#202936");
-      expect(node.chart.presentation?.percentStacked).toBe(
-        node.chart.type === "pie" ? undefined : true,
-      );
-      expect(node.chart.format?.title?.color).toBe("#e8eef7");
-      expect(node.chart.presentation?.lineMarkers).toBeUndefined();
-    }
-  });
   test.each(["column", "bar", "area"] as const)(
     "%s percentage choice starts a real draft and persists only on confirmation",
     (type) => {
