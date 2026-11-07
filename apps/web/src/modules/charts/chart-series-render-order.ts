@@ -1,16 +1,20 @@
 import type { EChartsOption } from "echarts";
 import type { SheetChart } from "@sheetcraft/core/sheet-charts";
 
-/** WPS minMax clustered bars place the first source series at the bottom of a group. */
-export function reversesChartSeriesSlots(chart: SheetChart): boolean {
+/** Clustered bars list their series from top to bottom in the legend and data table. */
+export function reversesBarLegendOrder(chart: SheetChart): boolean {
   return (
     chart.type === "bar" &&
     !chart.stacked &&
-    (chart.format?.bar?.overlap ?? 0) <= 0 &&
     !chart.presentation?.percentStacked &&
     !chart.format?.series?.some((series) => series.axis === "secondary") &&
     chart.format?.categoryAxis?.reverse !== true
   );
+}
+
+/** Overlapping series keep source paint order so the front bars remain visible. */
+export function reversesChartSeriesSlots(chart: SheetChart): boolean {
+  return reversesBarLegendOrder(chart) && (chart.format?.bar?.overlap ?? 0) <= 0;
 }
 
 /** The reversal is its own inverse: usable in either source/render direction. */

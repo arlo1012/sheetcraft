@@ -3,6 +3,14 @@
 实现基线：`8eca25c8`。此记录只覆盖下列具体路径，不代表整个插入工具栏已与 WPS 完全一致。
 继续按先插入细节、再打印的顺序推进；功能范围仍参考各领域的当前范围文档。
 
+### 横向条形图的数据表
+
+在本机 WPS 表格新建临时工作簿，用 North、West、East 三个类别及 Actual、Target 两个系列导出图表。默认簇状图的表头为 North / West / East，行序为 Target / Actual；分类逆序时表头为 East / West / North，第一行变为 Actual（13、12、11），水平数值轴移至上方。仅反转数值轴时，表头和系列顺序不变。堆积图的表格行序为 Actual / Target。另核对了正重叠和主次轴样例。
+
+Sheetcraft 现支持从「添加图表元素 → 数据表」选择带图例标示或无图例标示，底部数据表对齐绘图区，原有轴可见。独立 Chrome 工作簿已实测菜单添加、撤销、重做、刷新恢复和两种逆序，逐项核对了表头、行名与各数值。默认与逆序、堆积的图例顺序也随桌面样例调整。回归用例已编写，未执行。此项验收未涵盖原生 XLSX 数据表往返或最终打印。
+
+对照图片：[WPS 默认簇状图](evidence/bar-data-table/wps-clustered.png)、[Sheetcraft 默认簇状图](evidence/bar-data-table/sheetcraft-clustered.png)、[WPS 分类逆序](evidence/bar-data-table/wps-category-reverse.png)。
+
 ### 截屏选区
 
 本机 WPS 表格的「插入 → 截屏」下拉菜单依次提供矩形、椭圆、圆角矩形、自定义区域、屏幕录制，下方有屏幕截图、截屏时隐藏当前窗口及截屏工具窗口。此版本在圆角矩形、自定义区域与屏幕录制旁标注会员。屏幕截图和隐藏当前窗口的快捷键分别为 Ctrl+Alt+X 和 Ctrl+Alt+C。

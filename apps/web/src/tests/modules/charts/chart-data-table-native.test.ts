@@ -1,3 +1,4 @@
+// 未执行：本轮新增横向条形图数据表回归，按用户要求不运行测试。
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { EChartsOption, EChartsType } from "echarts";
 import { use } from "echarts/core";
@@ -114,6 +115,182 @@ afterEach(() => {
 });
 
 describe("installed ECharts SVG data table scene", () => {
+  test.each([
+    {
+      categoryReverse: false,
+      valueReverse: false,
+      stacked: false,
+      percent: false,
+      rows: ["pear", "apple"],
+    },
+    {
+      categoryReverse: true,
+      valueReverse: false,
+      stacked: false,
+      percent: false,
+      rows: ["apple", "pear"],
+    },
+    {
+      categoryReverse: false,
+      valueReverse: true,
+      stacked: false,
+      percent: false,
+      rows: ["pear", "apple"],
+    },
+    {
+      categoryReverse: true,
+      valueReverse: true,
+      stacked: false,
+      percent: false,
+      rows: ["apple", "pear"],
+    },
+    {
+      categoryReverse: false,
+      valueReverse: false,
+      stacked: true,
+      percent: false,
+      rows: ["apple", "pear"],
+    },
+    {
+      categoryReverse: true,
+      valueReverse: false,
+      stacked: true,
+      percent: false,
+      rows: ["apple", "pear"],
+    },
+    {
+      categoryReverse: false,
+      valueReverse: true,
+      stacked: true,
+      percent: false,
+      rows: ["apple", "pear"],
+    },
+    {
+      categoryReverse: true,
+      valueReverse: true,
+      stacked: true,
+      percent: false,
+      rows: ["apple", "pear"],
+    },
+    {
+      categoryReverse: true,
+      valueReverse: false,
+      stacked: true,
+      percent: true,
+      rows: ["apple", "pear"],
+    },
+  ])(
+    "WPS horizontal bar table categoryReverse=$categoryReverse valueReverse=$valueReverse stacked=$stacked percent=$percent",
+    ({ categoryReverse, valueReverse, stacked, percent, rows }) => {
+      const value: SheetChart = {
+        ...chart,
+        type: "bar",
+        stacked,
+        ...(percent ? { presentation: { percentStacked: true } } : {}),
+        format: {
+          categoryAxis: { reverse: categoryReverse },
+          valueAxis: { reverse: valueReverse },
+          series: [
+            { id: "apple", color: "#112233" },
+            { id: "pear", color: "#aabbcc" },
+          ],
+        },
+      };
+      const before = structuredClone({ value, data });
+      const { instance, plan } = render(value);
+      expect(plan).toBeDefined();
+      const table = tableElements(instance);
+      const headers = table
+        .filter((entry) => data.categories.includes(entry.style?.text ?? ""))
+        .sort((a, b) => a.style!.x! - b.style!.x!);
+      const ordinals = categoryReverse ? [2, 1, 0] : [0, 1, 2];
+      expect(headers.map((entry) => entry.style!.text)).toEqual(
+        ordinals.map((index) => data.categories[index]),
+      );
+      const rowLabels = table
+        .filter((entry) => ["apple", "pear"].includes(entry.style?.text ?? ""))
+        .sort((a, b) => a.style!.y! - b.style!.y!);
+      expect(rowLabels.map((entry) => entry.style!.text)).toEqual(rows);
+      rows.forEach((name, index) => {
+        const source = data.series.find((entry) => entry.name === name)!;
+        const cells = table
+          .filter(
+            (entry) =>
+              entry.type === "text" &&
+              entry.style!.y === rowLabels[index]!.style!.y &&
+              entry.style!.text !== name,
+          )
+          .sort((a, b) => a.style!.x! - b.style!.x!);
+        expect(cells.map((entry) => entry.style!.text)).toEqual(
+          ordinals.map((ordinal) => String(source.values[ordinal])),
+        );
+        cells.forEach((entry, column) =>
+          expect(entry.style!.x).toBeCloseTo(headers[column]!.style!.x!, 6),
+        );
+      });
+      const keys = table
+        .filter((entry) => entry.type === "rect" && entry.shape?.width === 10)
+        .sort((a, b) => a.shape!.y! - b.shape!.y!);
+      expect(keys.map((entry) => entry.style!.fill)).toEqual(
+        rows.map((name) => (name === "apple" ? "#112233" : "#aabbcc")),
+      );
+      const vertical = table
+        .filter((entry) => entry.type === "line" && entry.shape?.x1 === entry.shape?.x2)
+        .map((entry) => entry.shape!.x1!)
+        .sort((a, b) => a - b);
+      expect(vertical).toHaveLength(data.categories.length + 2);
+      const columnWidth = vertical[2]! - vertical[1]!;
+      expect(columnWidth).toBeGreaterThanOrEqual(48);
+      for (let column = 0; column < data.categories.length; column++) {
+        expect(vertical[column + 2]! - vertical[column + 1]!).toBeCloseTo(columnWidth, 6);
+        expect(headers[column]!.style!.x).toBeCloseTo(
+          (vertical[column + 1]! + vertical[column + 2]!) / 2,
+          6,
+        );
+      }
+      const axes = instance.getOption() as {
+        xAxis: Array<{ type: string; inverse: boolean; axisLabel?: { show: boolean } }>;
+        yAxis: Array<{
+          type: string;
+          inverse: boolean;
+          data?: string[];
+          axisLabel?: { show: boolean };
+        }>;
+      };
+      expect(axes.xAxis[0]).toMatchObject({ type: "value", inverse: valueReverse });
+      expect(axes.xAxis[0]!.axisLabel?.show).toBe(true);
+      expect(axes.yAxis[0]).toMatchObject({
+        type: "category",
+        inverse: categoryReverse,
+        data: data.categories,
+      });
+      expect(axes.yAxis[0]!.axisLabel?.show).toBe(true);
+      expect({ value, data }).toEqual(before);
+      svg(instance);
+    },
+  );
+
+  test.each([
+    { mode: "withLegendKeys" as const, legend: false, keys: 2 },
+    { mode: "withLegendKeys" as const, legend: true, keys: 2 },
+    { mode: "withoutLegendKeys" as const, legend: false, keys: 0 },
+    { mode: "withoutLegendKeys" as const, legend: true, keys: 0 },
+  ])(
+    "horizontal bar table $mode keeps its keys independent of chart legend=$legend",
+    ({ mode, legend, keys }) => {
+      const { instance } = render({ ...chart, type: "bar", legend, elements: { dataTable: mode } });
+      const table = tableElements(instance);
+      expect(
+        table.filter((entry) => entry.type === "rect" && entry.shape?.width === 10),
+      ).toHaveLength(keys);
+      const rows = table
+        .filter((entry) => ["apple", "pear"].includes(entry.style?.text ?? ""))
+        .sort((a, b) => a.style!.y! - b.style!.y!);
+      expect(rows.map((entry) => entry.style!.text)).toEqual(["pear", "apple"]);
+      expect((instance.getOption().legend as Array<{ show: boolean }>)[0]!.show).toBe(legend);
+    },
+  );
+
   test.each(["svg", "canvas"] as const)(
     "line square keys use normalized rect geometry in %s without applying dormant Combo shapes",
     (renderer) => {
@@ -214,7 +391,7 @@ describe("installed ECharts SVG data table scene", () => {
     expect(chart).toEqual(originalChart);
   });
 
-  test.each(["column", "line", "area"] as const)(
+  test.each(["bar", "column", "line", "area"] as const)(
     "%s supports single, duplicate and numeric category labels using integer ordinal conversion",
     (type) => {
       for (const categories of [["one"], ["same", "same", "42"]]) {
@@ -421,7 +598,7 @@ describe("installed ECharts SVG data table scene", () => {
       /coordinates are unavailable/,
     );
     expect(tableElements(instance)).toEqual([]);
-    expect(createChartDataTablePlan({ ...chart, type: "bar" }, data, dimensions)).toBeUndefined();
+    expect(createChartDataTablePlan({ ...chart, type: "pie" }, data, dimensions)).toBeUndefined();
   });
 
   test("full numeric text must fit final contained columns; no clipped first-N or microscopic scene survives", () => {

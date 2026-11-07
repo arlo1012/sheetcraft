@@ -427,9 +427,26 @@ export function applyChartCommonFormat(
       position: horizontal ? "right" : "top",
       axisLine: { ...category.axisLine, onZero: false },
     };
+  const reversedBarCategories = horizontal && format.categoryAxis?.reverse === true;
+  if (reversedBarCategories) {
+    mainAxis.position = "top";
+    mainAxis.axisLine = { ...mainAxis.axisLine, onZero: false };
+    // The primary scale moves above the plot, between its top edge and the chart title.
+    const grid = next.grid;
+    if (grid && !Array.isArray(grid) && typeof grid.top === "number" && mainAxis.show !== false) {
+      const tickSpace = (format.valueAxis?.text?.fontSize ?? 12) + 12;
+      next.grid = { ...grid, top: grid.top + tickSpace };
+    }
+  }
   const otherAxis = hasSecondary
     ? valueAxis(
-        { type: "value", position: horizontal ? "top" : "right" },
+        {
+          type: "value",
+          position: horizontal ? "top" : "right",
+          ...(reversedBarCategories
+            ? { offset: (format.valueAxis?.text?.fontSize ?? 12) + 12 }
+            : {}),
+        },
         format.secondaryValueAxis,
         secondaryEntries,
         isStacked,

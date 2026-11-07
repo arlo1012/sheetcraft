@@ -268,8 +268,8 @@ export const chartsZhCN = {
   "chart.dataTableWithLegendKeys": "带图例标示",
   "chart.dataTableWithoutLegendKeys": "无图例标示",
   "chart.dataTableHint":
-    "数据表支持柱形、折线和面积图，使用当前系列和类别。保留全部数值，最多32个类别、8个系列，并需满足绘图区和数据表的可读空间。",
-  "chart.dataTableBarHint": "条形图的分类轴为垂直方向，暂不支持底部数据表。",
+    "数据表支持柱形、条形、折线、面积和组合图，使用当前系列和类别。保留全部数值，最多32个类别、8个系列，并需满足绘图区和数据表的可读空间。",
+  "chart.dataTableBarHint": "数据表显示在绘图区下方，原有分类轴和数值轴按图表设置显示。",
   "chart.dataTableApplyFailed":
     "数据表未更改。请确认可编辑，或放大图表、减少类别与系列及数字格式长度。",
   "chart.variantMenu": "{type}子型",

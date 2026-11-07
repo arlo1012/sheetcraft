@@ -8,6 +8,8 @@ import { format } from "echarts/core";
 import { resolveChartSeriesColors } from "@sheetcraft/core/chart-presentation";
 import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
 
+import { reversesBarLegendOrder } from "./chart-series-render-order";
+
 const seriesLegendTypes = new Set(["column", "bar", "line", "area", "combo", "scatter"]);
 
 /** A renderer-only name; never a Core ID or a saved source/series mutation. */
@@ -103,7 +105,7 @@ export function applySeriesLegendIdentity(
     const originalFormatter = legend.formatter;
     return {
       ...legend,
-      data: chart.type === "bar" ? [...legendEntries].reverse() : legendEntries,
+      data: reversesBarLegendOrder(chart) ? [...legendEntries].reverse() : legendEntries,
       formatter: (key: string) => {
         const label = labels.get(key) ?? key;
         return typeof originalFormatter === "function"

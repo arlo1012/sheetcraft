@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import type { SheetChart } from "@sheetcraft/core/sheet-charts";
+import { supportsChartDataTable } from "../chart-data-table";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
 
@@ -13,13 +14,7 @@ const props = defineProps<{
 const { t } = useAppI18n();
 const failed = ref(false);
 let active = true;
-const supported = computed(
-  () =>
-    props.chart.type === "column" ||
-    props.chart.type === "line" ||
-    props.chart.type === "area" ||
-    props.chart.type === "combo",
-);
+const supported = computed(() => supportsChartDataTable(props.chart.type));
 const selected = computed(() => props.chart.elements?.dataTable ?? "none");
 watch(
   () => [props.chart, props.chart.type, props.apply],

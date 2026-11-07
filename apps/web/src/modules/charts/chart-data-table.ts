@@ -1,4 +1,4 @@
-import { chartSeriesSlotIndex } from "./chart-series-render-order";
+import { chartSeriesSlotIndex, reversesBarLegendOrder } from "./chart-series-render-order";
 import { chartAxisTitleExtent, chartAxisTitleWidthBudget } from "./chart-axis-title-layout";
 import {
   createChartTextPlan,
@@ -55,6 +55,7 @@ type TableText = Readonly<{
   color?: string;
 }>;
 export type ChartDataTablePlan = Readonly<{
+  horizontalBars: boolean;
   mode: "withLegendKeys" | "withoutLegendKeys";
   width: number;
   height: number;
@@ -136,13 +137,17 @@ function createMeasurementSession(ownerDocument?: Document): MeasurementSession 
   }
 }
 
+export function supportsChartDataTable(type: SheetChart["type"]): boolean {
+  return ["column", "bar", "line", "area", "combo"].includes(type);
+}
+
 /** Count/format-only admission for source capture before print fonts are loaded.
  * Never touches native text measurement or claims final geometric fit. */
 export function countChartDataTableText(chart: SheetChart, data: ChartData): number {
   if (
     !chart.elements?.dataTable ||
     chart.elements.dataTable === "none" ||
-    !["column", "line", "area", "combo"].includes(chart.type) ||
+    !supportsChartDataTable(chart.type) ||
     !data.categories.length ||
     !data.series.length
   )
@@ -192,7 +197,7 @@ export function createChartDataTablePlan(
   if (mode === undefined || mode === "none") return undefined;
   if (mode !== "withLegendKeys" && mode !== "withoutLegendKeys")
     unavailable("has an unsupported setting.");
-  if (!["column", "line", "area", "combo"].includes(chart.type)) return undefined;
+  if (!supportsChartDataTable(chart.type)) return undefined;
   if (
     data.diagnostics?.some(
       (entry) => entry.code === "broken-reference" || entry.code === "length-mismatch",
@@ -284,7 +289,7 @@ export function createChartDataTablePlan(
           : combo.markers
             ? "markerLine"
             : "line"
-        : chart.type === "column"
+        : chart.type === "column" || chart.type === "bar"
           ? "column"
           : (settings?.markers ??
               (chart.type === "line" ? chart.presentation?.lineMarkers : undefined) ??
@@ -309,6 +314,8 @@ export function createChartDataTablePlan(
         }),
       };
     });
+    const horizontalBars = chart.type === "bar";
+    if (reversesBarLegendOrder(chart)) rows.reverse();
     const tableHeight = (rows.length + 1) * limit.rowHeight;
     const labelGutter = Math.max(
       72,
@@ -319,19 +326,26 @@ export function createChartDataTablePlan(
           (mode === "withLegendKeys" ? 16 : 0),
       ),
     );
+    const bottomBarAxis =
+      horizontalBars && !format?.categoryAxis?.reverse && format?.valueAxis?.show !== false;
+    const bottomAxis = horizontalBars
+      ? bottomBarAxis
+        ? format?.valueAxis
+        : undefined
+      : format?.categoryAxis;
     const gap =
       MARGIN +
-      (format?.categoryAxis?.title && format.categoryAxis.titleVisible !== false
+      (bottomBarAxis ? (bottomAxis?.text?.fontSize ?? 12) + 10 : 0) +
+      (bottomAxis?.title && bottomAxis.titleVisible !== false
         ? 32 +
-          (format.categoryAxis.titleText !== undefined ||
-          format.categoryAxis.titleRotation !== undefined
+          (bottomAxis.titleText !== undefined || bottomAxis.titleRotation !== undefined
             ? chartAxisTitleExtent(
-                format.categoryAxis,
+                bottomAxis,
                 true,
                 dimensions,
-                chartAxisTitleWidthBudget(format.categoryAxis, true, dimensions),
+                chartAxisTitleWidthBudget(bottomAxis, true, dimensions),
               ).height
-            : (format.categoryAxis.text?.fontSize ?? 12))
+            : (bottomAxis.text?.fontSize ?? 12))
         : 0);
     const primitiveUpperBound =
       2 +
@@ -356,6 +370,7 @@ export function createChartDataTablePlan(
     const textColor = getChartPresentationTextColor(chart) ?? "#333333";
     return {
       mode,
+      horizontalBars,
       width,
       height,
       categories,
@@ -415,7 +430,8 @@ export function prepareChartDataTableOption(
   const axes = option.xAxis ? (Array.isArray(option.xAxis) ? option.xAxis : [option.xAxis]) : [];
   const realAxes = axes.filter((axis) => axis.id !== X_PROBE);
   const categories = realAxes.filter((axis) => axis.type === "category");
-  if (!categories.length) unavailable("requires an actual x category axis.");
+  if (!plan.horizontalBars && !categories.length)
+    unavailable("requires an actual x category axis.");
   const endpoint =
     categories.some((axis) => axis.boundaryGap === false) && plan.categories.length > 1;
   // Keep complete endpoint cells on the surface even for future boundaryGap:false options.
@@ -447,7 +463,7 @@ export function prepareChartDataTableOption(
   // ECharts considers hidden opposing value axes for automatic real axis lines/ticks.
   // Preserve the pre-probe effective visibility, without changing explicit choices.
   const opposingValue = realAxes.some((axis) => axis.type === "value" || axis.type === "log");
-  const realValueAxis = (axis: ValueAxis): ValueAxis =>
+  const realValueAxis = <T extends ValueAxis | CategoryAxis>(axis: T, opposingValue: boolean): T =>
     axis.type !== "value"
       ? { ...axis }
       : {
@@ -475,12 +491,17 @@ export function prepareChartDataTableOption(
               ...axis,
               axisLabel: { ...axis.axisLabel, show: false },
             }
-          : { ...axis },
+          : realValueAxis(
+              axis,
+              yAxes.some((other) => other.type === "value" || other.type === "log"),
+            ),
       ),
       probe(X_PROBE),
     ],
     yAxis: [
-      ...yAxes.filter((axis) => axis.id !== Y_PROBE).map(realValueAxis),
+      ...yAxes
+        .filter((axis) => axis.id !== Y_PROBE)
+        .map((axis) => realValueAxis(axis, opposingValue)),
       probe(Y_PROBE) as ValueAxis,
     ],
   };
@@ -562,7 +583,9 @@ export function applyChartDataTableGraphics(
     const xProbe = xAxes?.findIndex((axis) => axis.id === X_PROBE) ?? -1;
     const yProbe = yAxes?.findIndex((axis) => axis.id === Y_PROBE) ?? -1;
     const categoryAxes =
-      xAxes?.flatMap((axis, index) => (axis.type === "category" ? [index] : [])) ?? [];
+      (plan.horizontalBars ? yAxes : xAxes)?.flatMap((axis, index) =>
+        axis.type === "category" ? [index] : [],
+      ) ?? [];
     if (xProbe < 0 || yProbe < 0 || !categoryAxes.length)
       unavailable("native reservation probes are missing.");
     const start = scalar(instance, "x", xProbe, 1),
@@ -576,33 +599,49 @@ export function applyChartDataTableGraphics(
       Math.abs(yEnd - yStart) < CHART_DATA_TABLE_LIMITS.plotHeight
     )
       unavailable("native axis labels leave less than a readable 96×96px plot.");
-    const display = plan.categories
-      .map((category) => ({
+    let display: Array<ChartDataTablePlan["categories"][number] & { center: number }>;
+    let edges: number[];
+    if (plan.horizontalBars) {
+      // The table spans the plot width, independently of the horizontal value scale.
+      // WPS reads the vertical categories from bottom to top for the column headings.
+      const order = yAxes![categoryAxes[0]!]!.inverse
+        ? [...plan.categories].reverse()
+        : plan.categories;
+      const step = (right - left) / order.length;
+      display = order.map((category, index) => ({
         ...category,
-        center: scalar(instance, "x", categoryAxes[0]!, category.sourceOrdinal),
-      }))
-      .sort((a, b) => a.center - b.center);
-    for (const category of display) {
-      if (category.center < left - 0.5 || category.center > right + 0.5)
-        unavailable("native category center lies outside the reserved plot.");
-      for (const axis of categoryAxes.slice(1))
-        if (Math.abs(scalar(instance, "x", axis, category.sourceOrdinal) - category.center) > 0.5)
-          unavailable("primary and secondary category axes are misaligned.");
+        center: left + (index + 0.5) * step,
+      }));
+      edges = Array.from({ length: order.length + 1 }, (_, index) => left + index * step);
+    } else {
+      display = plan.categories
+        .map((category) => ({
+          ...category,
+          center: scalar(instance, "x", categoryAxes[0]!, category.sourceOrdinal),
+        }))
+        .sort((a, b) => a.center - b.center);
+      for (const category of display) {
+        if (category.center < left - 0.5 || category.center > right + 0.5)
+          unavailable("native category center lies outside the reserved plot.");
+        for (const axis of categoryAxes.slice(1))
+          if (Math.abs(scalar(instance, "x", axis, category.sourceOrdinal) - category.center) > 0.5)
+            unavailable("primary and secondary category axes are misaligned.");
+      }
+      const endpoint = xAxes![categoryAxes[0]!]!.boundaryGap === false && display.length > 1;
+      edges = [
+        endpoint ? display[0]!.center - (display[1]!.center - display[0]!.center) / 2 : left,
+      ];
+      for (let index = 1; index < display.length; index++) {
+        if (display[index]!.center - display[index - 1]!.center <= 0.5)
+          unavailable("native categories overlap or have duplicate coordinates.");
+        edges.push((display[index - 1]!.center + display[index]!.center) / 2);
+      }
+      edges.push(
+        endpoint
+          ? display.at(-1)!.center + (display.at(-1)!.center - display.at(-2)!.center) / 2
+          : right,
+      );
     }
-    const endpoint = xAxes![categoryAxes[0]!]!.boundaryGap === false && display.length > 1;
-    const edges = [
-      endpoint ? display[0]!.center - (display[1]!.center - display[0]!.center) / 2 : left,
-    ];
-    for (let index = 1; index < display.length; index++) {
-      if (display[index]!.center - display[index - 1]!.center <= 0.5)
-        unavailable("native categories overlap or have duplicate coordinates.");
-      edges.push((display[index - 1]!.center + display[index]!.center) / 2);
-    }
-    edges.push(
-      endpoint
-        ? display.at(-1)!.center + (display.at(-1)!.center - display.at(-2)!.center) / 2
-        : right,
-    );
     const grid = (option.grid as Array<{ bottom?: unknown }> | undefined)?.[0];
     const top = plan.height - pixels(grid?.bottom, plan.height, 35) + plan.gap;
     const tableLeft = edges[0]! - plan.labelGutter;

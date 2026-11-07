@@ -294,9 +294,9 @@ export const chartsEnUS = {
   "chart.dataTableWithLegendKeys": "With legend keys",
   "chart.dataTableWithoutLegendKeys": "Without legend keys",
   "chart.dataTableHint":
-    "Data tables support column, line and area charts and use the current series and categories. All values are retained; up to 32 categories and 8 series must fit the readable plot/table area.",
+    "Data tables support column, bar, line, area and combo charts and use the current series and categories. All values are retained; up to 32 categories and 8 series must fit the readable plot/table area.",
   "chart.dataTableBarHint":
-    "Bar charts use a vertical category axis; a bottom data table is not supported yet.",
+    "The data table appears below the plot. Both axes remain visible according to their chart settings.",
   "chart.dataTableApplyFailed":
     "The data table was not changed. Check editability, enlarge the chart, or reduce categories/series and formatted-number length.",
   "chart.variantMenu": "{type} subtypes",

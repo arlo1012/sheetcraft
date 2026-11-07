@@ -1,3 +1,4 @@
+// 未执行：本轮新增横向条形图数据表回归，按用户要求不运行测试。
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { EChartsOption } from "echarts";
 import type { ChartData, SheetChart } from "@sheetcraft/core/sheet-charts";
@@ -214,10 +215,47 @@ describe("bounded complete raw chart data table plans", () => {
     expect(
       createChartDataTablePlan(chart, { ...data, categories: [], series: [] }, dimensions),
     ).toBeUndefined();
-    for (const type of ["bar", "pie", "scatter", "radar"] as const)
+    for (const type of ["pie", "scatter", "radar"] as const)
       expect(createChartDataTablePlan({ ...chart, type }, data, dimensions)).toBeUndefined();
-    for (const type of ["line", "area"] as const)
+    for (const type of ["bar", "line", "area"] as const)
       expect(required({ ...chart, type }).rows).toHaveLength(2);
+  });
+
+  test("horizontal bars retain source ordinals and complete raw cells with column-shaped legend keys", () => {
+    const value: SheetChart = {
+      ...chart,
+      type: "bar",
+      format: { categoryAxis: { reverse: true }, valueAxis: { reverse: true } },
+    };
+    const before = structuredClone({ value, data });
+    const plan = required(value);
+    expect(plan.categories.map((entry) => [entry.sourceOrdinal, entry.label.text])).toEqual([
+      [0, "east"],
+      [1, "north"],
+      [2, "south"],
+    ]);
+    for (const entry of data.series) {
+      const row = plan.rows.find((row) => row.id === entry.id)!;
+      expect(row.key).toBe("column");
+      expect(row.label.text).toBe(entry.name);
+      expect(row.cells.map((cell) => cell.value)).toEqual(entry.values);
+      expect(row.cells.map((cell) => cell.label.text)).toEqual(entry.values.map(String));
+    }
+    expect(countChartDataTableText(value, data)).toBe(plan.generatedTextUnits);
+    expect({ value, data }).toEqual(before);
+  });
+
+  test("horizontal bar key visibility changes presentation budget without changing source cells", () => {
+    const keyed = required({ ...chart, type: "bar", elements: { dataTable: "withLegendKeys" } });
+    const unkeyed = required({
+      ...chart,
+      type: "bar",
+      elements: { dataTable: "withoutLegendKeys" },
+    });
+    expect(keyed.rows).toEqual(unkeyed.rows);
+    expect(keyed.categories).toEqual(unkeyed.categories);
+    expect(keyed.primitiveUpperBound - unkeyed.primitiveUpperBound).toBe(data.series.length);
+    expect(keyed.generatedTextUnits).toBe(unkeyed.generatedTextUnits);
   });
 
   test("source errors, incomplete vectors and nonfinite values fail the entire table", () => {
@@ -292,6 +330,57 @@ describe("bounded complete raw chart data table plans", () => {
 });
 
 describe("table-only option reservation after full chart formatting", () => {
+  test("horizontal bar reservation retains the value x axis and category y axis while reserving a bottom table strip", () => {
+    const value: SheetChart = {
+      ...chart,
+      type: "bar",
+      legend: true,
+      format: {
+        categoryAxis: { title: "Categories", reverse: true, text: { color: "#123456" } },
+        valueAxis: { title: "Amount", min: -20, max: 140, reverse: true },
+      },
+    };
+    const input = createChartOption(value, data, dimensions);
+    const plan = required(value);
+    const result = prepareChartDataTableOption(input, plan);
+    type Axis = {
+      type?: string;
+      inverse?: boolean;
+      data?: unknown;
+      name?: string;
+      min?: number;
+      max?: number;
+      axisLabel?: { show?: boolean; color?: string };
+    };
+    const originalX = (Array.isArray(input.xAxis) ? input.xAxis : [input.xAxis]) as Axis[];
+    const originalY = (Array.isArray(input.yAxis) ? input.yAxis : [input.yAxis]) as Axis[];
+    const x = result.xAxis as Axis[];
+    const y = result.yAxis as Axis[];
+    expect(x).toHaveLength(originalX.length + 1);
+    expect(y).toHaveLength(originalY.length + 1);
+    expect(x[0]).toMatchObject({
+      type: "value",
+      inverse: true,
+      min: -20,
+      max: 140,
+      name: originalX[0]!.name,
+    });
+    expect(y[0]).toMatchObject({
+      type: "category",
+      inverse: true,
+      data: data.categories,
+      name: originalY[0]!.name,
+    });
+    expect(y[0]!.axisLabel?.show ?? true).toBe(originalY[0]!.axisLabel?.show ?? true);
+    expect(y[0]!.axisLabel?.color).toBe(originalY[0]!.axisLabel?.color);
+    expect(result.series).toBe(input.series);
+    expect(result.title).toBe(input.title);
+    expect(result.legend).toBe(input.legend);
+    expect((result.grid as { bottom: number }).bottom).toBeGreaterThan(
+      (input.grid as { bottom: number }).bottom,
+    );
+  });
+
   test("clones the formatted option, preserves axes/series/title/legend, suppresses duplicate category labels", () => {
     const value = {
       ...chart,
