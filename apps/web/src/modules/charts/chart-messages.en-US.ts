@@ -81,7 +81,7 @@ export const chartsEnUS = {
   "chart.sankeyHint":
     "The first three columns contain source, target and value. Links must not form a cycle.",
   "chart.scatterHint":
-    "The first numeric series supplies X values and the following series supply Y values. Do not treat numeric X values as categories.",
+    "One series uses point numbers for X. For multiple series, the first provides X values and the rest provide Y values.",
   "chart.invalidSource":
     "Select a valid source range on this sheet containing the numeric columns required by the chart.",
   "chart.column": "Column",
@@ -103,6 +103,17 @@ export const chartsEnUS = {
   "chart.area": "Area",
   "chart.pie": "Pie",
   "chart.doughnut": "Doughnut",
+  "chart.xy.family.marker": "Markers",
+  "chart.xy.family.smooth": "Smooth",
+  "chart.xy.family.line": "Straight",
+  "chart.xy.variant.marker": "Scatter with markers",
+  "chart.xy.variant.smoothMarker": "Smooth lines with markers",
+  "chart.xy.variant.smooth": "Smooth lines",
+  "chart.xy.variant.lineMarker": "Straight lines with markers",
+  "chart.xy.variant.line": "Straight lines",
+  "chart.xy.followTheme": "Follow theme",
+  "chart.xy.more": "More",
+  "chart.xy.card": "{style}, palette {index}",
   "chart.scatter": "Scatter",
   "chart.radar": "Radar",
   "chart.treemap": "Treemap",

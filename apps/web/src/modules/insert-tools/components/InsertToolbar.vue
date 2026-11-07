@@ -57,6 +57,7 @@ defineProps<{
   editSessionId?: string;
   insertSymbolTextHandler?: (payload: SymbolInsertion) => boolean;
   insertShapeHandler?: (choice: ShapeGalleryChoice, continuous: boolean) => boolean;
+  themeColors?: readonly string[];
   shapeOwnerId?: string | number;
   insertEquationHandler?: (choice: EquationPresetId | null) => boolean | Promise<boolean>;
   insertWordArtHandler?: (choice: WordArtStylePreset) => boolean | Promise<boolean>;
@@ -230,6 +231,7 @@ const { t, locale } = useAppI18n();
       </div>
     </section>
     <ChartInsertTools
+      :theme-colors="themeColors"
       :disabled="imageDisabled"
       :dashboard-disabled="dashboardDisabled"
       @dashboard="emit('insertDashboard')"

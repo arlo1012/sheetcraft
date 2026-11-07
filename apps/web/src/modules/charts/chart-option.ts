@@ -6,6 +6,7 @@ import { createChartElementLayout, getChartLegendLayout } from "./chart-element-
 import { applySeriesLegendIdentity } from "./chart-series-legend";
 import type { EChartsOption, SeriesOption } from "echarts";
 import { formatCellNumberValue } from "@sheetcraft/core/number-format";
+import { DEFAULT_WORKBOOK_THEME } from "@sheetcraft/core/workbook-theme";
 import type { CellNumberFormat } from "@sheetcraft/core/style";
 import {
   normalizeSheetChart,
@@ -14,6 +15,7 @@ import {
 } from "@sheetcraft/core/sheet-charts";
 import {
   DEFAULT_CHART_PALETTE,
+  rotateChartPalette,
   type ChartPresentationSettings,
 } from "@sheetcraft/core/chart-presentation";
 import type { ChartComboSeriesChange } from "@sheetcraft/core/chart-combo";
@@ -68,7 +70,13 @@ function buildChartOption(
   presentation?: ChartPresentationSettings,
   comboSeriesChanges?: readonly ChartComboSeriesChange[],
 ): EChartsOption {
-  const palette = presentation?.palette ?? [...colors];
+  const palette =
+    presentation?.themeAccent !== undefined
+      ? rotateChartPalette(
+          dimensions?.theme?.accentColors ?? DEFAULT_WORKBOOK_THEME.accentColors,
+          presentation.themeAccent,
+        )
+      : (presentation?.palette ?? [...colors]);
   const background = presentation?.background ?? "#ffffff";
   if (chart.source !== undefined) {
     if (!["column", "bar", "line", "area", "radar", "combo"].includes(chart.type))
@@ -300,15 +308,34 @@ function buildChartOption(
   const rightLabelSpace =
     lastBarLabels && !lastBarLabels.some((value) => value >= 0) ? 0 : labelClearance;
   const series: SeriesOption[] = scatter
-    ? data.series.slice(1).map((series) => ({
-        type: "scatter",
-        name: series.name,
-        data: series.values.flatMap((value, index) => {
+    ? data.series.slice(1).map((series): SeriesOption => {
+        const style = presentation?.scatterStyle ?? "marker";
+        const coordinates: Array<[number, number | "-"]> = [];
+        series.values.forEach((y, index) => {
           const x = data.series[0]?.values[index];
-          return x !== null && x !== undefined && value !== null ? [[x, value]] : [];
-        }),
-        label: { show: chart.labels },
-      }))
+          if (x == null || (style === "marker" && y === null)) return;
+          coordinates.push([x, y ?? "-"]);
+        });
+        const common = {
+          ...seriesAppearance(series, palette),
+          name: series.name,
+          data: coordinates,
+          label: { show: chart.labels },
+        };
+        if (style === "marker") return { ...common, type: "scatter" };
+        const markers = style === "lineMarker" || style === "smoothMarker";
+        return {
+          ...common,
+          type: "line",
+          smooth: style === "smooth" || style === "smoothMarker",
+          // Native line labels are attached to symbols. Zero-size symbols retain labels on line-only plots.
+          showSymbol: markers || chart.labels,
+          ...(!markers && chart.labels ? { symbolSize: 0 } : {}),
+          showAllSymbol: true,
+          connectNulls: false,
+          symbol: "circle",
+        };
+      })
     : data.series.map((series) =>
         chart.type === "line" ||
         chart.type === "area" ||
@@ -453,11 +480,17 @@ export function createChartOption(
     option.series = option.series.map((series, index) => {
       const format = plotted[index]?.numberFormat;
       if (!format && chart.type !== "radar" && !percent && !customLabels) return series;
+      const lastCategoryIndex =
+        chart.type === "scatter" && "data" in series && Array.isArray(series.data)
+          ? data.series[0]?.values.at(-1) != null && plotted[index]?.values.at(-1) != null
+            ? series.data.length - 1
+            : -1
+          : data.categories.length - 1;
       const formatLabel = (params: { value?: unknown; dataIndex?: number }) => {
         if (
           customLabels &&
           chart.elements?.labelScope === "lastCategory" &&
-          params.dataIndex !== data.categories.length - 1
+          params.dataIndex !== lastCategoryIndex
         )
           return "";
         if (

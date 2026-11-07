@@ -494,10 +494,10 @@ export function applyChartCommonFormat(
           },
           ...(combo
             ? { smooth: false }
-            : settings?.smooth !== undefined
+            : chart.type !== "scatter" && settings?.smooth !== undefined
               ? { smooth: settings.smooth }
               : {}),
-          ...(!combo && settings?.markers !== undefined
+          ...(!combo && chart.type !== "scatter" && settings?.markers !== undefined
             ? { showSymbol: settings.markers, symbol: settings.markers ? "circle" : "none" }
             : {}),
           // Shape is independent of size and visibility. Keep legacy implicit symbols

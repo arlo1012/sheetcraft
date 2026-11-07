@@ -1,4 +1,10 @@
 import {
+  isScatterStyle,
+  rotateChartPalette,
+  DEFAULT_CHART_PALETTE,
+  type ScatterStyle,
+} from "@sheetcraft/core/chart-presentation";
+import {
   chartTypes,
   normalizeSheetChart,
   type ChartType,
@@ -26,7 +32,14 @@ export type ChartDesignIntent =
   | { kind: "variant"; variant: ChartVariant }
   | { kind: "style"; style: ChartStyleId };
 export type DynamicChartTemplate = { type: ChartType; style: ChartStyleId; labels: boolean };
+export type ScatterInsertChoice = {
+  type: "scatter";
+  scatterStyle: ScatterStyle;
+  accent: number;
+  followTheme: boolean;
+};
 export type ChartInsertIntent =
+  | ScatterInsertChoice
   | ChartType
   | { type: CommonChartType; variant: ChartVariant }
   | DynamicChartTemplate;
@@ -74,6 +87,25 @@ export function normalizeChartInsertIntent(value: unknown): ChartInsertIntent {
       throw new RangeError("Unknown chart insertion type.");
     return value as ChartType;
   }
+  if (value && typeof value === "object" && Object.hasOwn(value, "scatterStyle")) {
+    const data = dataRecord(value, ["type", "scatterStyle", "accent", "followTheme"]);
+    if (
+      data.type !== "scatter" ||
+      !isScatterStyle(data.scatterStyle) ||
+      typeof data.accent !== "number" ||
+      !Number.isInteger(data.accent) ||
+      data.accent < 0 ||
+      data.accent > 5 ||
+      typeof data.followTheme !== "boolean"
+    )
+      throw new RangeError("Invalid scatter insertion choice.");
+    return {
+      type: "scatter",
+      scatterStyle: data.scatterStyle,
+      accent: data.accent,
+      followTheme: data.followTheme,
+    };
+  }
   if (value && typeof value === "object" && Object.hasOwn(value, "style")) {
     const data = dataRecord(value, ["type", "style", "labels"]);
     if (
@@ -90,6 +122,20 @@ export function normalizeChartInsertIntent(value: unknown): ChartInsertIntent {
     throw new RangeError("Variant insertion requires a common chart type.");
   const type = data.type as CommonChartType;
   return { type, variant: normalizeVariant(data.variant, type) };
+}
+export function applyScatterInsertChoice(
+  chart: SheetChart,
+  choice: ScatterInsertChoice,
+): SheetChart {
+  const presentation = { ...chart.presentation, scatterStyle: choice.scatterStyle };
+  if (choice.followTheme) {
+    delete presentation.palette;
+    presentation.themeAccent = choice.accent;
+  } else {
+    delete presentation.themeAccent;
+    presentation.palette = rotateChartPalette(DEFAULT_CHART_PALETTE, choice.accent);
+  }
+  return normalizeSheetChart({ ...chart, presentation });
 }
 /** Existing line charts retain their marker-on default until an explicit choice. */
 export function getChartVariant(chart: SheetChart): ChartVariant | undefined {
@@ -120,6 +166,7 @@ export function changeChartType(chart: SheetChart, type: ChartType): SheetChart 
   if (next.presentation) {
     if (!isCommonChartType(type)) delete next.presentation.percentStacked;
     if (type !== "line") delete next.presentation.lineMarkers;
+    if (type !== "scatter") delete next.presentation.scatterStyle;
     if (!Object.keys(next.presentation).length) delete next.presentation;
   }
   return normalizeSheetChart(next);
@@ -267,6 +314,7 @@ function activeChartSeriesIds(chart: SheetChart): Set<string> {
   );
 }
 function applyRecipe(chart: SheetChart, recipe: ChartStyleRecipe): void {
+  if (chart.presentation) delete chart.presentation.themeAccent;
   chart.presentation = {
     ...chart.presentation,
     palette: [...recipe.palette],

@@ -19,6 +19,7 @@ import {
   getCellStyle,
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
+  type CellAddress,
   type CellRange,
   type Sheet,
   type SheetEvaluator,
@@ -172,6 +173,8 @@ export function normalizeSheetChart(chart: SheetChart): SheetChart {
     if (!field || !("value" in field))
       throw new TypeError("Chart presentation must be an own data field, not an accessor.");
     presentation = normalizeChartPresentation(field.value);
+    if (presentation.scatterStyle !== undefined && chart.type !== "scatter")
+      throw new RangeError("XY scatter styles require a scatter chart.");
     if (
       presentation.percentStacked === true &&
       (chart.stacked !== true || !["column", "bar", "line", "area"].includes(chart.type))
@@ -430,25 +433,41 @@ export function getSheetChartSourceData(
       ? value
       : null;
   };
-  const numeric = (row: number, column: number): number | null => {
-    const value = read(row, column);
-    return typeof value === "number" ? value : null;
-  };
   const records = rows.map((row) => {
     const record: Array<string | number | null> = [];
     for (let column = range.start.column; column <= range.end.column; column++)
       record.push(read(row, column));
     return record;
   });
-  const seriesFormat = (addresses: Array<{ row: number; column: number }>) => {
-    const formats = addresses
-      .filter(({ row, column }) => numeric(row, column) !== null)
-      .map((address) => getCellStyle(sheet, address)?.numberFormat);
+  const hasSharedX = (chart.seriesBy === "rows" ? rows : columns).length > 1;
+  function readBand(
+    index: number,
+    addresses: CellAddress[],
+  ): Pick<ChartSeries, "values" | "numberFormat"> {
+    const samples = addresses.map(({ row, column }) => read(row, column));
+    if (
+      chart.type === "scatter" &&
+      hasSharedX &&
+      index === 0 &&
+      samples.some((v) => typeof v === "string" && v !== "")
+    )
+      return { values: samples.map((_, i) => i + 1) };
+    const values = samples.map((v) => (typeof v === "number" ? v : null));
+    const formats = addresses.flatMap((address, i) =>
+      values[i] === null ? [] : [getCellStyle(sheet, address)?.numberFormat],
+    );
     const first = formats[0];
-    return first && formats.every((format) => JSON.stringify(format) === JSON.stringify(first))
-      ? { numberFormat: { ...first } }
-      : {};
-  };
+    return {
+      values,
+      ...(first && formats.every((f) => JSON.stringify(f) === JSON.stringify(first))
+        ? { numberFormat: { ...first } }
+        : {}),
+    };
+  }
+  function xySeries(series: ChartSeries[]): ChartSeries[] {
+    if (chart.type !== "scatter" || series.length !== 1) return series;
+    return [{ name: "X", values: series[0]!.values.map((_, i) => i + 1) }, ...series];
+  }
   const identities = ["column", "bar", "line", "area", "radar", "combo"].includes(chart.type)
     ? new Map(
         (normalized.rectangleSeries?.[chart.seriesBy] ?? []).map((entry) => [
@@ -469,26 +488,34 @@ export function getSheetChartSourceData(
       categories: columns.map((column, index) =>
         chart.headerRow ? String(read(range.start.row, column) ?? "") : String(index + 1),
       ),
-      series: rows.map((row, index) => ({
-        ...identity(row),
-        ...seriesFormat(columns.map((column) => ({ row, column }))),
-        name: chart.headerColumn
-          ? String(read(row, range.start.column) ?? "")
-          : `Series ${index + 1}`,
-        values: columns.map((column) => numeric(row, column)),
-      })),
+      series: xySeries(
+        rows.map((row, index) => ({
+          ...identity(row),
+          ...readBand(
+            index,
+            columns.map((column) => ({ row, column })),
+          ),
+          name: chart.headerColumn
+            ? String(read(row, range.start.column) ?? "")
+            : `Series ${index + 1}`,
+        })),
+      ),
       records,
     };
   return {
     categories: rows.map((row, index) =>
       chart.headerColumn ? String(read(row, range.start.column) ?? "") : String(index + 1),
     ),
-    series: columns.map((column, index) => ({
-      ...identity(column),
-      ...seriesFormat(rows.map((row) => ({ row, column }))),
-      name: chart.headerRow ? String(read(range.start.row, column) ?? "") : `Series ${index + 1}`,
-      values: rows.map((row) => numeric(row, column)),
-    })),
+    series: xySeries(
+      columns.map((column, index) => ({
+        ...identity(column),
+        ...readBand(
+          index,
+          rows.map((row) => ({ row, column })),
+        ),
+        name: chart.headerRow ? String(read(range.start.row, column) ?? "") : `Series ${index + 1}`,
+      })),
+    ),
     records,
   };
 }

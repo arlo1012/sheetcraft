@@ -92,9 +92,12 @@ export function applySeriesLegendIdentity(
   });
   const legendEntries = series.map((item, index) => ({
     name: keys[index]!,
-    ...((chart.type === "combo" || chart.type === "line") &&
+    ...((chart.type === "combo" || chart.type === "line" || chart.type === "scatter") &&
     item.type === "line" &&
-    item.showSymbol === false
+    (item.showSymbol === false ||
+      (chart.type === "scatter" &&
+        (chart.presentation?.scatterStyle === "line" ||
+          chart.presentation?.scatterStyle === "smooth")))
       ? {
           icon: "line",
           itemStyle: { borderColor: "auto", borderWidth: item.lineStyle?.width ?? 2 },

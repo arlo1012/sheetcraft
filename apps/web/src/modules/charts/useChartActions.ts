@@ -36,6 +36,7 @@ import { resolveRangeReference } from "../../shared/range-reference/formatRangeR
 import {
   applyChartDesignIntent,
   normalizeChartInsertIntent,
+  applyScatterInsertChoice,
   type ChartInsertIntent,
 } from "./chart-design-intents";
 
@@ -255,6 +256,8 @@ export function useChartActions(options: {
       });
       drawing.chart.labels = request.labels;
       drawing.chart.presentation = { ...drawing.chart.presentation, animated: true };
+    } else if (typeof request !== "string" && "scatterStyle" in request) {
+      drawing.chart = applyScatterInsertChoice(drawing.chart, request);
     } else if (typeof request !== "string")
       drawing.chart = applyChartDesignIntent(drawing.chart, {
         kind: "variant",

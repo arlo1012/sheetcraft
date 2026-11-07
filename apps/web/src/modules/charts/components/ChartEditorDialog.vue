@@ -27,6 +27,13 @@ import {
 } from "../../../shared/range-reference/formatRangeReference";
 import ChartContent from "./ChartContent.vue";
 import ChartTypeNavigation from "./ChartTypeNavigation.vue";
+import ScatterThumbnail from "./ScatterThumbnail.vue";
+import {
+  scatterStyles,
+  DEFAULT_CHART_PALETTE,
+  rotateChartPalette,
+  type ScatterStyle,
+} from "@sheetcraft/core/chart-presentation";
 import ChartSubtypeControls from "./ChartSubtypeControls.vue";
 import ChartComboControls from "./ChartComboControls.vue";
 import {
@@ -92,6 +99,19 @@ function applyDesign(intent: ChartDesignIntent): boolean {
     return false;
   }
 }
+function selectScatterStyle(style: ScatterStyle) {
+  if (props.disabled || draft.value.chart.type !== "scatter") return;
+  draft.value.chart = normalizeSheetChart({
+    ...draft.value.chart,
+    presentation: { ...draft.value.chart.presentation, scatterStyle: style },
+  });
+}
+const scatterColors = computed(() => {
+  const presentation = draft.value.chart.presentation;
+  return presentation?.themeAccent !== undefined
+    ? rotateChartPalette(props.workbook.theme.accentColors, presentation.themeAccent)
+    : (presentation?.palette ?? DEFAULT_CHART_PALETTE);
+});
 function changeType(value: unknown): void {
   if (
     props.disabled ||
@@ -289,6 +309,8 @@ function typeDisabled(type: ChartType): boolean {
 }
 const selectedSubtype = computed(() => {
   const type = commonType.value;
+  if (draft.value.chart.type === "scatter")
+    return t(`chart.xy.variant.${draft.value.chart.presentation?.scatterStyle ?? "marker"}`);
   if (!type) return t(`chart.${draft.value.chart.type}`);
   const variant = getChartVariant(draft.value.chart) ?? "standard";
   if (type === "line") return t(`chart.variant.line.${variant}`);
@@ -408,6 +430,26 @@ function onDialogKeydown(event: KeyboardEvent): void {
             :disabled="disabled"
             :apply="applyDesign"
           />
+          <div
+            v-else-if="draft.chart.type === 'scatter'"
+            class="scatter-variants"
+            role="group"
+            :aria-label="t('chart.subtypes')"
+          >
+            <button
+              v-for="style in scatterStyles"
+              :key="style"
+              type="button"
+              :disabled="disabled"
+              :aria-pressed="(draft.chart.presentation?.scatterStyle ?? 'marker') === style"
+              :data-scatter-variant="style"
+              :aria-label="t(`chart.xy.variant.${style}`)"
+              :title="t(`chart.xy.variant.${style}`)"
+              @click="selectScatterStyle(style)"
+            >
+              <ScatterThumbnail :colors="scatterColors" :variant="style" />
+            </button>
+          </div>
           <div v-else class="chart-selector__single-type">
             <strong>{{ t(`chart.${draft.chart.type}`) }}</strong>
             <span v-if="draft.chart.type === 'combo'">{{ t("chart.comboHint") }}</span>
@@ -705,5 +747,26 @@ function onDialogKeydown(event: KeyboardEvent): void {
       max-height: 95px;
     }
   }
+}
+.scatter-variants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.scatter-variants button {
+  width: 56px;
+  padding: 3px;
+  background: transparent;
+  border: 1px solid var(--td-component-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.scatter-variants button[aria-pressed="true"] {
+  background: var(--td-brand-color-light);
+  border-color: var(--td-brand-color);
+}
+.scatter-variants svg {
+  display: block;
+  width: 100%;
 }
 </style>

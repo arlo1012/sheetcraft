@@ -1,17 +1,38 @@
 import { readPictureDataArray } from "./picture-data-array.js";
 
+export const scatterStyles = ["marker", "smoothMarker", "smooth", "lineMarker", "line"] as const;
+export type ScatterStyle = (typeof scatterStyles)[number];
+export function isScatterStyle(value: unknown): value is ScatterStyle {
+  return scatterStyles.includes(value as ScatterStyle);
+}
+export function rotateChartPalette(palette: readonly string[], accent: number): string[] {
+  const start = accent % palette.length;
+  return [...palette.slice(start), ...palette.slice(0, start)];
+}
+
 /** Sparse chart-wide choices; omission retains the chart's existing presentation. */
 export type ChartPresentationSettings = {
   /** A rendering choice only; worksheet and cached values remain unchanged. */
   animated?: true;
   percentStacked?: true;
   lineMarkers?: boolean;
+  scatterStyle?: ScatterStyle;
+  /** Start the series palette at this accent in the current workbook theme. */
+  themeAccent?: number;
   /** Ordered opaque RGB colors, independent of source-series identities. */
   palette?: string[];
   background?: string;
 };
 
-const keys = ["animated", "percentStacked", "lineMarkers", "palette", "background"] as const;
+const keys = [
+  "animated",
+  "percentStacked",
+  "lineMarkers",
+  "scatterStyle",
+  "themeAccent",
+  "palette",
+  "background",
+] as const;
 
 function color(value: unknown): string {
   if (typeof value !== "string" || !/^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(value))
@@ -57,6 +78,22 @@ export function normalizeChartPresentation(value: unknown): ChartPresentationSet
     if (typeof source.lineMarkers !== "boolean")
       throw new TypeError("Chart line markers must be a boolean.");
     result.lineMarkers = source.lineMarkers;
+  }
+  if (Object.hasOwn(source, "scatterStyle")) {
+    if (!isScatterStyle(source.scatterStyle)) throw new RangeError("Unknown XY scatter style.");
+    result.scatterStyle = source.scatterStyle;
+  }
+  if (Object.hasOwn(source, "themeAccent")) {
+    const accent = source.themeAccent;
+    if (
+      typeof accent !== "number" ||
+      !Number.isInteger(accent) ||
+      accent < 0 ||
+      accent > 5 ||
+      Object.hasOwn(source, "palette")
+    )
+      throw new RangeError("Invalid chart theme accent.");
+    result.themeAccent = accent;
   }
   if (Object.hasOwn(source, "palette")) {
     const palette = readPictureDataArray(source.palette as readonly unknown[], "chart palette", 16);

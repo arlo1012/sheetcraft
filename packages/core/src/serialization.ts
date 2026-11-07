@@ -363,6 +363,7 @@ export type WorkbookSnapshotV99 = Omit<WorkbookSnapshotV98, "version"> & { versi
 export type WorkbookSnapshotV100 = Omit<WorkbookSnapshotV99, "version"> & { version: 100 };
 export type WorkbookSnapshotV101 = Omit<WorkbookSnapshotV100, "version"> & { version: 101 };
 export type WorkbookSnapshotV102 = Omit<WorkbookSnapshotV101, "version"> & { version: 102 };
+export type WorkbookSnapshotV103 = Omit<WorkbookSnapshotV102, "version"> & { version: 103 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -423,7 +424,8 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV99
   | WorkbookSnapshotV100
   | WorkbookSnapshotV101
-  | WorkbookSnapshotV102;
+  | WorkbookSnapshotV102
+  | WorkbookSnapshotV103;
 type WorkbookWritePayload = Omit<WorkbookSnapshotV98, "version"> & {
   version: WorkbookSnapshot["version"];
 };
@@ -547,7 +549,8 @@ type SnapshotVersion =
   | 99
   | 100
   | 101
-  | 102;
+  | 102
+  | 103;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -563,6 +566,18 @@ function hasCameraSourceSheet(drawings: unknown): boolean {
 
 function hasSparklineGroup(value: unknown): boolean {
   return value !== null && typeof value === "object" && Object.hasOwn(value, "groupId");
+}
+function hasScatterPresentation(drawings: unknown): boolean {
+  return (
+    Array.isArray(drawings) &&
+    drawings.some(
+      (d) =>
+        d?.kind === "chart" &&
+        d.chart?.presentation &&
+        (Object.hasOwn(d.chart.presentation, "scatterStyle") ||
+          Object.hasOwn(d.chart.presentation, "themeAccent")),
+    )
+  );
 }
 function hasCatalogIcons(drawings: unknown): boolean {
   return (
@@ -2835,7 +2850,13 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     )
       version = 101;
     if (hasCatalogIcons(record.drawings)) version = 102;
+    if (hasScatterPresentation(record.drawings)) version = 103;
   }
+  if (version < 103 && hasScatterPresentation(record.drawings))
+    return fail(
+      path + ".drawings",
+      "Scatter styles and theme palettes require snapshot version 103.",
+    );
   if (version < 102 && hasCatalogIcons(record.drawings))
     return fail(path + ".drawings", "Catalog icons require snapshot version 102.");
   if (Object.hasOwn(record, "dashboard") && version < 99)
@@ -3318,6 +3339,7 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   if (sheets.some((sheet) => sheet.cells.some((cell) => hasExternalSparklineDates(cell.sparkline))))
     snapshot.version = 101;
   if (sheets.some((sheet) => hasCatalogIcons(sheet.drawings))) snapshot.version = 102;
+  if (sheets.some((sheet) => hasScatterPresentation(sheet.drawings))) snapshot.version = 103;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -3427,7 +3449,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 99 &&
     record.version !== 100 &&
     record.version !== 101 &&
-    record.version !== 102
+    record.version !== 102 &&
+    record.version !== 103
   ) {
     throw new WorkbookDomainError(
       {

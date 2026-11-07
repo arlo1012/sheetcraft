@@ -5703,6 +5703,7 @@ watch(
       </template>
       <template #insert-tools>
         <InsertToolbar
+          :theme-colors="session.workbook.theme.accentColors"
           :pivot-disabled="loading || fileBusy || xlsxBusy"
           :pivot-chart-disabled="
             loading ||

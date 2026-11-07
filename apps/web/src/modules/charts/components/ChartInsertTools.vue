@@ -6,7 +6,6 @@ import {
   ChartBar,
   ChartArea,
   ChartPie,
-  ChartScatter,
   ChartNetwork,
   ChartNoAxesCombined,
   LayoutDashboard,
@@ -17,6 +16,7 @@ import type {
   ChartInsertIntent,
   CommonChartType,
 } from "../chart-design-intents";
+import ScatterInsertMenu from "./ScatterInsertMenu.vue";
 import ChartSubtypeControls from "./ChartSubtypeControls.vue";
 import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import RibbonSplitButton from "../../../shared/ribbon/RibbonSplitButton.vue";
@@ -28,7 +28,11 @@ import { useMenu } from "../../../shared/menu/useMenu";
 import { useAppI18n } from "../../../shared/i18n";
 const DynamicChartGallery = defineAsyncComponent(() => import("./DynamicChartGallery.vue"));
 const galleryOpen = ref(false);
-const props = defineProps<{ disabled: boolean; dashboardDisabled?: boolean }>();
+const props = defineProps<{
+  disabled: boolean;
+  dashboardDisabled?: boolean;
+  themeColors?: readonly string[];
+}>();
 const emit = defineEmits<{ insert: [intent: ChartInsertIntent]; dashboard: [] }>();
 const { t } = useAppI18n();
 const triggerComponent = ref<InstanceType<typeof RibbonMenuButton>>();
@@ -178,13 +182,11 @@ function insert(type: ChartType) {
         @activate="emit('insert', 'pie')"
         ><ChartPie
       /></RibbonButton>
-      <RibbonButton
-        :label="t('chart.scatter')"
-        :text="t('chart.scatter')"
+      <ScatterInsertMenu
         :disabled="disabled"
-        @activate="emit('insert', 'scatter')"
-        ><ChartScatter
-      /></RibbonButton>
+        :theme-colors="themeColors"
+        @insert="emit('insert', $event)"
+      />
     </div>
     <RibbonButton
       variant="tall"
