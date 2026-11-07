@@ -16,6 +16,7 @@ import {
 import { useFontCatalog } from "../../../shared/cell-text/useFontCatalog";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import { paintWatermarkInRect } from "../page-decoration-painter";
 
 const previewAssetId = "watermark-preview";
@@ -205,6 +206,9 @@ onBeforeUnmount(clearLocalImage);
   <Dialog
     :visible="visible"
     :header="t('pageDecoration.customWatermark')"
+    :aria-label="t('pageDecoration.customWatermark')"
+    role="dialog"
+    aria-modal="true"
     :confirm-btn="{
       content: t('pageDecoration.confirm'),
       disabled: !canSave || busy,
@@ -245,6 +249,7 @@ onBeforeUnmount(clearLocalImage);
             <TFormItem :label="t('pageDecoration.scale')">
               <TSelect
                 v-model="imageScale"
+                v-native-control="{ attributes: { 'aria-label': t('pageDecoration.scale') } }"
                 :disabled="!imageEnabled || !draft.image || busy"
                 :options="[
                   { label: t('pageDecoration.auto'), value: 'auto' },
@@ -260,6 +265,12 @@ onBeforeUnmount(clearLocalImage);
                 <TSelect
                   class="watermark-dialog__image-layout"
                   v-model="imageDraft.angle"
+                  v-native-control="{
+                    attributes: {
+                      'aria-label':
+                        t('pageDecoration.imageWatermark') + ': ' + t('pageDecoration.layout'),
+                    },
+                  }"
                   :disabled="!imageEnabled || !draft.image || busy"
                   :options="[
                     { label: t('pageDecoration.horizontal'), value: 0 },
@@ -289,6 +300,7 @@ onBeforeUnmount(clearLocalImage);
           <TFormItem :label="t('pageDecoration.watermarkText')">
             <TAutoComplete
               v-model="draft.text"
+              v-native-control="{ attributes: { 'aria-label': t('pageDecoration.watermarkText') } }"
               :disabled="!textEnabled || busy"
               :options="[
                 {
@@ -305,6 +317,7 @@ onBeforeUnmount(clearLocalImage);
           <TFormItem :label="t('pageDecoration.fontFamily')">
             <TAutoComplete
               v-model="draft.fontFamily"
+              v-native-control="{ attributes: { 'aria-label': t('pageDecoration.fontFamily') } }"
               :disabled="!textEnabled || busy"
               :options="fontOptions"
               filterable
@@ -314,6 +327,7 @@ onBeforeUnmount(clearLocalImage);
           <TFormItem :label="t('pageDecoration.fontSize')">
             <TSelect
               v-model="draft.fontSize"
+              v-native-control="{ attributes: { 'aria-label': t('pageDecoration.fontSize') } }"
               :disabled="!textEnabled || busy"
               :options="fontSizeOptions"
             />
@@ -330,6 +344,12 @@ onBeforeUnmount(clearLocalImage);
           <TFormItem :label="t('pageDecoration.layout')">
             <TSelect
               v-model="draft.angle"
+              v-native-control="{
+                attributes: {
+                  'aria-label':
+                    t('pageDecoration.textWatermark') + ': ' + t('pageDecoration.layout'),
+                },
+              }"
               :disabled="!textEnabled || busy"
               :options="[
                 { label: t('pageDecoration.horizontal'), value: 0 },
@@ -347,6 +367,7 @@ onBeforeUnmount(clearLocalImage);
               />
               <TInputNumber
                 v-model="opacityPercent"
+                v-native-control="{ attributes: { 'aria-label': t('pageDecoration.opacity') } }"
                 theme="column"
                 class="sheetcraft-input-number--persistent-controls"
                 :disabled="!textEnabled || busy"
@@ -362,6 +383,7 @@ onBeforeUnmount(clearLocalImage);
           <TFormItem :label="t('pageDecoration.applyTo')">
             <TSelect
               v-model="scope"
+              v-native-control="{ attributes: { 'aria-label': t('pageDecoration.applyTo') } }"
               :disabled="busy"
               :options="[
                 { label: t('pageDecoration.currentSheet'), value: 'sheet' },
