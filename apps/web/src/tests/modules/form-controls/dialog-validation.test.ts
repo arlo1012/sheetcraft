@@ -108,25 +108,13 @@ describe("optional control cell links", () => {
 });
 
 describe("form control editor type-specific validation", () => {
-  test.each([NaN, Infinity, -Infinity])(
-    "does not submit non-finite radio value %s",
-    async (value) => {
-      const wrapper = fixture("radio");
-      await setNumber(wrapper, "Selected value", value);
-      expect(wrapper.getComponent(Dialog).props("confirmBtn")).toMatchObject({ disabled: true });
-      expect(document.body.querySelector('[role="alert"]')?.textContent).toContain(
-        "numeric value for the selected option",
-      );
-      confirm(wrapper);
-      expect(wrapper.emitted("confirm")).toBeUndefined();
-    },
-  );
-
-  test.each([0, -2.5, 42])("submits finite radio value %s", async (value) => {
+  test("explains automatic radio grouping without a custom selected-value input", () => {
     const wrapper = fixture("radio");
-    await setNumber(wrapper, "Selected value", value);
+    expect(wrapper.findAllComponents(InputNumber)).toHaveLength(0);
+    expect(document.body.textContent).toMatch(/group/i);
+    expect(wrapper.getComponent(Dialog).props("confirmBtn")).toMatchObject({ disabled: false });
     confirm(wrapper);
-    expect(confirmedDrawing(wrapper).control).toMatchObject({ type: "radio", optionValue: value });
+    expect(confirmedDrawing(wrapper).control.type).toBe("radio");
   });
 
   test("ignores invalid old numeric fields after changing a numeric control to a checkbox", async () => {
@@ -149,8 +137,7 @@ describe("form control editor type-specific validation", () => {
   });
 
   test("discards an invalid old radio value when switching to a numeric control", async () => {
-    const wrapper = fixture("radio");
-    await setNumber(wrapper, "Selected value", Infinity);
+    const wrapper = fixture("radio", { optionValue: Infinity });
     await setType(wrapper, "scrollbar");
     expect(wrapper.getComponent(Dialog).props("confirmBtn")).toMatchObject({ disabled: false });
     confirm(wrapper);

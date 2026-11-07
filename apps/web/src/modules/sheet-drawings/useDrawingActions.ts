@@ -16,6 +16,7 @@ import { createGraphicDrawing } from "./drawing-defaults";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { canUseSheetPermission } from "@sheetcraft/core";
 import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
+import { prepareFormRadioDrawings } from "@sheetcraft/core/form-radio-groups";
 import {
   isFramedShapeDrawing,
   type SheetFramedGraphicDrawing,
@@ -402,7 +403,10 @@ export function useDrawingActions(options: {
       }
       assertEquationForestGeometryPreserved(proposed, prepared);
       assertChartForestPreserved(capturedCharts, prepared);
-      const command = createSetSheetDrawingsCommand(binding.sheet.id, prepared);
+      const command = createSetSheetDrawingsCommand(
+        binding.sheet.id,
+        prepareFormRadioDrawings(binding.sheet, prepared),
+      );
       const connected = command.drawings.some((root) =>
         isShapeGroupDrawing(root)
           ? traverseShapeGroup(root).some(({ node }) => "shapeConnector" in node)

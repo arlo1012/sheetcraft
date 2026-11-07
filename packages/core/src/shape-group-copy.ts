@@ -102,6 +102,10 @@ function cloneNormalizedRoots(
     if ("shapeFrame" in root && root.shapeFrame.anchor.mode === "fixed")
       delete root.shapeFrame.anchor.exportEncoding;
     root.id = remapped.get(root.id)!;
+    if (root.kind === "control" && root.control.type === "radio" && root.control.radioGroupId) {
+      const newGroup = remapped.get(root.control.radioGroupId);
+      if (newGroup) root.control.radioGroupId = newGroup;
+    }
     remapConnector(root);
     if (isShapeGroupDrawing(root)) for (const child of root.members) remapChild(child);
   }

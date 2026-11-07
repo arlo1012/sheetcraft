@@ -559,6 +559,8 @@ export type SetSheetDrawingsCommand = {
   type: "setSheetDrawings";
   sheetId: string;
   drawings: SheetDrawing[];
+  /** Initializing an option group's new link and editing the options share one history entry. */
+  radioLinkWrite?: SetCellContentsCommand | RestoreTableTransactionCommand;
 };
 
 export type SheetDrawingCollectionReplacement = {

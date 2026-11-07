@@ -197,6 +197,10 @@
       "types": "./dist/form-controls.d.ts",
       "import": "./dist/form-controls.js"
     },
+    "./form-radio-groups": {
+      "types": "./dist/form-radio-groups.d.ts",
+      "import": "./dist/form-radio-groups.js"
+    },
     "./pivot-tables": {
       "types": "./dist/pivot-tables.d.ts",
       "import": "./dist/pivot-tables.js"

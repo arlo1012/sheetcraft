@@ -9,6 +9,7 @@ import {
   type WorkbookCommand,
 } from "@sheetcraft/core/commands";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
+import { prepareFormRadioDrawings } from "@sheetcraft/core/form-radio-groups";
 import { isShapeGroupDrawing, traverseShapeGroup } from "@sheetcraft/core/shape-group";
 import { normalizeShapeDrawingForest } from "@sheetcraft/core/shape-group-planning";
 import { canEditSheetDrawingCollection } from "@sheetcraft/core/shape-protection";
@@ -98,7 +99,10 @@ export function useShapeDrawingTransfer(options: {
       };
       const capturedChartForests = leases.map((lease) => captureChartDrawingForest(lease.next));
       const prepared = leases.map((lease, index) => {
-        const proposed = normalizeShapeDrawingForest(lease.next);
+        const proposed = prepareFormRadioDrawings(
+          lease.sheet,
+          normalizeShapeDrawingForest(lease.next),
+        );
         assertEquationForestSourcesPreserved(lease.expected, proposed);
         const capturedCharts = captureChartDrawingForest(proposed);
         const priorNodes = nodes(lease.expected),

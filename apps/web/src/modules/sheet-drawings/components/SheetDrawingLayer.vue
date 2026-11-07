@@ -101,6 +101,7 @@ import SheetShapeSelectionToolbar from "./SheetShapeSelectionToolbar.vue";
 import ShapeGroupSelection from "./ShapeGroupSelection.vue";
 import { canEditShapeObject } from "@sheetcraft/core/shape-protection";
 import { isDrawingClipboardEligibleRoot } from "../drawing-clipboard-eligibility";
+import { getFormRadioGroups, type FormRadioGroup } from "@sheetcraft/core/form-radio-groups";
 import { getShapeObjectProperties } from "@sheetcraft/core/shape-object-properties";
 import { resolveShapeDrawing, updateResolvedShapeDrawing } from "../resolved-shape-drawing";
 import { shapeViewLayout, shapeViewAtRect } from "../shape-view-layout";
@@ -312,6 +313,15 @@ function isStandard(drawing: SheetDrawing): drawing is SheetGraphicDrawing {
 const metrics = computed(() => {
   void props.revision;
   return props.metrics ?? (props.sheet ? createPictureSheetMetrics(props.sheet) : undefined);
+});
+const radioGroupsById = computed(() => {
+  void props.revision;
+  const groups = new Map<string, FormRadioGroup>();
+  if (props.sheet) {
+    for (const group of getFormRadioGroups(props.sheet, props.drawings, metrics.value).values())
+      for (const member of group.members) groups.set(member.id, group);
+  }
+  return groups;
 });
 // Resolve the complete relation forest before any group, pane or visibility filter.
 // Static documents retain their existing resolution and admission budgets.
@@ -2521,7 +2531,7 @@ function pointContext(fragment: DrawingFragment, event: MouseEvent): void {
 const shapeTextMenu = shallowRef<{
   key: string;
   canText: boolean;
-  kind: "shape" | "textBox" | "shapeGroup" | "chart";
+  kind: "shape" | "textBox" | "shapeGroup" | "chart" | "control";
   canObject: boolean;
   actions: {
     object: () => boolean;
@@ -2617,13 +2627,16 @@ function groupClipboardContext(
   shapeTextMenuAnchor.value = createContextMenuPoint(event, event.currentTarget as Element | null);
   shapeTextMenu.value = menu;
 }
-function chartClipboardContext(fragment: DrawingFragment, event: MouseEvent | KeyboardEvent): void {
+function widgetClipboardContext(
+  fragment: DrawingFragment,
+  event: MouseEvent | KeyboardEvent,
+): void {
   const drawing = fragment.drawing;
   const sheet = props.sheet;
   const source = sourceOwner(drawing);
   if (
-    drawing.kind !== "chart" ||
-    source?.kind !== "chart" ||
+    (drawing.kind !== "chart" && drawing.kind !== "control") ||
+    source?.kind !== drawing.kind ||
     !sheet ||
     !canChange(drawing) ||
     !props.drawings.includes(source) ||
@@ -2640,13 +2653,18 @@ function chartClipboardContext(fragment: DrawingFragment, event: MouseEvent | Ke
     rev = props.revision;
   const menu: NonNullable<typeof shapeTextMenu.value> = {
     key,
-    kind: "chart",
+    kind: drawing.kind,
     canObject: false,
     canText: false,
     actions: {
       object: () => false,
       text: () => false,
-      format: () => false,
+      format: () => {
+        if (capturedSource.kind !== "control" || !valid()) return false;
+        dismissShapeTextMenu("programmatic", false);
+        emit("edit", capturedSource);
+        return true;
+      },
       ...clipboardMenuActions(paths, valid),
     },
   };
@@ -2673,8 +2691,8 @@ function chartClipboardContext(fragment: DrawingFragment, event: MouseEvent | Ke
 }
 function shapeContext(fragment: DrawingFragment, event: MouseEvent | KeyboardEvent): void {
   const drawing = fragment.drawing;
-  if (drawing.kind === "chart") {
-    chartClipboardContext(fragment, event);
+  if (drawing.kind === "chart" || drawing.kind === "control") {
+    widgetClipboardContext(fragment, event);
     return;
   }
   if (!props.startTextEdit) {
@@ -3534,6 +3552,11 @@ watch(
               }
             "
             :drawing="equationPaintView(fragment.drawing)"
+            :radio-group="
+              fragment.drawing.kind === 'control' && fragment.drawing.control.type === 'radio'
+                ? radioGroupsById.get(fragment.drawing.id)
+                : undefined
+            "
             :chart-editing="!readOnly"
             :chart-selected-element="
               chartElementSelection &&
@@ -3703,13 +3726,15 @@ watch(
         ref="shapeTextMenuSurface"
         :style="shapeTextMenuStyles"
         :label="
-          shapeTextMenu.kind === 'chart'
-            ? locale === 'zh-CN'
-              ? '图表操作'
-              : 'Chart actions'
-            : locale === 'zh-CN'
-              ? '形状操作'
-              : 'Shape actions'
+          shapeTextMenu.kind === 'control'
+            ? t('control.title')
+            : shapeTextMenu.kind === 'chart'
+              ? locale === 'zh-CN'
+                ? '图表操作'
+                : 'Chart actions'
+              : locale === 'zh-CN'
+                ? '形状操作'
+                : 'Shape actions'
         "
       >
         <MenuItem v-if="shapeTextMenu.actions.copy" v-on="{ select: shapeTextMenu.actions.copy }">{{
@@ -3730,13 +3755,13 @@ watch(
           >{{ t("drawing.textBoxReferenceMenu") }}</MenuItem
         >
         <MenuItem
-          v-if="shapeTextMenu.kind !== 'shapeGroup' && shapeTextMenu.kind !== 'chart'"
+          v-if="shapeTextMenu.kind === 'shape' || shapeTextMenu.kind === 'textBox'"
           :disabled="!shapeTextMenu.canText"
           v-on="{ select: shapeTextMenu.actions.text }"
           >{{ locale === "zh-CN" ? "编辑文本" : "Edit Text" }}</MenuItem
         >
         <MenuItem
-          v-if="shapeTextMenu.kind !== 'shapeGroup' && shapeTextMenu.kind !== 'chart'"
+          v-if="shapeTextMenu.kind === 'shape' || shapeTextMenu.kind === 'textBox'"
           :disabled="!shapeTextMenu.canObject"
           v-on="{ select: shapeTextMenu.actions.object }"
           >{{
@@ -3757,7 +3782,13 @@ watch(
         <MenuItem
           v-if="shapeTextMenu.kind !== 'chart'"
           v-on="{ select: shapeTextMenu.actions.format }"
-          >{{ locale === "zh-CN" ? "设置形状格式" : "Format Shape" }}</MenuItem
+          >{{
+            shapeTextMenu.kind === "control"
+              ? t("control.format")
+              : locale === "zh-CN"
+                ? "设置形状格式"
+                : "Format Shape"
+          }}</MenuItem
         >
       </MenuSurface>
     </Teleport>

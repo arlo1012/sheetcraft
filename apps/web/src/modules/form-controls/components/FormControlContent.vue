@@ -9,16 +9,35 @@ import { Button } from "tdesign-vue-next/es/button";
 import { canEditCell } from "@sheetcraft/core";
 import { canEditShapeObject } from "@sheetcraft/core/shape-protection";
 import { getFormControlItems, getFormControlValue } from "@sheetcraft/core/form-controls";
+import {
+  findFormRadioGroup,
+  getFormRadioGroups,
+  selectedFormRadio,
+  type FormRadioGroup,
+} from "@sheetcraft/core/form-radio-groups";
 import type { SheetControlDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { Sheet, SheetEvaluator } from "@sheetcraft/core/workbook";
 const props = defineProps<{
   drawing: SheetControlDrawing;
+  radioGroup?: FormRadioGroup;
   sheet: Sheet;
   evaluator: SheetEvaluator;
   revision: number;
 }>();
 const emit = defineEmits<{ change: [value: unknown] }>();
 const control = computed(() => props.drawing.control);
+const radioGroup = computed(() => {
+  void props.revision;
+  return control.value.type === "radio"
+    ? (props.radioGroup ?? findFormRadioGroup(getFormRadioGroups(props.sheet), props.drawing.id))
+    : undefined;
+});
+const radioChecked = computed(() => {
+  void props.revision;
+  return (
+    !!radioGroup.value && selectedFormRadio(radioGroup.value, props.evaluator) === props.drawing.id
+  );
+});
 const value = computed(() => {
   void props.revision;
   return getFormControlValue(control.value, props.evaluator);
@@ -32,8 +51,9 @@ const options = computed(() => {
 });
 const disabled = computed(() => {
   void props.revision;
-  return control.value.linkedCell
-    ? !canEditCell(props.sheet, control.value.linkedCell)
+  const linkedCell = radioGroup.value ? radioGroup.value.linkedCell : control.value.linkedCell;
+  return linkedCell
+    ? !canEditCell(props.sheet, linkedCell)
     : control.value.type === "button" || !canEditShapeObject(props.sheet, props.drawing);
 });
 const number = computed(() => (typeof value.value === "number" ? value.value : control.value.min));
@@ -58,7 +78,10 @@ function scrollByKey(event: KeyboardEvent) {
 }
 </script>
 <template>
-  <div class="form-control-content">
+  <div
+    class="form-control-content"
+    :class="{ 'form-control-content--radio': control.type === 'radio' }"
+  >
     <fieldset v-if="control.type === 'group'">
       <legend>{{ control.label }}</legend>
     </fieldset>
@@ -83,7 +106,7 @@ function scrollByKey(event: KeyboardEvent) {
         >
         <Radio
           v-else-if="control.type === 'radio'"
-          :checked="value === control.optionValue"
+          :checked="radioChecked"
           :disabled="disabled"
           @change="emit('change', control.optionValue)"
           >{{ control.label }}</Radio
@@ -151,6 +174,9 @@ function scrollByKey(event: KeyboardEvent) {
   flex-direction: column;
   padding: 4px 8px;
   background: #fff;
+  &--radio {
+    background: transparent;
+  }
   color: #202124;
   pointer-events: auto;
   &__caption {

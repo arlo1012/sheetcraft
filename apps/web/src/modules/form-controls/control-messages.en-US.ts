@@ -1,8 +1,8 @@
 export const controlsEnUS = {
   "control.invalidBounds": "Enter numeric bounds with the minimum no greater than the maximum.",
   "control.invalidStep": "Enter a step greater than zero.",
-  "control.invalidOptionValue": "Enter a numeric value for the selected option.",
   "control.title": "Form controls",
+  "control.format": "Format Control…",
   "control.type": "Control type",
   "control.labelText": "Label",
   "control.linked": "Linked cell (optional)",
@@ -13,7 +13,8 @@ export const controlsEnUS = {
   "control.min": "Minimum",
   "control.max": "Maximum",
   "control.step": "Step",
-  "control.optionValue": "Selected value",
+  "control.radioHint":
+    "Options fully inside the same group box share a linked cell. Options outside all boxes form one group. The linked cell stores the selected option’s number, starting at 1.",
   "control.resetValue": "Value to write on click",
   "control.resetType": "Value type",
   "control.valueText": "Text",

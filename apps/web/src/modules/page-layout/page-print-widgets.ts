@@ -1,5 +1,6 @@
 import { iconPaths } from "@sheetcraft/core/sheet-icons";
 import { getFormControlItems, getFormControlValue } from "@sheetcraft/core/form-controls";
+import { getFormRadioGroups, selectedFormRadio } from "@sheetcraft/core/form-radio-groups";
 import {
   normalizeSheetDrawing,
   isSheetDrawingVisible,
@@ -32,6 +33,11 @@ export function capturePrintWidgets(
   evaluator: SheetEvaluator,
   metrics: PictureSheetMetrics,
 ) {
+  const checkedOptions = new Set(
+    [...getFormRadioGroups(sheet, sheet.drawings, metrics).values()].map((group) =>
+      selectedFormRadio(group, evaluator),
+    ),
+  );
   return (sheet.drawings ?? []).flatMap((source, order) => {
     if (!isWidget(source) || !isSheetDrawingVisible(source)) return [];
     const drawing = normalizeSheetDrawing(source);
@@ -50,7 +56,12 @@ export function capturePrintWidgets(
         drawing,
         order,
         layout,
-        value: drawing.kind === "control" ? getFormControlValue(drawing.control, evaluator) : null,
+        value:
+          drawing.kind !== "control"
+            ? null
+            : drawing.control.type === "radio"
+              ? checkedOptions.has(drawing.id)
+              : getFormControlValue(drawing.control, evaluator),
         items: drawing.kind === "control" ? getFormControlItems(drawing.control, evaluator) : [],
       },
     ];
@@ -111,8 +122,10 @@ function paintControl(
   entry: PrintWidget,
 ): void {
   const { control, width, height } = drawing;
-  context.fillStyle = "#fff";
-  context.fillRect(0, 0, width, height);
+  if (control.type !== "radio") {
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, width, height);
+  }
   context.strokeStyle = "#9ca3af";
   context.fillStyle = "#202124";
   context.font = "12px sans-serif";
@@ -138,8 +151,7 @@ function paintControl(
     if (control.type === "radio") context.arc(16, mid, 7, 0, Math.PI * 2);
     else context.rect(9, mid - 7, 14, 14);
     context.stroke();
-    const checked =
-      control.type === "checkbox" ? entry.value === true : entry.value === control.optionValue;
+    const checked = entry.value === true;
     if (checked) {
       context.fillStyle = "#2563eb";
       if (control.type === "radio") {

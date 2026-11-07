@@ -87,8 +87,6 @@ const localError = computed(() => {
     return t("control.invalidBounds");
   if (numeric.value && (!Number.isFinite(control.step) || control.step <= 0))
     return t("control.invalidStep");
-  if (control.type === "radio" && !Number.isFinite(control.optionValue))
-    return t("control.invalidOptionValue");
   if (
     control.type === "button" &&
     resetType.value === "number" &&
@@ -229,13 +227,7 @@ function confirm() {
             class="sheetcraft-input-number--persistent-controls"
         /></FormItem>
       </template>
-      <FormItem v-if="draft.control.type === 'radio'" :label="t('control.optionValue')"
-        ><InputNumber
-          v-model="draft.control.optionValue"
-          v-native-control="{ attributes: { 'aria-label': t('control.optionValue') } }"
-          theme="column"
-          class="sheetcraft-input-number--persistent-controls"
-      /></FormItem>
+      <p v-if="draft.control.type === 'radio'">{{ t("control.radioHint") }}</p>
       <template v-if="draft.control.type === 'button'">
         <FormItem :label="t('control.resetType')">
           <Select

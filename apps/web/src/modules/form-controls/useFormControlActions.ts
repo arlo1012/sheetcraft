@@ -8,6 +8,12 @@ import {
 } from "@sheetcraft/core/commands";
 import { normalizeSheetDrawing, type SheetControlDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
+  findFormRadioGroup,
+  getFormRadioGroups,
+  prepareFormRadioDrawings,
+  selectedFormRadio,
+} from "@sheetcraft/core/form-radio-groups";
+import {
   getFormControlItems,
   getFormControlValue,
   normalizeLocalControlValue,
@@ -15,6 +21,7 @@ import {
   type FormControlType,
 } from "@sheetcraft/core/form-controls";
 import type { Workbook, Sheet, CellAddress, SheetEvaluator } from "@sheetcraft/core/workbook";
+import { getCellContent } from "@sheetcraft/core/workbook";
 import { useDrawingDialogTarget } from "../../shared/drawing-dialog/useDrawingDialogTarget";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { resolveRangeReference } from "../../shared/range-reference/formatRangeReference";
@@ -42,15 +49,15 @@ export function useFormControlActions(options: {
   function open(drawing?: SheetControlDrawing, type: FormControlType = "checkbox") {
     const target = targets.prepare(drawing);
     if (!target) return;
-    const initial = drawing ?? {
+    let initial: SheetControlDrawing = drawing ?? {
       id: idFactory("control"),
       kind: "control",
       name: options.name(type),
       anchor: { ...options.getAddress() },
       offsetX: 8,
       offsetY: 8,
-      width: 220,
-      height: type === "list" || type === "group" ? 160 : 64,
+      width: type === "group" ? 320 : 220,
+      height: type === "group" ? 240 : type === "list" ? 160 : 64,
       text: "",
       shape: "rectangle",
       fill: "#ffffff",
@@ -74,6 +81,16 @@ export function useFormControlActions(options: {
         resetValue: 0,
       },
     };
+    if (initial.control.type === "radio") {
+      const current = target.sheet.drawings ?? [];
+      const preview = prepareFormRadioDrawings(
+        target.sheet,
+        drawing ? current : [...current, initial],
+      );
+      initial = preview.find(
+        (item): item is SheetControlDrawing => item.kind === "control" && item.id === initial.id,
+      )!;
+    }
     targets.open(target, initial, (current, next, linked, source) =>
       confirm(next, linked, source, current),
     );
@@ -127,18 +144,36 @@ export function useFormControlActions(options: {
           control,
         });
         const current = sheet.drawings ?? [];
-        if (
-          !targets.commit(
-            currentTarget,
-            createSetSheetDrawingsCommand(
-              sheet.id,
-              currentTarget.existing
-                ? current.map((item) => (item === currentTarget.existing ? next : item))
-                : [...current, next],
-            ),
-          ) &&
-          dialog.value === currentTarget
-        )
+        const proposed = currentTarget.existing
+          ? current.map((item) => (item === currentTarget.existing ? next : item))
+          : control.type === "group"
+            ? [next, ...current]
+            : [...current, next];
+        const drawings = prepareFormRadioDrawings(
+          sheet,
+          proposed,
+          control.type === "radio"
+            ? { id: drawing.id, linkedCell: control.linkedCell, evaluator: options.getEvaluator() }
+            : undefined,
+        );
+        const command = createSetSheetDrawingsCommand(sheet.id, drawings);
+        if (control.type === "radio" && linked) {
+          const group = findFormRadioGroup(getFormRadioGroups(sheet, drawings), drawing.id)!;
+          const previousGroup = getFormRadioGroups(sheet).get(group.boxId);
+          const address = linked.range.start;
+          const oldLink = previousGroup?.linkedCell;
+          if (!oldLink || address.row !== oldLink.row || address.column !== oldLink.column) {
+            const selected =
+              previousGroup && selectedFormRadio(previousGroup, options.getEvaluator());
+            const index = group.members.findIndex((item) => item.id === selected) + 1;
+            if (index || getCellContent(sheet, address) !== null)
+              command.radioLinkWrite = createSetCellContentCommand(sheet.id, address, {
+                kind: "literal",
+                value: index,
+              });
+          }
+        }
+        if (!targets.commit(currentTarget, command) && dialog.value === currentTarget)
           error.value = true;
       } catch {
         if (dialog.value === currentTarget) error.value = true;
@@ -151,16 +186,34 @@ export function useFormControlActions(options: {
     const drawings = sheet.drawings ?? [];
     const drawing = drawings.find((item) => item.id === id);
     if (drawing?.kind !== "control") return;
-    const { linkedCell } = drawing.control;
+    const radioGroup =
+      drawing.control.type === "radio"
+        ? findFormRadioGroup(getFormRadioGroups(sheet), id)
+        : undefined;
+    const linkedCell = radioGroup ? radioGroup.linkedCell : drawing.control.linkedCell;
     if (linkedCell ? !canEditCell(sheet, linkedCell) : !canEditShapeObject(sheet, drawing)) return;
-    const value = resolveFormControlValue(
-      drawing.control,
-      requested,
-      getFormControlItems(drawing.control, options.getEvaluator()).length,
-    );
+    const value = radioGroup
+      ? radioGroup.members.findIndex((item) => item.id === id) + 1
+      : resolveFormControlValue(
+          drawing.control,
+          requested,
+          getFormControlItems(drawing.control, options.getEvaluator()).length,
+        );
     if (value === undefined) return;
     if (!linkedCell) {
       if (drawing.control.type === "button") return;
+      if (radioGroup) {
+        const ids = new Set(radioGroup.members.map((item) => item.id));
+        const next = prepareFormRadioDrawings(sheet, drawings).map((item) => {
+          if (item.kind !== "control" || !ids.has(item.id)) return item;
+          const control = { ...item.control };
+          if (item.id === id) control.localValue = control.optionValue;
+          else delete control.localValue;
+          return { ...item, control };
+        });
+        options.execute(createSetSheetDrawingsCommand(sheet.id, next));
+        return;
+      }
       const localValue = normalizeLocalControlValue(drawing.control, value);
       if (localValue === drawing.control.localValue) return;
       options.execute(

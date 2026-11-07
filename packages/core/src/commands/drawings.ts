@@ -8,6 +8,7 @@ import type { Workbook } from "../workbook.js";
 import type {
   ReplaceSheetDrawingCollectionsCommand,
   SetSheetDrawingsCommand,
+  WorkbookCommand,
 } from "./contracts.js";
 import { getSheetOrThrow, invalidCommandPayload, validateCommandPayload } from "./helpers.js";
 export function createSetSheetDrawingsCommand(
@@ -23,12 +24,27 @@ export function createSetSheetDrawingsCommand(
 export function applySetSheetDrawingsCommand(
   workbook: Workbook,
   command: SetSheetDrawingsCommand,
+  applyLinkWrite: (
+    edit: NonNullable<SetSheetDrawingsCommand["radioLinkWrite"]>,
+  ) => WorkbookCommand | null,
 ): SetSheetDrawingsCommand | null {
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const next = createSetSheetDrawingsCommand(command.sheetId, command.drawings);
   assertShapeObjectsForSheet(next.drawings, sheet);
-  if (JSON.stringify(sheet.drawings ?? []) === JSON.stringify(next.drawings)) return null;
+  const changed = JSON.stringify(sheet.drawings ?? []) !== JSON.stringify(next.drawings);
+  if (!changed && !command.radioLinkWrite) return null;
   const inverse = createSetSheetDrawingsCommand(command.sheetId, sheet.drawings ?? []);
+  if (command.radioLinkWrite) {
+    if (
+      command.radioLinkWrite.type !== "setCellContents" &&
+      command.radioLinkWrite.type !== "restoreTableTransaction"
+    )
+      throw invalidCommandPayload("radioLinkWrite", command.sheetId);
+    const reverse = applyLinkWrite(command.radioLinkWrite);
+    if (reverse?.type === "setCellContents" || reverse?.type === "restoreTableTransaction")
+      inverse.radioLinkWrite = reverse;
+    if (!changed && !reverse) return null;
+  }
   sheet.drawings = next.drawings;
   return inverse;
 }

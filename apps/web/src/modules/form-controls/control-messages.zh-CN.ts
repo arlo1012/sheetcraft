@@ -1,5 +1,6 @@
 export const controlsZhCN = {
   "control.title": "窗体",
+  "control.format": "设置控件格式…",
   "control.type": "控件类型",
   "control.labelText": "显示文字",
   "control.linked": "关联单元格（可选）",
@@ -9,7 +10,8 @@ export const controlsZhCN = {
   "control.min": "最小值",
   "control.max": "最大值",
   "control.step": "步长",
-  "control.optionValue": "选中时写入的值",
+  "control.radioHint":
+    "完全位于同一分组框内的单选按钮共用关联单元格。框外的按钮组成一组。关联单元格记录所选按钮在组内的序号，从 1 开始。",
   "control.resetValue": "点击时写入的值",
   "control.resetType": "点击值类型",
   "control.valueText": "文本",
@@ -23,7 +25,6 @@ export const controlsZhCN = {
   "control.invalid": "请检查关联单元格、单行或单列选项来源及数值范围。仅支持当前工作表。",
   "control.invalidBounds": "最小值和最大值必须是数字，且最小值不能大于最大值。",
   "control.invalidStep": "步长必须是大于零的数字。",
-  "control.invalidOptionValue": "选中时写入的值必须是数字。",
   "control.checkbox": "复选框",
   "control.radio": "单选按钮",
   "control.combo": "下拉框",

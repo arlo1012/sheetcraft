@@ -27,6 +27,8 @@ export type SheetFormControl = {
   max: number;
   step: number;
   optionValue: number;
+  creationOrder?: number;
+  radioGroupId?: string;
   resetValue: CellValue;
 };
 const types = new Set([
@@ -63,6 +65,10 @@ export function normalizeFormControl(value: SheetFormControl): SheetFormControl 
     ) ||
     value.min > value.max ||
     value.step <= 0 ||
+    (value.creationOrder !== undefined &&
+      (!Number.isSafeInteger(value.creationOrder) || value.creationOrder < 1)) ||
+    (value.radioGroupId !== undefined &&
+      (typeof value.radioGroupId !== "string" || !value.radioGroupId)) ||
     (value.resetValue !== null &&
       typeof value.resetValue !== "string" &&
       typeof value.resetValue !== "number" &&
@@ -104,6 +110,12 @@ export function normalizeFormControl(value: SheetFormControl): SheetFormControl 
     max: value.max,
     step: value.step,
     optionValue: value.optionValue,
+    ...((value.type === "radio" || value.type === "group") && value.creationOrder !== undefined
+      ? { creationOrder: value.creationOrder }
+      : {}),
+    ...(value.type === "radio" && value.radioGroupId !== undefined
+      ? { radioGroupId: value.radioGroupId }
+      : {}),
     resetValue: value.resetValue,
   };
 }

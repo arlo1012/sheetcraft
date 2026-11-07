@@ -14,6 +14,7 @@ import {
   createSheet,
   getActiveSheet,
   getCellContent,
+  setCellContent,
   createSheetEvaluator,
   insertSheet,
 } from "@sheetcraft/core/workbook";
@@ -91,8 +92,8 @@ describe("form control actions", () => {
     expect(draft).toMatchObject({
       name: type,
       anchor: { row: 1, column: 1 },
-      width: 220,
-      height: type === "list" || type === "group" ? 160 : 64,
+      width: type === "group" ? 320 : 220,
+      height: type === "group" ? 240 : type === "list" ? 160 : 64,
       control: { type, label: type, linkedCell: null },
     });
     expect(f.execute).not.toHaveBeenCalled();
@@ -194,7 +195,7 @@ describe("form control actions", () => {
 
   test.each([
     { type: "checkbox", requested: true, expected: true },
-    { type: "radio", requested: true, expected: 3 },
+    { type: "radio", requested: true, expected: 1 },
     { type: "combo", requested: 2, expected: 2 },
     { type: "list", requested: 2, expected: 2 },
     { type: "spinner", requested: 3, expected: 4 },
@@ -218,6 +219,128 @@ describe("form control actions", () => {
       expect(f.sheet.cells.size).toBe(0);
     },
   );
+
+  test("radio selection is exclusive and undo restores the prior member", () => {
+    const f = fixture();
+    const first = controlDrawing("radio");
+    first.control = {
+      ...first.control,
+      linkedCell: null,
+      optionValue: 1,
+      creationOrder: 1,
+      localValue: 1,
+    };
+    const second = { ...controlDrawing("radio"), id: "second" };
+    second.control = { ...second.control, linkedCell: null, optionValue: 2, creationOrder: 2 };
+    f.sheet.drawings = [first, second];
+    f.actions.change(second.id, true);
+    expect(
+      f.sheet.drawings!.map((item) => (item as SheetControlDrawing).control.localValue),
+    ).toEqual([undefined, 2]);
+    expect(f.sheet.cells.size).toBe(0);
+    undoWorkbookCommand(f.session);
+    expect(f.sheet.drawings).toEqual([first, second]);
+    redoWorkbookCommand(f.session);
+    expect(
+      f.sheet.drawings!.map((item) => (item as SheetControlDrawing).control.localValue),
+    ).toEqual([undefined, 2]);
+  });
+
+  test("editing one radio links its whole group and undo restores local selection", () => {
+    const f = fixture();
+    const first = controlDrawing("radio");
+    first.control = {
+      ...first.control,
+      linkedCell: null,
+      optionValue: 1,
+      creationOrder: 1,
+      localValue: 1,
+    };
+    const second = { ...controlDrawing("radio"), id: "second" };
+    second.control = { ...second.control, linkedCell: null, optionValue: 2, creationOrder: 2 };
+    f.sheet.drawings = [first, second];
+    f.actions.open(second);
+    f.actions.confirm(f.actions.editing.value!, "B1", "");
+    for (const item of f.sheet.drawings as SheetControlDrawing[]) {
+      expect(item.control.linkedCell).toEqual({ row: 0, column: 1 });
+      expect(item.control.localValue).toBeUndefined();
+    }
+    undoWorkbookCommand(f.session);
+    expect(f.sheet.drawings).toEqual([first, second]);
+    redoWorkbookCommand(f.session);
+    f.actions.change(second.id, true);
+    expect(getCellContent(f.sheet, { row: 0, column: 1 })).toEqual({ kind: "literal", value: 2 });
+    undoWorkbookCommand(f.session);
+    expect(getCellContent(f.sheet, { row: 0, column: 1 })).toEqual({ kind: "literal", value: 1 });
+  });
+
+  describe.each([false, true])("radio link initialization, relink=%s", (relink) => {
+    test.each([
+      { selected: false, target: "empty" },
+      { selected: false, target: "literal" },
+      { selected: false, target: "formula" },
+      { selected: true, target: "empty" },
+      { selected: true, target: "literal" },
+      { selected: true, target: "formula" },
+    ] as const)(
+      "preserves selection and restores $target target on undo, selected=$selected",
+      ({ selected, target }) => {
+        const f = fixture();
+        const first = controlDrawing("radio");
+        first.control = {
+          ...first.control,
+          linkedCell: relink ? { row: 0, column: 0 } : null,
+          optionValue: 1,
+          creationOrder: 1,
+        };
+        const second = { ...controlDrawing("radio"), id: "second" };
+        second.control = {
+          ...second.control,
+          linkedCell: first.control.linkedCell,
+          optionValue: 2,
+          creationOrder: 2,
+        };
+        if (relink)
+          setCellContent(
+            f.sheet,
+            { row: 0, column: 0 },
+            { kind: "literal", value: selected ? 2 : 0 },
+          );
+        else if (selected) second.control.localValue = 2;
+        f.sheet.drawings = [first, second];
+        const before = structuredClone(f.sheet.drawings);
+        const address = { row: 0, column: 1 };
+        const original =
+          target === "empty"
+            ? null
+            : target === "formula"
+              ? { kind: "formula" as const, formula: { source: "=40+2" } }
+              : { kind: "literal" as const, value: 99 };
+        setCellContent(f.sheet, address, original);
+        f.actions.open(first);
+        f.actions.confirm(f.actions.editing.value!, "B1", "");
+        const expected = selected
+          ? { kind: "literal", value: 2 }
+          : target === "empty"
+            ? null
+            : { kind: "literal", value: 0 };
+        expect(getCellContent(f.sheet, address)).toEqual(expected);
+        for (const drawing of f.sheet.drawings as SheetControlDrawing[])
+          expect(drawing.control.linkedCell).toEqual(address);
+        expect(f.session.history.undoStack).toHaveLength(1);
+        undoWorkbookCommand(f.session);
+        expect(f.sheet.drawings).toEqual(before);
+        expect(getCellContent(f.sheet, address)).toEqual(original);
+        redoWorkbookCommand(f.session);
+        expect(getCellContent(f.sheet, address)).toEqual(expected);
+        if (relink)
+          expect(getCellContent(f.sheet, { row: 0, column: 0 })).toEqual({
+            kind: "literal",
+            value: selected ? 2 : 0,
+          });
+      },
+    );
+  });
 
   test.each(["button", "label", "group"] as const)(
     "an unlinked %s cannot write to a worksheet cell",

@@ -15,10 +15,15 @@ afterEach(() => {
 });
 function fixture(type: FormControlType) {
   const sheet = getActiveSheet(createWorkbook({ id: "controls", sheetId: "sheet" }));
+  const drawing = controlDrawing(type);
+  if (type === "radio") {
+    drawing.control.optionValue = 1;
+    sheet.drawings = [drawing];
+  }
   const wrapper = mount(FormControlContent, {
     attachTo: document.body,
     props: {
-      drawing: controlDrawing(type),
+      drawing,
       sheet,
       evaluator: createSheetEvaluator(sheet),
       revision: 0,
@@ -66,13 +71,17 @@ describe("form control content", () => {
   test.each(["combo", "list", "spinner", "scrollbar", "radio"] as const)(
     "renders the unlinked %s value from local state",
     async (type) => {
-      const { wrapper } = fixture(type);
+      const { wrapper, sheet } = fixture(type);
       const drawing = controlDrawing(type);
       drawing.control = {
         ...drawing.control,
         linkedCell: null,
-        localValue: type === "radio" ? 3 : 2,
+        localValue: type === "radio" ? 1 : 2,
       };
+      if (type === "radio") {
+        drawing.control.optionValue = 1;
+        sheet.drawings = [drawing];
+      }
       await wrapper.setProps({ drawing });
       if (type === "combo") {
         expect(wrapper.getComponent(Select).props("value")).toBe(2);

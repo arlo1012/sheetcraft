@@ -474,7 +474,9 @@ export function applyWorkbookCommand(
       case "ungroupSheetRange":
         return applyUngroupSheetRangeCommand(workbook, command);
       case "setSheetDrawings":
-        return applySetSheetDrawingsCommand(workbook, command);
+        return applySetSheetDrawingsCommand(workbook, command, (edit) =>
+          applyWorkbookCommand(workbook, edit, options),
+        );
       case "replaceSheetDrawingCollections":
         return applyReplaceSheetDrawingCollectionsCommand(workbook, command);
       case "setSheetFloatingImages":

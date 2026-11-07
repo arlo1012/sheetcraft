@@ -326,8 +326,12 @@ export function planShapeClipboardPaste(options: {
       ],
     },
   );
+  // A same-sheet cut moves a form control. Its creation order and the identities
+  // of any included group boxes must survive the move.
   const placed = placeShapeClipboardRoots(
-    roots,
+    roots.map((root, index) =>
+      options.mode === "cut" && root.kind === "control" ? options.selection.roots[index]! : root,
+    ),
     options.sourceMetrics,
     options.targetMetrics,
     options.address,

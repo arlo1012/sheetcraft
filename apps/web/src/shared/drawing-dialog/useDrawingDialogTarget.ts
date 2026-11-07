@@ -129,7 +129,7 @@ export function useDrawingDialogTarget<T extends SheetDrawing, Args extends unkn
     }
   }
   function unchanged(target: Dialog, command: ReturnType<typeof createSetSheetDrawingsCommand>) {
-    if (!target.existing) return false;
+    if (!target.existing || command.radioLinkWrite) return false;
     const sheets = new Map(target.workbook.sheets);
     sheets.set(target.sheet.id, { ...target.sheet });
     return applyWorkbookCommand({ ...target.workbook, sheets }, command) === null;

@@ -15,6 +15,7 @@ import { useAppI18n } from "../../../shared/i18n";
 import ShapeLeafPixelContent from "./ShapeLeafPixelContent.vue";
 import StandardShapeContent from "./StandardShapeContent.vue";
 import type { ShapeDetailedPresentation } from "../shape-detailed-presentation";
+import type { FormRadioGroup } from "@sheetcraft/core/form-radio-groups";
 import { standardShapeSvgTransform } from "../shape-geometry";
 const FormControlContent = defineAsyncComponent(
   () => import("../../form-controls/components/FormControlContent.vue"),
@@ -29,6 +30,7 @@ const ChartContent = defineAsyncComponent(() => import("../../charts/components/
 const EquationContent = defineAsyncComponent(() => import("./EquationContent.vue"));
 const props = defineProps<{
   drawing: SheetDrawing;
+  radioGroup?: FormRadioGroup;
   paintChart?: SheetChart;
   chartEditing?: boolean;
   chartSelectedElement?: ChartFormatTarget;
@@ -222,6 +224,7 @@ const legacyBodyTransform = computed(() =>
     <FormControlContent
       v-else-if="drawing.kind === 'control' && sheet && evaluator"
       :drawing="drawing"
+      :radio-group="radioGroup"
       :sheet="sheet"
       :evaluator="evaluator"
       :revision="revision ?? 0"

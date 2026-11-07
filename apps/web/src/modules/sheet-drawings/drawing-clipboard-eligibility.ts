@@ -10,6 +10,7 @@ import type {
   SheetDrawing,
   SheetGraphicDrawing,
   SheetChartDrawing,
+  SheetControlDrawing,
 } from "@sheetcraft/core/sheet-drawings";
 import {
   isFramedEquationDrawing,
@@ -20,6 +21,7 @@ import { resolveShapeFrame } from "@sheetcraft/core/shape-frame";
 export type DrawingClipboardEligibleRoot =
   | ShapeGroupEligibleRoot
   | SheetChartDrawing
+  | SheetControlDrawing
   | SheetFramedEquationDrawing
   | (SheetGraphicDrawing & { kind: "equation" });
 
@@ -27,7 +29,12 @@ export type DrawingClipboardEligibleRoot =
 export function isDrawingClipboardEligibleRoot(
   value: SheetDrawing,
 ): value is DrawingClipboardEligibleRoot {
-  return isShapeGroupEligibleRoot(value) || value.kind === "equation" || value.kind === "chart";
+  return (
+    isShapeGroupEligibleRoot(value) ||
+    value.kind === "equation" ||
+    value.kind === "chart" ||
+    value.kind === "control"
+  );
 }
 
 /** Legacy equation/chart placement is resolved without promoting it into a shape frame or member. */
@@ -35,7 +42,7 @@ export function resolveDrawingClipboardRootLayout(
   value: DrawingClipboardEligibleRoot,
   metrics: PictureSheetMetrics,
 ): ResolvedShapeFrame {
-  if (value.kind !== "equation" && value.kind !== "chart")
+  if (value.kind !== "equation" && value.kind !== "chart" && value.kind !== "control")
     return resolveShapeRootLayout(value, metrics);
   if (value.kind === "equation" && isFramedEquationDrawing(value))
     return resolveShapeFrame(value.shapeFrame, metrics, value.rotation);
