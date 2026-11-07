@@ -23,7 +23,11 @@ import ChartSubtypeControls from "./ChartSubtypeControls.vue";
 import ChartStyleGallery from "./ChartStyleGallery.vue";
 import ChartQuickLayoutGallery from "./ChartQuickLayoutGallery.vue";
 import ChartDataTableControls from "./ChartDataTableControls.vue";
-import { getChartQuickLayout, type ChartQuickLayoutId } from "../chart-quick-layout";
+import {
+  getChartQuickLayout,
+  supportsChartQuickLayouts,
+  type ChartQuickLayoutId,
+} from "../chart-quick-layout";
 import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import {
   getChartVariant,
@@ -315,7 +319,10 @@ const layoutMenu = useMenu({
   menuSurfaceRef: layoutSurface,
   disabled: computed(
     () =>
-      props.disabled || !props.applyLayout || !props.previewLayout || props.chart.type !== "column",
+      props.disabled ||
+      !props.applyLayout ||
+      !props.previewLayout ||
+      !supportsChartQuickLayouts(props.chart.type),
   ),
   defaultFocus: "selected",
   additionalInside: () => [
@@ -336,7 +343,7 @@ const layoutMenu = useMenu({
       props.applyLayout === apply &&
       props.previewLayout === preview &&
       !props.disabled &&
-      chart.type === "column";
+      supportsChartQuickLayouts(chart.type);
     const callbacks: LayoutSession = {
       preview(id) {
         if (id === undefined) return preview?.(undefined) ?? true;
@@ -489,7 +496,7 @@ onBeforeUnmount(() => {
       data-ribbon-group="chart-design"
     >
       <div
-        v-if="applyLayout && previewLayout && chart.type === 'column'"
+        v-if="applyLayout && previewLayout && supportsChartQuickLayouts(chart.type)"
         class="chart-elements-toolbar__menu"
       >
         <RibbonMenuButton

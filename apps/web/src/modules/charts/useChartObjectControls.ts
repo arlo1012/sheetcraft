@@ -81,6 +81,7 @@ export function useChartObjectControls(options: {
   getData?: (drawing: SheetChartDrawing, chart: SheetChart) => ChartData;
   getSourceData?: (drawing: SheetChartDrawing, chart: SheetChart) => ChartData;
   getAxisTitle?: () => string;
+  getChartTitle?: () => string;
 }) {
   const error = ref(false);
   const preview = shallowRef<(ChartLayoutPreview & { lease: object }) | undefined>();
@@ -216,6 +217,7 @@ export function useChartObjectControls(options: {
             drawing.chart,
             layout,
             options.getAxisTitle?.() ?? "Axis Title",
+            options.getChartTitle?.(),
           );
           return pendingTitle === undefined
             ? chart
@@ -232,6 +234,7 @@ export function useChartObjectControls(options: {
             drawing.chart,
             layout,
             options.getAxisTitle?.() ?? "Axis Title",
+            options.getChartTitle?.(),
           );
           if (pendingTitle !== undefined) chart = applyElementPatch(chart, { title: pendingTitle });
           validateTable(chart);

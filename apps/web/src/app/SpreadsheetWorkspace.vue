@@ -1803,6 +1803,7 @@ const chartObjectControls = useChartObjectControls({
       session.workbook.sheets.get(sheetId),
     ),
   getAxisTitle: () => t("chart.axisTitlePlaceholder"),
+  getChartTitle: () => t("chart.defaultTitle"),
 });
 const chartObjectContext = chartObjectControls.snapshot;
 const chartLayoutPreview = chartObjectControls.paintPreview;

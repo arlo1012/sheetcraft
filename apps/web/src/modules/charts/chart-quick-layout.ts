@@ -152,6 +152,41 @@ const layouts: Record<ChartQuickLayoutId, LayoutRecipe> = {
   },
 };
 
+export type BarQuickLayoutId = Exclude<ChartQuickLayoutId, 11>;
+const barLayouts = {
+  1: { ...layouts[1], gap: 150, overlap: 0 },
+  2: { ...layouts[2], gap: 150, overlap: -25 },
+  3: { ...layouts[3], gap: 219, overlap: -27 },
+  4: { ...layouts[4], gap: 75, overlap: 0 },
+  5: { ...layouts[5], valueTitle: false, gap: 150, overlap: 0 },
+  6: { ...layouts[6], gap: 150, overlap: 0 },
+  7: { ...layouts[7], gap: 300, overlap: 0 },
+  8: { ...layouts[9], gap: 150, overlap: 0 },
+  9: { ...layouts[10], gap: 75, overlap: 40 },
+  10: { ...layouts[11], gap: 150, overlap: 0 },
+} satisfies Record<BarQuickLayoutId, LayoutRecipe>;
+const stackedBarGap: Record<BarQuickLayoutId, number> = {
+  1: 55,
+  2: 95,
+  3: 75,
+  4: 75,
+  5: 95,
+  6: 55,
+  7: 75,
+  8: 300,
+  9: 300,
+  10: 150,
+};
+export function getBarLayoutRecipe(id: ChartQuickLayoutId, stacked: boolean): LayoutRecipe {
+  if (id === 11 || !Object.hasOwn(barLayouts, id))
+    throw new RangeError("Unknown horizontal bar chart layout.");
+  const choice = barLayouts[id];
+  return stacked ? { ...choice, gap: stackedBarGap[id], overlap: id === 9 ? 0 : 100 } : choice;
+}
+export function supportsChartQuickLayouts(type: SheetChart["type"]): boolean {
+  return type === "column" || type === "bar";
+}
+
 function recipe(id: ChartQuickLayoutId): LayoutRecipe {
   if (!Number.isInteger(id) || !Object.hasOwn(layouts, id))
     throw new RangeError("Unknown chart quick layout.");
@@ -163,13 +198,18 @@ export function applyChartQuickLayout(
   chart: SheetChart,
   id: ChartQuickLayoutId,
   axisTitle: string,
+  defaultChartTitle = "Chart Title",
 ): SheetChart {
-  if (chart.type !== "column")
-    throw new RangeError("Quick layouts currently require a column chart.");
+  if (!supportsChartQuickLayouts(chart.type))
+    throw new RangeError("Unsupported chart quick layout type.");
   if (typeof axisTitle !== "string" || !axisTitle.trim() || axisTitle.length > 1000)
     throw new RangeError("Chart axis placeholder must be bounded text.");
-  const next = normalizeSheetChart(chart),
-    choice = recipe(id);
+  const next = normalizeSheetChart(chart);
+  const stackedBar =
+    chart.type === "bar" && (chart.stacked || chart.presentation?.percentStacked === true);
+  const choice = chart.type === "bar" ? getBarLayoutRecipe(id, stackedBar) : recipe(id);
+  if (chart.type === "bar" && choice.title === "above" && !next.title.trim())
+    next.title = defaultChartTitle;
   next.legend = choice.legend !== "none";
   next.labels = choice.labels !== "none";
   next.elements = {
@@ -177,10 +217,19 @@ export function applyChartQuickLayout(
     titlePosition: choice.title,
     ...(choice.legend !== "none" ? { legendPosition: choice.legend } : {}),
     legendOverlay: false,
-    labelPosition: choice.labels === "inside" ? "insideEnd" : "outsideEnd",
+    labelPosition:
+      choice.labels === "inside"
+        ? "insideEnd"
+        : stackedBar && choice.labels !== "none"
+          ? "center"
+          : "outsideEnd",
     labelContent: choice.labels === "lastCategory" ? "seriesAndValue" : "value",
     labelScope:
-      choice.labels === "lastCategory" ? "lastCategory" : id === 10 ? "lastSeries" : "all",
+      choice.labels === "lastCategory"
+        ? "lastCategory"
+        : choice.labels === "inside"
+          ? "lastSeries"
+          : "all",
     dataTable: choice.table ? "withLegendKeys" : "none",
   };
   next.format = {
@@ -215,8 +264,9 @@ export function applyChartQuickLayout(
 
 /** Match only fields owned by the layout; source values and user titles are not IDs. */
 export function getChartQuickLayout(chart: SheetChart): ChartQuickLayoutId | undefined {
-  if (chart.type !== "column") return undefined;
+  if (!supportsChartQuickLayouts(chart.type)) return undefined;
   for (const id of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const) {
+    if (chart.type === "bar" && id === 11) break;
     const expected = applyChartQuickLayout(chart, id, "Axis Title");
     if (
       chart.legend === expected.legend &&

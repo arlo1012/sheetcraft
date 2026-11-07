@@ -281,12 +281,24 @@ function buildChartOption(
     labelPosition === "outsideEnd";
   const labelClearance = outsideLabels
     ? Math.min(
-        36,
+        horizontal && chart.elements?.labelContent === "seriesAndValue" ? 128 : 36,
         (horizontal
           ? (layout?.plot.width ?? dimensions?.width ?? 480)
           : (layout?.plot.height ?? dimensions?.height ?? 300)) * 0.2,
       )
     : 0;
+  // The last-category preset prints each series name beside its last visible bar.
+  // Reserve room on the side that actually carries those longer labels.
+  const lastBarLabels =
+    horizontal && outsideLabels && chart.elements?.labelScope === "lastCategory"
+      ? data.series
+          .map((series) => series.values.at(-1))
+          .filter((value): value is number => typeof value === "number")
+      : undefined;
+  const leftLabelSpace =
+    lastBarLabels && !lastBarLabels.some((value) => value < 0) ? 0 : labelClearance;
+  const rightLabelSpace =
+    lastBarLabels && !lastBarLabels.some((value) => value >= 0) ? 0 : labelClearance;
   const series: SeriesOption[] = scatter
     ? data.series.slice(1).map((series) => ({
         type: "scatter",
@@ -371,15 +383,18 @@ function buildChartOption(
           ...plotBounds,
           ...(outsideLabels
             ? horizontal
-              ? { left: plotBounds.left + labelClearance, right: plotBounds.right + labelClearance }
+              ? {
+                  left: plotBounds.left + leftLabelSpace,
+                  right: plotBounds.right + rightLabelSpace,
+                }
               : { top: plotBounds.top + labelClearance, bottom: plotBounds.bottom + labelClearance }
             : {}),
           containLabel: true,
         }
       : {
           top: Math.max(chart.title ? 45 : 15, outsideLabels && !horizontal ? labelClearance : 0),
-          left: 48,
-          right: Math.max(22, outsideLabels && horizontal ? labelClearance : 0),
+          left: Math.max(48, lastBarLabels ? leftLabelSpace : 0),
+          right: Math.max(22, outsideLabels && horizontal ? rightLabelSpace : 0),
           bottom: Math.max(
             chart.legend ? 58 : 35,
             outsideLabels && !horizontal ? labelClearance : 0,

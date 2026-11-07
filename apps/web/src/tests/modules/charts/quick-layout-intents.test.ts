@@ -1,3 +1,4 @@
+// 未执行：本轮补写条形图快速布局回归，按用户要求不运行测试。
 import { describe, expect, test } from "vitest";
 import {
   normalizeSheetChart,
@@ -150,6 +151,138 @@ describe("eleven concrete quick-layout patches", () => {
     expect(
       getChartQuickLayout({ ...base, elements: { ...base.elements, legendPosition: "left" } }),
     ).toBeUndefined();
+  });
+});
+
+describe("ten WPS horizontal-bar quick layouts", () => {
+  function bar(): SheetChart {
+    return { ...chart(), type: "bar" };
+  }
+
+  test.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const)(
+    "layout %s matches without changing the bar type, raw source, user text, or unrelated appearance",
+    (id) => {
+      const source = bar();
+      const before = structuredClone(source);
+      const next = applyChartQuickLayout(source, id, "Axis Title");
+      expect(getChartQuickLayout(next)).toBe(id);
+      expect(next.type).toBe("bar");
+      expect(next.dataCache).toEqual(before.dataCache);
+      expect(next.range).toEqual(before.range);
+      expect(next.title).toBe(before.title);
+      expect(next.headerRow).toBe(before.headerRow);
+      expect(next.headerColumn).toBe(before.headerColumn);
+      expect(next.seriesBy).toBe(before.seriesBy);
+      expect(next.showHidden).toBe(before.showHidden);
+      expect(next.presentation).toEqual(before.presentation);
+      expect(next.format?.series).toEqual(before.format?.series);
+      expect(next.format?.valueAxis?.min).toBe(before.format?.valueAxis?.min);
+      expect(next.format?.valueAxis?.max).toBe(before.format?.valueAxis?.max);
+      expect(next.format?.valueAxis?.numberFormat).toEqual(before.format?.valueAxis?.numberFormat);
+      expect(source).toEqual(before);
+    },
+  );
+
+  test("bar layout 5 shows a keyed data table with both axis titles hidden", () => {
+    const next = applyChartQuickLayout(bar(), 5, "Axis Title");
+    expect(next.elements?.dataTable).toBe("withLegendKeys");
+    expect(next.format?.categoryAxis?.titleVisible).toBe(false);
+    expect(next.format?.valueAxis?.titleVisible).toBe(false);
+    expect(next.format?.categoryAxis?.title).toBe("User categories");
+    expect(next.format?.valueAxis?.title).toBe("User amount");
+  });
+
+  test("bar layouts 6, 8, 9, and 10 retain their distinct WPS element choices", () => {
+    const six = applyChartQuickLayout(bar(), 6, "Axis Title");
+    expect(six.labels).toBe(true);
+    expect(six.elements).toMatchObject({
+      labelScope: "lastCategory",
+      labelContent: "seriesAndValue",
+    });
+    expect(six.format?.valueAxis?.titleVisible).toBe(true);
+    expect(six.format?.categoryAxis?.titleVisible).toBe(false);
+    const eight = applyChartQuickLayout(bar(), 8, "Axis Title");
+    expect(eight.legend).toBe(true);
+    expect(eight.elements?.legendPosition).toBe("right");
+    expect(eight.format?.categoryAxis?.titleVisible).toBe(true);
+    expect(eight.format?.valueAxis?.titleVisible).toBe(true);
+    const nine = applyChartQuickLayout(bar(), 9, "Axis Title");
+    expect(nine.labels).toBe(true);
+    expect(nine.elements).toMatchObject({
+      labelScope: "lastSeries",
+      labelPosition: "insideEnd",
+      labelContent: "value",
+    });
+    expect(nine.format?.bar?.overlap).toBeGreaterThan(0);
+    const ten = applyChartQuickLayout(bar(), 10, "Axis Title");
+    expect(ten.elements?.titlePosition).toBe("none");
+    expect(ten.legend).toBe(true);
+    expect(ten.elements?.legendPosition).toBe("right");
+    expect(ten.title).toBe("User chart title");
+  });
+
+  test.each([2, 4, 6] as const)(
+    "bar layout %s places clustered labels outside and stacked or percentage labels at the center",
+    (id) => {
+      for (const variant of ["clustered", "stacked", "percent"] as const) {
+        const base = bar();
+        const source: SheetChart = {
+          ...base,
+          stacked: variant !== "clustered",
+          presentation: {
+            ...base.presentation,
+            ...(variant === "percent" ? { percentStacked: true } : {}),
+          },
+        };
+        const before = structuredClone(source);
+        const next = applyChartQuickLayout(source, id, "Axis Title");
+        expect(next.elements?.labelPosition).toBe(
+          variant === "clustered" ? "outsideEnd" : "center",
+        );
+        expect(next.type).toBe("bar");
+        expect(next.stacked).toBe(source.stacked);
+        expect(next.presentation?.percentStacked).toBe(source.presentation?.percentStacked);
+        expect(next.dataCache).toEqual(before.dataCache);
+        const option = createChartOption(next, data);
+        const series = option.series as unknown as Array<{
+          type: string;
+          data: Array<{ label: { position: string } }>;
+        }>;
+        for (const entry of series) {
+          expect(entry.type).toBe("bar");
+          expect(entry.data.map((point) => point.label.position)).toEqual(
+            data.categories.map(() => (variant === "clustered" ? "right" : "inside")),
+          );
+        }
+        expect(source).toEqual(before);
+      }
+    },
+  );
+
+  test("bar layout 6 labels only the last category and layout 9 only the last series", () => {
+    function label(id: 6 | 9, seriesIndex: number, categoryIndex: number) {
+      const option = createChartOption(applyChartQuickLayout(bar(), id, "Axis Title"), data);
+      const series = option.series as unknown as Array<{
+        label: { formatter: (params: { value: number | null; dataIndex: number }) => string };
+      }>;
+      return series[seriesIndex]!.label.formatter({
+        value: data.series[seriesIndex]!.values[categoryIndex]!,
+        dataIndex: categoryIndex,
+      });
+    }
+    expect(label(6, 0, 0)).toBe("");
+    expect(label(6, 1, 1)).toBe("");
+    expect(label(6, 0, 2)).toBe("apple, 120");
+    expect(label(6, 1, 2)).toBe("pear, 90");
+    expect(label(9, 0, 1)).toBe("");
+    expect(label(9, 1, 1)).toBe("80");
+  });
+
+  test("layout 11 is rejected for horizontal bars without mutating its source", () => {
+    const source = bar();
+    const before = structuredClone(source);
+    expect(() => applyChartQuickLayout(source, 11, "Axis Title")).toThrow();
+    expect(source).toEqual(before);
   });
 });
 

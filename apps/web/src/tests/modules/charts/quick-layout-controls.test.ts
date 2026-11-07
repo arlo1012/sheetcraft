@@ -1,3 +1,4 @@
+// 未执行：本轮补写条形图快速布局回归，按用户要求不运行测试。
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { isVNode, type VNode } from "vue";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -67,6 +68,41 @@ function choiceVNode(wrapper: VueWrapper, id: ChartQuickLayoutId): VNode {
 }
 
 describe("eleven concrete Quick Layout choices", () => {
+  test("horizontal bars show exactly ten localized layout choices with no eleventh item", () => {
+    const source = chart({ type: "bar" });
+    const before = structuredClone(source);
+    const f = gallery({ chart: source }, "zh-CN");
+    expect(f.wrapper.findAll("button").map((button) => button.text())).toEqual([
+      "布局1",
+      "布局2",
+      "布局3",
+      "布局4",
+      "布局5",
+      "布局6",
+      "布局7",
+      "布局8",
+      "布局9",
+      "布局10",
+    ]);
+    expect(f.wrapper.findAll("svg")).toHaveLength(10);
+    expect(f.wrapper.find('[data-chart-quick-layout="11"]').exists()).toBe(false);
+    expect(source).toEqual(before);
+    expect(f.apply).not.toHaveBeenCalled();
+    expect(f.preview).not.toHaveBeenCalled();
+  });
+
+  test("switching from column to bar removes layout 11 and rejects its retained event", async () => {
+    const f = gallery();
+    const oldClick = choiceVNode(f.wrapper, 11).props!.onClick as () => void;
+    await f.wrapper.setProps({ chart: chart({ type: "bar" }), selected: undefined });
+    expect(f.wrapper.findAll("button")).toHaveLength(10);
+    expect(f.wrapper.find('[data-chart-quick-layout="11"]').exists()).toBe(false);
+    oldClick();
+    expect(f.apply).not.toHaveBeenCalled();
+    await choice(f.wrapper, 10).trigger("click");
+    expect(f.apply).toHaveBeenCalledExactlyOnceWith(10);
+  });
+
   test("Chinese captions stay single-line and every owned thumbnail has a distinct hierarchy", () => {
     const { wrapper } = gallery({}, "zh-CN");
     expect(wrapper.findAll("button").map((button) => button.text())).toEqual([
@@ -287,30 +323,27 @@ describe("chart data table choices", () => {
     expect(JSON.stringify(source)).toBe(before);
   });
 
-  test.each(["column", "line", "area"] as const)(
+  test.each(["bar", "column", "line", "area"] as const)(
     "%s exposes all three working choices",
     async (type) => {
       const f = tables(chart({ type }));
       expect(f.wrapper.findAll('[aria-disabled="false"]')).toHaveLength(3);
       await tableChoice(f.wrapper, "withLegendKeys").trigger("click");
       expect(f.apply).toHaveBeenCalledExactlyOnceWith("withLegendKeys");
-      expect(f.wrapper.text()).toContain("current series and categories");
-    },
-  );
-
-  test.each(["bar", "pie", "scatter"] as const)(
-    "%s is gated with a capability hint",
-    async (type) => {
-      const f = tables(chart({ type }));
-      expect(f.wrapper.findAll('[role="menuitemradio"][aria-disabled="true"]')).toHaveLength(3);
-      await tableChoice(f.wrapper, "withLegendKeys").trigger("click");
-      await tableChoice(f.wrapper, "none").trigger("keydown", { key: "Enter" });
-      expect(f.apply).not.toHaveBeenCalled();
       expect(f.wrapper.text()).toContain(
-        type === "bar" ? "vertical category axis" : "support column, line and area",
+        type === "bar" ? "Both axes remain visible" : "current series and categories",
       );
     },
   );
+
+  test.each(["pie", "scatter"] as const)("%s is gated with a capability hint", async (type) => {
+    const f = tables(chart({ type }));
+    expect(f.wrapper.findAll('[role="menuitemradio"][aria-disabled="true"]')).toHaveLength(3);
+    await tableChoice(f.wrapper, "withLegendKeys").trigger("click");
+    await tableChoice(f.wrapper, "none").trigger("keydown", { key: "Enter" });
+    expect(f.apply).not.toHaveBeenCalled();
+    expect(f.wrapper.text()).toContain("support column, bar, line");
+  });
 
   test("click and Enter each apply once; repeated or composing keys do not apply", async () => {
     const f = tables();

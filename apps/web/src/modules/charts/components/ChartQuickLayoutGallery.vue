@@ -4,6 +4,8 @@ import type { SheetChart } from "@sheetcraft/core/sheet-charts";
 import { useAppI18n } from "../../../shared/i18n";
 import type { ChartQuickLayoutId } from "../chart-quick-layout";
 
+import BarLayoutThumbnail from "./BarLayoutThumbnail.vue";
+
 const props = defineProps<{
   chart: SheetChart;
   disabled: boolean;
@@ -144,7 +146,12 @@ const bindings = computed(() => {
         data-chart-quick-layout="1"
         v-on="bindings.one"
       >
-        <svg viewBox="0 0 112 76" aria-hidden="true">
+        <BarLayoutThumbnail
+          v-if="chart.type === 'bar'"
+          :layout="1"
+          :stacked="chart.stacked || chart.presentation?.percentStacked === true"
+        />
+        <svg v-else viewBox="0 0 112 76" aria-hidden="true">
           <path data-thumbnail-element="title" d="M34 8h44" class="thumbnail-title" />
           <g data-thumbnail-element="gridlines" class="thumbnail-grid">
             <path d="M16 23h63M16 34h63M16 45h63" />
@@ -177,7 +184,12 @@ const bindings = computed(() => {
         data-chart-quick-layout="2"
         v-on="bindings.two"
       >
-        <svg viewBox="0 0 112 76" aria-hidden="true">
+        <BarLayoutThumbnail
+          v-if="chart.type === 'bar'"
+          :layout="2"
+          :stacked="chart.stacked || chart.presentation?.percentStacked === true"
+        />
+        <svg v-else viewBox="0 0 112 76" aria-hidden="true">
           <path data-thumbnail-element="title" d="M34 8h44" class="thumbnail-title" />
           <g data-thumbnail-element="legend-top">
             <path d="M34 16h4v4h-4z" class="thumbnail-first" />
@@ -210,7 +222,12 @@ const bindings = computed(() => {
         data-chart-quick-layout="3"
         v-on="bindings.three"
       >
-        <svg viewBox="0 0 112 76" aria-hidden="true">
+        <BarLayoutThumbnail
+          v-if="chart.type === 'bar'"
+          :layout="3"
+          :stacked="chart.stacked || chart.presentation?.percentStacked === true"
+        />
+        <svg v-else viewBox="0 0 112 76" aria-hidden="true">
           <path data-thumbnail-element="title" d="M34 8h44" class="thumbnail-title" />
           <path
             data-thumbnail-element="gridlines"
@@ -245,7 +262,12 @@ const bindings = computed(() => {
         data-chart-quick-layout="4"
         v-on="bindings.four"
       >
-        <svg viewBox="0 0 112 76" aria-hidden="true">
+        <BarLayoutThumbnail
+          v-if="chart.type === 'bar'"
+          :layout="4"
+          :stacked="chart.stacked || chart.presentation?.percentStacked === true"
+        />
+        <svg v-else viewBox="0 0 112 76" aria-hidden="true">
           <path data-thumbnail-element="axes" d="M16 10v46h84" class="thumbnail-axis" />
           <path
             data-thumbnail-element="axis-labels"
@@ -279,7 +301,12 @@ const bindings = computed(() => {
         data-chart-quick-layout="5"
         v-on="bindings.five"
       >
-        <svg viewBox="0 0 112 76" aria-hidden="true">
+        <BarLayoutThumbnail
+          v-if="chart.type === 'bar'"
+          :layout="5"
+          :stacked="chart.stacked || chart.presentation?.percentStacked === true"
+        />
+        <svg v-else viewBox="0 0 112 76" aria-hidden="true">
           <path data-thumbnail-element="title" d="M34 8h44" class="thumbnail-title" />
           <path data-thumbnail-element="axis-title-y" d="M5 27v18" class="thumbnail-title" />
           <path
@@ -322,7 +349,12 @@ const bindings = computed(() => {
         data-chart-quick-layout="6"
         v-on="bindings.six"
       >
-        <svg viewBox="0 0 112 76" aria-hidden="true">
+        <BarLayoutThumbnail
+          v-if="chart.type === 'bar'"
+          :layout="6"
+          :stacked="chart.stacked || chart.presentation?.percentStacked === true"
+        />
+        <svg v-else viewBox="0 0 112 76" aria-hidden="true">
           <path data-thumbnail-element="title" d="M34 8h44" class="thumbnail-title" />
           <path data-thumbnail-element="axis-title-y" d="M5 31v20" class="thumbnail-title" />
           <path
@@ -356,7 +388,12 @@ const bindings = computed(() => {
         data-chart-quick-layout="7"
         v-on="bindings.seven"
       >
-        <svg viewBox="0 0 112 76" aria-hidden="true">
+        <BarLayoutThumbnail
+          v-if="chart.type === 'bar'"
+          :layout="7"
+          :stacked="chart.stacked || chart.presentation?.percentStacked === true"
+        />
+        <svg v-else viewBox="0 0 112 76" aria-hidden="true">
           <path data-thumbnail-element="axis-title-y" d="M5 27v20" class="thumbnail-title" />
           <path data-thumbnail-element="axis-title-x" d="M39 70h24" class="thumbnail-title" />
           <path
@@ -397,7 +434,12 @@ const bindings = computed(() => {
         data-chart-quick-layout="8"
         v-on="bindings.eight"
       >
-        <svg viewBox="0 0 112 76" aria-hidden="true">
+        <BarLayoutThumbnail
+          v-if="chart.type === 'bar'"
+          :layout="8"
+          :stacked="chart.stacked || chart.presentation?.percentStacked === true"
+        />
+        <svg v-else viewBox="0 0 112 76" aria-hidden="true">
           <path data-thumbnail-element="title" d="M34 8h44" class="thumbnail-title" />
           <path data-thumbnail-element="axis-title-y" d="M5 30v18" class="thumbnail-title" />
           <path data-thumbnail-element="axis-title-x" d="M46 71h26" class="thumbnail-title" />
@@ -424,7 +466,12 @@ const bindings = computed(() => {
         data-chart-quick-layout="9"
         v-on="bindings.nine"
       >
-        <svg viewBox="0 0 112 76" aria-hidden="true">
+        <BarLayoutThumbnail
+          v-if="chart.type === 'bar'"
+          :layout="9"
+          :stacked="chart.stacked || chart.presentation?.percentStacked === true"
+        />
+        <svg v-else viewBox="0 0 112 76" aria-hidden="true">
           <path data-thumbnail-element="title" d="M34 8h44" class="thumbnail-title" />
           <path data-thumbnail-element="axis-title-y" d="M5 31v18" class="thumbnail-title" />
           <path data-thumbnail-element="axis-title-x" d="M39 71h24" class="thumbnail-title" />
@@ -461,7 +508,12 @@ const bindings = computed(() => {
         data-chart-quick-layout="10"
         v-on="bindings.ten"
       >
-        <svg viewBox="0 0 112 76" aria-hidden="true">
+        <BarLayoutThumbnail
+          v-if="chart.type === 'bar'"
+          :layout="10"
+          :stacked="chart.stacked || chart.presentation?.percentStacked === true"
+        />
+        <svg v-else viewBox="0 0 112 76" aria-hidden="true">
           <path data-thumbnail-element="title" d="M34 8h44" class="thumbnail-title" />
           <path
             data-thumbnail-element="gridlines"
@@ -494,6 +546,7 @@ const bindings = computed(() => {
       <button
         type="button"
         role="menuitemradio"
+        v-if="chart.type !== 'bar'"
         :aria-checked="selected === 11"
         :aria-disabled="disabled"
         :disabled="disabled"

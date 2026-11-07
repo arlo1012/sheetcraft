@@ -113,7 +113,9 @@ export function reserveChartAxisTitles(
       )
         additions[side] = Math.max(
           additions[side],
-          (horizontal ? extent.height : extent.width) + 8,
+          horizontal && chart.type === "bar"
+            ? (axis.nameGap ?? 42) + extent.height / 2 + 4
+            : (horizontal ? extent.height : extent.width) + 8,
         );
       const result: Axis = {
         ...axis,
