@@ -209,6 +209,8 @@ import { ensureCellFontResource } from "../shared/cell-text/font-resources";
 import { useSheetDisplaySnapshot } from "../modules/sheet-grid/canvas/sheet-display-snapshot";
 import { DEFAULT_CELL_FONT_FAMILY } from "@sheetcraft/core/style";
 import { captureScreen } from "../modules/insert-tools/captureScreen";
+import ScreenCaptureSourceDialog from "../modules/insert-tools/components/ScreenCaptureSourceDialog.vue";
+import type { CaptureShape } from "../modules/insert-tools/capture-region";
 import ScreenCaptureDialog from "../modules/insert-tools/components/ScreenCaptureDialog.vue";
 import { useShapeCreation } from "../modules/sheet-drawings/useShapeCreation";
 import type { ShapeGalleryChoice } from "../modules/sheet-drawings/shape-gallery";
@@ -1996,13 +1998,18 @@ const symbolVisible = computed(() => !!symbolDialog.value);
 const symbolPreferences = useSymbolPreferences();
 let symbolDialogSequence = 0;
 const captureBusy = ref(false);
+const canCaptureScreen = !!navigator.mediaDevices?.getDisplayMedia;
 const screenCapture = shallowRef<{
-  file: File;
+  file?: File;
+  shape: CaptureShape;
+  excludeSelf: boolean;
   workbook: Workbook;
   sheet: Sheet;
   generation: number;
   address: CellAddress;
 }>();
+const requestingCapture = shallowRef<typeof screenCapture.value>();
+const preparingFrame = shallowRef<typeof screenCapture.value>();
 watch([workbookGeneration, () => activeSheet.value.id], () => {
   screenCapture.value = undefined;
 });
@@ -2145,7 +2152,11 @@ watch(
     symbolDialog.value = undefined;
   },
 );
-async function insertScreenCapture(): Promise<void> {
+function insertScreenCapture(
+  shape: CaptureShape = "rectangle",
+  tools = false,
+  excludeSelf = false,
+): void {
   if (
     captureBusy.value ||
     screenCapture.value ||
@@ -2157,34 +2168,40 @@ async function insertScreenCapture(): Promise<void> {
     !cellEditSession.finish()
   )
     return;
-  if (!navigator.mediaDevices?.getDisplayMedia) {
-    void MessagePlugin.warning(t("drawing.captureUnsupported"));
-    return;
-  }
-  const workbook = session.workbook;
-  const sheet = activeSheet.value;
-  const generation = workbookGeneration.value;
-  const address = { ...activeAddress.value };
-  captureBusy.value = true;
+  screenCapture.value = {
+    workbook: session.workbook,
+    sheet: activeSheet.value,
+    generation: workbookGeneration.value,
+    address: { ...activeAddress.value },
+    shape,
+    excludeSelf,
+  };
+  if (!tools && canCaptureScreen) void acquireScreenCapture(true);
+}
+async function acquireScreenCapture(direct: boolean) {
+  const target = screenCapture.value;
+  if (!target || requestingCapture.value === target) return;
+  requestingCapture.value = target;
   try {
-    const file = await captureScreen();
-    if (
-      file &&
-      session.workbook === workbook &&
-      activeSheet.value === sheet &&
-      workbookGeneration.value === generation &&
-      canUseSheetPermission(activeSheet.value, "editObjects")
-    )
-      screenCapture.value = { file, workbook, sheet, generation, address };
+    const file = await captureScreen(target.excludeSelf, async () => {
+      if (target !== screenCapture.value) return false;
+      preparingFrame.value = target;
+      await nextTick();
+      return screenCapture.value === target;
+    });
+    if (screenCapture.value !== target) return;
+    if (file) screenCapture.value = { ...target, file };
+    else if (direct) screenCapture.value = undefined;
   } catch {
-    void MessagePlugin.error(t("drawing.captureFailed"));
+    if (screenCapture.value === target) void MessagePlugin.error(t("drawing.captureFailed"));
   } finally {
-    captureBusy.value = false;
+    if (requestingCapture.value === target) requestingCapture.value = undefined;
+    if (preparingFrame.value === target) preparingFrame.value = undefined;
   }
 }
 async function insertCapturedRegion(file: File): Promise<void> {
   const target = screenCapture.value;
-  if (!target || captureBusy.value) return;
+  if (!target?.file || captureBusy.value) return;
   if (
     target.workbook !== session.workbook ||
     target.sheet !== activeSheet.value ||
@@ -4752,6 +4769,27 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     undo,
     redo,
   };
+  if (
+    event.ctrlKey &&
+    event.altKey &&
+    !event.metaKey &&
+    !event.shiftKey &&
+    !event.defaultPrevented &&
+    !event.repeat &&
+    !event.isComposing &&
+    !historyContext.editing &&
+    !historyContext.blocked &&
+    !historyContext.cropping &&
+    !(
+      event.target instanceof HTMLElement &&
+      event.target.closest("input,textarea,select,[contenteditable=true],[role=dialog],[role=menu]")
+    ) &&
+    (event.code === "KeyX" || event.code === "KeyC")
+  ) {
+    event.preventDefault();
+    insertScreenCapture("rectangle", false, event.code === "KeyC");
+    return;
+  }
   if (routeRibbonHistoryShortcut(event, historyContext)) {
     if (fromEffectsTrigger && effectsTrigger)
       restoreFocusAfterRemount(effectsTrigger, effectsFocusReturn, () => true, activeBeforeHistory);
@@ -7146,8 +7184,21 @@ watch(
       @confirm="pictureBatchSize.confirm"
       @close="pictureBatchSize.close"
     />
+    <ScreenCaptureSourceDialog
+      v-if="screenCapture && !screenCapture.file && preparingFrame !== screenCapture"
+      :can-capture="canCaptureScreen"
+      :busy="requestingCapture === screenCapture"
+      @screen="acquireScreenCapture(false)"
+      @file="
+        (file) => {
+          if (screenCapture) screenCapture = { ...screenCapture, file };
+        }
+      "
+      @close="screenCapture = undefined"
+    />
     <ScreenCaptureDialog
-      v-if="screenCapture"
+      v-if="screenCapture?.file"
+      :shape="screenCapture.shape"
       :file="screenCapture.file"
       :busy="captureBusy"
       @confirm="insertCapturedRegion"

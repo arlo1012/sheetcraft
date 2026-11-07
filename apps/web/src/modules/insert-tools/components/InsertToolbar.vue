@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import EquationInsertMenu from "../../sheet-drawings/equation/EquationInsertMenu.vue";
 import type { EquationPresetId } from "../../sheet-drawings/equation/equation-catalog";
+import ScreenCaptureMenu from "./ScreenCaptureMenu.vue";
+import type { CaptureShape } from "../capture-region";
 import DiagramInsertMenu from "./DiagramInsertMenu.vue";
 import type { MindMapStart } from "../../mind-maps/mind-map-document";
 import type { FlowchartStart } from "../../flowcharts/flowchart-templates";
@@ -31,7 +33,6 @@ import {
   ALargeSmall,
   Star,
   Sigma,
-  Scan,
   Eraser,
 } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
@@ -76,7 +77,7 @@ const emit = defineEmits<{
   insertSymbolText: [payload: SymbolInsertion];
   insertSparkline: [type: CellSparkline["type"]];
   clearSparklines: [];
-  captureScreen: [];
+  captureScreen: [shape: CaptureShape, tools: boolean, excludeSelf: boolean];
   insertDrawing: [kind: SheetGraphicDrawing["kind"]];
   insertImage: [mode: "cell" | "floating"];
   insertHyperlink: [];
@@ -131,15 +132,10 @@ const { t, locale } = useAppI18n();
         ><FileText
       /></RibbonButton>
       <slot name="watermark" />
-      <RibbonButton
-        variant="tall"
-        :label="t('drawing.screenshot')"
-        :text="t('drawing.screenshot')"
+      <ScreenCaptureMenu
         :disabled="imageDisabled"
-        data-insert-tool="screenshot"
-        @activate="emit('captureScreen')"
-        ><Scan
-      /></RibbonButton>
+        @capture="(shape, tools, excludeSelf) => emit('captureScreen', shape, tools, excludeSelf)"
+      />
       <ShapeInsertMenu
         v-if="insertShapeHandler"
         :disabled="imageDisabled"

@@ -2,6 +2,7 @@
 import { describe, expect, test } from "vitest";
 import {
   captureRegionBetween,
+  captureShapePath,
   setCaptureRegionField,
 } from "../../../modules/insert-tools/capture-region";
 
@@ -59,4 +60,48 @@ describe("screen capture region", () => {
     );
     expect(original).toEqual({ x: 10, y: 20, width: 80, height: 60 });
   });
+});
+
+describe("capture shape paths", () => {
+  test("maps normalized freehand points into source-image coordinates and leaves inputs unchanged", () => {
+    const region = { x: 10, y: 20, width: 80, height: 40 };
+    const points = [
+      { x: 0, y: 0.25 },
+      { x: 1, y: 0.25 },
+      { x: 0.75, y: 1 },
+    ];
+    const before = structuredClone({ region, points });
+    const path = captureShapePath("freehand", region, points);
+    expect(path.match(/-?\d+(?:\.\d+)?/g)!.map(Number)).toEqual([10, 30, 90, 30, 70, 60]);
+    expect(path).toMatch(/^[Mm]/);
+    expect(path).toMatch(/[Zz]\s*$/);
+    expect({ region, points }).toEqual(before);
+  });
+
+  test.each([
+    { points: [] },
+    { points: [{ x: 0, y: 0 }] },
+    {
+      points: [
+        { x: 0, y: 0 },
+        { x: 1, y: 1 },
+      ],
+    },
+  ])(
+    "does not create a freehand clipping path with fewer than three points: $points",
+    ({ points }) => {
+      expect(captureShapePath("freehand", { x: 0, y: 0, width: 80, height: 40 }, points)).toBe("");
+    },
+  );
+
+  test.each(["ellipse", "rounded"] as const)(
+    "returns a closed curved %s clipping path",
+    (shape) => {
+      const path = captureShapePath(shape, { x: 10, y: 20, width: 80, height: 40 }, []);
+      expect(path).toMatch(/^[Mm]/);
+      expect(path).toMatch(/[AaQqCc]/);
+      expect(path).toMatch(/[Zz]\s*$/);
+      expect(path).not.toMatch(/NaN|Infinity/);
+    },
+  );
 });

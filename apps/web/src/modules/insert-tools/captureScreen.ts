@@ -1,9 +1,17 @@
 /** Captures one frame only after the browser's user-mediated source picker resolves. */
-export async function captureScreen(): Promise<File | null> {
+export async function captureScreen(
+  excludeSelf = false,
+  beforeFrame?: () => Promise<boolean>,
+): Promise<File | null> {
   if (!navigator.mediaDevices?.getDisplayMedia) throw new Error("Screen capture is unavailable.");
   let stream: MediaStream;
   try {
-    stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+    const options: DisplayMediaStreamOptions & { selfBrowserSurface?: "exclude" } = {
+      video: true,
+      audio: false,
+    };
+    if (excludeSelf) options.selfBrowserSurface = "exclude";
+    stream = await navigator.mediaDevices.getDisplayMedia(options);
   } catch (error) {
     if (error instanceof DOMException && error.name === "NotAllowedError") return null;
     throw error;
@@ -12,6 +20,7 @@ export async function captureScreen(): Promise<File | null> {
   video.muted = true;
   video.playsInline = true;
   try {
+    if (beforeFrame && !(await beforeFrame())) return null;
     video.srcObject = stream;
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {

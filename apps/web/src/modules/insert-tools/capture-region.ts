@@ -32,3 +32,36 @@ export function setCaptureRegionField(
   next.height = Math.max(1, Math.min(size.height - next.y, next.height));
   return next;
 }
+
+export const captureShapes = ["rectangle", "ellipse", "rounded", "freehand"] as const;
+export type CaptureShape = (typeof captureShapes)[number];
+
+/** SVG and Canvas use the same pixel-space path. Freehand vertices are relative to the crop. */
+export function captureShapePath(
+  shape: CaptureShape,
+  region: CaptureRegion,
+  points: readonly CapturePoint[],
+): string {
+  const { x, y, width, height } = region;
+  const right = x + width,
+    bottom = y + height;
+  if (shape === "freehand") {
+    if (points.length < 3) return "";
+    return (
+      points
+        .map((p, i) => (i === 0 ? "M" : "L") + (x + p.x * width) + " " + (y + p.y * height))
+        .join(" ") + " Z"
+    );
+  }
+  if (shape === "ellipse") {
+    const rx = width / 2,
+      ry = height / 2,
+      cy = y + ry;
+    return `M ${x} ${cy} A ${rx} ${ry} 0 1 0 ${right} ${cy} A ${rx} ${ry} 0 1 0 ${x} ${cy} Z`;
+  }
+  if (shape === "rounded") {
+    const r = Math.min(width, height) / 6;
+    return `M ${x + r} ${y} H ${right - r} Q ${right} ${y} ${right} ${y + r} V ${bottom - r} Q ${right} ${bottom} ${right - r} ${bottom} H ${x + r} Q ${x} ${bottom} ${x} ${bottom - r} V ${y + r} Q ${x} ${y} ${x + r} ${y} Z`;
+  }
+  return `M ${x} ${y} H ${right} V ${bottom} H ${x} Z`;
+}

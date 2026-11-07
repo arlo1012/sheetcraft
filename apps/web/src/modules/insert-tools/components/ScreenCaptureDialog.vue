@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
+import { Select } from "tdesign-vue-next/es/select";
 import { Button } from "tdesign-vue-next/es/button";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
 import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
@@ -14,12 +15,15 @@ import {
 } from "../../../shared/sheet-input/pointer-session";
 import {
   captureRegionBetween,
+  captureShapePath,
+  captureShapes,
+  type CaptureShape,
   setCaptureRegionField,
   type CapturePoint,
   type CaptureRegion,
 } from "../capture-region";
 
-const props = defineProps<{ file: File; busy: boolean }>();
+const props = defineProps<{ file: File; busy: boolean; shape?: CaptureShape }>();
 const emit = defineEmits<{ confirm: [file: File]; close: [] }>();
 const { t, locale } = useAppI18n();
 const source = URL.createObjectURL(props.file);
@@ -29,13 +33,35 @@ const region = ref<CaptureRegion>({ x: 0, y: 0, width: 0, height: 0 });
 const start = ref<CapturePoint>();
 let session: PointerSession | undefined;
 let beforeDrag = region.value;
+const shape = ref<CaptureShape>(props.shape ?? "rectangle");
+const vertices = ref<CapturePoint[]>([]);
+let beforeVertices: CapturePoint[] = [];
+let stroke: CapturePoint[] = [];
+const clipPath = computed(() => captureShapePath(shape.value, region.value, vertices.value));
+function validPolygon() {
+  const [a, b] = vertices.value;
+  if (!a || !b) return false;
+  return vertices.value
+    .slice(2)
+    .some(
+      (p) =>
+        Math.abs((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)) *
+          region.value.width *
+          region.value.height >=
+        1,
+    );
+}
 let disposed = false;
 const encoding = ref(false);
 const failed = ref(false);
 const loadFailed = ref(false);
 const busy = computed(() => props.busy || encoding.value);
 const valid = computed(
-  () => region.value.width > 0 && region.value.height > 0 && !loadFailed.value,
+  () =>
+    region.value.width > 0 &&
+    region.value.height > 0 &&
+    !loadFailed.value &&
+    (shape.value !== "freehand" || validPolygon()),
 );
 const regionStyle = computed(() => ({
   left: `${(100 * region.value.x) / size.value.width}%`,
@@ -44,6 +70,13 @@ const regionStyle = computed(() => ({
   height: `${(100 * region.value.height) / size.value.height}%`,
 }));
 function selectAll(): void {
+  if (shape.value === "freehand")
+    vertices.value = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+      { x: 0, y: 1 },
+    ];
   region.value = { x: 0, y: 0, ...size.value };
 }
 function loaded(): void {
@@ -51,7 +84,7 @@ function loaded(): void {
   loadFailed.value = false;
   failed.value = false;
   size.value = { width: image.value.naturalWidth, height: image.value.naturalHeight };
-  selectAll();
+  region.value = { x: 0, y: 0, ...size.value };
 }
 function point(event: GestureEvent): CapturePoint {
   const rect = image.value!.getBoundingClientRect();
@@ -65,7 +98,10 @@ function begin(event: PointerEvent): void {
   event.preventDefault();
   session?.cancel();
   beforeDrag = { ...region.value };
+  beforeVertices = vertices.value;
   start.value = point(event);
+  stroke = [];
+  if (shape.value === "freehand") addVertex(start.value);
   session = startPointerSession({
     event,
     captureTarget: event.currentTarget as HTMLElement,
@@ -74,18 +110,49 @@ function begin(event: PointerEvent): void {
     onCancel: cancelDrag,
   });
 }
+function addVertex(point: CapturePoint) {
+  const x = Math.max(0, Math.min(size.value.width, Math.round(point.x))),
+    y = Math.max(0, Math.min(size.value.height, Math.round(point.y)));
+  const last = stroke.at(-1);
+  if (last?.x === x && last.y === y) return;
+  const previous = region.value;
+  const left = stroke.length ? Math.min(previous.x, x) : x,
+    top = stroke.length ? Math.min(previous.y, y) : y;
+  const right = stroke.length ? Math.max(previous.x + previous.width, x) : x,
+    bottom = stroke.length ? Math.max(previous.y + previous.height, y) : y;
+  stroke.push({ x, y });
+  region.value = { x: left, y: top, width: right - left, height: bottom - top };
+  vertices.value = stroke.map((p) => ({
+    x: (p.x - left) / (right - left || 1),
+    y: (p.y - top) / (bottom - top || 1),
+  }));
+}
 function move(event: GestureEvent): void {
-  if (start.value) region.value = captureRegionBetween(start.value, point(event), size.value);
+  if (!start.value) return;
+  if (shape.value === "freehand") addVertex(point(event));
+  else region.value = captureRegionBetween(start.value, point(event), size.value);
 }
 function end(event: GestureEvent): void {
   if (!start.value) return;
   move(event);
-  if (region.value.width < 2 || region.value.height < 2) region.value = beforeDrag;
+  if (
+    region.value.width < 2 ||
+    region.value.height < 2 ||
+    (shape.value === "freehand" && !validPolygon())
+  ) {
+    region.value = beforeDrag;
+    vertices.value = beforeVertices;
+  }
+  stroke = [];
   start.value = undefined;
   session = undefined;
 }
 function cancelDrag(): void {
-  if (start.value) region.value = beforeDrag;
+  if (start.value) {
+    region.value = beforeDrag;
+    vertices.value = beforeVertices;
+  }
+  stroke = [];
   start.value = undefined;
   session = undefined;
 }
@@ -98,6 +165,7 @@ async function confirm(): Promise<void> {
   failed.value = false;
   const crop = { ...region.value };
   if (
+    shape.value === "rectangle" &&
     crop.x === 0 &&
     crop.y === 0 &&
     crop.width === size.value.width &&
@@ -113,6 +181,11 @@ async function confirm(): Promise<void> {
     canvas.height = crop.height;
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Canvas is unavailable.");
+    if (shape.value !== "rectangle")
+      context.clip(
+        new Path2D(captureShapePath(shape.value, { ...crop, x: 0, y: 0 }, vertices.value)),
+        "evenodd",
+      );
     context.drawImage(
       image.value,
       crop.x,
@@ -168,16 +241,47 @@ onBeforeUnmount(() => {
             @load="loaded"
             @error="loadFailed = failed = true"
           />
-          <div v-if="size.width" class="screen-capture__region" :style="regionStyle" />
+          <div
+            v-if="size.width && shape === 'rectangle'"
+            class="screen-capture__region"
+            :style="regionStyle"
+          />
+          <svg
+            v-else-if="size.width"
+            class="screen-capture__outline"
+            :viewBox="`0 0 ${size.width} ${size.height}`"
+            aria-hidden="true"
+          >
+            <path
+              :d="`M0 0 H${size.width} V${size.height} H0 Z ${clipPath}`"
+              fill="rgb(0 0 0 / 45%)"
+              fill-rule="evenodd"
+            />
+            <path
+              :d="clipPath"
+              fill="none"
+              stroke="var(--sheetcraft-action-primary)"
+              vector-effect="non-scaling-stroke"
+            />
+          </svg>
         </div>
       </div>
       <Form
         v-if="size.width"
         class="screen-capture__controls sheetcraft-form-grid"
         label-align="right"
-        :label-width="locale === 'zh-CN' ? 48 : 64"
+        :label-width="locale === 'zh-CN' ? 112 : 120"
         :prevent-submit-default="true"
       >
+        <FormItem :label="t('drawing.captureShape')"
+          ><Select
+            v-model="shape"
+            :aria-label="t('drawing.captureShape')"
+            :disabled="busy"
+            :options="
+              captureShapes.map((value) => ({ value, label: t(`drawing.capture.${value}`) }))
+            "
+        /></FormItem>
         <FormItem :label="t('drawing.captureLeft')"
           ><InputNumber
             :model-value="region.x"
@@ -276,6 +380,13 @@ onBeforeUnmount(() => {
     box-sizing: border-box;
     border: 1px solid var(--sheetcraft-action-primary);
     box-shadow: 0 0 0 9999px rgb(0 0 0 / 45%);
+    pointer-events: none;
+  }
+  &__outline {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     pointer-events: none;
   }
   &__controls {

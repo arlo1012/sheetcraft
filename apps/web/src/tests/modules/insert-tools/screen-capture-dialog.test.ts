@@ -6,6 +6,7 @@ import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Button } from "tdesign-vue-next/es/button";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
 import ScreenCaptureDialog from "../../../modules/insert-tools/components/ScreenCaptureDialog.vue";
+import { captureShapePath, type CaptureShape } from "../../../modules/insert-tools/capture-region";
 import { createAppI18n } from "../../../shared/i18n";
 
 const mountedWrappers: Array<{ unmount(): void }> = [];
@@ -16,7 +17,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function fixture(deferredEncoding = false) {
+async function fixture(deferredEncoding = false, shape?: CaptureShape) {
   const createObjectURL = vi.fn(() => "blob:capture-source");
   const revokeObjectURL = vi.fn();
   vi.stubGlobal(
@@ -27,8 +28,19 @@ async function fixture(deferredEncoding = false) {
     },
   );
   const drawImage = vi.fn();
+  const clip = vi.fn();
+  const fillRect = vi.fn();
+  const paths: string[] = [];
+  class CapturePath {
+    constructor(readonly data: string) {
+      paths.push(data);
+    }
+  }
+  vi.stubGlobal("Path2D", CapturePath);
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
     drawImage,
+    clip,
+    fillRect,
   } as unknown as CanvasRenderingContext2D);
   const encodedCanvases: HTMLCanvasElement[] = [];
   let encode: BlobCallback | undefined;
@@ -43,7 +55,7 @@ async function fixture(deferredEncoding = false) {
   const file = new File(["original capture"], "original-capture.png", { type: "image/png" });
   const wrapper = mount(ScreenCaptureDialog, {
     attachTo: document.body,
-    props: { file, busy: false },
+    props: { file, busy: false, ...(shape ? { shape } : {}) },
     global: { plugins: [createAppI18n("en-US")] },
   });
   mountedWrappers.push(wrapper);
@@ -66,6 +78,10 @@ async function fixture(deferredEncoding = false) {
     image,
     file,
     drawImage,
+    clip,
+    fillRect,
+    paths,
+    CapturePath,
     toBlob,
     encodedCanvases,
     createObjectURL,
@@ -84,7 +100,9 @@ async function fixture(deferredEncoding = false) {
 function numberInput(wrapper: Awaited<ReturnType<typeof fixture>>["wrapper"], label: string) {
   const input = wrapper
     .findAllComponents(InputNumber)
-    .find((candidate) => candidate.vm.$attrs["aria-label"] === label);
+    .find((candidate) =>
+      candidate.findAll("input").some((field) => field.attributes("aria-label") === label),
+    );
   expect(input).toBeDefined();
   return input!;
 }
@@ -128,6 +146,7 @@ describe("screen capture crop dialog", () => {
     expect(f.wrapper.emitted("confirm")![0]![0]).toBe(f.file);
     expect(f.toBlob).not.toHaveBeenCalled();
     expect(f.drawImage).not.toHaveBeenCalled();
+    expect(f.clip).not.toHaveBeenCalled();
   });
 
   test("maps a reverse drag on the scaled preview to real source pixels and exports that size", async () => {
@@ -159,7 +178,148 @@ describe("screen capture crop dialog", () => {
     expect(result).not.toBe(f.file);
     expect(result.name).toBe("screenshot.png");
     expect(result.type).toBe("image/png");
+    expect(f.clip).not.toHaveBeenCalled();
   });
+
+  test.each(["ellipse", "rounded"] as const)(
+    "clips and encodes the full image for %s instead of reusing the rectangular source File",
+    async (shape) => {
+      const f = await fixture(false, shape);
+      expect(cropValues(f.wrapper)).toEqual([0, 0, 1600, 900]);
+      confirm(f.wrapper);
+      await flushPromises();
+
+      expect(f.encodedCanvases).toHaveLength(1);
+      expect(f.encodedCanvases[0]).toMatchObject({ width: 1600, height: 900 });
+      expect(f.paths).toEqual([
+        captureShapePath(shape, { x: 0, y: 0, width: 1600, height: 900 }, []),
+      ]);
+      expect(f.clip).toHaveBeenCalledExactlyOnceWith(expect.any(f.CapturePath), "evenodd");
+      expect(f.clip.mock.invocationCallOrder[0]).toBeLessThan(
+        f.drawImage.mock.invocationCallOrder[0]!,
+      );
+      expect(f.fillRect).not.toHaveBeenCalled();
+      expect(f.toBlob).toHaveBeenCalledWith(expect.any(Function), "image/png");
+      expect(f.wrapper.emitted("confirm")).toHaveLength(1);
+      const result = f.wrapper.emitted("confirm")![0]![0] as File;
+      expect(result).not.toBe(f.file);
+      expect(result.type).toBe("image/png");
+    },
+  );
+
+  test.each(["ellipse", "rounded"] as const)(
+    "previews the %s crop in source coordinates and clips it at the output canvas origin",
+    async (shape) => {
+      const f = await fixture(false, shape);
+      await setNumber(f.wrapper, "Left (px)", 125);
+      await setNumber(f.wrapper, "Top (px)", 80);
+      await setNumber(f.wrapper, "Width (px)", 300);
+      await setNumber(f.wrapper, "Height (px)", 200);
+      const previewPath = captureShapePath(shape, { x: 125, y: 80, width: 300, height: 200 }, []);
+      expect(
+        f.wrapper.findAll("svg path").some((path) => path.attributes("d") === previewPath),
+      ).toBe(true);
+      confirm(f.wrapper);
+      await flushPromises();
+
+      expect(f.paths).toEqual([
+        captureShapePath(shape, { x: 0, y: 0, width: 300, height: 200 }, []),
+      ]);
+      expect(f.drawImage).toHaveBeenCalledExactlyOnceWith(
+        f.image.element,
+        125,
+        80,
+        300,
+        200,
+        0,
+        0,
+        300,
+        200,
+      );
+      expect(f.clip.mock.invocationCallOrder[0]).toBeLessThan(
+        f.drawImage.mock.invocationCallOrder[0]!,
+      );
+      expect(f.fillRect).not.toHaveBeenCalled();
+    },
+  );
+
+  test("does not insert a freehand crop until it has a usable traced region", async () => {
+    const f = await fixture(false, "freehand");
+    expect(f.wrapper.getComponent(Dialog).props("confirmBtn")).toMatchObject({ disabled: true });
+    confirm(f.wrapper);
+    await flushPromises();
+    expect(f.wrapper.emitted("confirm")).toBeUndefined();
+    expect(f.toBlob).not.toHaveBeenCalled();
+
+    pointer(f.image.element, "pointerdown", 200, 150);
+    pointer(window, "pointermove", 400, 150);
+    pointer(window, "pointermove", 400, 350);
+    pointer(window, "pointerup", 200, 150);
+    await nextTick();
+    expect(cropValues(f.wrapper)).toEqual([200, 200, 400, 400]);
+    expect(f.wrapper.getComponent(Dialog).props("confirmBtn")).toMatchObject({ disabled: false });
+    confirm(f.wrapper);
+    await flushPromises();
+
+    expect(f.paths).toHaveLength(1);
+    const coordinates = f.paths[0]!.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+    const points = Array.from({ length: coordinates.length / 2 }, (_, i) =>
+      coordinates.slice(i * 2, i * 2 + 2),
+    );
+    expect(points).toEqual(
+      expect.arrayContaining([
+        [0, 0],
+        [400, 0],
+        [400, 400],
+      ]),
+    );
+    expect(coordinates.every((value) => value >= 0 && value <= 400)).toBe(true);
+    expect(f.clip).toHaveBeenCalledExactlyOnceWith(expect.any(f.CapturePath), "evenodd");
+    expect(f.fillRect).not.toHaveBeenCalled();
+    expect(f.wrapper.emitted("confirm")).toHaveLength(1);
+    expect(f.encodedCanvases[0]).toMatchObject({ width: 400, height: 400 });
+  });
+
+  test("cancels an unfinished freehand trace without enabling insertion or encoding", async () => {
+    const f = await fixture(false, "freehand");
+    pointer(f.image.element, "pointerdown", 200, 150);
+    pointer(window, "pointermove", 400, 150);
+    pointer(window, "pointermove", 400, 350);
+    pointer(window, "pointercancel", 400, 350);
+    await nextTick();
+    expect(f.wrapper.getComponent(Dialog).props("confirmBtn")).toMatchObject({ disabled: true });
+    confirm(f.wrapper);
+    await flushPromises();
+    expect(f.toBlob).not.toHaveBeenCalled();
+    expect(f.clip).not.toHaveBeenCalled();
+    expect(f.wrapper.emitted("confirm")).toBeUndefined();
+  });
+
+  test("rejects a zero-area freehand trace even when its bounding rectangle has positive dimensions", async () => {
+    const f = await fixture(false, "freehand");
+    pointer(f.image.element, "pointerdown", 200, 150);
+    pointer(window, "pointermove", 300, 250);
+    pointer(window, "pointerup", 400, 350);
+    await nextTick();
+    expect(f.wrapper.getComponent(Dialog).props("confirmBtn")).toMatchObject({ disabled: true });
+    confirm(f.wrapper);
+    await flushPromises();
+    expect(f.toBlob).not.toHaveBeenCalled();
+    expect(f.wrapper.emitted("confirm")).toBeUndefined();
+  });
+
+  test.each(["ellipse", "rounded", "freehand"] as const)(
+    "closing the %s crop dialog does not write a captured image",
+    async (shape) => {
+      const f = await fixture(false, shape);
+      f.wrapper.getComponent(Dialog).vm.$emit("close");
+      expect(f.wrapper.emitted("close")).toEqual([[]]);
+      expect(f.wrapper.emitted("confirm")).toBeUndefined();
+      expect(f.drawImage).not.toHaveBeenCalled();
+      expect(f.clip).not.toHaveBeenCalled();
+      expect(f.toBlob).not.toHaveBeenCalled();
+    },
+  );
 
   test("edits the crop numerically in source pixels with integer dimensions", async () => {
     const f = await fixture();
