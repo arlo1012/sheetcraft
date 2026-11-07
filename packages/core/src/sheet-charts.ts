@@ -174,6 +174,14 @@ export function normalizeSheetChart(chart: SheetChart): SheetChart {
     if (!field || !("value" in field))
       throw new TypeError("Chart presentation must be an own data field, not an accessor.");
     presentation = normalizeChartPresentation(field.value);
+    if (presentation.pieStyle && chart.type !== "pie")
+      throw new RangeError("Pie subtypes require a pie chart.");
+    if (
+      (presentation.pieLabels || presentation.pieExploded) &&
+      chart.type !== "pie" &&
+      chart.type !== "doughnut"
+    )
+      throw new RangeError("Pie labels and explosion require a pie or doughnut chart.");
     if (presentation.bubbleShading && chart.type !== "bubble")
       throw new RangeError("Bubble shading requires a bubble chart.");
     if (presentation.scatterStyle !== undefined && chart.type !== "scatter")

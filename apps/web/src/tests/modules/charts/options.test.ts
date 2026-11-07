@@ -77,13 +77,23 @@ describe("chart options", () => {
       ],
     });
   });
-  test("omits negative and missing pie slices while retaining zero", () => {
+  test("plots negative pie slices by absolute value while retaining zero", () => {
+    const option = createChartOption(
+      { ...chart, type: "pie" },
+      { ...data, series: [{ name: "Sales", values: [-2, null, 0] }] },
+    );
+    const pie = (
+      option.series as Array<{ type: string; data: Array<{ name: string; value: number | "-" }> }>
+    )[0]!;
+    expect(pie.type).toBe("pie");
     expect(
-      createChartOption(
-        { ...chart, type: "pie" },
-        { ...data, series: [{ name: "Sales", values: [-2, null, 0] }] },
-      ),
-    ).toMatchObject({ series: [{ type: "pie", data: [{ name: "C", value: 0 }] }] });
+      pie.data
+        .filter((slice) => typeof slice.value === "number")
+        .map(({ name, value }) => ({ name, value })),
+    ).toEqual([
+      { name: "A", value: 2 },
+      { name: "C", value: 0 },
+    ]);
   });
   test("rejects cyclic Sankey links and preserves a valid directed graph", () => {
     expect(() =>

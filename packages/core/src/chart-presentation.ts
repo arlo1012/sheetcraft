@@ -1,6 +1,10 @@
 import { readPictureDataArray } from "./picture-data-array.js";
 
 export const scatterStyles = ["marker", "smoothMarker", "smooth", "lineMarker", "line"] as const;
+export const pieFamilies = ["pie", "threeD", "pieOfPie", "barOfPie", "doughnut"] as const;
+export type PieFamily = (typeof pieFamilies)[number];
+export type PieStyle = Exclude<PieFamily, "pie" | "doughnut">;
+export type PieLabel = "percent" | "categoryPercent";
 export type ScatterStyle = (typeof scatterStyles)[number];
 export function isScatterStyle(value: unknown): value is ScatterStyle {
   return scatterStyles.includes(value as ScatterStyle);
@@ -18,6 +22,9 @@ export type ChartPresentationSettings = {
   lineMarkers?: boolean;
   scatterStyle?: ScatterStyle;
   bubbleShading?: true;
+  pieStyle?: PieStyle;
+  pieLabels?: PieLabel;
+  pieExploded?: true;
   /** Start the series palette at this accent in the current workbook theme. */
   themeAccent?: number;
   /** Ordered opaque RGB colors, independent of source-series identities. */
@@ -31,6 +38,9 @@ const keys = [
   "lineMarkers",
   "scatterStyle",
   "bubbleShading",
+  "pieStyle",
+  "pieLabels",
+  "pieExploded",
   "themeAccent",
   "palette",
   "background",
@@ -85,6 +95,24 @@ export function normalizeChartPresentation(value: unknown): ChartPresentationSet
     if (source.bubbleShading !== true)
       throw new RangeError("Omit bubble shading for flat bubbles.");
     result.bubbleShading = true;
+  }
+  if (Object.hasOwn(source, "pieStyle")) {
+    if (
+      source.pieStyle !== "threeD" &&
+      source.pieStyle !== "pieOfPie" &&
+      source.pieStyle !== "barOfPie"
+    )
+      throw new RangeError("Unknown pie chart subtype.");
+    result.pieStyle = source.pieStyle;
+  }
+  if (Object.hasOwn(source, "pieLabels")) {
+    if (source.pieLabels !== "percent" && source.pieLabels !== "categoryPercent")
+      throw new RangeError("Unknown pie chart labels.");
+    result.pieLabels = source.pieLabels;
+  }
+  if (Object.hasOwn(source, "pieExploded")) {
+    if (source.pieExploded !== true) throw new RangeError("Omit pie explosion for joined sectors.");
+    result.pieExploded = true;
   }
   if (Object.hasOwn(source, "scatterStyle")) {
     if (!isScatterStyle(source.scatterStyle)) throw new RangeError("Unknown XY scatter style.");

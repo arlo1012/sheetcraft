@@ -1,3 +1,4 @@
+import { pieChartOption } from "./chart-pie";
 import { chartPlotSeries, bubbleSeries, bubbleFormats, isXYChart } from "./chart-bubble";
 import { specialtyOption } from "./chart-specialty-options";
 import { applyChartSeriesRenderOrder } from "./chart-series-render-order";
@@ -128,15 +129,24 @@ function buildChartOption(
     dimensions ?? { width: 480, height: 300 },
   );
   if (special) return special;
-  if (chart.type === "pie" || chart.type === "doughnut" || chart.type === "rose")
+  if (chart.type === "pie" || chart.type === "doughnut")
+    return pieChartOption(
+      chart,
+      data,
+      common,
+      palette,
+      dimensions ?? { width: 480, height: 300 },
+      plotBounds,
+    );
+  if (chart.type === "rose")
     return {
       ...common,
       series: [
         {
           type: "pie",
           ...plotBounds,
-          ...(chart.type === "rose" ? { roseType: "radius" as const } : {}),
-          radius: chart.type === "doughnut" ? ["35%", "65%"] : "65%",
+          roseType: "radius",
+          radius: "65%",
           center: ["50%", "50%"],
           label: { show: chart.labels },
           data: data.categories.flatMap((name, index) => {
@@ -494,6 +504,7 @@ export function createChartOption(
   };
   if (Array.isArray(option.series))
     option.series = option.series.map((series, index) => {
+      if (chart.type === "pie" || chart.type === "doughnut") return series;
       const format = plotted[index]?.numberFormat;
       if (!format && chart.type !== "radar" && chart.type !== "bubble" && !percent && !customLabels)
         return series;

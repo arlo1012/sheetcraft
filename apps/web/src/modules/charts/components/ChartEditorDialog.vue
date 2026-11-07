@@ -28,9 +28,12 @@ import {
 import ChartContent from "./ChartContent.vue";
 import ChartTypeNavigation from "./ChartTypeNavigation.vue";
 import BubbleThumbnail from "./BubbleThumbnail.vue";
+import PieThumbnail from "./PieThumbnail.vue";
 import ScatterThumbnail from "./ScatterThumbnail.vue";
 import {
   scatterStyles,
+  pieFamilies,
+  type PieFamily,
   DEFAULT_CHART_PALETTE,
   rotateChartPalette,
   type ScatterStyle,
@@ -40,6 +43,8 @@ import ChartComboControls from "./ChartComboControls.vue";
 import {
   applyChartDesignIntent,
   changeChartType,
+  changePieFamily,
+  pieChartFamily,
   getChartVariant,
   isCommonChartType,
   type ChartDesignIntent,
@@ -106,6 +111,11 @@ function selectScatterStyle(style: ScatterStyle) {
     ...draft.value.chart,
     presentation: { ...draft.value.chart.presentation, scatterStyle: style },
   });
+}
+function selectPieFamily(family: PieFamily) {
+  if (props.disabled || (draft.value.chart.type !== "pie" && draft.value.chart.type !== "doughnut"))
+    return;
+  draft.value.chart = changePieFamily(draft.value.chart, family);
 }
 function selectBubbleShading(shaded: boolean) {
   if (props.disabled || draft.value.chart.type !== "bubble") return;
@@ -317,6 +327,8 @@ function typeDisabled(type: ChartType): boolean {
 }
 const selectedSubtype = computed(() => {
   const type = commonType.value;
+  if (draft.value.chart.type === "pie" || draft.value.chart.type === "doughnut")
+    return t(`chart.pie.${pieChartFamily(draft.value.chart)}`);
   if (draft.value.chart.type === "bubble")
     return t(
       draft.value.chart.presentation?.bubbleShading ? "chart.bubbleShaded" : "chart.bubbleFlat",
@@ -460,6 +472,26 @@ function onDialogKeydown(event: KeyboardEvent): void {
               @click="selectScatterStyle(style)"
             >
               <ScatterThumbnail :colors="scatterColors" :variant="style" />
+            </button>
+          </div>
+          <div
+            v-else-if="draft.chart.type === 'pie' || draft.chart.type === 'doughnut'"
+            class="scatter-variants"
+            role="group"
+            :aria-label="t('chart.subtypes')"
+          >
+            <button
+              v-for="family in pieFamilies"
+              :key="family"
+              type="button"
+              :disabled="disabled"
+              :aria-pressed="pieChartFamily(draft.chart) === family"
+              :data-pie-variant="family"
+              :aria-label="t(`chart.pie.${family}`)"
+              :title="t(`chart.pie.${family}`)"
+              @click="selectPieFamily(family)"
+            >
+              <PieThumbnail :family="family" :colors="scatterColors" />
             </button>
           </div>
           <div

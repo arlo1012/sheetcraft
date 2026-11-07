@@ -5,7 +5,6 @@ import {
   ChartLine,
   ChartBar,
   ChartArea,
-  ChartPie,
   ChartNetwork,
   ChartNoAxesCombined,
   LayoutDashboard,
@@ -16,6 +15,7 @@ import type {
   ChartInsertIntent,
   CommonChartType,
 } from "../chart-design-intents";
+import PieInsertMenu from "./PieInsertMenu.vue";
 import ScatterInsertMenu from "./ScatterInsertMenu.vue";
 import ChartSubtypeControls from "./ChartSubtypeControls.vue";
 import GallerySection from "../../../shared/gallery/GallerySection.vue";
@@ -175,13 +175,11 @@ function insert(type: ChartType) {
         @menu-keydown="commonKeydown('area', $event)"
         ><ChartArea
       /></RibbonSplitButton>
-      <RibbonButton
-        :label="t('chart.pie')"
-        :text="t('chart.pie')"
+      <PieInsertMenu
         :disabled="disabled"
-        @activate="emit('insert', 'pie')"
-        ><ChartPie
-      /></RibbonButton>
+        :theme-colors="themeColors"
+        @insert="emit('insert', $event)"
+      />
       <ScatterInsertMenu
         :disabled="disabled"
         :theme-colors="themeColors"

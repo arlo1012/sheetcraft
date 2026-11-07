@@ -37,6 +37,7 @@ import {
   applyChartDesignIntent,
   normalizeChartInsertIntent,
   applyScatterInsertChoice,
+  applyPieInsertChoice,
   type ChartInsertIntent,
 } from "./chart-design-intents";
 
@@ -217,6 +218,9 @@ export function useChartActions(options: {
         headerColumn: type !== "scatter" && type !== "bubble",
         seriesBy: "columns",
         legend: true,
+        ...(type === "pie" || type === "doughnut"
+          ? { elements: { legendPosition: "right" as const } }
+          : {}),
         labels: false,
         stacked: false,
         showHidden: false,
@@ -256,6 +260,8 @@ export function useChartActions(options: {
       });
       drawing.chart.labels = request.labels;
       drawing.chart.presentation = { ...drawing.chart.presentation, animated: true };
+    } else if (typeof request !== "string" && "pieFamily" in request) {
+      drawing.chart = applyPieInsertChoice(drawing.chart, request);
     } else if (typeof request !== "string" && "scatterStyle" in request) {
       drawing.chart = applyScatterInsertChoice(drawing.chart, request);
     } else if (typeof request !== "string")

@@ -121,6 +121,7 @@ function canvas2D(document: Document, width: number, height: number) {
 
 function printOption(
   option: EChartsOption,
+  drawing: SheetChartDrawing,
   resolveFontFamily: ((original: string) => string) | undefined,
 ): EChartsOption {
   // Match installed ECharts 6.1 globalDefault for options without textStyle.
@@ -183,6 +184,10 @@ function printOption(
         return { ...entry, ...noninteractive, progressive: 0, label: withFamily(entry.label) };
       case "line":
         return { ...entry, ...noninteractive, label: withFamily(entry.label) };
+      case "custom":
+        if (drawing.chart.type !== "pie")
+          throw new RangeError("Unsupported native chart print series.");
+        return { ...entry, ...noninteractive };
       case "pie":
         return { ...entry, ...noninteractive, label: withFamily(entry.label) };
       case "radar":
@@ -313,6 +318,7 @@ export function renderChartPrintPresentation(
       ? undefined
       : printOption(
           createChartOption(drawing.chart, data, options, options.comboSeriesChanges),
+          drawing,
           options.resolveFontFamily,
         );
   const table = createChartDataTablePlan(drawing.chart, data, options, options.comboSeriesChanges);

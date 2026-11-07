@@ -1,7 +1,10 @@
+import { pieCards } from "./chart-pie-cards";
 import {
   isScatterStyle,
   rotateChartPalette,
   DEFAULT_CHART_PALETTE,
+  pieFamilies,
+  type PieFamily,
   type ScatterStyle,
 } from "@sheetcraft/core/chart-presentation";
 import {
@@ -38,7 +41,14 @@ export type ScatterInsertChoice = {
   accent: number;
   followTheme: boolean;
 };
+export type PieInsertChoice = {
+  type: "pie" | "doughnut";
+  pieFamily: PieFamily;
+  card: number;
+  followTheme: boolean;
+};
 export type ChartInsertIntent =
+  | PieInsertChoice
   | ScatterInsertChoice
   | ChartType
   | { type: CommonChartType; variant: ChartVariant }
@@ -86,6 +96,20 @@ export function normalizeChartInsertIntent(value: unknown): ChartInsertIntent {
     if (!chartTypes.includes(value as ChartType))
       throw new RangeError("Unknown chart insertion type.");
     return value as ChartType;
+  }
+  if (value && typeof value === "object" && Object.hasOwn(value, "pieFamily")) {
+    const data = dataRecord(value, ["type", "pieFamily", "card", "followTheme"]);
+    if (
+      !pieFamilies.includes(data.pieFamily as PieFamily) ||
+      data.type !== (data.pieFamily === "doughnut" ? "doughnut" : "pie") ||
+      typeof data.card !== "number" ||
+      !Number.isInteger(data.card) ||
+      data.card < 0 ||
+      data.card >= pieCards.length ||
+      typeof data.followTheme !== "boolean"
+    )
+      throw new RangeError("Invalid pie insertion choice.");
+    return data as PieInsertChoice;
   }
   if (value && typeof value === "object" && Object.hasOwn(value, "scatterStyle")) {
     const data = dataRecord(value, ["type", "scatterStyle", "accent", "followTheme"]);
@@ -137,6 +161,33 @@ export function applyScatterInsertChoice(
   }
   return normalizeSheetChart({ ...chart, presentation });
 }
+export function pieChartFamily(chart: SheetChart): PieFamily {
+  return chart.type === "doughnut" ? "doughnut" : (chart.presentation?.pieStyle ?? "pie");
+}
+export function changePieFamily(chart: SheetChart, family: PieFamily): SheetChart {
+  const next = changeChartType(chart, family === "doughnut" ? "doughnut" : "pie");
+  const presentation = { ...next.presentation };
+  if (family === "pie" || family === "doughnut") delete presentation.pieStyle;
+  else presentation.pieStyle = family;
+  return normalizeSheetChart({ ...next, presentation });
+}
+export function applyPieInsertChoice(chart: SheetChart, choice: PieInsertChoice): SheetChart {
+  const next = changePieFamily(chart, choice.pieFamily);
+  const presentation = { ...next.presentation };
+  const card = pieCards[choice.card]!;
+  if (choice.followTheme) {
+    delete presentation.palette;
+    presentation.themeAccent = choice.card % 6;
+  } else {
+    delete presentation.themeAccent;
+    presentation.palette = [...card.colors];
+  }
+  if (card.labels !== "none") presentation.pieLabels = card.labels;
+  else delete presentation.pieLabels;
+  if (card.exploded) presentation.pieExploded = true;
+  else delete presentation.pieExploded;
+  return normalizeSheetChart({ ...next, labels: card.labels !== "none", presentation });
+}
 /** Existing line charts retain their marker-on default until an explicit choice. */
 export function getChartVariant(chart: SheetChart): ChartVariant | undefined {
   if (!isCommonChartType(chart.type)) return undefined;
@@ -167,6 +218,11 @@ export function changeChartType(chart: SheetChart, type: ChartType): SheetChart 
     if (!isCommonChartType(type)) delete next.presentation.percentStacked;
     if (type !== "line") delete next.presentation.lineMarkers;
     if (type !== "scatter") delete next.presentation.scatterStyle;
+    if (type !== "pie") delete next.presentation.pieStyle;
+    if (type !== "pie" && type !== "doughnut") {
+      delete next.presentation.pieLabels;
+      delete next.presentation.pieExploded;
+    }
     if (type !== "bubble") delete next.presentation.bubbleShading;
     if (!Object.keys(next.presentation).length) delete next.presentation;
   }
