@@ -260,7 +260,7 @@ type AxisContextMenuState = {
 type CellContextMenuState = {
   anchor: FloatingReference;
   imageAddress?: CellAddress;
-  noteAddress: CellAddress;
+  address: CellAddress;
 };
 
 const CLIPBOARD_MESSAGE_KEYS: Record<GridClipboardFeedback, MessageKey> = {
@@ -530,6 +530,8 @@ const emit = defineEmits<{
   editErrorInFormulaBar: [];
   errorCheckOptions: [];
   openHyperlink: [address: CellAddress];
+  editHyperlink: [];
+  removeHyperlink: [address: CellAddress];
   "update:zoom": [zoom: number];
 }>();
 
@@ -3671,7 +3673,7 @@ function openCellContextMenu(address: CellAddress, event: MouseEvent): void {
       getCellContent(props.sheet, layout.value.getAnchorForAddress(address))?.kind === "image"
         ? layout.value.getAnchorForAddress(address)
         : undefined,
-    noteAddress,
+    address: noteAddress,
     anchor: markRaw(createContextMenuPoint(event, rootRef.value ?? contextElement ?? undefined)),
   };
 }
@@ -3696,7 +3698,7 @@ function openActiveCellContextMenu(): void {
       getCellContent(props.sheet, activeCell.value)?.kind === "image"
         ? { ...activeCell.value }
         : undefined,
-    noteAddress,
+    address: noteAddress,
     anchor: markRaw(createContextMenuPoint({ clientX: x, clientY: y }, scroller)),
   };
 }
@@ -3814,9 +3816,30 @@ function requestCellImageAction(action: "preview" | "float"): void {
   }
 }
 
+const hyperlinkEditDisabled = computed(
+  () =>
+    (props.readOnly && !props.sheet.properties.protected) ||
+    !canUseSheetPermission(props.sheet, "insertHyperlinks"),
+);
+function requestCellHyperlink(action: "edit" | "open" | "remove"): void {
+  const address = cellContextMenu.value?.address;
+  cellContextMenu.value = undefined;
+  if (!address) return;
+  if (action === "open") {
+    emit("openHyperlink", address);
+    return;
+  }
+  if (hyperlinkEditDisabled.value) return;
+  setActiveCell(address);
+  if (action === "edit") emit("editHyperlink");
+  else {
+    emit("removeHyperlink", address);
+    focusEditor();
+  }
+}
 function requestCellNote(action: "edit" | "delete"): void {
   if (objectsReadOnly.value) return;
-  const address = cellContextMenu.value?.noteAddress;
+  const address = cellContextMenu.value?.address;
   cellContextMenu.value = undefined;
   if (!address) return;
   if (action === "edit") emit("editNote", address);
@@ -3837,11 +3860,11 @@ function requestCellClear(): void {
 
 const contextPivotDetails = computed(() =>
   props.sheet.pivotTables?.find((table) =>
-    isPivotValueCell(table, cellContextMenu.value?.noteAddress ?? activeCell.value),
+    isPivotValueCell(table, cellContextMenu.value?.address ?? activeCell.value),
   ),
 );
 const contextPivotGroup = computed(() => {
-  const address = cellContextMenu.value?.noteAddress ?? activeCell.value;
+  const address = cellContextMenu.value?.address ?? activeCell.value;
   for (const table of props.sheet.pivotTables ?? []) {
     const active = getPivotActiveField(table, [], address);
     if (active?.area === "rows" || active?.area === "columns") {
@@ -3861,7 +3884,7 @@ function requestPivotGroup(ungroup = false): void {
 }
 function requestPivotDetails(): void {
   const table = contextPivotDetails.value;
-  const address = cellContextMenu.value?.noteAddress;
+  const address = cellContextMenu.value?.address;
   if (table && address) emit("showPivotDetails", table.id, address);
   closeCellContextMenu(false);
 }
@@ -5048,6 +5071,9 @@ defineExpose({
     <SheetCellContextMenu
       v-if="cellContextMenu"
       :anchor="cellContextMenu.anchor"
+      :has-hyperlink="!!getCellHyperlink(sheet, cellContextMenu.address)"
+      :hyperlink-disabled="hyperlinkEditDisabled"
+      @hyperlink="requestCellHyperlink"
       :state="contextMenuState"
       :sheet="sheet"
       :range="selectedRange"
@@ -5081,9 +5107,7 @@ defineExpose({
       "
       :has-note="
         Boolean(
-          sheet.cells.get(
-            `${cellContextMenu.noteAddress.row}:${cellContextMenu.noteAddress.column}`,
-          )?.note,
+          sheet.cells.get(`${cellContextMenu.address.row}:${cellContextMenu.address.column}`)?.note,
         )
       "
       :read-only="readOnly"

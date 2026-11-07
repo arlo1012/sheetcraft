@@ -18,6 +18,8 @@ import {
   Filter,
   FunnelX,
   Image as ImageIcon,
+  Link,
+  Unlink,
   ListChecks,
   ListMinus,
   MessageSquarePlus,
@@ -62,6 +64,8 @@ const props = withDefaults(
     groupPivotField?: boolean;
     ungroupPivotField?: boolean;
     hasNote?: boolean;
+    hasHyperlink?: boolean;
+    hyperlinkDisabled?: boolean;
     readOnly?: boolean;
     contentReadOnly?: boolean;
     state?: SheetContextMenuState;
@@ -88,6 +92,7 @@ const emit = defineEmits<{
   previewImage: [];
   editNote: [];
   deleteNote: [];
+  hyperlink: [action: "edit" | "open" | "remove"];
   clear: [];
   action: [action: SheetContextAction];
   close: [restoreFocus: boolean];
@@ -345,6 +350,21 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
           ><template #icon><MessageSquareX :size="16" /></template
           >{{ t("review.deleteNotes") }}</MenuItem
         >
+        <MenuSeparator />
+        <MenuItem v-if="hasHyperlink" @select="emit('hyperlink', 'open')">
+          <template #icon><MoveUpRight :size="16" /></template>{{ t("hyperlinks.open") }}
+        </MenuItem>
+        <MenuItem :disabled="hyperlinkDisabled" @select="emit('hyperlink', 'edit')">
+          <template #icon><Link :size="16" /></template
+          >{{ t(hasHyperlink ? "hyperlinks.edit" : "hyperlinks.insert") }}
+        </MenuItem>
+        <MenuItem
+          v-if="hasHyperlink"
+          :disabled="hyperlinkDisabled"
+          @select="emit('hyperlink', 'remove')"
+        >
+          <template #icon><Unlink :size="16" /></template>{{ t("hyperlinks.remove") }}
+        </MenuItem>
         <MenuSeparator />
         <MenuItem
           data-cell-action="format-painter"

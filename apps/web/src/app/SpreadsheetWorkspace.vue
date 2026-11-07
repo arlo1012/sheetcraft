@@ -6339,6 +6339,8 @@ watch(
       :key="hyperlinkDialog.dialogId"
       :draft="hyperlinkDialog.initial"
       :error="hyperlinkError"
+      :names="hyperlinkActions.names.value"
+      :recent-emails="hyperlinkActions.recentEmails.value"
       :current-sheet-name="activeSheet.name"
       :sheets="
         [...session.workbook.sheets.values()]
@@ -6647,6 +6649,8 @@ watch(
           @filter-column-request="dataTools.openColumnFilter($event)"
           @table-expand-request="tableActions.expandTable"
           @open-hyperlink="hyperlinkActions.open"
+          @edit-hyperlink="hyperlinkActions.edit"
+          @remove-hyperlink="hyperlinkActions.removeFromMenu"
           @edit-note="reviewActions.edit($event)"
           @save-note="reviewActions.save"
           @cancel-note="reviewActions.close(false)"

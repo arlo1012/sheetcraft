@@ -2,6 +2,19 @@ import { quoteFormulaSheetName } from "../../shared/formula-editing/formula-inpu
 
 export type HyperlinkKind = "web" | "location" | "email";
 
+export function isCloudShareUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      /(^|\.)(kdocs\.cn|wps\.cn|wps\.com)$/i.test(url.hostname) &&
+      /^\/l\/[^/]+/.test(url.pathname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function readHyperlinkTarget(target: string, currentSheetName: string) {
   const value = target.trim();
   const kind: HyperlinkKind = value.startsWith("#")

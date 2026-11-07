@@ -17,6 +17,8 @@ import {
 } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../shared/i18n";
 import { resolveRangeReference } from "../../shared/range-reference/formatRangeReference";
+import { readHyperlinkTarget } from "./hyperlink-target";
+import { loadRecentEmailAddresses, rememberEmailAddress } from "./recent-email-addresses";
 
 export type HyperlinkInput = { target: string; displayText: string; tooltip: string };
 export type HyperlinkDraft = HyperlinkInput & { hasLink: boolean; canEditDisplay: boolean };
@@ -48,6 +50,23 @@ export function useHyperlinksController(options: {
   const dialog = shallowRef<HyperlinkDialogTarget>();
   const draft = computed(() => dialog.value?.initial);
   const error = ref("");
+  const recentEmails = ref(loadRecentEmailAddresses());
+  const names = computed(() => {
+    const owner = dialog.value;
+    if (!owner) return [];
+    const workbook = owner.workbook;
+    const sheetId = owner.sheet.id;
+    const visible = new Map<string, string>();
+    for (const entry of workbook.definedNames.values()) {
+      if (entry.scopeSheetId !== undefined && entry.scopeSheetId !== sheetId) continue;
+      const key = entry.name.toLowerCase();
+      if (entry.scopeSheetId === sheetId || !visible.has(key)) visible.set(key, entry.name);
+    }
+    return [...visible.values()].filter((name) => {
+      const ref = resolveRangeReference(workbook, name, sheetId);
+      return ref && !workbook.sheets.get(ref.sheetId)?.properties.hidden;
+    });
+  });
   let dialogSequence = 0;
   const isCurrent = (target: HyperlinkDialogTarget) =>
     dialog.value === target &&
@@ -165,20 +184,37 @@ export function useHyperlinksController(options: {
         error.value = t("hyperlinks.failed");
         return;
       }
+      if (/^mailto:/i.test(address)) {
+        const { emailAddress } = readHyperlinkTarget(address, sheet.name);
+        recentEmails.value = rememberEmailAddress(recentEmails.value, emailAddress);
+      }
       close(target);
     } catch {
       if (isCurrent(target)) error.value = t("hyperlinks.failed");
     }
   }
 
+  function clearLink(sheet: Sheet, address: CellAddress): boolean {
+    return options.execute(createSetCellHyperlinkCommand(sheet.id, address, null));
+  }
+  function removeFromMenu(address: CellAddress): void {
+    if (options.isBusy() || !options.finishEditing()) return;
+    const sheet = options.getSheet();
+    if (!canUseSheetPermission(sheet, "insertHyperlinks") || !getCellHyperlink(sheet, address))
+      return;
+    try {
+      if (clearLink(sheet, address)) return;
+    } catch {
+      /* Give the same feedback for a refused or failed command. */
+    }
+    void MessagePlugin.error(t("hyperlinks.failed"));
+  }
   function remove(target = dialog.value): void {
     if (!target || !isCurrent(target) || options.isBusy()) return;
     const sheet = target.sheet;
     if (!canUseSheetPermission(sheet, "insertHyperlinks")) return;
     try {
-      const accepted = options.execute(
-        createSetCellHyperlinkCommand(sheet.id, target.address, null),
-      );
+      const accepted = clearLink(sheet, target.address);
       if (!isCurrent(target)) return;
       if (!accepted) {
         error.value = t("hyperlinks.failed");
@@ -212,5 +248,17 @@ export function useHyperlinksController(options: {
     }
   }
 
-  return { dialog, draft, error, edit, save, remove, open, close };
+  return {
+    dialog,
+    draft,
+    error,
+    names,
+    recentEmails,
+    edit,
+    save,
+    remove,
+    removeFromMenu,
+    open,
+    close,
+  };
 }

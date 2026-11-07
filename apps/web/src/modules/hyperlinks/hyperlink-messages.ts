@@ -5,6 +5,14 @@ export type HyperlinkMessageSchema = {
     displayText: string;
     address: string;
     web: string;
+    cloud: string;
+    cloudAddress: string;
+    linkTo: string;
+    definedNames: string;
+    recentEmails: string;
+    tipTitle: string;
+    tipText: string;
+    webHint: string;
     location: string;
     email: string;
     sheet: string;
