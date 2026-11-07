@@ -384,7 +384,8 @@ function choose(kind: DashboardKind) {
       <p v-if="failed" role="alert">{{ t("dashboard.error") }}</p>
     </div>
     <Dialog
-      :visible="adding"
+      v-if="adding"
+      :visible="true"
       :header="t('dashboard.add')"
       width="460px"
       :footer="false"
