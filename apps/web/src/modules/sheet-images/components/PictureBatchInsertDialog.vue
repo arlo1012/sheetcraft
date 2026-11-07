@@ -164,6 +164,9 @@ function confirm(): void {
   <Dialog
     :visible="true"
     :header="t('image.batchInsert')"
+    :aria-label="t('image.batchInsert')"
+    role="dialog"
+    aria-modal="true"
     width="min(680px, calc(100vw - 32px))"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
@@ -179,7 +182,9 @@ function confirm(): void {
     @close="emit('close')"
   >
     <div class="picture-batch-insert">
-      <p>{{ t(mode === "cell" ? "image.batchCellHint" : "image.batchFloatingHint") }}</p>
+      <p v-if="!matchActive">
+        {{ t(mode === "cell" ? "image.batchCellHint" : "image.batchFloatingHint") }}
+      </p>
       <Form
         label-align="right"
         :label-width="locale === 'zh-CN' ? 144 : 192"

@@ -1845,7 +1845,7 @@ export const zhCN = {
     batchNameBelow: "图片下方",
     batchNameLeft: "图片左列",
     batchNameRight: "图片右列",
-    batchFitCellsHint: "图片按比例放入目标单元格，名称写入相邻单元格。",
+    batchFitCellsHint: "图片按比例放入目标单元格。",
     batchPerRow: "每行固定张数",
     batchPerColumn: "每列固定张数",
     batchUp: "上移",

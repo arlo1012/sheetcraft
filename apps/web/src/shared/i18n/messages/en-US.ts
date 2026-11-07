@@ -1895,8 +1895,7 @@ export const enUS = {
     batchNameBelow: "Below pictures",
     batchNameLeft: "Left of pictures",
     batchNameRight: "Right of pictures",
-    batchFitCellsHint:
-      "Pictures fit the destination cells proportionally; names go in adjacent cells.",
+    batchFitCellsHint: "Pictures fit the destination cells proportionally.",
     batchPerRow: "Pictures per row",
     batchPerColumn: "Pictures per column",
     batchUp: "Up",
