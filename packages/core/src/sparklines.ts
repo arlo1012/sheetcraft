@@ -24,6 +24,7 @@ export type CellSparkline = {
   negativeColor: string;
   markers: boolean;
   axis: boolean;
+  rightToLeft?: boolean;
   minAxis?: SparklineAxisLimit;
   maxAxis?: SparklineAxisLimit;
   showHidden: boolean;
@@ -39,6 +40,8 @@ export function normalizeCellSparkline(
   value: CellSparkline | null | undefined,
 ): CellSparkline | undefined {
   if (value == null) return undefined;
+  if (value.rightToLeft !== undefined && typeof value.rightToLeft !== "boolean")
+    throw new RangeError("Invalid sparkline direction.");
   for (const limit of [value.minAxis, value.maxAxis]) {
     if (
       limit !== undefined &&
@@ -112,6 +115,7 @@ export function normalizeCellSparkline(
     negativeColor: value.negativeColor,
     markers: value.markers,
     axis: value.axis,
+    ...(value.rightToLeft !== undefined ? { rightToLeft: value.rightToLeft } : {}),
     ...(value.minAxis
       ? {
           minAxis:

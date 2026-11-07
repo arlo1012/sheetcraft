@@ -171,7 +171,7 @@ describe("native XLSX sparkline point styles", () => {
     expect(omissionLocations(decoded)).not.toContain(location);
   });
 
-  test.each(['dateAxis="1"', 'rightToLeft="1"'])(
+  test.each(['dateAxis="1"'])(
     "still reports unsupported %s while retaining supported point styles",
     async (axisAttribute) => {
       const entries = await nativeArchive(

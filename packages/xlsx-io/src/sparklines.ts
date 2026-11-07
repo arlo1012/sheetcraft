@@ -80,6 +80,8 @@ export function writeXlsxSparklines(entries: Unzipped, sheets: readonly Sheet[])
             : "";
         })
         .join("");
+      const directionAttribute =
+        spark.rightToLeft === undefined ? "" : ` rightToLeft="${Number(spark.rightToLeft)}"`;
       const pointAttributes = pointFields
         .filter(([field]) => spark[field] !== undefined)
         .map(([field, attribute]) => ` ${attribute}="${Number(spark[field]!.show)}"`)
@@ -89,7 +91,7 @@ export function writeXlsxSparklines(entries: Unzipped, sheets: readonly Sheet[])
         .map(([field, , element]) => colorElement(element, spark[field]!.color))
         .join("");
       const negative = spark.negativePoints ?? (spark.type !== "line" || spark.markers);
-      return `<x14:sparklineGroup type="${spark.type === "winLoss" ? "stacked" : spark.type}" displayEmptyCellsAs="${spark.empty === "connect" ? "span" : spark.empty}" markers="${Number(spark.markers)}" negative="${Number(negative)}" displayXAxis="${Number(spark.axis)}" displayHidden="${Number(spark.showHidden)}"${axisAttributes}${pointAttributes}>${colorElement("colorSeries", spark.color)}${colorElement("colorNegative", spark.negativeColor)}${colorElement("colorAxis", "#a3a3a3")}${colorElement("colorMarkers", spark.markerColor ?? spark.color)}${pointColors}<x14:sparklines>${members.join("")}</x14:sparklines></x14:sparklineGroup>`;
+      return `<x14:sparklineGroup type="${spark.type === "winLoss" ? "stacked" : spark.type}" displayEmptyCellsAs="${spark.empty === "connect" ? "span" : spark.empty}" markers="${Number(spark.markers)}" negative="${Number(negative)}" displayXAxis="${Number(spark.axis)}" displayHidden="${Number(spark.showHidden)}"${axisAttributes}${directionAttribute}${pointAttributes}>${colorElement("colorSeries", spark.color)}${colorElement("colorNegative", spark.negativeColor)}${colorElement("colorAxis", "#a3a3a3")}${colorElement("colorMarkers", spark.markerColor ?? spark.color)}${pointColors}<x14:sparklines>${members.join("")}</x14:sparklines></x14:sparklineGroup>`;
     });
     if (!groups.length) return;
     const xml = strFromU8(entries[part]!);
@@ -182,13 +184,16 @@ export function readXlsxSparklines(
               : {}),
             ...points,
             ...limits,
+            ...(attr(attributes, "rightToLeft") !== undefined
+              ? { rightToLeft: flag("rightToLeft") }
+              : {}),
             markers: flag("markers"),
             axis: flag("displayXAxis"),
             showHidden: flag("displayHidden"),
             empty: empty === "span" ? "connect" : (empty as CellSparkline["empty"]),
           })!;
           result.set(reference.toUpperCase(), sparkline);
-          if (["dateAxis", "rightToLeft"].some(flag)) omitted?.(index, reference);
+          if (flag("dateAxis")) omitted?.(index, reference);
         } catch {
           omitted?.(index, reference);
         }

@@ -57,6 +57,7 @@ function comparable(value: CellSparkline, key: keyof CellSparkline): unknown {
   if (key === "negativePoints")
     return value.negativePoints ?? (value.type !== "line" || value.markers);
   if (key === "markerColor") return value.markerColor ?? value.color;
+  if (key === "rightToLeft") return value.rightToLeft ?? false;
   if (key === "minAxis" || key === "maxAxis") return value[key] ?? { type: "individual" };
   return value[key];
 }
@@ -94,6 +95,7 @@ export function useSparklineTools(options: {
       "negativeColor",
       "markers",
       "axis",
+      "rightToLeft",
       "minAxis",
       "maxAxis",
       "showHidden",

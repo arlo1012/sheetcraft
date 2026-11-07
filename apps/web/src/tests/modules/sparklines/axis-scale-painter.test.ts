@@ -26,9 +26,18 @@ function paint(
 ) {
   const clips: Rect[] = [];
   const visibleBars: Rect[] = [];
+  const pointColors: string[] = [],
+    barColors: string[] = [];
+  let fillStyle = "#000000";
   let pending: Rect | undefined;
   let activeClip: Rect | undefined;
   const context = {
+    get fillStyle() {
+      return fillStyle;
+    },
+    set fillStyle(value: string) {
+      fillStyle = value;
+    },
     save: vi.fn(),
     restore: vi.fn(),
     beginPath: vi.fn(() => {
@@ -46,8 +55,11 @@ function paint(
     lineTo: vi.fn(),
     stroke: vi.fn(),
     arc: vi.fn(),
-    fill: vi.fn(),
+    fill: vi.fn(() => {
+      pointColors.push(fillStyle);
+    }),
     fillRect: vi.fn((x: number, y: number, width: number, height: number) => {
+      barColors.push(fillStyle);
       const raw = { x, y, width, height };
       const visible = activeClip ? intersection(raw, activeClip) : raw;
       if (visible.width > 0 && visible.height > 0) visibleBars.push(visible);
@@ -65,7 +77,7 @@ function paint(
     ...patch,
   };
   paintSparkline(context as unknown as CanvasRenderingContext2D, cell, definition, values, scale);
-  return { context, clips, visibleBars };
+  return { context, clips, visibleBars, pointColors, barColors };
 }
 
 describe("sparkline painter axis scales", () => {
@@ -187,5 +199,51 @@ describe("sparkline painter axis scales", () => {
       [20, 23, 36, 20],
       [70, 43, 36, 20],
     ]);
+  });
+});
+
+describe("sparkline right-to-left coordinates", () => {
+  test.each(["line", "column", "winLoss"] as const)(
+    "mirrors only %s horizontal placement while retaining value and color order",
+    (type) => {
+      const values = [2, -1, 4];
+      const scale = { min: -2, max: 6 };
+      const left = paint(values, { type, markers: true, rightToLeft: false }, scale);
+      const right = paint(values, { type, markers: true, rightToLeft: true }, scale);
+      if (type === "line") {
+        expect(left.context.arc.mock.calls.map(([x]) => x)).toEqual([13, 63, 113]);
+        expect(right.context.arc.mock.calls.map(([x]) => x)).toEqual([113, 63, 13]);
+        expect(right.context.arc.mock.calls.map(([, y]) => y)).toEqual([43, 58, 33]);
+        expect(right.context.arc.mock.calls.map(([, y]) => y)).toEqual(
+          left.context.arc.mock.calls.map(([, y]) => y),
+        );
+        expect(right.pointColors).toEqual(left.pointColors);
+      } else {
+        const original = left.context.fillRect.mock.calls;
+        const mirrored = right.context.fillRect.mock.calls;
+        expect(mirrored).toHaveLength(3);
+        for (let index = 0; index < 3; index++) {
+          const source = original[index]!,
+            target = mirrored[index]!;
+          expect(target[0] + target[2] / 2).toBeCloseTo(126 - (source[0] + source[2] / 2));
+          expect(target.slice(1)).toEqual(source.slice(1));
+        }
+        expect(right.barColors).toEqual(left.barColors);
+      }
+      expect(values).toEqual([2, -1, 4]);
+    },
+  );
+
+  test("keeps first and last styling attached to the original non-null source positions", () => {
+    const result = paint([null, 4, null, 2, null], {
+      rightToLeft: true,
+      firstPoint: { show: true, color: "#aa0000" },
+      lastPoint: { show: true, color: "#0000aa" },
+    });
+    expect(result.context.arc.mock.calls.map(([x, y]) => [x, y])).toEqual([
+      [88, 23],
+      [38, 63],
+    ]);
+    expect(result.pointColors).toEqual(["#aa0000", "#0000aa"]);
   });
 });

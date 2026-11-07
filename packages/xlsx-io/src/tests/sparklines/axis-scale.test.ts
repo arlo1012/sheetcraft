@@ -201,3 +201,32 @@ describe("native XLSX sparkline axis scales", () => {
     expect(omissions(decoded)).not.toContain(location);
   });
 });
+
+describe("native XLSX sparkline direction", () => {
+  test.each([true, false])(
+    "writes and imports explicit rightToLeft=%s without an omission",
+    async (rightToLeft) => {
+      const f = fixture(definition({ rightToLeft }));
+      const encoded = await encodeXlsx(f.workbook);
+      const entries = unzipSync(encoded.bytes);
+      expect(strFromU8(entries[part]!)).toContain(`rightToLeft="${Number(rightToLeft)}"`);
+      const omitted = vi.fn();
+      expect(readXlsxSparklines(entries, [f.sheet.name], omitted)[0]!.get("F2")?.rightToLeft).toBe(
+        rightToLeft,
+      );
+      expect(omitted).not.toHaveBeenCalled();
+      const decoded = await decodeXlsx(encoded.bytes);
+      const imported = getCellSparkline(getActiveSheet(decoded.workbook), target)!;
+      expect(imported.rightToLeft).toBe(rightToLeft);
+      expect(imported.source).toEqual(definition().source);
+      expect(omissions(decoded)).not.toContain(location);
+
+      const native = await nativeArchive(`rightToLeft="${String(rightToLeft)}"`);
+      const nativeDecoded = await decodeXlsx(zipSync(native));
+      expect(getCellSparkline(getActiveSheet(nativeDecoded.workbook), target)?.rightToLeft).toBe(
+        rightToLeft,
+      );
+      expect(omissions(nativeDecoded)).not.toContain(location);
+    },
+  );
+});

@@ -38,6 +38,12 @@ export function paintSparkline(
     width = rect.width - 6,
     height = rect.height - 6;
   const { min, max }: SparklineScale = scale;
+  const pointX = (index: number) =>
+    left +
+    (values.length === 1
+      ? width / 2
+      : (width * (sparkline.rightToLeft ? values.length - 1 - index : index)) /
+        (values.length - 1));
   const y = (value: number) =>
     max === min
       ? value === min
@@ -78,7 +84,7 @@ export function paintSparkline(
         if (sparkline.empty !== "connect") active = false;
         return;
       }
-      const x = left + (values.length === 1 ? width / 2 : (width * index) / (values.length - 1));
+      const x = pointX(index);
       if (active) context.lineTo(x, y(value));
       else context.moveTo(x, y(value));
       active = true;
@@ -90,7 +96,7 @@ export function paintSparkline(
         !(sparkline.markers || values.length === 1 || explicitPoint(value, index))
       )
         return;
-      const x = left + (values.length === 1 ? width / 2 : (width * index) / (values.length - 1));
+      const x = pointX(index);
       context.fillStyle = pointColor(value, index) ?? sparkline.markerColor ?? sparkline.color;
       context.beginPath();
       context.arc(x, y(value), 2, 0, 2 * Math.PI);
@@ -105,7 +111,9 @@ export function paintSparkline(
       const base = zero;
       const end = sparkline.type === "winLoss" ? (value > 0 ? top : top + height) : y(value);
       context.fillRect(
-        left + slot * index + (slot - barWidth) / 2,
+        left +
+          slot * (sparkline.rightToLeft ? values.length - 1 - index : index) +
+          (slot - barWidth) / 2,
         Math.min(base, end),
         barWidth,
         Math.max(1, Math.abs(base - end)),

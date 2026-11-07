@@ -284,3 +284,41 @@ describe("sparkline source-derived axis scales", () => {
     expect(refreshed(f.primary, [10, 20])).toEqual({ min: -30, max: 40 });
   });
 });
+
+describe("sparkline source direction", () => {
+  test("preserves explicit false, leaves a missing direction absent, and rejects nonboolean directions", () => {
+    expect(normalizeCellSparkline(definition({ rightToLeft: false }))?.rightToLeft).toBe(false);
+    expect(Object.hasOwn(normalizeCellSparkline(definition())!, "rightToLeft")).toBe(false);
+    for (const rightToLeft of [0, 1, "true", null])
+      expect(() =>
+        normalizeCellSparkline({ ...definition(), rightToLeft } as unknown as CellSparkline),
+      ).toThrow();
+  });
+
+  test.each([true, false])(
+    "uses snapshot 98 for explicit direction=%s and restores standalone sheets",
+    (rightToLeft) => {
+      const session = createTestWorkbookSession();
+      const sheet = getActiveSheet(session.workbook);
+      const address = { row: 4, column: 4 };
+      setCellSparkline(sheet, address, definition());
+      expect(serializeWorkbook(session.workbook).version).toBeLessThan(98);
+      setCellSparkline(sheet, address, definition({ rightToLeft }));
+      const snapshot = serializeWorkbook(session.workbook);
+      expect(snapshot.version).toBe(98);
+      expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
+      expect(() => deserializeWorkbook({ ...snapshot, version: 97 })).toThrow(/version 98/);
+      const standalone = serializeSheet(sheet);
+      expect(serializeSheet(deserializeSheet(standalone))).toEqual(standalone);
+    },
+  );
+
+  test("changes no values or vertical group bounds when direction is reversed", () => {
+    const f = fixture();
+    const values = [10, 20];
+    const resolve = createSparklineScaleResolver(f.sheet, createSheetEvaluator(f.sheet));
+    expect(resolve({ ...f.primary, rightToLeft: true }, values)).toEqual({ min: -30, max: 40 });
+    expect(resolve({ ...f.primary, rightToLeft: false }, values)).toEqual({ min: -30, max: 40 });
+    expect(values).toEqual([10, 20]);
+  });
+});
