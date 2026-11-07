@@ -65,6 +65,24 @@ const edges = computed(() => {
       to = byId.get(edge.to)!;
     const dx = to.x + to.width / 2 - from.x - from.width / 2,
       dy = to.y + to.height / 2 - from.y - from.height / 2;
+    const fontSize = Math.min(from.fontSize ?? 14, to.fontSize ?? 14);
+    if (edge.route) {
+      const site = (node: FlowchartNode, p: { x: number; y: number }) => ({
+        x: node.x + p.x * node.width,
+        y: node.y + p.y * node.height,
+      });
+      const points = [site(from, edge.route.start), ...edge.route.bends, site(to, edge.route.end)];
+      const mid = Math.floor((points.length - 1) / 2);
+      const a = points[mid]!,
+        b = points[mid + 1]!;
+      return {
+        edge,
+        fontSize,
+        d: points.map((p, i) => (i ? "L" : "M") + p.x + " " + p.y).join(" "),
+        x: (a.x + b.x) / 2,
+        y: (a.y + b.y) / 2 - fontSize * 0.4,
+      };
+    }
     const start = anchor(from, dx, dy),
       end = anchor(to, -dx, -dy);
     if (from === to) {
@@ -72,6 +90,7 @@ const edges = computed(() => {
         y = from.y + from.height / 2;
       return {
         edge,
+        fontSize,
         d: `M ${x} ${y} h 18 v ${-from.height / 2 - 12} H ${from.x + from.width / 2} v 12`,
         x,
         y: from.y - 16,
@@ -79,6 +98,7 @@ const edges = computed(() => {
     }
     return {
       edge,
+      fontSize,
       d: `M ${start.x} ${start.y} L ${end.x} ${end.y}`,
       x: (start.x + end.x) / 2,
       y: (start.y + end.y) / 2 - 6,
@@ -107,7 +127,7 @@ const edges = computed(() => {
       </marker>
     </defs>
     <g
-      v-for="{ edge, d, x, y } in edges"
+      v-for="{ edge, d, x, y, fontSize } in edges"
       :key="edge.id"
       :data-flow-edge="edge.id"
       :tabindex="interactive ? 0 : undefined"
@@ -121,7 +141,7 @@ const edges = computed(() => {
         :d="d"
         fill="none"
         :stroke="edge.id === selected ? '#005fd2' : '#476575'"
-        :stroke-width="edge.id === selected ? 3 : 2"
+        :stroke-width="(edge.id === selected ? 3 : 2) * Math.min(1, fontSize / 14)"
         :marker-end="`url(#${marker})`"
       />
       <path v-if="interactive" :d="d" fill="none" stroke="transparent" stroke-width="14" />
@@ -129,9 +149,9 @@ const edges = computed(() => {
         :x="x"
         :y="y"
         text-anchor="middle"
-        font-size="14"
+        :font-size="fontSize"
         stroke="#fff"
-        stroke-width="4"
+        :stroke-width="fontSize / 4"
         paint-order="stroke"
       >
         {{ edge.label }}
@@ -153,16 +173,21 @@ const edges = computed(() => {
         v-for="(path, i) in paths"
         :key="i"
         :d="path.d"
-        :fill="path.filled ? '#e7f2fa' : 'none'"
+        :fill="path.filled ? (node.fill ?? '#e7f2fa') : 'none'"
         :stroke="path.stroke ? '#456780' : 'none'"
-        stroke-width="2"
+        :stroke-width="Math.min(2, (node.fontSize ?? 16) / 8)"
       />
       <foreignObject
         :x="node.width * 0.1"
         :y="node.height * 0.08"
         :width="node.width * 0.8"
         :height="node.height * 0.84"
-        ><div class="flowchart-label">{{ node.text }}</div></foreignObject
+        ><div
+          class="flowchart-label"
+          :style="{ color: node.color, fontSize: node.fontSize && node.fontSize + 'px' }"
+        >
+          {{ node.text }}
+        </div></foreignObject
       >
       <rect
         v-if="selected === node.id"

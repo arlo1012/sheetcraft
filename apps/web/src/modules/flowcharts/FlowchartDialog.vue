@@ -5,8 +5,9 @@ import { Button } from "tdesign-vue-next/es/button";
 import { Input } from "tdesign-vue-next/es/input";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
+import { attachmentBlob } from "../attachments/attachment-file";
 import { downloadBlob } from "../../shared/files/download";
-import { Trash2, Undo2, Redo2, Download } from "lucide-vue-next";
+import { Trash2, Undo2, Redo2, Download, ZoomIn, ZoomOut } from "lucide-vue-next";
 import { useAppI18n } from "../../shared/i18n";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { evaluateShapePreset, shapePresetPathToSvg } from "@sheetcraft/core/shape-presets";
@@ -68,15 +69,14 @@ function download() {
   if (!draft.value) return;
   try {
     const chart = encodeFlowchartAttachment(draft.value);
-    downloadBlob(
-      new Blob([JSON.stringify(parseFlowchartDocument(draft.value))], { type: "application/json" }),
-      chart.filename,
-    );
+    downloadBlob(attachmentBlob(chart), chart.filename);
     exportError.value = false;
   } catch {
     exportError.value = true;
   }
 }
+
+const zoom = ref(100);
 
 const selected = ref<string>();
 const node = computed(() => draft.value?.nodes.find((n) => n.id === selected.value));
@@ -256,25 +256,45 @@ function remove() {
             </svg>
           </button>
         </div>
-        <FlowchartCanvas
-          class="canvas"
-          :document="draft"
-          :selected="selected"
-          interactive
-          @node-down="nodeDown"
-          @select="selectNode"
-          @edge-down="clearSelection"
-          @background="clearSelection()"
-          @pointermove="move"
-          @edit-label="focusLabel"
-          @dragover.prevent
-          @drop.prevent="drop"
-          @pointerup="endDrag"
-          @pointercancel="endDrag"
-          @lostpointercapture="endDrag"
-        />
+        <div class="viewport">
+          <FlowchartCanvas
+            :style="{ width: zoom + '%', height: zoom + '%' }"
+            class="canvas"
+            :document="draft"
+            :selected="selected"
+            interactive
+            @node-down="nodeDown"
+            @select="selectNode"
+            @edge-down="clearSelection"
+            @background="clearSelection()"
+            @pointermove="move"
+            @edit-label="focusLabel"
+            @dragover.prevent
+            @drop.prevent="drop"
+            @pointerup="endDrag"
+            @pointercancel="endDrag"
+            @lostpointercapture="endDrag"
+          />
+        </div>
       </div>
       <div class="tools">
+        <div class="zoom" role="group" :aria-label="t('flowchart.zoom')">
+          <Button
+            variant="text"
+            :aria-label="t('statusBar.zoomOut')"
+            :disabled="zoom <= 100"
+            @click="zoom -= 50"
+            ><ZoomOut :size="16"
+          /></Button>
+          <span>{{ zoom }}%</span>
+          <Button
+            variant="text"
+            :aria-label="t('statusBar.zoomIn')"
+            :disabled="zoom >= 400"
+            @click="zoom += 50"
+            ><ZoomIn :size="16"
+          /></Button>
+        </div>
         <Button
           variant="text"
           :aria-label="t('flowchart.undo')"
@@ -386,6 +406,16 @@ function remove() {
   width: 100%;
   height: 25px;
 }
+.zoom {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.viewport {
+  overflow: auto;
+  min-height: 0;
+  min-width: 0;
+}
 .canvas {
   touch-action: none;
   min-width: 0;
@@ -393,6 +423,7 @@ function remove() {
 }
 .tools {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 </style>

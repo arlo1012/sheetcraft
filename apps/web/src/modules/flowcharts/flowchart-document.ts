@@ -10,7 +10,11 @@ export const FLOWCHART_MAX_BYTES = 1024 * 1024;
 export const flowchartShapes = SHAPE_PRESET_GALLERY.find(
   (group) => group.id === "flowchart",
 )!.items;
+export type FlowchartPoint = { x: number; y: number };
 export type FlowchartNode = {
+  fill?: string;
+  color?: string;
+  fontSize?: number;
   id: string;
   preset: ShapePresetName;
   text: string;
@@ -19,7 +23,13 @@ export type FlowchartNode = {
   width: number;
   height: number;
 };
-export type FlowchartEdge = { id: string; from: string; to: string; label: string };
+export type FlowchartEdge = {
+  id: string;
+  from: string;
+  to: string;
+  label: string;
+  route?: { start: FlowchartPoint; end: FlowchartPoint; bends: FlowchartPoint[] };
+};
 export type FlowchartDocument = {
   format: "sheetcraft-flowchart";
   version: 1;
@@ -40,6 +50,26 @@ function string(value: unknown, max: number): string {
 }
 function number(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : invalid();
+}
+function color(value: unknown) {
+  if (typeof value !== "string" || !/^#[0-9a-f]{6}$/i.test(value)) return invalid();
+  return value;
+}
+function point(value: unknown, limitX: number, limitY: number) {
+  const src = record(value);
+  const x = number(src.x),
+    y = number(src.y);
+  if (x < 0 || x > limitX || y < 0 || y > limitY) return invalid();
+  return { x, y };
+}
+function route(value: unknown) {
+  const src = record(value);
+  if (!Array.isArray(src.bends) || src.bends.length > 256) return invalid();
+  return {
+    start: point(src.start, 1, 1),
+    end: point(src.end, 1, 1),
+    bends: src.bends.map((p) => point(p, FLOWCHART_WIDTH, FLOWCHART_HEIGHT)),
+  };
 }
 export function parseFlowchartDocument(value: unknown): FlowchartDocument {
   const src = record(value);
@@ -78,7 +108,22 @@ export function parseFlowchartDocument(value: unknown): FlowchartDocument {
       y + height > FLOWCHART_HEIGHT
     )
       return invalid();
-    return { id: identity(node.id), preset, text: string(node.text, 4096), x, y, width, height };
+    const result: FlowchartNode = {
+      id: identity(node.id),
+      preset,
+      text: string(node.text, 4096),
+      x,
+      y,
+      width,
+      height,
+    };
+    if (node.fill !== undefined) result.fill = color(node.fill);
+    if (node.color !== undefined) result.color = color(node.color);
+    if (node.fontSize !== undefined) {
+      result.fontSize = number(node.fontSize);
+      if (result.fontSize <= 0 || result.fontSize > 256) return invalid();
+    }
+    return result;
   });
   const nodeIds = new Set(ids);
   const edges = src.edges.map((value) => {
@@ -86,7 +131,14 @@ export function parseFlowchartDocument(value: unknown): FlowchartDocument {
     const from = string(edge.from, 128),
       to = string(edge.to, 128);
     if (!nodeIds.has(from) || !nodeIds.has(to)) return invalid();
-    return { id: identity(edge.id), from, to, label: string(edge.label, 1024) };
+    const result: FlowchartEdge = {
+      id: identity(edge.id),
+      from,
+      to,
+      label: string(edge.label, 1024),
+    };
+    if (edge.route !== undefined) result.route = route(edge.route);
+    return result;
   });
   return { format: "sheetcraft-flowchart", version: 1, title, nodes, edges };
 }

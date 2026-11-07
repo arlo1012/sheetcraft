@@ -1,4 +1,7 @@
-export const flowchartsEnUS = {
+export const flowchartsZhCN = {
+  "flowchart.zoom": "流程图缩放",
+  "flowchart.importHint":
+    "可导入 Sheetcraft JSON 或 ProcessOn POS 基础流程图。POS 会转换为当前编辑器的图形和文字样式。",
   "flowchart.title": "流程图",
   "flowchart.save": "保存",
   "flowchart.insert": "插入",
@@ -20,15 +23,19 @@ export const flowchartsEnUS = {
   "flowchart.workbook": "当前工作簿",
   "flowchart.file": "本地文件",
   "flowchart.source": "流程图来源",
-  "flowchart.choose": "选择流程图 JSON 文件…",
-  "flowchart.invalid": "请选择有效的 Sheetcraft 流程图文件（最大 1 MiB）。",
+  "flowchart.choose": "选择流程图文件…",
+  "flowchart.invalid":
+    "无法导入此文件。请选择有效的 Sheetcraft JSON 或仅含受支持图形和连线的 POS 文件（最大 1 MiB）。",
   "flowchart.none": "工作簿中没有流程图",
   "flowchart.x": "左",
   "flowchart.y": "上",
   "flowchart.width": "宽",
   "flowchart.height": "高",
 };
-export const flowchartsZhCN = {
+export const flowchartsEnUS = {
+  "flowchart.zoom": "Flowchart zoom",
+  "flowchart.importHint":
+    "Import Sheetcraft JSON or a basic ProcessOn POS flowchart. POS files use this editor’s shape and text styles.",
   "flowchart.title": "Flowchart",
   "flowchart.save": "Save",
   "flowchart.insert": "Insert",
@@ -50,8 +57,9 @@ export const flowchartsZhCN = {
   "flowchart.workbook": "This workbook",
   "flowchart.file": "Local file",
   "flowchart.source": "Flowchart source",
-  "flowchart.choose": "Choose flowchart JSON file…",
-  "flowchart.invalid": "Choose a valid Sheetcraft flowchart file (up to 1 MiB).",
+  "flowchart.choose": "Choose flowchart file…",
+  "flowchart.invalid":
+    "Choose valid Sheetcraft JSON or a POS file with supported shapes and connectors (up to 1 MiB).",
   "flowchart.none": "No flowcharts in this workbook",
   "flowchart.x": "Left",
   "flowchart.y": "Top",

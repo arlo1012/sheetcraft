@@ -4,6 +4,7 @@ import { Button } from "tdesign-vue-next/es/button";
 import { Plus } from "lucide-vue-next";
 import { useAppI18n } from "../../shared/i18n";
 import OptionList from "../../shared/option-list/OptionList.vue";
+import { importProcessOnFlowchart } from "./processon-import";
 import FlowchartCanvas from "./FlowchartCanvas.vue";
 import {
   FLOWCHART_MAX_BYTES,
@@ -44,7 +45,13 @@ async function importFile(event: Event) {
   try {
     if (source.size > FLOWCHART_MAX_BYTES) throw new RangeError();
     const json = new TextDecoder("utf-8", { fatal: true }).decode(await source.arrayBuffer());
-    emit("choose", parseFlowchartDocument(JSON.parse(json)));
+    const value: unknown = JSON.parse(json);
+    emit(
+      "choose",
+      source.name.toLowerCase().endsWith(".pos")
+        ? importProcessOnFlowchart(value)
+        : parseFlowchartDocument(value),
+    );
   } catch {
     invalid.value = true;
   }
@@ -60,7 +67,8 @@ async function importFile(event: Event) {
       @select="category = $event"
     />
     <div v-if="category === 'import'">
-      <input ref="file" type="file" accept=".json" hidden @change="importFile" />
+      <p>{{ t("flowchart.importHint") }}</p>
+      <input ref="file" type="file" accept=".json,.pos" hidden @change="importFile" />
       <Button @click="file?.click()">{{ t("flowchart.choose") }}</Button>
       <p v-if="invalid" role="alert">
         {{ t("flowchart.invalid") }}
