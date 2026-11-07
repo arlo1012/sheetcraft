@@ -3,6 +3,7 @@ import { symbolsEnUS } from "../../../modules/insert-tools/symbol-messages.en-US
 import { pivotsEnUS } from "../../../modules/pivot-tables/pivot-messages.en-US";
 import { controlsEnUS } from "../../../modules/form-controls/control-messages.en-US";
 import { attachmentsEnUS } from "../../../modules/attachments/attachment-messages.en-US";
+import { mindMapsEnUS } from "../../../modules/mind-maps/mind-map-messages";
 import { flowchartsEnUS } from "../../../modules/flowcharts/flowchart-messages";
 import { cameraEnUS } from "../../../modules/camera/camera-messages.en-US";
 import { sparklinesEnUS } from "../../../modules/sparklines/sparkline-messages.en-US";
@@ -31,6 +32,7 @@ export const enUS = {
   ...pivotsEnUS,
   ...controlsEnUS,
   ...attachmentsEnUS,
+  ...mindMapsEnUS,
   ...flowchartsEnUS,
   ...cameraEnUS,
   ...sparklinesEnUS,

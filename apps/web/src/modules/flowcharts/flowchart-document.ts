@@ -1,12 +1,16 @@
-import { normalizeSheetAttachment, type SheetAttachment } from "@sheetcraft/core/sheet-attachments";
+import type { SheetAttachment } from "@sheetcraft/core/sheet-attachments";
 import type { ShapePresetName } from "@sheetcraft/core/shape-presets";
 import { SHAPE_PRESET_GALLERY } from "../../shared/shape-presets/shape-gallery-data";
-import { decodeAttachmentBytes, encodeAttachmentBytes } from "../attachments/attachment-file";
+import {
+  MAX_DIAGRAM_SOURCE_BYTES,
+  encodeDiagramSource,
+  decodeDiagramSource,
+} from "../attachments/diagram-source";
 
 export const FLOWCHART_MIME = "application/vnd.sheetcraft.flowchart+json";
 export const FLOWCHART_WIDTH = 800,
   FLOWCHART_HEIGHT = 500;
-export const FLOWCHART_MAX_BYTES = 1024 * 1024;
+export const FLOWCHART_MAX_BYTES = MAX_DIAGRAM_SOURCE_BYTES;
 export const flowchartShapes = SHAPE_PRESET_GALLERY.find(
   (group) => group.id === "flowchart",
 )!.items;
@@ -146,36 +150,10 @@ export function parseFlowchartDocument(value: unknown): FlowchartDocument {
 export function encodeFlowchartAttachment(document: FlowchartDocument): SheetAttachment {
   const source = parseFlowchartDocument(document);
   if (!source.nodes.length) return invalid();
-  const bytes = new TextEncoder().encode(JSON.stringify(source));
-  if (bytes.length > FLOWCHART_MAX_BYTES) return invalid();
-  const name = Array.from(source.title, (char) =>
-    char.charCodeAt(0) < 32 || /[<>:"/\\|?*]/.test(char) ? "_" : char,
-  ).join("");
-  return {
-    filename: name + ".flowchart.json",
-    mimeType: FLOWCHART_MIME,
-    size: bytes.length,
-    data: encodeAttachmentBytes(bytes),
-    display: "document",
-  };
+  return encodeDiagramSource(source, FLOWCHART_MIME, ".flowchart.json");
 }
 export function decodeFlowchartAttachment(
   attachment: SheetAttachment,
 ): FlowchartDocument | undefined {
-  if (
-    attachment.mimeType !== FLOWCHART_MIME ||
-    attachment.size > FLOWCHART_MAX_BYTES ||
-    attachment.data.length > Math.ceil(FLOWCHART_MAX_BYTES / 3) * 4
-  )
-    return;
-  try {
-    normalizeSheetAttachment(attachment);
-    return parseFlowchartDocument(
-      JSON.parse(
-        new TextDecoder("utf-8", { fatal: true }).decode(decodeAttachmentBytes(attachment.data)),
-      ),
-    );
-  } catch {
-    return undefined;
-  }
+  return decodeDiagramSource(attachment, FLOWCHART_MIME, parseFlowchartDocument);
 }

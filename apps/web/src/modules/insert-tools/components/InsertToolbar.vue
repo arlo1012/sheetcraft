@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import EquationInsertMenu from "../../sheet-drawings/equation/EquationInsertMenu.vue";
 import type { EquationPresetId } from "../../sheet-drawings/equation/equation-catalog";
-import FlowchartInsertMenu from "../../flowcharts/FlowchartInsertMenu.vue";
+import DiagramInsertMenu from "./DiagramInsertMenu.vue";
+import type { MindMapStart } from "../../mind-maps/mind-map-document";
 import type { FlowchartStart } from "../../flowcharts/flowchart-templates";
 import SymbolInsertMenu from "./SymbolInsertMenu.vue";
 import type { SymbolInsertion } from "../symbols/symbol-preferences";
@@ -19,6 +20,8 @@ import TextBoxInsertMenu from "../../sheet-drawings/components/TextBoxInsertMenu
 import type { ShapeGalleryChoice } from "../../sheet-drawings/shape-gallery";
 import {
   Camera,
+  Workflow,
+  Network,
   FileText,
   Paperclip,
   Link2,
@@ -62,6 +65,7 @@ const emit = defineEmits<{
   editPivot: [];
   removePivot: [];
   insertChart: [intent: ChartInsertIntent];
+  insertMindMap: [start: MindMapStart];
   insertFlowchart: [start: FlowchartStart];
   insertAttachment: [display: "icon" | "document"];
   insertCamera: [];
@@ -184,7 +188,6 @@ const { t, locale } = useAppI18n();
         @activate="emit('insertDrawing', 'wordArt')"
         ><ALargeSmall
       /></RibbonButton>
-      <FlowchartInsertMenu :disabled="imageDisabled" @insert="emit('insertFlowchart', $event)" />
       <TextBoxInsertMenu
         v-if="insertShapeHandler"
         :disabled="imageDisabled"
@@ -202,6 +205,28 @@ const { t, locale } = useAppI18n();
         @activate="emit('insertDrawing', 'textBox')"
         ><Type
       /></RibbonButton>
+      <div class="insert-toolbar__diagrams">
+        <DiagramInsertMenu
+          tool="flowchart"
+          :disabled="imageDisabled"
+          :title="t('flowchart.title')"
+          :workbook-label="t('flowchart.workbookMenu')"
+          :local-label="t('flowchart.localMenu')"
+          @workbook="emit('insertFlowchart', 'gallery')"
+          @local="emit('insertFlowchart', 'local')"
+          ><Workflow
+        /></DiagramInsertMenu>
+        <DiagramInsertMenu
+          tool="mind-map"
+          :disabled="imageDisabled"
+          :title="t('mindMap.title')"
+          :workbook-label="t('mindMap.workbook')"
+          :local-label="t('mindMap.local')"
+          @workbook="emit('insertMindMap', 'workbook')"
+          @local="emit('insertMindMap', 'local')"
+          ><Network
+        /></DiagramInsertMenu>
+      </div>
     </section>
     <ChartInsertTools :disabled="imageDisabled" @insert="emit('insertChart', $event)" />
     <section class="insert-toolbar__group" role="group" :aria-label="t('sparkline.title')">
@@ -287,6 +312,9 @@ const { t, locale } = useAppI18n();
 </template>
 <style scoped lang="scss">
 @use "../../../shared/ribbon/ribbon-layout" as ribbon;
+.insert-toolbar__diagrams {
+  @include ribbon.two-rows;
+}
 .insert-toolbar__group {
   @include ribbon.columns;
 }

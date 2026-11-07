@@ -76,6 +76,8 @@ import CalculatedColumnDialog from "../modules/table-styles/components/Calculate
 import TableToolsToolbar from "../modules/table-styles/components/TableToolsToolbar.vue";
 import NewTableStyleDialog from "../modules/table-styles/components/NewTableStyleDialog.vue";
 import HyperlinkDialog from "../modules/hyperlinks/components/HyperlinkDialog.vue";
+import type { DiagramWorkspace } from "../modules/attachments/useDiagramActions";
+import { useMindMapActions } from "../modules/mind-maps/useMindMapActions";
 import { useFlowchartActions } from "../modules/flowcharts/useFlowchartActions";
 import AttachmentInsertDialog from "../modules/attachments/components/AttachmentInsertDialog.vue";
 import { useHyperlinksController } from "../modules/hyperlinks/useHyperlinksController";
@@ -175,6 +177,7 @@ import {
 } from "../modules/charts/chart-source-editor";
 import ChartElementsToolbar from "../modules/charts/components/ChartElementsToolbar.vue";
 import { defineAsyncComponent } from "vue";
+const MindMapDialog = defineAsyncComponent(() => import("../modules/mind-maps/MindMapDialog.vue"));
 const FlowchartDialog = defineAsyncComponent(
   () => import("../modules/flowcharts/FlowchartDialog.vue"),
 );
@@ -1583,14 +1586,19 @@ const {
 } = attachmentActions;
 watch(() => activeSheet.value.id, attachmentActions.close);
 watch(workbookGeneration, attachmentActions.close);
-const flowcharts = useFlowchartActions({
+const diagramWorkspace: DiagramWorkspace = {
   getSheets: () => session.workbook.sheets.values(),
   getSheet: () => activeSheet.value,
   getAddress: () => activeAddress.value,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
   flush: () => cellEditSession.finish(),
   execute: executeCommand,
-});
+};
+const flowcharts = useFlowchartActions(diagramWorkspace);
+const mindMaps = useMindMapActions(diagramWorkspace);
+const { editor: mindMapEditor, error: mindMapError } = mindMaps;
+watch(() => activeSheet.value.id, mindMaps.close);
+watch(workbookGeneration, mindMaps.close);
 const { editor: flowchartEditor, error: flowchartError } = flowcharts;
 watch(() => activeSheet.value.id, flowcharts.close);
 watch(workbookGeneration, flowcharts.close);
@@ -1945,7 +1953,8 @@ function editSheetDrawing(drawing: SheetDrawing): void {
   if (drawing.kind === "chart") chartActions.edit(drawing);
   else if (drawing.kind === "control") controlActions.open(drawing);
   else if (drawing.kind === "attachment") {
-    if (!flowcharts.open("gallery", drawing)) attachmentActions.viewing.value = drawing;
+    if (!flowcharts.open("gallery", drawing) && !mindMaps.open("workbook", drawing))
+      attachmentActions.viewing.value = drawing;
   } else if (drawing.kind === "camera") cameraActions.open(drawing);
   else if (drawing.kind === "equation") beginEquationEdit(drawing);
   else drawingActions.edit(drawing);
@@ -5040,6 +5049,7 @@ const gridInert = computed(
     pivotFieldSettingsOpen.value ||
     !!pictureAnnotation.value ||
     !!viewingAttachment.value ||
+    !!mindMapEditor.value ||
     !!flowchartEditor.value ||
     !!insertingAttachment.value ||
     !!editingDrawing.value ||
@@ -5162,6 +5172,7 @@ watch(
         pivotFieldSettingsOpen ||
         !!pictureAnnotation ||
         !!viewingAttachment ||
+        !!mindMapEditor ||
         !!flowchartEditor ||
         !!insertingAttachment ||
         !!editingDrawing ||
@@ -5574,6 +5585,7 @@ watch(
           @refresh-pivot="pivotActions.refresh"
           @remove-pivot="pivotActions.remove"
           @insert-control="controlActions.insert($event)"
+          @insert-mind-map="mindMaps.open($event)"
           @insert-flowchart="flowcharts.open($event)"
           @insert-attachment="attachmentActions.requestInsert"
           @insert-drawing="drawingActions.insert"
@@ -6489,6 +6501,7 @@ watch(
         pivotFieldSettingsOpen ||
         !!pictureAnnotation ||
         !!viewingAttachment ||
+        !!mindMapEditor ||
         !!flowchartEditor ||
         !!insertingAttachment ||
         !!editingDrawing ||
@@ -7150,6 +7163,7 @@ watch(
         pivotFieldSettingsOpen ||
         !!pictureAnnotation ||
         !!viewingAttachment ||
+        !!mindMapEditor ||
         !!flowchartEditor ||
         !!insertingAttachment ||
         !!editingDrawing ||
@@ -7326,6 +7340,15 @@ watch(
     type="file"
     hidden
     @change="attachmentActions.onFiles"
+  />
+  <MindMapDialog
+    v-if="mindMapEditor"
+    :start="mindMapEditor.start"
+    :existing="mindMapEditor.existing"
+    :source="mindMapEditor.document"
+    :error="mindMapError"
+    @save="mindMaps.save"
+    @close="mindMaps.close"
   />
   <FlowchartDialog
     v-if="flowchartEditor"

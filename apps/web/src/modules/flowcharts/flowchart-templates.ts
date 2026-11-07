@@ -1,7 +1,7 @@
 import type { AppLocale } from "../../shared/i18n";
 import type { FlowchartDocument, FlowchartNode } from "./flowchart-document";
 
-export type FlowchartStart = "gallery" | "blank" | "import";
+export type FlowchartStart = "gallery" | "local" | "blank" | "import";
 export type FlowchartTemplate = "blank" | "basic" | "approval";
 export function createFlowchartTemplate(
   template: FlowchartTemplate,

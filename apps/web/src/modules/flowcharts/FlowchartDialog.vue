@@ -5,6 +5,7 @@ import { Button } from "tdesign-vue-next/es/button";
 import { Input } from "tdesign-vue-next/es/input";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
+import { useDiagramHistory } from "../attachments/useDiagramHistory";
 import { attachmentBlob } from "../attachments/attachment-file";
 import { downloadBlob } from "../../shared/files/download";
 import { Trash2, Undo2, Redo2, Download, ZoomIn, ZoomOut } from "lucide-vue-next";
@@ -41,28 +42,10 @@ const draft = ref(
       ? createFlowchartTemplate("blank", language.value)
       : undefined,
 );
-const history = ref<string[]>([]);
-const cursor = ref(-1);
-function record() {
-  if (!draft.value) return;
-  const snapshot = JSON.stringify(draft.value);
-  if (history.value[cursor.value] === snapshot) return;
-  history.value.splice(cursor.value + 1, Infinity, snapshot);
-  if (history.value.length > 50) history.value.shift();
-  cursor.value = history.value.length - 1;
-}
+const { history, cursor, record, travel } = useDiagramHistory(draft, () => clearSelection());
 function choose(chart: FlowchartDocument) {
   draft.value = chart;
   record();
-}
-record();
-function travel(step: number) {
-  record();
-  const next = cursor.value + step;
-  if (next < 0 || next >= history.value.length) return;
-  cursor.value = next;
-  draft.value = JSON.parse(history.value[next]!);
-  clearSelection();
 }
 const exportError = ref(false);
 function download() {
@@ -221,7 +204,7 @@ function remove() {
     @close="emit('close')"
   >
     <FlowchartPicker v-if="!draft" :start="start" :existing="existing" @choose="choose" />
-    <div v-else class="editor">
+    <div v-else ref="historyElement" class="editor">
       <Form label-align="right" :label-width="zh ? 60 : 75" :prevent-submit-default="true"
         ><FormItem :label="t('flowchart.name')"
           ><Input

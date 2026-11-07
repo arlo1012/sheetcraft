@@ -29,10 +29,7 @@ function pos() {
             id: "review",
             name: "decision",
             props: { x: 500, y: 400, w: 100, h: 80, angle: 0 },
-            textBlock: [
-              { text: "<span>复核&nbsp;&lt;A&gt;</span>" },
-              { text: "<i>确认</i>" },
-            ],
+            textBlock: [{ text: "<span>复核&nbsp;&lt;A&gt;</span>" }, { text: "<i>确认</i>" }],
             fillStyle: { color: "255,240,128" },
             fontStyle: { color: "0,64,128", size: 18 },
           },
@@ -42,7 +39,10 @@ function pos() {
             linkerType: "broken",
             from: { id: "submit", x: 200, y: 230 },
             to: { id: "review", x: 500, y: 420 },
-            points: [{ x: 700, y: 150 }, { x: 700, y: 420 }],
+            points: [
+              { x: 700, y: 150 },
+              { x: 700, y: 420 },
+            ],
             text: "<b>通过 &amp; 继续</b>",
           },
         },
@@ -87,17 +87,22 @@ describe("ProcessOn flowchart import", () => {
           fontSize: 18,
         },
       ],
-      edges: [{
-        id: "submit-review",
-        from: "submit",
-        to: "review",
-        label: "通过 & 继续",
-        route: {
-          start: { x: 1, y: 0.5 },
-          end: { x: 0, y: 0.25 },
-          bends: [{ x: 700, y: 85 }, { x: 700, y: 355 }],
+      edges: [
+        {
+          id: "submit-review",
+          from: "submit",
+          to: "review",
+          label: "通过 & 继续",
+          route: {
+            start: { x: 1, y: 0.5 },
+            end: { x: 0, y: 0.25 },
+            bends: [
+              { x: 700, y: 85 },
+              { x: 700, y: 355 },
+            ],
+          },
         },
-      }],
+      ],
     });
     expect(parseFlowchartDocument(result)).toEqual(result);
     expect(source).toEqual(before);
@@ -189,11 +194,14 @@ describe("ProcessOn flowchart import", () => {
     expect(() => importProcessOnFlowchart(source)).toThrow();
   });
 
-  test.each(["from", "to"] as const)("rejects the connector when its %s endpoint is missing", (end) => {
-    const source = pos();
-    source.diagram.elements.elements.connection[end].id = "missing-node";
-    expect(() => importProcessOnFlowchart(source)).toThrow();
-  });
+  test.each(["from", "to"] as const)(
+    "rejects the connector when its %s endpoint is missing",
+    (end) => {
+      const source = pos();
+      source.diagram.elements.elements.connection[end].id = "missing-node";
+      expect(() => importProcessOnFlowchart(source)).toThrow();
+    },
+  );
 
   test.each([
     undefined,
@@ -207,22 +215,20 @@ describe("ProcessOn flowchart import", () => {
     expect(() => importProcessOnFlowchart(value)).toThrow();
   });
 
-  test.each([
-    { x: NaN },
-    { y: Infinity },
-    { w: 0 },
-    { h: -10 },
-    { w: "100" },
-    { angle: 1 },
-  ])("rejects malformed or unsupported node geometry %j", (patch) => {
-    const source = pos();
-    const node = source.diagram.elements.elements.first;
-    const elements = {
-      ...source.diagram.elements.elements,
-      first: { ...node, props: { ...node.props, ...patch } },
-    };
-    expect(() => importProcessOnFlowchart({ ...source, diagram: { elements: { elements } } })).toThrow();
-  });
+  test.each([{ x: NaN }, { y: Infinity }, { w: 0 }, { h: -10 }, { w: "100" }, { angle: 1 }])(
+    "rejects malformed or unsupported node geometry %j",
+    (patch) => {
+      const source = pos();
+      const node = source.diagram.elements.elements.first;
+      const elements = {
+        ...source.diagram.elements.elements,
+        first: { ...node, props: { ...node.props, ...patch } },
+      };
+      expect(() =>
+        importProcessOnFlowchart({ ...source, diagram: { elements: { elements } } }),
+      ).toThrow();
+    },
+  );
 
   test.each([
     { textBlock: null },
@@ -236,7 +242,9 @@ describe("ProcessOn flowchart import", () => {
       ...source.diagram.elements.elements,
       first: { ...source.diagram.elements.elements.first, ...patch },
     };
-    expect(() => importProcessOnFlowchart({ ...source, diagram: { elements: { elements } } })).toThrow();
+    expect(() =>
+      importProcessOnFlowchart({ ...source, diagram: { elements: { elements } } }),
+    ).toThrow();
   });
 
   test.each([
@@ -252,13 +260,17 @@ describe("ProcessOn flowchart import", () => {
       ...source.diagram.elements.elements,
       connection: { ...source.diagram.elements.elements.connection, ...patch },
     };
-    expect(() => importProcessOnFlowchart({ ...source, diagram: { elements: { elements } } })).toThrow();
+    expect(() =>
+      importProcessOnFlowchart({ ...source, diagram: { elements: { elements } } }),
+    ).toThrow();
   });
 
   test("rejects duplicate node identities and an empty graph", () => {
     const source = pos();
     source.diagram.elements.elements.second.id = source.diagram.elements.elements.first.id;
     expect(() => importProcessOnFlowchart(source)).toThrow();
-    expect(() => importProcessOnFlowchart({ ...pos(), diagram: { elements: { elements: {} } } })).toThrow();
+    expect(() =>
+      importProcessOnFlowchart({ ...pos(), diagram: { elements: { elements: {} } } }),
+    ).toThrow();
   });
 });

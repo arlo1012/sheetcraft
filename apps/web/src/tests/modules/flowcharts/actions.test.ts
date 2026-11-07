@@ -369,13 +369,17 @@ describe("flowchart actions", () => {
     insertSheet(f.workbook, other);
     addFlowchart(other, source("Other chart"), "other-chart");
     other.drawings!.push(
-      createAttachmentDrawing("ordinary-file", { row: 0, column: 0 }, {
-        filename: "report.txt",
-        mimeType: "text/plain",
-        size: 3,
-        data: "YWJj",
-        display: "document",
-      }),
+      createAttachmentDrawing(
+        "ordinary-file",
+        { row: 0, column: 0 },
+        {
+          filename: "report.txt",
+          mimeType: "text/plain",
+          size: 3,
+          data: "YWJj",
+          display: "document",
+        },
+      ),
     );
     const corrupt = addFlowchart(other, source("Corrupt source"), "corrupt");
     corrupt.attachment = { ...corrupt.attachment, data: "%%%=" };

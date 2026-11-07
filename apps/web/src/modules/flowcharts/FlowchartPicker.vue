@@ -22,13 +22,14 @@ const zh = computed(() => locale.value === "zh-CN");
 const category = ref<"templates" | "workbook" | "import">(
   props.start === "import" ? "import" : "templates",
 );
-const categories = computed(
-  () =>
+const categories = computed(() =>
+  (
     [
       { value: "templates", label: t("flowchart.templates") },
       { value: "workbook", label: t("flowchart.workbook") },
       { value: "import", label: t("flowchart.file") },
-    ] as const,
+    ] as const
+  ).filter((item) => item.value !== "workbook" || props.start === "gallery"),
 );
 const templates = computed(() =>
   (["blank", "basic", "approval"] as const).map((type) =>

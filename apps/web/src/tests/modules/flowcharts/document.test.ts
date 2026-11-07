@@ -90,9 +90,12 @@ describe("flowchart source document", () => {
     },
   );
 
-  test.each([undefined, null, "", " \t\n ", 123])("rejects an empty or non-text title %j", (title) => {
-    expect(() => parseFlowchartDocument({ ...document(), title })).toThrow();
-  });
+  test.each([undefined, null, "", " \t\n ", 123])(
+    "rejects an empty or non-text title %j",
+    (title) => {
+      expect(() => parseFlowchartDocument({ ...document(), title })).toThrow();
+    },
+  );
 
   test.each([
     { nodes: undefined },
@@ -232,7 +235,7 @@ describe("flowchart source attachments", () => {
     },
   );
 
-  test.each(["", "{", "null", "[]", "{\"format\":\"sheetcraft-flowchart\",\"version\":2}"])(
+  test.each(["", "{", "null", "[]", '{"format":"sheetcraft-flowchart","version":2}'])(
     "safely ignores damaged or invalid source JSON %j",
     (text) => {
       const attachment = textAttachment(text);
