@@ -37,7 +37,9 @@ export function getChartElementCapabilities(
   const bars = type === "column" || type === "bar";
   return {
     title: true,
-    legend: type !== "treemap" && type !== "sankey" && type !== "wordCloud",
+    legend: !["treemap", "sankey", "wordCloud", "liquid", "gauge", "waterfall", "venn"].includes(
+      type,
+    ),
     labels: type !== "wordCloud",
     labelPosition: bars || (type === "combo" && (!chart || hasComboColumns(chart, comboChanges))),
     stacked: bars || type === "line" || type === "area",

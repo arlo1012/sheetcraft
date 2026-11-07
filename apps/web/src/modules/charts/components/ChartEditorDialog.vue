@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Input } from "tdesign-vue-next/es/input";
 import { ref, computed, watch, onBeforeUnmount, nextTick } from "vue";
 import { Button } from "tdesign-vue-next/es/button";
 import { Dialog, type DialogCloseContext } from "tdesign-vue-next/es/dialog";
@@ -6,6 +7,7 @@ import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
+  chartTypes,
   normalizeSheetChart,
   getSheetChartSourceData,
   type ChartType,
@@ -58,6 +60,16 @@ const draft = ref<SheetChartDrawing>({
   ...props.drawing,
   chart: normalizeSheetChart(props.drawing.chart),
 });
+const animated = computed({
+  get: () => draft.value.chart.presentation?.animated === true,
+  set: (value: boolean) => {
+    const presentation = { ...draft.value.chart.presentation };
+    if (value) presentation.animated = true;
+    else delete presentation.animated;
+    if (Object.keys(presentation).length) draft.value.chart.presentation = presentation;
+    else delete draft.value.chart.presentation;
+  },
+});
 const comboChanges = ref<ChartComboSeriesChange[]>([]);
 const initialComboRecipePending = ref(props.comboRecipe === true);
 const comboInitialized = ref(
@@ -84,7 +96,7 @@ function changeType(value: unknown): void {
   if (
     props.disabled ||
     typeof value !== "string" ||
-    !types.includes(value as ChartType) ||
+    !chartTypes.includes(value as ChartType) ||
     (value === "combo" && !!(draft.value.chart.pivotTableId || draft.value.chart.dataCache))
   )
     return;
@@ -267,21 +279,6 @@ watch(
   },
   { immediate: true },
 );
-const types: ChartType[] = [
-  "column",
-  "bar",
-  "line",
-  "combo",
-  "area",
-  "pie",
-  "doughnut",
-  "scatter",
-  "radar",
-  "treemap",
-  "sankey",
-  "river",
-  "wordCloud",
-];
 function typeDisabled(type: ChartType): boolean {
   return (
     props.disabled ||
@@ -461,6 +458,17 @@ function onDialogKeydown(event: KeyboardEvent): void {
               >
             </div>
           </FormItem>
+          <FormItem :label="t('chart.title')">
+            <Input
+              v-model="draft.chart.title"
+              :aria-label="t('chart.title')"
+              :maxlength="1000"
+              :disabled="disabled"
+            />
+          </FormItem>
+          <FormItem>
+            <Checkbox v-model="animated" :disabled="disabled">{{ t("chart.animate") }}</Checkbox>
+          </FormItem>
         </Form>
         <div v-else class="chart-selector__source-controls">
           <p class="chart-selector__hint">
@@ -578,7 +586,13 @@ function onDialogKeydown(event: KeyboardEvent): void {
                   ? "chart.sankeyHint"
                   : draft.chart.type === "scatter"
                     ? "chart.scatterHint"
-                    : "chart.sourceHint",
+                    : draft.chart.type === "venn"
+                      ? "chart.vennHint"
+                      : draft.chart.type === "liquid" || draft.chart.type === "gauge"
+                        ? "chart.percentHint"
+                        : draft.chart.type === "waterfall"
+                          ? "chart.waterfallHint"
+                          : "chart.sourceHint",
             )
           }}
         </p>

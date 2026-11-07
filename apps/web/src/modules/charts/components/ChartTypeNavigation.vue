@@ -34,6 +34,11 @@ const options = computed<readonly OptionListOption<ChartType>[]>(() => [
   { value: "combo", label: t("chart.comboCategory"), disabled: props.disabled("combo") },
   { value: "sankey", label: t("chart.sankey"), disabled: props.disabled("sankey") },
   { value: "river", label: t("chart.river"), disabled: props.disabled("river") },
+  ...(["rose", "funnel", "gauge", "liquid", "waterfall", "venn"] as const).map((value) => ({
+    value,
+    label: t(`chart.${value}`),
+    disabled: props.disabled(value),
+  })),
   { value: "wordCloud", label: t("chart.wordCloud"), disabled: props.disabled("wordCloud") },
 ]);
 function choose(type: ChartType): void {

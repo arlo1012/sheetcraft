@@ -248,7 +248,14 @@ export function useChartActions(options: {
       drawing.chart = normalizeSheetChart({ ...drawing.chart, range: null });
       invalidSelection = true;
     }
-    if (typeof request !== "string")
+    if (typeof request !== "string" && "style" in request) {
+      drawing.chart = applyChartDesignIntent(drawing.chart, {
+        kind: "style",
+        style: request.style,
+      });
+      drawing.chart.labels = request.labels;
+      drawing.chart.presentation = { ...drawing.chart.presentation, animated: true };
+    } else if (typeof request !== "string")
       drawing.chart = applyChartDesignIntent(drawing.chart, {
         kind: "variant",
         variant: request.variant,

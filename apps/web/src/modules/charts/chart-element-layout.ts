@@ -113,10 +113,9 @@ export function createChartElementLayout(
   };
   let legendBounds: ChartLegendBounds | undefined;
   if (chart.legend && capabilities.legend) {
-    const names =
-      chart.type === "pie" || chart.type === "doughnut"
-        ? data.categories
-        : data.series.slice(chart.type === "scatter" ? 1 : 0).map((entry) => entry.name);
+    const names = ["pie", "doughnut", "rose", "funnel"].includes(chart.type)
+      ? data.categories
+      : data.series.slice(chart.type === "scatter" ? 1 : 0).map((entry) => entry.name);
     const vertical = ["left", "right", "topRight"].includes(settings.legendPosition);
     const gap = Math.min(8, plot.width * 0.04, plot.height * 0.04);
     // A bounded scroll viewport and truncated one-line names keep even very long
@@ -219,10 +218,9 @@ export function getChartLegendLayout(
   const vertical = ["left", "right", "topRight"].includes(
     getChartElementSettings(chart).legendPosition,
   );
-  const names =
-    chart.type === "pie" || chart.type === "doughnut"
-      ? data.categories
-      : series.map((entry) => entry.name);
+  const names = ["pie", "doughnut", "rose", "funnel"].includes(chart.type)
+    ? data.categories
+    : series.map((entry) => entry.name);
   if (!names.length) return;
   const metrics = legendMetrics(chart, names, viewport.height, dimensions);
   const { fontSize, lineHeight, padding, border } = metrics;

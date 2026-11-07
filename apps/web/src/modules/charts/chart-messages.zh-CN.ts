@@ -1,4 +1,16 @@
 export const chartsZhCN = {
+  "chart.animate": "播放图表动画",
+  "chart.dynamic": "动态图表",
+  "chart.rose": "玫瑰图",
+  "chart.funnel": "漏斗图",
+  "chart.gauge": "仪表盘图",
+  "chart.liquid": "水波图",
+  "chart.waterfall": "瀑布图",
+  "chart.venn": "韦恩图",
+  "chart.vennHint": "依次使用第一组系列的三个数值：两个集合的总量及交集。",
+  "chart.percentHint": "读取第一个数值，范围为 0 至 100；百分比单元格按显示值读取。",
+  "chart.waterfallHint": "第一组系列依次表示每一步的增减量，负数向下绘制。",
+  "chart.templateHint": "选择模板后，可调整数据区域和图表设置。",
   "chart.comboCategory": "组合图",
   "chart.scriptOrThemeFont": "按脚本/主题字体",
   "chart.scriptFontPreviewLimited":

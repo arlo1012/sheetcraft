@@ -1,5 +1,8 @@
 import { init, use, type EChartsType } from "echarts/core";
 import {
+  CustomChart,
+  FunnelChart,
+  GaugeChart,
   BarChart,
   LineChart,
   PieChart,
@@ -20,6 +23,9 @@ import {
 } from "echarts/components";
 import { SVGRenderer } from "echarts/renderers";
 use([
+  CustomChart,
+  FunnelChart,
+  GaugeChart,
   BarChart,
   LineChart,
   PieChart,

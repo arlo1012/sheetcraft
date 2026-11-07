@@ -1,4 +1,5 @@
 import {
+  chartTypes,
   normalizeSheetChart,
   type ChartType,
   type SheetChart,
@@ -24,7 +25,11 @@ export type ChartStyleId =
 export type ChartDesignIntent =
   | { kind: "variant"; variant: ChartVariant }
   | { kind: "style"; style: ChartStyleId };
-export type ChartInsertIntent = ChartType | { type: CommonChartType; variant: ChartVariant };
+export type DynamicChartTemplate = { type: ChartType; style: ChartStyleId; labels: boolean };
+export type ChartInsertIntent =
+  | ChartType
+  | { type: CommonChartType; variant: ChartVariant }
+  | DynamicChartTemplate;
 
 const variants: readonly ChartVariant[] = [
   "standard",
@@ -33,21 +38,6 @@ const variants: readonly ChartVariant[] = [
   "standardMarkers",
   "stackedMarkers",
   "percentStackedMarkers",
-];
-const chartTypes: readonly ChartType[] = [
-  "column",
-  "bar",
-  "line",
-  "combo",
-  "area",
-  "pie",
-  "doughnut",
-  "scatter",
-  "radar",
-  "treemap",
-  "sankey",
-  "river",
-  "wordCloud",
 ];
 export function isCommonChartType(type: ChartType): type is CommonChartType {
   return type === "column" || type === "bar" || type === "line" || type === "area";
@@ -83,6 +73,17 @@ export function normalizeChartInsertIntent(value: unknown): ChartInsertIntent {
     if (!chartTypes.includes(value as ChartType))
       throw new RangeError("Unknown chart insertion type.");
     return value as ChartType;
+  }
+  if (value && typeof value === "object" && Object.hasOwn(value, "style")) {
+    const data = dataRecord(value, ["type", "style", "labels"]);
+    if (
+      !chartTypes.includes(data.type as ChartType) ||
+      typeof data.style !== "string" ||
+      !Object.hasOwn(recipes, data.style) ||
+      typeof data.labels !== "boolean"
+    )
+      throw new RangeError("Unknown dynamic chart template.");
+    return { type: data.type as ChartType, style: data.style as ChartStyleId, labels: data.labels };
   }
   const data = dataRecord(value, ["type", "variant"]);
   if (typeof data.type !== "string" || !isCommonChartType(data.type as ChartType))

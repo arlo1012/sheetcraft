@@ -26,20 +26,29 @@ import {
 import { normalizeCellNumberFormat, type CellNumberFormat } from "./style.js";
 import { readChartSeriesFilter, type ChartSeriesFilter } from "./chart-series-filter.js";
 
-export type ChartType =
-  | "column"
-  | "combo"
-  | "bar"
-  | "line"
-  | "area"
-  | "pie"
-  | "doughnut"
-  | "scatter"
-  | "radar"
-  | "treemap"
-  | "sankey"
-  | "river"
-  | "wordCloud";
+export const chartTypes = [
+  "column",
+  "combo",
+  "bar",
+  "line",
+  "area",
+  "pie",
+  "doughnut",
+  "scatter",
+  "radar",
+  "treemap",
+  "sankey",
+  "river",
+  "wordCloud",
+  "rose",
+  "funnel",
+  "gauge",
+  "liquid",
+  "waterfall",
+  "venn",
+] as const;
+export type ChartType = (typeof chartTypes)[number];
+
 /** Sparse element layout choices; omission retains the existing chart behavior. */
 export type ChartElementSettings = {
   titlePosition?: "none" | "above" | "overlay";
@@ -77,21 +86,6 @@ export type SheetChart = {
   format?: ChartFormatSettings;
   presentation?: ChartPresentationSettings;
 };
-const types = new Set([
-  "column",
-  "combo",
-  "bar",
-  "line",
-  "area",
-  "pie",
-  "doughnut",
-  "scatter",
-  "radar",
-  "treemap",
-  "sankey",
-  "river",
-  "wordCloud",
-]);
 function normalizeChartElementSettings(value: unknown): ChartElementSettings {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new TypeError("Invalid chart element settings.");
@@ -218,7 +212,7 @@ export function normalizeSheetChart(chart: SheetChart): SheetChart {
     (chart.pivotTableId !== undefined && chart.dataCache !== undefined) ||
     (chart.pivotTableId !== undefined &&
       (typeof chart.pivotTableId !== "string" || !chart.pivotTableId.trim())) ||
-    !types.has(chart.type) ||
+    !chartTypes.includes(chart.type) ||
     typeof chart.title !== "string" ||
     chart.title.length > 1000 ||
     !["columns", "rows"].includes(chart.seriesBy) ||

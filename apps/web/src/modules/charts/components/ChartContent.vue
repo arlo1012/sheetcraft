@@ -140,7 +140,7 @@ const scriptFontLimited = computed(() => {
   const limited = (text: ChartTextFormat | undefined, labels: string[]) =>
     !!text?.scriptFonts &&
     labels.some((label) => createChartTextPlan(label, text, props.theme).limitations.length > 0);
-  const names = ["pie", "doughnut"].includes(paintChart.value.type)
+  const names = ["pie", "doughnut", "rose", "funnel"].includes(paintChart.value.type)
     ? data.value.categories
     : data.value.series.map((series) => series.name);
   const numeric = (axis: NonNullable<typeof f>["valueAxis"]) =>
@@ -394,6 +394,9 @@ function render() {
       tableError.value = false;
       return;
     }
+    const animate =
+      !!paintChart.value.presentation?.animated &&
+      !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const option = createChartOption(
       paintChart.value,
       data.value,
@@ -401,6 +404,7 @@ function render() {
         width: props.drawing.width,
         height: props.drawing.height,
         theme: props.theme,
+        animate,
       },
       props.comboSeriesChanges,
     );
@@ -433,6 +437,10 @@ function render() {
       { ...props.drawing, theme: props.theme },
       props.comboSeriesChanges,
     );
+    if (animate) {
+      option.animation = true;
+      option.animationDuration = 550;
+    }
     chart.setOption(prepareChartDataTableOption(option, table), { notMerge: true });
     if (table) applyChartDataTableGraphics(chart, table);
     bindEvents(chart);
@@ -525,7 +533,8 @@ onBeforeUnmount(() => {
       </text>
       <text
         v-for="(word, index) in words"
-        :key="index"
+        :key="word.text + ':' + index"
+        :class="{ 'chart-content__animated-word': paintChart.presentation?.animated }"
         :x="word.x"
         :y="word.y"
         :font-size="word.size"
@@ -580,6 +589,19 @@ onBeforeUnmount(() => {
     box-sizing: border-box;
     outline: 1px solid var(--sheetcraft-action-primary, #2563eb);
     outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    &__animated-word {
+      animation: chart-word-appear 0.55s ease-out both;
+    }
+  }
+  @keyframes chart-word-appear {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
   &__error {
     position: absolute;

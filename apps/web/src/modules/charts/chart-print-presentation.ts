@@ -4,7 +4,7 @@ import type { EChartsOption, SeriesOption } from "echarts";
 import { use } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
-import { normalizeChartDataCache, type ChartData } from "@sheetcraft/core/sheet-charts";
+import { chartTypes, normalizeChartDataCache, type ChartData } from "@sheetcraft/core/sheet-charts";
 import { normalizeChartFormat } from "@sheetcraft/core/chart-format";
 import type { ChartComboSeriesChange } from "@sheetcraft/core/chart-combo";
 import { init, type EChartsType } from "./chart-runtime";
@@ -87,23 +87,7 @@ function validateDrawing(drawing: SheetChartDrawing, data: ChartData) {
     drawing.height <= 0
   )
     throw new RangeError("Invalid chart drawing dimensions.");
-  if (
-    ![
-      "column",
-      "bar",
-      "line",
-      "area",
-      "combo",
-      "pie",
-      "doughnut",
-      "scatter",
-      "radar",
-      "treemap",
-      "sankey",
-      "river",
-      "wordCloud",
-    ].includes(drawing.chart.type)
-  )
+  if (!chartTypes.includes(drawing.chart.type))
     throw new RangeError("Unsupported chart print type.");
   if (
     data.diagnostics?.some(

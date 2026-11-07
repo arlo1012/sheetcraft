@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef, useId } from "vue";
+import { defineAsyncComponent, computed, ref, shallowRef, useId } from "vue";
 import {
   ChartColumn,
   ChartLine,
@@ -8,6 +8,7 @@ import {
   ChartPie,
   ChartScatter,
   ChartNetwork,
+  ChartNoAxesCombined,
   LayoutDashboard,
 } from "lucide-vue-next";
 import type { ChartType } from "@sheetcraft/core/sheet-charts";
@@ -25,6 +26,8 @@ import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import { useAppI18n } from "../../../shared/i18n";
+const DynamicChartGallery = defineAsyncComponent(() => import("./DynamicChartGallery.vue"));
+const galleryOpen = ref(false);
 const props = defineProps<{ disabled: boolean; dashboardDisabled?: boolean }>();
 const emit = defineEmits<{ insert: [intent: ChartInsertIntent]; dashboard: [] }>();
 const { t } = useAppI18n();
@@ -183,6 +186,22 @@ function insert(type: ChartType) {
         ><ChartScatter
       /></RibbonButton>
     </div>
+    <RibbonButton
+      variant="tall"
+      :label="t('chart.dynamic')"
+      :text="t('chart.dynamic')"
+      :disabled="disabled"
+      @activate="galleryOpen = true"
+      ><ChartNoAxesCombined
+    /></RibbonButton>
+    <DynamicChartGallery
+      v-if="galleryOpen && !disabled"
+      @close="galleryOpen = false"
+      @choose="
+        galleryOpen = false;
+        emit('insert', $event);
+      "
+    />
     <RibbonMenuButton
       ref="triggerComponent"
       variant="tall"

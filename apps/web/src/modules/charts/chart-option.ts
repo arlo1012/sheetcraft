@@ -1,3 +1,4 @@
+import { specialtyOption } from "./chart-specialty-options";
 import { applyChartSeriesRenderOrder } from "./chart-series-render-order";
 import { reserveChartAxisTitles } from "./chart-axis-title-layout";
 import type { ChartFontContext } from "./chart-script-fonts";
@@ -28,7 +29,7 @@ import {
   getChartRenderPresentation,
 } from "./chart-presentation-render";
 const colors = DEFAULT_CHART_PALETTE;
-type ChartDimensions = { width: number; height: number } & ChartFontContext;
+type ChartDimensions = { width: number; height: number; animate?: boolean } & ChartFontContext;
 
 /** Explicit sources keep each series' original palette slot when reordered. */
 function seriesAppearance(series: ChartData["series"][number], palette: readonly string[]) {
@@ -110,13 +111,22 @@ function buildChartOption(
     textStyle: { fontFamily: "Arial, sans-serif" },
     ...(layout ? { title: layout.title, legend: layout.legend } : {}),
   };
-  if (chart.type === "pie" || chart.type === "doughnut")
+  const special = specialtyOption(
+    chart,
+    data,
+    common,
+    palette,
+    dimensions ?? { width: 480, height: 300 },
+  );
+  if (special) return special;
+  if (chart.type === "pie" || chart.type === "doughnut" || chart.type === "rose")
     return {
       ...common,
       series: [
         {
           type: "pie",
           ...plotBounds,
+          ...(chart.type === "rose" ? { roseType: "radius" as const } : {}),
           radius: chart.type === "doughnut" ? ["35%", "65%"] : "65%",
           center: ["50%", "50%"],
           label: { show: chart.labels },

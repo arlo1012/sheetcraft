@@ -1,4 +1,19 @@
 export const chartsEnUS = {
+  "chart.animate": "Animate chart",
+  "chart.dynamic": "Dynamic charts",
+  "chart.rose": "Rose",
+  "chart.funnel": "Funnel",
+  "chart.gauge": "Gauge",
+  "chart.liquid": "Liquid level",
+  "chart.waterfall": "Waterfall",
+  "chart.venn": "Venn",
+  "chart.vennHint":
+    "Use the first three values in one series: the two set sizes followed by their intersection.",
+  "chart.percentHint":
+    "Uses the first numeric value from 0 to 100. Percentage cells use their displayed percentage.",
+  "chart.waterfallHint":
+    "Values in the first series represent successive changes. Negative changes step down.",
+  "chart.templateHint": "Choose a template to configure its data range and chart settings.",
   "chart.comboCategory": "Combo",
   "chart.scriptOrThemeFont": "Script/theme fonts",
   "chart.scriptFontPreviewLimited":

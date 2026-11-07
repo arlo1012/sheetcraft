@@ -3,6 +3,7 @@ import { readPictureDataArray } from "./picture-data-array.js";
 /** Sparse chart-wide choices; omission retains the chart's existing presentation. */
 export type ChartPresentationSettings = {
   /** A rendering choice only; worksheet and cached values remain unchanged. */
+  animated?: true;
   percentStacked?: true;
   lineMarkers?: boolean;
   /** Ordered opaque RGB colors, independent of source-series identities. */
@@ -10,7 +11,7 @@ export type ChartPresentationSettings = {
   background?: string;
 };
 
-const keys = ["percentStacked", "lineMarkers", "palette", "background"] as const;
+const keys = ["animated", "percentStacked", "lineMarkers", "palette", "background"] as const;
 
 function color(value: unknown): string {
   if (typeof value !== "string" || !/^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(value))
@@ -43,6 +44,10 @@ export function normalizeChartPresentation(value: unknown): ChartPresentationSet
     source[key] = field.value as unknown;
   }
   const result: ChartPresentationSettings = {};
+  if (Object.hasOwn(source, "animated")) {
+    if (source.animated !== true) throw new TypeError("Omit animated to disable chart motion.");
+    result.animated = true;
+  }
   if (Object.hasOwn(source, "percentStacked")) {
     if (source.percentStacked !== true)
       throw new TypeError("Chart percent stacking must be true; omit it to reset.");
