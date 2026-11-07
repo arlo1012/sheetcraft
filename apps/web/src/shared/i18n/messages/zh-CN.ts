@@ -3,6 +3,7 @@ import { symbolsZhCN } from "../../../modules/insert-tools/symbol-messages.zh-CN
 import { pivotsZhCN } from "../../../modules/pivot-tables/pivot-messages.zh-CN";
 import { controlsZhCN } from "../../../modules/form-controls/control-messages.zh-CN";
 import { attachmentsZhCN } from "../../../modules/attachments/attachment-messages.zh-CN";
+import { flowchartsZhCN } from "../../../modules/flowcharts/flowchart-messages";
 import { cameraZhCN } from "../../../modules/camera/camera-messages.zh-CN";
 import { sparklinesZhCN } from "../../../modules/sparklines/sparkline-messages.zh-CN";
 import { chartsZhCN } from "../../../modules/charts/chart-messages.zh-CN";
@@ -30,6 +31,7 @@ export const zhCN = {
   ...pivotsZhCN,
   ...controlsZhCN,
   ...attachmentsZhCN,
+  ...flowchartsZhCN,
   ...cameraZhCN,
   ...sparklinesZhCN,
   ...chartsZhCN,

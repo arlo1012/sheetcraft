@@ -76,6 +76,7 @@ import CalculatedColumnDialog from "../modules/table-styles/components/Calculate
 import TableToolsToolbar from "../modules/table-styles/components/TableToolsToolbar.vue";
 import NewTableStyleDialog from "../modules/table-styles/components/NewTableStyleDialog.vue";
 import HyperlinkDialog from "../modules/hyperlinks/components/HyperlinkDialog.vue";
+import { useFlowchartActions } from "../modules/flowcharts/useFlowchartActions";
 import AttachmentInsertDialog from "../modules/attachments/components/AttachmentInsertDialog.vue";
 import { useHyperlinksController } from "../modules/hyperlinks/useHyperlinksController";
 import NewCellStyleDialog from "../modules/cell-styles/components/NewCellStyleDialog.vue";
@@ -174,6 +175,9 @@ import {
 } from "../modules/charts/chart-source-editor";
 import ChartElementsToolbar from "../modules/charts/components/ChartElementsToolbar.vue";
 import { defineAsyncComponent } from "vue";
+const FlowchartDialog = defineAsyncComponent(
+  () => import("../modules/flowcharts/FlowchartDialog.vue"),
+);
 const ChartEditorDialog = defineAsyncComponent(
   () => import("../modules/charts/components/ChartEditorDialog.vue"),
 );
@@ -1579,6 +1583,17 @@ const {
 } = attachmentActions;
 watch(() => activeSheet.value.id, attachmentActions.close);
 watch(workbookGeneration, attachmentActions.close);
+const flowcharts = useFlowchartActions({
+  getSheets: () => session.workbook.sheets.values(),
+  getSheet: () => activeSheet.value,
+  getAddress: () => activeAddress.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  flush: () => cellEditSession.finish(),
+  execute: executeCommand,
+});
+const { editor: flowchartEditor, error: flowchartError } = flowcharts;
+watch(() => activeSheet.value.id, flowcharts.close);
+watch(workbookGeneration, flowcharts.close);
 const cameraActions = useCameraActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -1929,8 +1944,9 @@ function editSheetDrawing(drawing: SheetDrawing): void {
   }
   if (drawing.kind === "chart") chartActions.edit(drawing);
   else if (drawing.kind === "control") controlActions.open(drawing);
-  else if (drawing.kind === "attachment") attachmentActions.viewing.value = drawing;
-  else if (drawing.kind === "camera") cameraActions.open(drawing);
+  else if (drawing.kind === "attachment") {
+    if (!flowcharts.open("gallery", drawing)) attachmentActions.viewing.value = drawing;
+  } else if (drawing.kind === "camera") cameraActions.open(drawing);
   else if (drawing.kind === "equation") beginEquationEdit(drawing);
   else drawingActions.edit(drawing);
 }
@@ -5024,6 +5040,7 @@ const gridInert = computed(
     pivotFieldSettingsOpen.value ||
     !!pictureAnnotation.value ||
     !!viewingAttachment.value ||
+    !!flowchartEditor.value ||
     !!insertingAttachment.value ||
     !!editingDrawing.value ||
     (!!textBoxReferenceDialog.value && !pickingTextBoxReference.value) ||
@@ -5145,6 +5162,7 @@ watch(
         pivotFieldSettingsOpen ||
         !!pictureAnnotation ||
         !!viewingAttachment ||
+        !!flowchartEditor ||
         !!insertingAttachment ||
         !!editingDrawing ||
         !!textBoxReferenceDialog ||
@@ -5556,6 +5574,7 @@ watch(
           @refresh-pivot="pivotActions.refresh"
           @remove-pivot="pivotActions.remove"
           @insert-control="controlActions.insert($event)"
+          @insert-flowchart="flowcharts.open($event)"
           @insert-attachment="attachmentActions.requestInsert"
           @insert-drawing="drawingActions.insert"
           :insert-icon-handler="drawingActions.insertIcon"
@@ -6470,6 +6489,7 @@ watch(
         pivotFieldSettingsOpen ||
         !!pictureAnnotation ||
         !!viewingAttachment ||
+        !!flowchartEditor ||
         !!insertingAttachment ||
         !!editingDrawing ||
         !!textBoxReferenceDialog ||
@@ -7130,6 +7150,7 @@ watch(
         pivotFieldSettingsOpen ||
         !!pictureAnnotation ||
         !!viewingAttachment ||
+        !!flowchartEditor ||
         !!insertingAttachment ||
         !!editingDrawing ||
         symbolVisible ||
@@ -7305,6 +7326,15 @@ watch(
     type="file"
     hidden
     @change="attachmentActions.onFiles"
+  />
+  <FlowchartDialog
+    v-if="flowchartEditor"
+    :start="flowchartEditor.start"
+    :existing="flowchartEditor.existing"
+    :source="flowchartEditor.document"
+    :error="flowchartError"
+    @save="flowcharts.save"
+    @close="flowcharts.close"
   />
   <AttachmentInsertDialog
     v-if="insertingAttachment"

@@ -1,3 +1,4 @@
+import { createAttachmentDrawing } from "./create-attachment-drawing";
 import { ref, shallowRef } from "vue";
 import { canUseSheetPermission } from "@sheetcraft/core";
 import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
@@ -80,27 +81,7 @@ export function useAttachmentActions(options: {
     try {
       const attachment = await prepareAttachment(pending.file, display);
       if (!isCurrent(pending)) return;
-      const drawing: SheetAttachmentDrawing = {
-        id: idFactory("attachment"),
-        kind: "attachment",
-        name: attachment.filename,
-        anchor: pending.address,
-        offsetX: 8,
-        offsetY: 8,
-        width: display === "document" ? 360 : 220,
-        height: display === "document" ? 240 : 80,
-        text: "",
-        shape: "rectangle",
-        fill: "#ffffff",
-        stroke: "#d1d5db",
-        strokeWidth: 1,
-        color: "#111827",
-        fontSize: 14,
-        bold: false,
-        italic: false,
-        rotation: 0,
-        attachment,
-      };
+      const drawing = createAttachmentDrawing(idFactory("attachment"), pending.address, attachment);
       const accepted = options.execute(
         createSetSheetDrawingsCommand(pending.sheet.id, [
           ...(options.getSheet().drawings ?? []),

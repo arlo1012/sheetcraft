@@ -3,6 +3,7 @@ import type { symbolsEnUS } from "../../modules/insert-tools/symbol-messages.en-
 import type { pivotsEnUS } from "../../modules/pivot-tables/pivot-messages.en-US";
 import type { controlsEnUS } from "../../modules/form-controls/control-messages.en-US";
 import type { attachmentsEnUS } from "../../modules/attachments/attachment-messages.en-US";
+import type { flowchartsEnUS } from "../../modules/flowcharts/flowchart-messages";
 import type { cameraEnUS } from "../../modules/camera/camera-messages.en-US";
 import type { sparklinesEnUS } from "../../modules/sparklines/sparkline-messages.en-US";
 import type { chartsEnUS } from "../../modules/charts/chart-messages.en-US";
@@ -29,6 +30,7 @@ type ToolMessageSchema = typeof symbolsEnUS &
   typeof pivotsEnUS &
   typeof controlsEnUS &
   typeof attachmentsEnUS &
+  typeof flowchartsEnUS &
   typeof cameraEnUS &
   typeof sparklinesEnUS &
   typeof chartsEnUS &

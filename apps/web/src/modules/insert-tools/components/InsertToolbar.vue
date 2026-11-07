@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import EquationInsertMenu from "../../sheet-drawings/equation/EquationInsertMenu.vue";
 import type { EquationPresetId } from "../../sheet-drawings/equation/equation-catalog";
+import FlowchartInsertMenu from "../../flowcharts/FlowchartInsertMenu.vue";
+import type { FlowchartStart } from "../../flowcharts/flowchart-templates";
 import SymbolInsertMenu from "./SymbolInsertMenu.vue";
 import type { SymbolInsertion } from "../symbols/symbol-preferences";
 import PivotInsertTools from "../../pivot-tables/components/PivotInsertTools.vue";
@@ -60,6 +62,7 @@ const emit = defineEmits<{
   editPivot: [];
   removePivot: [];
   insertChart: [intent: ChartInsertIntent];
+  insertFlowchart: [start: FlowchartStart];
   insertAttachment: [display: "icon" | "document"];
   insertCamera: [];
   insertControl: [type: FormControlType];
@@ -181,6 +184,7 @@ const { t, locale } = useAppI18n();
         @activate="emit('insertDrawing', 'wordArt')"
         ><ALargeSmall
       /></RibbonButton>
+      <FlowchartInsertMenu :disabled="imageDisabled" @insert="emit('insertFlowchart', $event)" />
       <TextBoxInsertMenu
         v-if="insertShapeHandler"
         :disabled="imageDisabled"

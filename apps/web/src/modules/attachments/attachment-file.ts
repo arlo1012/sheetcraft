@@ -11,22 +11,27 @@ export async function prepareAttachment(
 ): Promise<SheetAttachment> {
   if (file.size > MAX_ATTACHMENT_BYTES) throw new RangeError("Attachment is too large.");
   const bytes = new Uint8Array(await file.arrayBuffer());
-  let raw = "";
-  for (let i = 0; i < bytes.length; i += 16384)
-    raw += String.fromCharCode(...bytes.subarray(i, i + 16384));
   return normalizeSheetAttachment({
     filename: file.name.replaceAll(/[\\/]/g, "_").slice(0, 255),
     mimeType:
       file.type && /^[\w.+-]+\/[\w.+-]+$/.test(file.type) ? file.type : "application/octet-stream",
     size: bytes.length,
-    data: btoa(raw),
+    data: encodeAttachmentBytes(bytes),
     display,
   });
 }
+export function encodeAttachmentBytes(bytes: Uint8Array): string {
+  let raw = "";
+  for (let i = 0; i < bytes.length; i += 16384)
+    raw += String.fromCharCode(...bytes.subarray(i, i + 16384));
+  return btoa(raw);
+}
+export function decodeAttachmentBytes(data: string) {
+  return Uint8Array.from(atob(data), (char) => char.charCodeAt(0));
+}
 export function attachmentBlob(attachment: SheetAttachment): Blob {
   const value = normalizeSheetAttachment(attachment);
-  const raw = atob(value.data);
-  return new Blob([Uint8Array.from(raw, (char) => char.charCodeAt(0))], { type: value.mimeType });
+  return new Blob([decodeAttachmentBytes(value.data)], { type: value.mimeType });
 }
 export function attachmentText(attachment: SheetAttachment): string | undefined {
   if (

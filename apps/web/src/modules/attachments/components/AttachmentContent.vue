@@ -1,17 +1,26 @@
 <script setup lang="ts">
+import { decodeFlowchartAttachment, FLOWCHART_MIME } from "../../flowcharts/flowchart-document";
+import FlowchartCanvas from "../../flowcharts/FlowchartCanvas.vue";
 import { computed } from "vue";
 import { FileText, Paperclip } from "lucide-vue-next";
 import type { SheetAttachmentDrawing } from "@sheetcraft/core/sheet-drawings";
 import { attachmentText } from "../attachment-file";
 const props = defineProps<{ drawing: SheetAttachmentDrawing }>();
+const chart = computed(
+  () =>
+    props.drawing.attachment.display === "document" &&
+    decodeFlowchartAttachment(props.drawing.attachment),
+);
 const text = computed(() =>
-  props.drawing.attachment.display === "document"
+  props.drawing.attachment.display === "document" &&
+  props.drawing.attachment.mimeType !== FLOWCHART_MIME
     ? attachmentText(props.drawing.attachment)
     : undefined,
 );
 </script>
 <template>
-  <div class="attachment-content">
+  <FlowchartCanvas v-if="chart" :document="chart" />
+  <div v-else class="attachment-content">
     <div class="attachment-content__heading">
       <FileText v-if="drawing.attachment.display === 'document'" :size="28" /><Paperclip
         v-else
