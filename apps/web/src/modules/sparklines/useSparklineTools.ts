@@ -97,6 +97,7 @@ export function useSparklineTools(options: {
       "markers",
       "axis",
       "rightToLeft",
+      "dateRange",
       "minAxis",
       "maxAxis",
       "showHidden",

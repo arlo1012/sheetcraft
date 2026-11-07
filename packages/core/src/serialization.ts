@@ -360,6 +360,7 @@ export type WorkbookSnapshotV97 = Omit<WorkbookSnapshotV96, "version"> & { versi
 /** Explicit horizontal plotting direction for sparklines. */
 export type WorkbookSnapshotV98 = Omit<WorkbookSnapshotV97, "version"> & { version: 98 };
 export type WorkbookSnapshotV99 = Omit<WorkbookSnapshotV98, "version"> & { version: 99 };
+export type WorkbookSnapshotV100 = Omit<WorkbookSnapshotV99, "version"> & { version: 100 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
   | WorkbookSnapshotV44
@@ -417,7 +418,8 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV96
   | WorkbookSnapshotV97
   | WorkbookSnapshotV98
-  | WorkbookSnapshotV99;
+  | WorkbookSnapshotV99
+  | WorkbookSnapshotV100;
 type WorkbookWritePayload = Omit<WorkbookSnapshotV98, "version"> & {
   version: WorkbookSnapshot["version"];
 };
@@ -538,7 +540,8 @@ type SnapshotVersion =
   | 96
   | 97
   | 98
-  | 99;
+  | 99
+  | 100;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -554,6 +557,9 @@ function hasCameraSourceSheet(drawings: unknown): boolean {
 
 function hasSparklineGroup(value: unknown): boolean {
   return value !== null && typeof value === "object" && Object.hasOwn(value, "groupId");
+}
+function hasSparklineDates(value: unknown): boolean {
+  return value !== null && typeof value === "object" && Object.hasOwn(value, "dateRange");
 }
 function hasSparklineDirection(value: unknown): boolean {
   return value !== null && typeof value === "object" && Object.hasOwn(value, "rightToLeft");
@@ -1595,6 +1601,8 @@ function parseCell(value: unknown, path: string, version: SnapshotVersion): Cell
   if (version < 27 && Object.hasOwn(record, "sparkline"))
     return fail(path, "Sparklines require snapshot version 27.");
   const hasSparkline = version >= 27 && Object.hasOwn(record, "sparkline");
+  if (hasSparkline && version < 100 && hasSparklineDates(record.sparkline))
+    return fail(`${path}.sparkline`, "Sparkline dates require snapshot version 100.");
   if (hasSparkline && version < 98 && hasSparklineDirection(record.sparkline))
     return fail(`${path}.sparkline`, "Sparkline direction requires snapshot version 98.");
   if (hasSparkline && version < 97 && hasSparklineAxisLimits(record.sparkline))
@@ -2799,6 +2807,11 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     )
       version = 98;
     if (Object.hasOwn(record, "dashboard")) version = 99;
+    if (
+      Array.isArray(record.cells) &&
+      record.cells.some((cell) => hasSparklineDates(asRecord(cell, path).sparkline))
+    )
+      version = 100;
   }
   if (Object.hasOwn(record, "dashboard") && version < 99)
     return fail(path + ".dashboard", "Dashboard worksheets require snapshot version 99.");
@@ -3275,6 +3288,8 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   if (sheets.some((sheet) => sheet.cells.some((cell) => hasSparklineDirection(cell.sparkline))))
     snapshot.version = 98;
   if (sheets.some((sheet) => sheet.dashboard)) snapshot.version = 99;
+  if (sheets.some((sheet) => sheet.cells.some((cell) => hasSparklineDates(cell.sparkline))))
+    snapshot.version = 100;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -3381,7 +3396,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 96 &&
     record.version !== 97 &&
     record.version !== 98 &&
-    record.version !== 99
+    record.version !== 99 &&
+    record.version !== 100
   ) {
     throw new WorkbookDomainError(
       {

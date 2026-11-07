@@ -32,7 +32,7 @@ import {
   normalizePivotTables,
 } from "../pivot-tables.js";
 import { getCellSparkline, setCellSparkline } from "../workbook.js";
-import { cloneCellSparkline } from "../sparklines.js";
+import { cloneCellSparkline, mapSparklineRanges } from "../sparklines.js";
 import {
   normalizeSheetDrawings,
   mapDrawingSource,
@@ -1185,17 +1185,12 @@ function transformSheetAxis(
   }
   for (const [key, originalCell] of sheet.cells) {
     let cell = originalCell;
-    if (cell.sparkline?.source) {
-      const source = transformRangeForAxis(
-        cell.sparkline.source,
-        axis,
-        index,
-        count,
-        maximum,
-        operation,
+    if (cell.sparkline) {
+      const sparkline = mapSparklineRanges(cell.sparkline, (range) =>
+        transformRangeForAxis(range, axis, index, count, maximum, operation),
       );
-      if (JSON.stringify(source) !== JSON.stringify(cell.sparkline.source)) {
-        cell = { ...cell, sparkline: { ...cell.sparkline, source } };
+      if (JSON.stringify(sparkline) !== JSON.stringify(cell.sparkline)) {
+        cell = { ...cell, sparkline };
         sheet.cells.set(key, cell);
         changed = true;
       }
@@ -1540,19 +1535,16 @@ function validateSheetAxisSlice(
     );
     if (index === null) continue;
     const current = getCellSparkline(sheet, setAxisIndex(entry.address, command.axis, index));
-    const expected = {
-      ...sparkline,
-      source: sparkline.source
-        ? transformRangeForAxis(
-            sparkline.source,
-            command.axis,
-            command.index,
-            command.count,
-            maximum,
-            command.operation,
-          )
-        : null,
-    };
+    const expected = mapSparklineRanges(sparkline, (range) =>
+      transformRangeForAxis(
+        range,
+        command.axis,
+        command.index,
+        command.count,
+        maximum,
+        command.operation,
+      ),
+    );
     if (JSON.stringify(current) !== JSON.stringify(expected))
       throw invalidCommandPayload("slice.sparklineSources", entry);
   }
@@ -2472,18 +2464,15 @@ export function applyMoveSheetAxisCommand(
         address: mapAddress(cell.address),
         ...(cell.sparkline
           ? {
-              sparkline: {
-                ...cell.sparkline,
-                source: cell.sparkline.source
-                  ? transformRangeForAxisMove(
-                      cell.sparkline.source,
-                      command.axis,
-                      command.index,
-                      command.count,
-                      command.toIndex,
-                    )
-                  : null,
-              },
+              sparkline: mapSparklineRanges(cell.sparkline, (range) =>
+                transformRangeForAxisMove(
+                  range,
+                  command.axis,
+                  command.index,
+                  command.count,
+                  command.toIndex,
+                ),
+              ),
             }
           : {}),
         ...(content?.kind === "formula"

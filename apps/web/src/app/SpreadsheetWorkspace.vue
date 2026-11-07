@@ -136,6 +136,8 @@ import { createCanvasImageCache } from "../modules/sheet-grid/canvas/image-paint
 import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
 import { useSparklineTools } from "../modules/sparklines/useSparklineTools";
 import { useSparklineDataOptions } from "../modules/sparklines/useSparklineDataOptions";
+import { useSparklineDateAxis } from "../modules/sparklines/useSparklineDateAxis";
+import SparklineDateAxisDialog from "../modules/sparklines/components/SparklineDateAxisDialog.vue";
 import { useSparklineAxisLimit } from "../modules/sparklines/useSparklineAxisLimit";
 import SparklineAxisLimitDialog from "../modules/sparklines/components/SparklineAxisLimitDialog.vue";
 import SparklineDataOptionsDialog from "../modules/sparklines/components/SparklineDataOptionsDialog.vue";
@@ -1664,32 +1666,35 @@ const sparklineSettings = {
   flush: () => cellEditSession.finish(),
 };
 const sparklineDataOptions = useSparklineDataOptions(sparklineSettings);
+const sparklineDates = useSparklineDateAxis(sparklineSettings, () => activeSheet.value.name);
 const sparklineAxisLimit = useSparklineAxisLimit(sparklineSettings);
 const { active: pickingSparklineRange, reference: pickedSparklineReference } = sparklineRangePicker;
 let sparklinePickerSequence = 0;
 const sparklinePicker = shallowRef<{ id: number; confirm: () => void; cancel: () => void }>();
 const selectSparklineReference = computed(() => {
   const dialog = sparklineDialog.value;
+  const dates = sparklineDates.dialog.value;
+  const currentOwner = () => (dates ? sparklineDates.dialog.value === dates : dialog?.isCurrent());
   return async (current: string): Promise<string | undefined> => {
-    if (!dialog?.isCurrent()) return undefined;
+    if (!currentOwner()) return undefined;
     const selection = sparklineRangePicker.selectReference(current);
     const picker = {
       id: ++sparklinePickerSequence,
       confirm: () => {
-        if (sparklinePicker.value === picker && dialog.isCurrent()) sparklineRangePicker.confirm();
+        if (sparklinePicker.value === picker && currentOwner()) sparklineRangePicker.confirm();
       },
       cancel: () => {
-        if (sparklinePicker.value === picker && dialog.isCurrent()) sparklineRangePicker.cancel();
+        if (sparklinePicker.value === picker && currentOwner()) sparklineRangePicker.cancel();
       },
     };
     sparklinePicker.value = picker;
     const result = await selection;
     if (sparklinePicker.value === picker) sparklinePicker.value = undefined;
-    return dialog.isCurrent() ? result : undefined;
+    return currentOwner() ? result : undefined;
   };
 });
 watch(
-  sparklineDialog,
+  [sparklineDialog, sparklineDates.dialog],
   () => {
     sparklineRangePicker.cancel();
     sparklinePicker.value = undefined;
@@ -5165,7 +5170,7 @@ const gridInert = computed(
     !!shapeClipboardTransferConfirmation.value ||
     symbolVisible.value ||
     ((!!editingChart.value || !!chartSourceDialog.value) && !pickingChartRange.value) ||
-    (!!sparklineDraft.value && !pickingSparklineRange.value) ||
+    ((!!sparklineDraft.value || !!sparklineDates.dialog.value) && !pickingSparklineRange.value) ||
     !!sparklineDataOptions.dialog.value ||
     !!sparklineAxisLimit.dialog.value ||
     cellStylesModalOpen.value ||
@@ -5290,7 +5295,7 @@ watch(
         !!shapeClipboardTransferConfirmation ||
         symbolVisible ||
         ((!!editingChart || !!chartSourceDialog) && !pickingChartRange) ||
-        (!!sparklineDraft && !pickingSparklineRange) ||
+        ((!!sparklineDraft || !!sparklineDates.dialog.value) && !pickingSparklineRange) ||
         cellStylesModalOpen ||
         tableModalOpen ||
         !!findFormatDraft ||
@@ -5675,6 +5680,7 @@ watch(
           :context="sparklineToolContext"
           @data-options="sparklineDataOptions.open"
           @custom-axis="sparklineAxisLimit.open"
+          @date-axis="sparklineDates.open"
         />
       </template>
       <template #insert-tools>
@@ -6670,7 +6676,7 @@ watch(
         !!shapeClipboardTransferConfirmation ||
         symbolVisible ||
         ((!!editingChart || !!chartSourceDialog) && !pickingChartRange) ||
-        (!!sparklineDraft && !pickingSparklineRange) ||
+        ((!!sparklineDraft || !!sparklineDates.dialog.value) && !pickingSparklineRange) ||
         cellStylesModalOpen ||
         tableModalOpen ||
         dataToolsModalOpen ||
@@ -7351,7 +7357,7 @@ watch(
         !!editingDrawing ||
         symbolVisible ||
         ((!!editingChart || !!chartSourceDialog) && !pickingChartRange) ||
-        (!!sparklineDraft && !pickingSparklineRange) ||
+        ((!!sparklineDraft || !!sparklineDates.dialog.value) && !pickingSparklineRange) ||
         cellStylesModalOpen ||
         (tableModalOpen && !pickingTableRange)
       "
@@ -7631,6 +7637,16 @@ watch(
     :edit-session-id="cellEditSession.id"
     @confirm="cameraRangePicker.confirm"
     @cancel="cameraRangePicker.cancel"
+  />
+  <SparklineDateAxisDialog
+    v-if="sparklineDates.dialog.value"
+    :key="sparklineDates.dialog.value.key"
+    :initial="sparklineDates.dialog.value.initial"
+    :failed="sparklineDates.failed.value"
+    :suspended="pickingSparklineRange"
+    :select-reference="selectSparklineReference"
+    @confirm="sparklineDates.dialog.value.confirm"
+    @close="sparklineDates.dialog.value.close"
   />
   <SparklineAxisLimitDialog
     v-if="sparklineAxisLimit.dialog.value"

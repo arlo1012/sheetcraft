@@ -50,14 +50,14 @@ async function fixture(value: CellSparkline) {
   return { workbook, sheet };
 }
 
-async function nativeArchive(flags: string, colorTags: string) {
+async function nativeArchive(flags: string, colorTags: string, dateFormula?: string) {
   const workbook = createWorkbook({
     id: "native-sparkline",
     sheetId: "sheet",
     sheetName: "Native",
   });
   const entries = unzipSync((await encodeXlsx(workbook)).bytes);
-  const extension = `<extLst><ext uri="{05C60535-1F16-4fd2-B633-F4F36F0B64E0}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><x14:sparklineGroups xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><x14:sparklineGroup type="line" displayEmptyCellsAs="gap" markers="0" displayXAxis="0" displayHidden="0" ${flags}>${colorTags}<x14:sparklines><x14:sparkline><xm:f>'Native'!A1:D1</xm:f><xm:sqref>F2</xm:sqref></x14:sparkline></x14:sparklines></x14:sparklineGroup></x14:sparklineGroups></ext></extLst>`;
+  const extension = `<extLst><ext uri="{05C60535-1F16-4fd2-B633-F4F36F0B64E0}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><x14:sparklineGroups xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><x14:sparklineGroup type="line" displayEmptyCellsAs="gap" markers="0" displayXAxis="0" displayHidden="0" ${flags}>${colorTags}${dateFormula === undefined ? "" : `<xm:f>${dateFormula}</xm:f>`}<x14:sparklines><x14:sparkline><xm:f>'Native'!A1:D1</xm:f><xm:sqref>F2</xm:sqref></x14:sparkline></x14:sparklines></x14:sparklineGroup></x14:sparklineGroups></ext></extLst>`;
   entries[part] = strToU8(
     strFromU8(entries[part]!).replace("</worksheet>", `${extension}</worksheet>`),
   );
@@ -171,24 +171,34 @@ describe("native XLSX sparkline point styles", () => {
     expect(omissionLocations(decoded)).not.toContain(location);
   });
 
-  test.each(['dateAxis="1"'])(
-    "still reports unsupported %s while retaining supported point styles",
-    async (axisAttribute) => {
-      const entries = await nativeArchive(
-        `negative="0" high="1" low="0" ${axisAttribute}`,
-        '<x14:colorSeries rgb="FF123456"/><x14:colorNegative rgb="FF654321"/><x14:colorHigh rgb="FF334466"/><x14:colorLow rgb="FF445577"/>',
-      );
-      const omitted = vi.fn();
-      const value = readXlsxSparklines(entries, ["Native"], omitted)[0]!.get("F2")!;
+  test("imports a valid date axis alongside point styles without reporting it omitted", async () => {
+    const entries = await nativeArchive(
+      'negative="0" high="1" low="0" dateAxis="1"',
+      '<x14:colorSeries rgb="FF123456"/><x14:colorNegative rgb="FF654321"/><x14:colorHigh rgb="FF334466"/><x14:colorLow rgb="FF445577"/>',
+      "'Native'!$A$5:$D$5",
+    );
+    const omitted = vi.fn();
+    const value = readXlsxSparklines(entries, ["Native"], omitted)[0]!.get("F2")!;
 
-      expect(value.highPoint).toEqual({ show: true, color: "#334466" });
-      expect(value.lowPoint).toEqual({ show: false, color: "#445577" });
-      expect(omitted.mock.calls).toEqual([[0, "F2"]]);
-      const decoded = await decodeXlsx(zipSync(entries));
-      expect(getCellSparkline(getActiveSheet(decoded.workbook), target)?.highPoint).toEqual(
-        value.highPoint,
-      );
-      expect(omissionLocations(decoded)).toContain(location);
-    },
-  );
+    expect(value.highPoint).toEqual({ show: true, color: "#334466" });
+    expect(value.lowPoint).toEqual({ show: false, color: "#445577" });
+    expect(value.dateRange).toEqual({
+      start: { row: 4, column: 0, rowAbsolute: true, columnAbsolute: true },
+      end: { row: 4, column: 3, rowAbsolute: true, columnAbsolute: true },
+    });
+    expect(value.source).toEqual({ start: { row: 0, column: 0 }, end: { row: 0, column: 3 } });
+    expect(omitted).not.toHaveBeenCalled();
+    const decoded = await decodeXlsx(zipSync(entries));
+    expect(getCellSparkline(getActiveSheet(decoded.workbook), target)?.highPoint).toEqual(
+      value.highPoint,
+    );
+    expect(omissionLocations(decoded)).not.toContain(location);
+  });
+
+  test("does not mistake a member data formula for a missing group date formula", async () => {
+    const entries = await nativeArchive('dateAxis="1"', '<x14:colorSeries rgb="FF123456"/>');
+    const omitted = vi.fn();
+    expect(readXlsxSparklines(entries, ["Native"], omitted)[0]!.has("F2")).toBe(false);
+    expect(omitted.mock.calls).toEqual([[0, "F2"]]);
+  });
 });

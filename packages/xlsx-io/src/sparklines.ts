@@ -3,6 +3,8 @@ import { parseFormulaReference } from "@sheetcraft/core/formula";
 import { getCellAddressLabel, parseCellAddress } from "@sheetcraft/core/coordinates";
 import {
   normalizeCellSparkline,
+  readSparklineDateRange,
+  formatSparklineDateRange,
   type CellSparkline,
   type SparklinePointKind,
   type SparklinePointStyle,
@@ -90,8 +92,12 @@ export function writeXlsxSparklines(entries: Unzipped, sheets: readonly Sheet[])
         .filter(([field]) => spark[field] !== undefined)
         .map(([field, , element]) => colorElement(element, spark[field]!.color))
         .join("");
+      const dates =
+        spark.dateRange === undefined
+          ? ""
+          : `<xm:f>${escape(spark.dateRange ? formatSparklineDateRange(spark.dateRange, sheet.name) : "#REF!")}</xm:f>`;
       const negative = spark.negativePoints ?? (spark.type !== "line" || spark.markers);
-      return `<x14:sparklineGroup type="${spark.type === "winLoss" ? "stacked" : spark.type}" displayEmptyCellsAs="${spark.empty === "connect" ? "span" : spark.empty}" markers="${Number(spark.markers)}" negative="${Number(negative)}" displayXAxis="${Number(spark.axis)}" displayHidden="${Number(spark.showHidden)}"${axisAttributes}${directionAttribute}${pointAttributes}>${colorElement("colorSeries", spark.color)}${colorElement("colorNegative", spark.negativeColor)}${colorElement("colorAxis", "#a3a3a3")}${colorElement("colorMarkers", spark.markerColor ?? spark.color)}${pointColors}<x14:sparklines>${members.join("")}</x14:sparklines></x14:sparklineGroup>`;
+      return `<x14:sparklineGroup type="${spark.type === "winLoss" ? "stacked" : spark.type}" ${dates ? 'dateAxis="1" ' : ""}displayEmptyCellsAs="${spark.empty === "connect" ? "span" : spark.empty}" markers="${Number(spark.markers)}" negative="${Number(negative)}" displayXAxis="${Number(spark.axis)}" displayHidden="${Number(spark.showHidden)}"${axisAttributes}${directionAttribute}${pointAttributes}>${colorElement("colorSeries", spark.color)}${colorElement("colorNegative", spark.negativeColor)}${colorElement("colorAxis", "#a3a3a3")}${colorElement("colorMarkers", spark.markerColor ?? spark.color)}${pointColors}${dates}<x14:sparklines>${members.join("")}</x14:sparklines></x14:sparklineGroup>`;
     });
     if (!groups.length) return;
     const xml = strFromU8(entries[part]!);
@@ -150,6 +156,13 @@ export function readXlsxSparklines(
           const type = attr(attributes, "type") ?? "line";
           const empty = attr(attributes, "displayEmptyCellsAs") ?? "zero";
           const flag = (name: string) => ["1", "true"].includes(attr(attributes, name) ?? "0");
+          let dateRange: CellSparkline["dateRange"];
+          if (flag("dateAxis")) {
+            const groupSettings = body.slice(0, body.search(/<(?:\w+:)?sparklines\b/));
+            const ref = decode(/<(?:\w+:)?f>([^<]*)<\//.exec(groupSettings)?.[1] ?? "");
+            dateRange = ref === "#REF!" ? null : readSparklineDateRange(ref, sheetNames[index]!);
+            if (dateRange === undefined) throw new Error("Unsupported sparkline date range.");
+          }
           const points: Partial<Record<SparklinePointKind, SparklinePointStyle>> = {};
           const limits: Pick<CellSparkline, "minAxis" | "maxAxis"> = {};
           for (const end of ["min", "max"] as const) {
@@ -176,6 +189,7 @@ export function readXlsxSparklines(
             ...(items.length > 1 ? { groupId } : {}),
             type: type === "stacked" ? "winLoss" : (type as CellSparkline["type"]),
             source: parsed?.target.range ?? null,
+            ...(dateRange === undefined ? {} : { dateRange }),
             color: color("colorSeries", "#2563eb"),
             negativeColor: color("colorNegative", "#ef4444"),
             negativePoints: flag("negative"),
@@ -193,7 +207,6 @@ export function readXlsxSparklines(
             empty: empty === "span" ? "connect" : (empty as CellSparkline["empty"]),
           })!;
           result.set(reference.toUpperCase(), sparkline);
-          if (flag("dateAxis")) omitted?.(index, reference);
         } catch {
           omitted?.(index, reference);
         }

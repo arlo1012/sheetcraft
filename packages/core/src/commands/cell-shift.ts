@@ -1,3 +1,4 @@
+import { mapSparklineRanges } from "../sparklines.js";
 import {
   prepareExternalDrawingCollections,
   readExternalDrawingCollections,
@@ -525,12 +526,9 @@ export function applyCellShiftCommand(
         ...(content === undefined ? {} : { content }),
         ...(cell.sparkline
           ? {
-              sparkline: {
-                ...cell.sparkline,
-                source: cell.sparkline.source
-                  ? transformFormulaRange(cell.sparkline.source, map, range, command.direction)
-                  : null,
-              },
+              sparkline: mapSparklineRanges(cell.sparkline, (reference) =>
+                transformFormulaRange(reference, map, range, command.direction),
+              ),
             }
           : {}),
       },

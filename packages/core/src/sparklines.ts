@@ -1,3 +1,5 @@
+import { parseFormulaReference } from "./formula/reference-model.js";
+import { getCellAddressLabel } from "./coordinates.js";
 import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
@@ -15,11 +17,50 @@ export type SparklineAxisLimit =
   | { type: "individual" | "group" }
   | { type: "custom"; value: number };
 export type SparklineScale = { min: number; max: number };
+type DateAddress = CellAddress & { rowAbsolute?: boolean; columnAbsolute?: boolean };
+export type SparklineDateRange = { start: DateAddress; end: DateAddress };
+export function readSparklineDateRange(
+  text: string,
+  sheetName: string,
+): SparklineDateRange | undefined {
+  const ref = parseFormulaReference(text.trim().replace(/^=/, ""), {
+    currentSheetId: sheetName,
+    resolveSheetId: (name) =>
+      name.toLowerCase() === sheetName.toLowerCase() ? sheetName : undefined,
+  });
+  if (!ref) return;
+  const { startReference: start, endReference } = ref.source;
+  const address = (ref: typeof start) => ({
+    row: ref.row,
+    column: ref.column,
+    ...(ref.rowAbsolute ? { rowAbsolute: true } : {}),
+    ...(ref.columnAbsolute ? { columnAbsolute: true } : {}),
+  });
+  const range = { start: address(start), end: address(endReference ?? start) };
+  try {
+    return cloneSparklineRange(range) as SparklineDateRange;
+  } catch {
+    return;
+  }
+}
+export function formatSparklineDateRange(range: SparklineDateRange, sheetName: string): string {
+  const address = (p: DateAddress) =>
+    getCellAddressLabel(p).replace(
+      /^([A-Z]+)([0-9]+)$/,
+      (_match, col: string, row: string) =>
+        (p.columnAbsolute ? "$" : "") + col + (p.rowAbsolute ? "$" : "") + row,
+    );
+  const start = address(range.start),
+    end = address(range.end);
+  return "'" + sheetName.replaceAll("'", "''") + "'!" + start + (end === start ? "" : ":" + end);
+}
 export type CellSparkline = {
   /** Group identities are scoped to the owning worksheet. */
   groupId?: string;
   type: "line" | "column" | "winLoss";
   source: CellRange | null;
+  /** Worksheet-local date labels; null is a broken date reference. */
+  dateRange?: SparklineDateRange | null;
   color: string;
   negativeColor: string;
   markers: boolean;
@@ -36,6 +77,25 @@ export type CellSparkline = {
   negativePoints?: boolean;
   markerColor?: string;
 };
+function cloneSparklineRange(source: CellRange | null): CellRange | null {
+  if (
+    source !== null &&
+    (!source ||
+      !source.start ||
+      !source.end ||
+      [source.start.row, source.start.column, source.end.row, source.end.column].some(
+        (index) => !Number.isInteger(index) || index < 0,
+      ) ||
+      source.end.row >= MAX_SHEET_ROWS ||
+      source.end.column >= MAX_SHEET_COLUMNS ||
+      source.start.row > source.end.row ||
+      source.start.column > source.end.column ||
+      (source.start.row !== source.end.row && source.start.column !== source.end.column) ||
+      Math.max(source.end.row - source.start.row, source.end.column - source.start.column) >= 10000)
+  )
+    throw new RangeError("A sparkline needs one row or column of at most 10,000 cells.");
+  return source ? { start: { ...source.start }, end: { ...source.end } } : null;
+}
 export function normalizeCellSparkline(
   value: CellSparkline | null | undefined,
 ): CellSparkline | undefined {
@@ -90,27 +150,14 @@ export function normalizeCellSparkline(
       throw new RangeError("Invalid sparkline point style.");
     points[key] = { show: point.show, color: point.color };
   }
-  const source = value.source;
-  if (
-    source !== null &&
-    (!source ||
-      !source.start ||
-      !source.end ||
-      [source.start.row, source.start.column, source.end.row, source.end.column].some(
-        (index) => !Number.isInteger(index) || index < 0,
-      ) ||
-      source.end.row >= MAX_SHEET_ROWS ||
-      source.end.column >= MAX_SHEET_COLUMNS ||
-      source.start.row > source.end.row ||
-      source.start.column > source.end.column ||
-      (source.start.row !== source.end.row && source.start.column !== source.end.column) ||
-      Math.max(source.end.row - source.start.row, source.end.column - source.start.column) >= 10000)
-  )
-    throw new RangeError("A sparkline needs one row or column of at most 10,000 cells.");
+  const source = cloneSparklineRange(value.source);
+  const dateRange =
+    value.dateRange === undefined ? undefined : cloneSparklineRange(value.dateRange);
   return {
     ...(value.groupId !== undefined ? { groupId: value.groupId } : {}),
     type: value.type,
-    source: source ? { start: { ...source.start }, end: { ...source.end } } : null,
+    source,
+    ...(dateRange !== undefined ? { dateRange } : {}),
     color: value.color,
     negativeColor: value.negativeColor,
     markers: value.markers,
@@ -195,31 +242,62 @@ export function expandSparklineGroups(
       (value.groupId && groups.has(value.groupId)),
   );
 }
+export function mapSparklineRanges(
+  value: CellSparkline,
+  map: (range: CellRange) => CellRange | null,
+): CellSparkline {
+  const dates = value.dateRange && map(value.dateRange);
+  return {
+    ...value,
+    source: value.source && map(value.source),
+    ...(value.dateRange !== undefined
+      ? {
+          dateRange: dates && {
+            start: { ...value.dateRange!.start, ...dates.start },
+            end: { ...value.dateRange!.end, ...dates.end },
+          },
+        }
+      : {}),
+  };
+}
 export function translateCellSparkline(
   value: CellSparkline | null | undefined,
   delta: CellAddress,
 ): CellSparkline | undefined {
   const sparkline = cloneCellSparkline(value);
-  if (!sparkline?.source) return sparkline;
-  const source = {
-    start: {
-      row: sparkline.source.start.row + delta.row,
-      column: sparkline.source.start.column + delta.column,
-    },
-    end: {
-      row: sparkline.source.end.row + delta.row,
-      column: sparkline.source.end.column + delta.column,
-    },
+  if (!sparkline) return;
+  const shift = (range: CellRange) => {
+    const start = { row: range.start.row + delta.row, column: range.start.column + delta.column };
+    const end = { row: range.end.row + delta.row, column: range.end.column + delta.column };
+    return start.row < 0 ||
+      start.column < 0 ||
+      end.row >= MAX_SHEET_ROWS ||
+      end.column >= MAX_SHEET_COLUMNS
+      ? null
+      : { start, end };
   };
+  const dateRange = sparkline.dateRange;
+  const shiftDate = (p: DateAddress) => ({
+    ...p,
+    row: p.row + (p.rowAbsolute ? 0 : delta.row),
+    column: p.column + (p.columnAbsolute ? 0 : delta.column),
+  });
+  const shiftedDates = dateRange && {
+    start: shiftDate(dateRange.start),
+    end: shiftDate(dateRange.end),
+  };
+  let translated = shiftedDates;
+  if (shiftedDates) {
+    try {
+      cloneSparklineRange(shiftedDates);
+    } catch {
+      translated = null;
+    }
+  }
   return {
     ...sparkline,
-    source:
-      source.start.row < 0 ||
-      source.start.column < 0 ||
-      source.end.row >= MAX_SHEET_ROWS ||
-      source.end.column >= MAX_SHEET_COLUMNS
-        ? null
-        : source,
+    source: sparkline.source && shift(sparkline.source),
+    ...(dateRange !== undefined ? { dateRange: translated } : {}),
   };
 }
 export function getSparklineValues(
@@ -297,6 +375,10 @@ export function createSparklineScaleResolver(sheet: Sheet, evaluator: SheetEvalu
 
 /** Recreate with the document display snapshot; share visibility work across its sparklines. */
 export function createSparklineValueResolver(sheet: Sheet, evaluator: SheetEvaluator) {
+  const series = createSparklineSeriesResolver(sheet, evaluator);
+  return (sparkline: CellSparkline) => series(sparkline).values;
+}
+export function createSparklineSeriesResolver(sheet: Sheet, evaluator: SheetEvaluator) {
   let hiddenRows: HiddenAxisInterval[] | undefined;
   let hiddenColumns: HiddenAxisInterval[] | undefined;
   let filteredRows: HiddenAxisInterval[] | undefined;
@@ -324,25 +406,45 @@ export function createSparklineValueResolver(sheet: Sheet, evaluator: SheetEvalu
       contains(hiddenColumns, column)
     );
   }
-  return (value: CellSparkline): Array<number | null> => {
+  return (value: CellSparkline): { values: Array<number | null>; dates?: number[] } => {
     const sparkline = normalizeCellSparkline(value)!;
-    if (!sparkline.source) return [];
+    if (!sparkline.source || sparkline.dateRange === null) return { values: [] };
+    const dates = sparkline.dateRange;
+    const points: { date: number; value: number | null }[] = [];
+    let ordinal = 0;
     const { start, end } = sparkline.source;
     const values: Array<number | null> = [];
     for (let row = start.row; row <= end.row; row++)
       for (let column = start.column; column <= end.column; column++) {
+        const index = ordinal++;
         if (!sparkline.showHidden && isHidden(row, column)) continue;
         const value = evaluator.getComputedValue({ row, column });
-        values.push(
+        const numeric =
           typeof value === "number" && Number.isFinite(value)
             ? value
             : value == null || value === ""
               ? sparkline.empty === "zero"
                 ? 0
                 : null
-              : null,
-        );
+              : null;
+        if (dates) {
+          const address = {
+            row: dates.start.row + (dates.end.row > dates.start.row ? index : 0),
+            column: dates.start.column + (dates.end.column > dates.start.column ? index : 0),
+          };
+          if (
+            index > Math.max(dates.end.row - dates.start.row, dates.end.column - dates.start.column)
+          )
+            continue;
+          const date = evaluator.getComputedValue(address);
+          if (typeof date === "number" && Number.isFinite(date))
+            points.push({ date, value: numeric });
+        } else values.push(numeric);
       }
-    return values;
+    if (dates) {
+      points.sort((a, b) => a.date - b.date);
+      return { values: points.map((p) => p.value), dates: points.map((p) => p.date) };
+    }
+    return { values };
   };
 }

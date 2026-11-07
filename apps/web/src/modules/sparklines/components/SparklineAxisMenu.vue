@@ -12,7 +12,7 @@ import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import SparklineAxisSection from "./SparklineAxisSection.vue";
 const props = defineProps<{ context: SparklineToolContext }>();
-const emit = defineEmits<{ custom: [end: SparklineAxisEnd]; failed: [] }>();
+const emit = defineEmits<{ custom: [end: SparklineAxisEnd]; date: []; failed: [] }>();
 const { t } = useAppI18n();
 const ends = ["minAxis", "maxAxis"] as const;
 const button = ref<InstanceType<typeof RibbonMenuButton>>();
@@ -51,6 +51,16 @@ function toggle(key: "axis" | "rightToLeft") {
   const current = takeOwner(true);
   if (current && !current.apply({ [key]: value })) emit("failed");
 }
+function dateAxis(useDates: boolean) {
+  const current = takeOwner(!useDates);
+  if (!current) return;
+  if (useDates) emit("date");
+  else if (
+    (current.value.dateRange !== undefined || current.mixed.includes("dateRange")) &&
+    !current.apply({ dateRange: undefined })
+  )
+    emit("failed");
+}
 function mode(end: SparklineAxisEnd) {
   return props.context.mixedAxisModes.includes(end)
     ? undefined
@@ -87,14 +97,20 @@ function limit(end: SparklineAxisEnd, type: "individual" | "group" | "custom") {
       >
         <template #items>
           <SparklineAxisSection :label="t('sparkline.horizontalAxisOptions')">
-            <MenuRadioItem checked indicator="check" @select="takeOwner(true)">{{
-              t("sparkline.generalAxis")
-            }}</MenuRadioItem>
             <MenuRadioItem
-              :checked="false"
-              disabled
+              :checked="
+                !context.mixed.includes('dateRange') && context.value.dateRange === undefined
+              "
               indicator="check"
-              :title="t('sparkline.dateAxisUnavailable')"
+              @select="dateAxis(false)"
+              >{{ t("sparkline.generalAxis") }}</MenuRadioItem
+            >
+            <MenuRadioItem
+              :checked="
+                !context.mixed.includes('dateRange') && context.value.dateRange !== undefined
+              "
+              indicator="check"
+              @select="dateAxis(true)"
               >{{ t("sparkline.dateAxis") }}…</MenuRadioItem
             >
             <MenuSeparator />

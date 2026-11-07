@@ -20,7 +20,7 @@ import SparklineColorMenu from "./SparklineColorMenu.vue";
 import SparklineDataMenu from "./SparklineDataMenu.vue";
 import SparklineStyleGallery from "./SparklineStyleGallery.vue";
 const props = defineProps<{ context: SparklineToolContext }>();
-const emit = defineEmits<{ dataOptions: []; customAxis: [end: SparklineAxisEnd] }>();
+const emit = defineEmits<{ dataOptions: []; dateAxis: []; customAxis: [end: SparklineAxisEnd] }>();
 const { t } = useAppI18n();
 const failed = ref(false);
 function apply(patch: SparklineStylePatch): void {
@@ -136,6 +136,7 @@ function point(key: SparklinePointKind, show: boolean): void {
       <SparklineAxisMenu
         :context="context"
         @custom="emit('customAxis', $event)"
+        @date="emit('dateAxis')"
         @failed="failed = true"
       />
       <div class="sparkline-tools__stack">

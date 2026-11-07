@@ -170,6 +170,7 @@ export function paintSheetScene(
           cell.content.sparkline.definition,
           cell.content.sparkline.values,
           cell.content.sparkline.scale,
+          cell.content.sparkline.dates,
         );
     const drawnSpans = new Set<string>();
     for (const cell of paneScene.cells) {

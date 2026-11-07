@@ -68,6 +68,40 @@ function axisMode(end: "minAxis" | "maxAxis", mode: "individual" | "group" | "cu
 }
 
 describe("sparkline axis menu", () => {
+  test("opens the enabled date-axis editor without applying a guessed date range", async () => {
+    const f = fixture();
+    await f.wrapper.getComponent(RibbonMenuButton).trigger("click");
+    const date = menu()
+      .findAll('[role="menuitemradio"]')
+      .find((item) => item.text().startsWith("Date axis type"))!;
+    expect(date.attributes("aria-disabled")).toBe("false");
+    await date.trigger("click");
+    expect(f.wrapper.emitted("date")).toEqual([[]]);
+    expect(f.context.apply).not.toHaveBeenCalled();
+    expect(document.body.querySelector('[role="menu"]')).toBeNull();
+  });
+
+  test("returning to the general axis explicitly removes the existing date range", async () => {
+    const initial = createContext();
+    const f = fixture({
+      value: {
+        ...initial.value,
+        dateRange: {
+          start: { row: 0, column: 0 },
+          end: { row: 0, column: 2 },
+        },
+      },
+    });
+    await f.wrapper.getComponent(RibbonMenuButton).trigger("click");
+    const general = menu()
+      .findAll('[role="menuitemradio"]')
+      .find((item) => item.text() === "General axis type")!;
+    expect(general.attributes("aria-checked")).toBe("false");
+    await general.trigger("click");
+    expect(f.context.apply).toHaveBeenCalledExactlyOnceWith({ dateRange: undefined });
+    expect(f.wrapper.emitted("date")).toBeUndefined();
+  });
+
   test("opens the axis disclosure without immediately toggling the horizontal axis", async () => {
     const f = fixture();
     const trigger = f.wrapper.getComponent(RibbonMenuButton);

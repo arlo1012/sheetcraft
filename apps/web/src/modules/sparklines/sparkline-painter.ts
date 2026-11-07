@@ -10,6 +10,7 @@ export function paintSparkline(
   sparkline: CellSparkline,
   values: readonly (number | null)[],
   scale = resolveSparklineScale(sparkline, values),
+  dates?: readonly number[],
 ): void {
   const numbers = values.filter((value): value is number => value !== null);
   if (!numbers.length || rect.width < 4 || rect.height < 4) return;
@@ -39,12 +40,17 @@ export function paintSparkline(
     width = rect.width - 6,
     height = rect.height - 6;
   const { min, max }: SparklineScale = scale;
-  const pointX = (index: number) =>
-    left +
-    (values.length === 1
-      ? width / 2
-      : (width * (sparkline.rightToLeft ? values.length - 1 - index : index)) /
-        (values.length - 1));
+  // A date slot represents one day; duplicate dates share a center.
+  const dateSlot = dates?.length ? width / (dates[dates.length - 1]! - dates[0]! + 1) : undefined;
+  const pointX = (index: number) => {
+    const offset =
+      dateSlot !== undefined && dates
+        ? (dates[index]! - dates[0]! + 0.5) * dateSlot
+        : values.length === 1
+          ? width / 2
+          : (width * index) / (values.length - 1);
+    return left + (sparkline.rightToLeft ? width - offset : offset);
+  };
   const y = (value: number) =>
     max === min
       ? value === min
@@ -104,17 +110,19 @@ export function paintSparkline(
       context.fill();
     });
   } else {
-    const slot = width / Math.max(1, values.length);
-    const barWidth = Math.max(0.5, slot * 0.72);
+    const slot = dateSlot ?? width / Math.max(1, values.length);
+    const barWidth = Math.max(0.5, slot * (dateSlot !== undefined ? 0.75 : 0.72));
     values.forEach((value, index) => {
       if (value === null || value === 0) return;
       context.fillStyle = pointColor(value, index) ?? sparkline.color;
       const base = zero;
       const end = sparkline.type === "winLoss" ? (value > 0 ? top : top + height) : y(value);
       context.fillRect(
-        left +
-          slot * (sparkline.rightToLeft ? values.length - 1 - index : index) +
-          (slot - barWidth) / 2,
+        dateSlot !== undefined
+          ? pointX(index) - barWidth / 2
+          : left +
+              slot * (sparkline.rightToLeft ? values.length - 1 - index : index) +
+              (slot - barWidth) / 2,
         Math.min(base, end),
         barWidth,
         Math.max(1, Math.abs(base - end)),
