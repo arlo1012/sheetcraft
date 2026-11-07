@@ -23,8 +23,13 @@ import {
   type CaptureRegion,
 } from "../capture-region";
 
-const props = defineProps<{ file: File; busy: boolean; shape?: CaptureShape }>();
-const emit = defineEmits<{ confirm: [file: File]; close: [] }>();
+const props = defineProps<{
+  file: File;
+  busy: boolean;
+  shape?: CaptureShape;
+  recordingRegion?: boolean;
+}>();
+const emit = defineEmits<{ confirm: [file: File]; region: [region: CaptureRegion]; close: [] }>();
 const { t, locale } = useAppI18n();
 const source = URL.createObjectURL(props.file);
 const image = ref<HTMLImageElement>();
@@ -164,6 +169,10 @@ async function confirm(): Promise<void> {
   if (!valid.value || busy.value || !image.value) return;
   failed.value = false;
   const crop = { ...region.value };
+  if (props.recordingRegion) {
+    emit("region", crop);
+    return;
+  }
   if (
     shape.value === "rectangle" &&
     crop.x === 0 &&
@@ -216,21 +225,25 @@ onBeforeUnmount(() => {
 <template>
   <Dialog
     :visible="true"
-    :header="t('drawing.captureRegion')"
-    :aria-label="t('drawing.captureRegion')"
+    :header="t(recordingRegion ? 'drawing.recordRegion' : 'drawing.captureRegion')"
+    :aria-label="t(recordingRegion ? 'drawing.recordRegion' : 'drawing.captureRegion')"
     role="dialog"
     aria-modal="true"
     placement="center"
     width="min(1000px, calc(100vw - 32px))"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
-    :confirm-btn="{ content: t('drawing.insert'), disabled: !valid || busy, loading: busy }"
+    :confirm-btn="{
+      content: t(recordingRegion ? 'drawing.recordStart' : 'drawing.insert'),
+      disabled: !valid || busy,
+      loading: busy,
+    }"
     :cancel-btn="t('picture.cancel')"
     @confirm="confirm"
     @close="emit('close')"
   >
     <div class="screen-capture">
-      <p>{{ t("drawing.captureRegionHint") }}</p>
+      <p>{{ t(recordingRegion ? "drawing.recordRegionHint" : "drawing.captureRegionHint") }}</p>
       <div class="screen-capture__viewport">
         <div class="screen-capture__stage" @pointerdown="begin">
           <img
@@ -273,7 +286,7 @@ onBeforeUnmount(() => {
         :label-width="locale === 'zh-CN' ? 112 : 120"
         :prevent-submit-default="true"
       >
-        <FormItem :label="t('drawing.captureShape')"
+        <FormItem v-if="!recordingRegion" :label="t('drawing.captureShape')"
           ><Select
             v-model="shape"
             :aria-label="t('drawing.captureShape')"

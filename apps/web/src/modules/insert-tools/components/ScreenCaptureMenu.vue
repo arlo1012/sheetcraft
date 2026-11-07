@@ -2,6 +2,7 @@
 import { computed, ref, useId } from "vue";
 import {
   Scan,
+  Video,
   SquareDashed,
   CircleDashed,
   RectangleHorizontal,
@@ -17,6 +18,7 @@ import { useAppI18n } from "../../../shared/i18n";
 import { captureShapes, type CaptureShape } from "../capture-region";
 const props = defineProps<{ disabled?: boolean }>();
 const emit = defineEmits<{
+  record: [];
   capture: [shape: CaptureShape, tools: boolean, excludeSelf: boolean];
 }>();
 const { t } = useAppI18n();
@@ -28,12 +30,6 @@ const { open, floatingStyles, toggleMenu, dismiss, onTriggerKeydown } = useMenu(
   menuSurfaceRef: computed(() => surface.value ?? null),
   disabled: computed(() => !!props.disabled),
 });
-const icons = {
-  rectangle: SquareDashed,
-  ellipse: CircleDashed,
-  rounded: RectangleHorizontal,
-  freehand: Lasso,
-};
 const mode = ref<CaptureShape>("rectangle"),
   excludeSelf = ref(false);
 function choose(shape: CaptureShape, tools = false) {
@@ -70,8 +66,18 @@ function choose(shape: CaptureShape, tools = false) {
     >
       <template #items>
         <MenuItem v-for="shape in captureShapes" :key="shape" @select="choose(shape)"
-          ><template #icon><component :is="icons[shape]" /></template
+          ><template #icon
+            ><SquareDashed v-if="shape === 'rectangle'" /><CircleDashed
+              v-else-if="shape === 'ellipse'" /><RectangleHorizontal
+              v-else-if="shape === 'rounded'" /><Lasso v-else /></template
           >{{ t(`drawing.capture.${shape}`) }}</MenuItem
+        >
+        <MenuItem
+          @select="
+            dismiss('programmatic', false);
+            emit('record');
+          "
+          ><template #icon><Video /></template>{{ t("drawing.record") }}</MenuItem
         >
         <MenuItem @select="choose(mode)"
           ><template #icon><Scan /></template>{{ t("drawing.captureStart")

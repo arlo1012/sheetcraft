@@ -209,6 +209,7 @@ import { ensureCellFontResource } from "../shared/cell-text/font-resources";
 import { useSheetDisplaySnapshot } from "../modules/sheet-grid/canvas/sheet-display-snapshot";
 import { DEFAULT_CELL_FONT_FAMILY } from "@sheetcraft/core/style";
 import { captureScreen } from "../modules/insert-tools/captureScreen";
+import ScreenRecordingTool from "../modules/insert-tools/components/ScreenRecordingTool.vue";
 import ScreenCaptureSourceDialog from "../modules/insert-tools/components/ScreenCaptureSourceDialog.vue";
 import type { CaptureShape } from "../modules/insert-tools/capture-region";
 import ScreenCaptureDialog from "../modules/insert-tools/components/ScreenCaptureDialog.vue";
@@ -1998,6 +1999,20 @@ const symbolVisible = computed(() => !!symbolDialog.value);
 const symbolPreferences = useSymbolPreferences();
 let symbolDialogSequence = 0;
 const captureBusy = ref(false);
+const recordingToolOpen = ref(false);
+const recordingModal = ref(false);
+function openRecorder() {
+  if (recordingToolOpen.value || !cellEditSession.finish()) return;
+  recordingModal.value = true;
+  recordingToolOpen.value = true;
+}
+function closeRecorder() {
+  recordingToolOpen.value = false;
+  recordingModal.value = false;
+}
+function insertRecording(file: File) {
+  if (attachmentActions.requestInsert("icon", file)) closeRecorder();
+}
 const canCaptureScreen = !!navigator.mediaDevices?.getDisplayMedia;
 const screenCapture = shallowRef<{
   file?: File;
@@ -4956,6 +4971,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     themeDialogVisible.value ||
     backgroundConflictVisible.value ||
     printPreviewVisible.value ||
+    recordingModal.value ||
     !!screenCapture.value ||
     !!imageActions.batchInsertion.value ||
     watermarkVisible.value ||
@@ -5121,6 +5137,7 @@ const gridInert = computed(
     loading.value ||
     fileBusy.value ||
     xlsxBusy.value ||
+    recordingModal.value ||
     !!screenCapture.value ||
     !!imageActions.batchInsertion.value ||
     (!!protectionDialog.value && !pickingProtectionRange.value) ||
@@ -5703,6 +5720,7 @@ watch(
           "
           @insert-symbol="openSymbolDialog"
           :insert-symbol-text-handler="quickSymbolInsert"
+          @record-screen="openRecorder"
           @capture-screen="insertScreenCapture"
           :disabled="loading || fileBusy || xlsxBusy || activeSheet.properties.protected"
           :image-disabled="
@@ -7183,6 +7201,13 @@ watch(
       :error="pictureBatchSize.error.value ? t(pictureBatchSize.error.value) : ''"
       @confirm="pictureBatchSize.confirm"
       @close="pictureBatchSize.close"
+    />
+    <ScreenRecordingTool
+      v-if="recordingToolOpen"
+      :can-insert="!activeSheet.dashboard && canUseSheetPermission(activeSheet, 'editObjects')"
+      @modal="recordingModal = $event"
+      @insert="insertRecording"
+      @close="closeRecorder"
     />
     <ScreenCaptureSourceDialog
       v-if="screenCapture && !screenCapture.file && preparingFrame !== screenCapture"

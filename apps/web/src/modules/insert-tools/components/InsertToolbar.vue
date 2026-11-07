@@ -77,6 +77,7 @@ const emit = defineEmits<{
   insertSymbolText: [payload: SymbolInsertion];
   insertSparkline: [type: CellSparkline["type"]];
   clearSparklines: [];
+  recordScreen: [];
   captureScreen: [shape: CaptureShape, tools: boolean, excludeSelf: boolean];
   insertDrawing: [kind: SheetGraphicDrawing["kind"]];
   insertImage: [mode: "cell" | "floating"];
@@ -134,6 +135,7 @@ const { t, locale } = useAppI18n();
       <slot name="watermark" />
       <ScreenCaptureMenu
         :disabled="imageDisabled"
+        @record="emit('recordScreen')"
         @capture="(shape, tools, excludeSelf) => emit('captureScreen', shape, tools, excludeSelf)"
       />
       <ShapeInsertMenu

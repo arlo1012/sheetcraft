@@ -34,7 +34,7 @@ export function useAttachmentActions(options: {
   let pickerTarget: AttachmentInsertion | undefined;
   const allowed = () =>
     !options.isBusy() && canUseSheetPermission(options.getSheet(), "editObjects");
-  function requestInsert(display: "icon" | "document") {
+  function requestInsert(display: "icon" | "document", file?: File) {
     if (!allowed() || busy.value || !options.flush()) return;
     inserting.value = {
       id: ++sequence,
@@ -42,9 +42,11 @@ export function useAttachmentActions(options: {
       sheet: options.getSheet(),
       address: { ...options.getAddress() },
       display,
+      file,
     };
     insertError.value = false;
     pickerTarget = undefined;
+    return true;
   }
   function chooseFile() {
     if (!inserting.value || !allowed() || busy.value) return;

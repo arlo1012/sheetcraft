@@ -1,13 +1,24 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, watchEffect, ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import type { SheetAttachmentDrawing } from "@sheetcraft/core/sheet-drawings";
 import { useAppI18n } from "../../../shared/i18n";
-import { attachmentText, ATTACHMENT_TEXT_PREVIEW_BYTES } from "../attachment-file";
+import { attachmentBlob, attachmentText, ATTACHMENT_TEXT_PREVIEW_BYTES } from "../attachment-file";
 const props = defineProps<{ drawing: SheetAttachmentDrawing }>();
 const emit = defineEmits<{ download: []; close: [] }>();
 const { t } = useAppI18n();
 const text = computed(() => attachmentText(props.drawing.attachment));
+const videoUrl = ref("");
+watchEffect((onCleanup) => {
+  const attachment = props.drawing.attachment;
+  if (!["video/webm", "video/mp4"].includes(attachment.mimeType)) {
+    videoUrl.value = "";
+    return;
+  }
+  const url = URL.createObjectURL(attachmentBlob(attachment));
+  videoUrl.value = url;
+  onCleanup(() => URL.revokeObjectURL(url));
+});
 </script>
 <template>
   <Dialog
@@ -23,7 +34,14 @@ const text = computed(() => attachmentText(props.drawing.attachment));
     @close="emit('close')"
     ><div class="attachment-dialog">
       <p>{{ t("attachment.hint") }}</p>
-      <pre v-if="text !== undefined">{{ text }}</pre>
+      <video
+        v-if="videoUrl"
+        :src="videoUrl"
+        :aria-label="drawing.attachment.filename"
+        controls
+        playsinline
+      />
+      <pre v-else-if="text !== undefined">{{ text }}</pre>
       <p v-else>
         {{ drawing.attachment.mimeType }} · {{ (drawing.attachment.size / 1024).toFixed(1) }} KB
       </p>
@@ -38,6 +56,10 @@ const text = computed(() => attachmentText(props.drawing.attachment));
   p {
     margin: 0 0 12px;
     color: var(--text-secondary);
+  }
+  video {
+    width: 100%;
+    max-height: 50dvh;
   }
   pre {
     max-height: 400px;
