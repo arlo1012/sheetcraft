@@ -167,6 +167,9 @@ import { useSheetViewport } from "../composables/useSheetViewport";
 import type { SheetHorizontalScrollState } from "../horizontal-scroll";
 import type { ImageInsertMode } from "../../sheet-images/useSheetImageActions";
 import SheetFloatingImageLayer from "../../sheet-images/components/SheetFloatingImageLayer.vue";
+import PictureColorPickLayer from "../../sheet-images/components/PictureColorPickLayer.vue";
+import { usePictureTransparentColor } from "../../sheet-images/usePictureTransparentColor";
+import { createPicturePaintResources } from "../../../shared/images/picture-paint-resources";
 import SheetOwnedPictureGroupLayer from "../../sheet-images/components/SheetOwnedPictureGroupLayer.vue";
 import type { PictureAlignmentReference } from "../../sheet-images/usePictureTools";
 import SheetPictureAdjustmentHandles from "../../sheet-images/components/SheetPictureAdjustmentHandles.vue";
@@ -1871,6 +1874,30 @@ function imagePoint(event: MouseEvent) {
   const point = surfacePoint(event);
   return surfacePointToBody(point, renderFrame.value.headerSize);
 }
+const pictureTransparentColor = usePictureTransparentColor({
+  getSheet: () => props.sheet,
+  getGeneration: () => props.pictureOwnerGeneration ?? 0,
+  getRevision: () => props.workbookRevision ?? 0,
+  getPath: () =>
+    selectedImageIds.value.length === 1
+      ? (selectedOwnedPicturePath.value ?? [selectedImageIds.value[0]!])
+      : undefined,
+  isReadOnly: () =>
+    pictureSelectionReadOnly.value ||
+    !!props.pictureSourceBusy ||
+    pictureCrop.active.value ||
+    !pictureFrameContext.value,
+  getLayout: () => layout.value,
+  getFrameContext: () => pictureFrameContext.value,
+  getEffects: () => drawingThemeEffects.value,
+  getResources: () =>
+    createPicturePaintResources(props.theme, resolvedImageUrls.value, floatingImageCache),
+  getImage: (assetId) => {
+    const url = resolvedImageUrls.value.get(assetId);
+    return url ? floatingImageCache.get(url) : undefined;
+  },
+  onError: () => emit("imageFeedback", "picture.operationFailed"),
+});
 const headerState = shallowRef<HeaderInteractionState>({});
 const headerSelection = computed(() => ({
   startRow: selectedRange.value.start.row,
@@ -2225,6 +2252,12 @@ const visibleNotes = computed(() => {
 });
 const notePreviewRefs = ref<InstanceType<typeof SheetNotePreview>[]>([]);
 function onDocumentPointerDown(event: PointerEvent): void {
+  if (
+    pictureTransparentColor.session.value &&
+    event.target instanceof Element &&
+    !event.target.closest("[data-picture-color-picker]")
+  )
+    pictureTransparentColor.cancel();
   if (
     pictureCrop.active.value &&
     event.button === 0 &&
@@ -3369,6 +3402,15 @@ function onDimensionResizeStart(
 }
 
 function onGridKeydown(event: KeyboardEvent): void {
+  if (pictureTransparentColor.session.value) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      pictureTransparentColor.cancel();
+      focusEditor();
+    } else if (event.key === "Tab") pictureTransparentColor.cancel();
+    return;
+  }
   if (
     event.target instanceof Element &&
     event.target.closest("[data-shape-canvas-text-editor], [data-equation-session]")
@@ -4432,6 +4474,8 @@ defineExpose({
   hasActivePictureCrop: () => pictureCrop.active.value,
   applyPendingPictureCrop: () => !pictureCrop.active.value || finishPictureCrop(false, false),
   cropImage: startPictureCrop,
+  startPictureTransparentColor: pictureTransparentColor.start,
+  canPickTransparentColor: pictureTransparentColor.canStart,
   canCropPicture: () => pictureCrop.canStart.value,
   rotateImage: (turns: -1 | 1 | 2) =>
     requiresOwnedClipboard()
@@ -4911,6 +4955,17 @@ defineExpose({
         @copy="(path, owner) => requestOwnedPictureCopy(path, 'copy', owner)"
         @cut="(path, owner) => requestOwnedPictureCopy(path, 'cut', owner)"
         @paste="requestOwnedPicturePaste"
+      />
+      <PictureColorPickLayer
+        v-if="pictureTransparentColor.session.value"
+        @pick="
+          pictureTransparentColor.pick(imagePoint($event));
+          if (!pictureTransparentColor.session.value) focusEditor();
+        "
+        @cancel="
+          pictureTransparentColor.cancel();
+          focusEditor();
+        "
       />
       <SheetPictureCropOverlay
         v-if="pictureCrop.view.value"

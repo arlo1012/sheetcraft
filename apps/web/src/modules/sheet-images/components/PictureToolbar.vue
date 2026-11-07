@@ -58,6 +58,7 @@ const props = withDefaults(
     restoreUnavailableReason?: string;
     cropHandler?: () => boolean;
     appearanceHandler?: (patch: Partial<ImageAppearance> | undefined) => boolean;
+    pickTransparentColor?: (commit: (patch: Partial<ImageAppearance>) => boolean) => boolean;
     effectHandler?: (edit: PictureEffectEdit) => boolean;
     restoreEffectsFocusTarget?: () => HTMLElement | null;
     disabled: boolean;
@@ -470,6 +471,7 @@ const restoreCallback = computed(() => {
       :disabled="disabled"
       :effect-handler="effectHandler ? effectCallback : undefined"
       :appearance-commit-handler="appearanceHandler ? appearanceCallback : undefined"
+      :pick-transparent-color="selectionCount === 1 ? pickTransparentColor : undefined"
       @change="appearanceCallback"
       @format="formatCallback"
     />

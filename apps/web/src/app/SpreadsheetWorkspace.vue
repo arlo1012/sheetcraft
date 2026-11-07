@@ -5379,6 +5379,11 @@ watch(
           :resize-handler="pictureToolbarOwner?.resize"
           :aspect-ratio-handler="pictureToolbarOwner?.aspectRatio"
           :appearance-handler="pictureToolbarOwner?.appearance"
+          :pick-transparent-color="
+            sheetGridRef?.canPickTransparentColor()
+              ? sheetGridRef.startPictureTransparentColor
+              : undefined
+          "
           :effect-handler="pictureToolbarOwner?.effect"
           :convert-handler="pictureSourceRibbonOwner?.convert"
           :can-convert="pictureSourceRibbonOwner?.canConvert"
@@ -5426,6 +5431,11 @@ watch(
           :busy="loading || fileBusy || xlsxBusy || imageBusy"
           :owner-key="pictureSourceRibbonOwner.key"
           :appearance-handler="pictureSourceRibbonOwner.appearance"
+          :pick-transparent-color="
+            sheetGridRef?.canPickTransparentColor()
+              ? sheetGridRef.startPictureTransparentColor
+              : undefined
+          "
           :effect-handler="pictureSourceRibbonOwner.effect"
           :replace-handler="pictureSourceRibbonOwner.replace"
           :format-handler="pictureSourceRibbonOwner.format"

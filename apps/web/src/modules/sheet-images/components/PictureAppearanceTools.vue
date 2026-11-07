@@ -19,6 +19,7 @@ import {
 } from "@sheetcraft/core/picture-group";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
+import RibbonSplitButton from "../../../shared/ribbon/RibbonSplitButton.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
@@ -44,6 +45,7 @@ const props = defineProps<{
   formatDisabled?: boolean;
   effectHandler?: (edit: PictureEffectEdit) => boolean;
   appearanceCommitHandler?: (patch: Partial<ImageAppearance>) => boolean;
+  pickTransparentColor?: (commit: (patch: Partial<ImageAppearance>) => boolean) => boolean;
   restoreEffectsFocusTarget?: () => HTMLElement | null;
 }>();
 function requireAppearanceSource(image: FloatingImage | GroupedPicture) {
@@ -79,7 +81,7 @@ const moreButton = ref<InstanceType<typeof RibbonMenuButton>>();
 const correctionsButton = ref<InstanceType<typeof RibbonMenuButton>>();
 const colorButton = ref<InstanceType<typeof RibbonMenuButton>>();
 const borderButton = ref<InstanceType<typeof RibbonMenuButton>>();
-const transparentColorButton = ref<InstanceType<typeof RibbonMenuButton>>();
+const transparentColorButton = ref<InstanceType<typeof RibbonSplitButton>>();
 const triggerRef = computed(() => {
   switch (mode.value) {
     case "more":
@@ -94,7 +96,7 @@ const triggerRef = computed(() => {
     case "border":
       return borderButton.value?.rootElement ?? null;
     case "transparentColor":
-      return transparentColorButton.value?.rootElement ?? null;
+      return transparentColorButton.value?.menuElement ?? null;
   }
 });
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
@@ -166,6 +168,12 @@ function change(patch: Partial<ImageAppearance>): boolean {
   if (props.disabled || (isFramed.value && patch.reflection === true)) return false;
   emit("change", patch);
   return true;
+}
+function beginTransparentColorPick(): void {
+  const commit = props.appearanceCommitHandler;
+  if (props.disabled || !commit || !props.pickTransparentColor) return;
+  dismiss("programmatic", false);
+  props.pickTransparentColor(commit);
 }
 type AppearanceNumber = "brightness" | "contrast" | "saturation" | "opacity" | "borderWidth";
 function numberValue(key: AppearanceNumber): number {
@@ -273,17 +281,20 @@ function reset(): void {
     :aria-label="t('picture.style')"
   >
     <div class="picture-appearance__stack">
-      <RibbonMenuButton
+      <RibbonSplitButton
         ref="transparentColorButton"
         :label="t('picture.transparentColor')"
+        :menu-label="t('picture.transparentColorOptions')"
         :text="t('picture.transparentColor')"
-        :disabled="disabled"
+        :disabled="disabled || !pickTransparentColor || !appearanceCommitHandler"
+        :menu-disabled="disabled"
         :expanded="open && mode === 'transparentColor'"
         :menu-id="menuId"
-        @activate="toggle('transparentColor')"
-        @keydown="keydown('transparentColor', $event)"
+        @activate="beginTransparentColorPick()"
+        @toggle-menu="toggle('transparentColor')"
+        @menu-keydown="keydown('transparentColor', $event)"
         ><Pipette
-      /></RibbonMenuButton>
+      /></RibbonSplitButton>
       <RibbonMenuButton
         ref="colorButton"
         :label="t('picture.color')"
@@ -644,11 +655,17 @@ function reset(): void {
           <MenuItem v-else-if="mode === 'border'" @select="preset({ border: undefined })">{{
             t("picture.noBorder")
           }}</MenuItem>
-          <MenuItem
-            v-else-if="mode === 'transparentColor'"
-            @select="preset({ transparentColor: undefined, transparentTolerance: undefined })"
-            >{{ t("picture.clearTransparentColor") }}</MenuItem
-          >
+          <template v-else-if="mode === 'transparentColor'">
+            <MenuItem
+              :disabled="!pickTransparentColor || !appearanceCommitHandler"
+              @select="beginTransparentColorPick()"
+              >{{ t("picture.pickTransparentColor") }}</MenuItem
+            >
+            <MenuItem
+              @select="preset({ transparentColor: undefined, transparentTolerance: undefined })"
+              >{{ t("picture.clearTransparentColor") }}</MenuItem
+            >
+          </template>
           <template v-else-if="mode === 'transparency'">
             <MenuItem @select="preset({ opacity: 1 })">0%</MenuItem>
             <MenuItem @select="preset({ opacity: 0.75 })">25%</MenuItem>

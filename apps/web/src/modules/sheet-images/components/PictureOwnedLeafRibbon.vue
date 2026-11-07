@@ -30,6 +30,7 @@ const props = defineProps<{
   canConvert?: boolean;
   formatHandler: (target?: "effects") => void;
   appearanceHandler?: (patch: Partial<ImageAppearance> | undefined) => boolean;
+  pickTransparentColor?: (commit: (patch: Partial<ImageAppearance>) => boolean) => boolean;
   effectHandler?: (edit: PictureEffectEdit) => boolean;
   restoreEffectsFocusTarget?: () => HTMLElement | null;
   ownerKey: string;
@@ -221,6 +222,7 @@ const callbacks = computed(() => {
       :disabled="disabled || !appearanceHandler"
       :effect-handler="effectHandler ? callbacks.effect : undefined"
       :appearance-commit-handler="appearanceHandler ? callbacks.appearance : undefined"
+      :pick-transparent-color="pickTransparentColor"
       @change="callbacks.appearance"
       @format="callbacks.format"
     />

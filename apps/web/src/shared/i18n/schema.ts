@@ -1768,6 +1768,9 @@ export type MessageSchema = ToolMessageSchema & {
     transparency: string;
     transparentColor: string;
     transparentColorHint: string;
+    transparentColorOptions: string;
+    pickTransparentColor: string;
+    pickTransparentColorHint: string;
     clearTransparentColor: string;
     resetStyle: string;
     adjustments: string;
