@@ -652,7 +652,7 @@ defineExpose({
 
 <style scoped lang="scss">
 .workbook-formula-bar {
-  --formula-bar-action-size: var(--td-comp-size-m);
+  --formula-bar-action-size: var(--sheetcraft-control-height-m);
   --formula-bar-action-gap: var(--sheetcraft-space-2);
 
   display: grid;
@@ -683,7 +683,7 @@ defineExpose({
   &__formula {
     position: relative;
     min-width: 0;
-    height: var(--td-comp-size-m);
+    height: var(--sheetcraft-control-height-m);
   }
 
   &__rich-input {

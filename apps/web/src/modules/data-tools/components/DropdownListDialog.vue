@@ -249,7 +249,7 @@ async function selectRange(current: string): Promise<string | undefined> {
     <div class="dropdown-list-dialog">
       <div class="dropdown-list-dialog__mode">
         <TRadioGroup
-          class="dropdown-list-dialog__choice"
+          class="dropdown-list-dialog__choice sheetcraft-radio-group--flush"
           :model-value="draft.mode"
           @update:model-value="setMode"
         >
@@ -405,7 +405,6 @@ async function selectRange(current: string): Promise<string | undefined> {
   justify-content: space-between;
 }
 .dropdown-list-dialog__choice {
-  --td-comp-margin-xxl: 0;
   flex-shrink: 0;
   white-space: nowrap;
 }

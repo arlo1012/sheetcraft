@@ -3,7 +3,7 @@
 // TDesign is a Web dependency. Keep its theme values mapped from product tokens
 // here so feature styles never depend on its internal token names or DOM structure.
 :root {
-  --td-comp-size-m: 28px;
+  --td-comp-size-m: var(--sheetcraft-control-height-m);
   --td-brand-color-1: var(--sheetcraft-palette-brand-1);
   --td-brand-color-2: var(--sheetcraft-palette-brand-2);
   --td-brand-color-3: var(--sheetcraft-palette-brand-3);
@@ -667,4 +667,9 @@
   border: 0;
   background: transparent;
   box-shadow: none;
+}
+
+// Standalone single-option radio groups drop the trailing group margin.
+.sheetcraft-radio-group--flush {
+  --td-comp-margin-xxl: 0;
 }
