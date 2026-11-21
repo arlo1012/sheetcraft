@@ -1001,6 +1001,7 @@ export function applyRemoveTableCommand(
       owner.drawings?.some(
         (drawing) =>
           drawing.kind === "slicer" &&
+          "tableId" in drawing.slicer &&
           drawing.slicer.tableId === command.tableId &&
           (drawing.slicer.sourceSheetId ?? owner.id) === sheet.id,
       )
@@ -1008,6 +1009,7 @@ export function applyRemoveTableCommand(
       owner.drawings = owner.drawings.filter(
         (drawing) =>
           drawing.kind !== "slicer" ||
+          !("tableId" in drawing.slicer) ||
           drawing.slicer.tableId !== command.tableId ||
           (drawing.slicer.sourceSheetId ?? owner.id) !== sheet.id,
       );

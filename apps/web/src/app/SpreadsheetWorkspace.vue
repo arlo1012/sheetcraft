@@ -1590,6 +1590,7 @@ const tableSlicers = useTableSlicers({
   workbook: () => session.workbook,
   sheet: () => activeSheet.value,
   table: () => activeTable.value,
+  pivot: () => activePivot.value,
   address: () => activeAddress.value,
   revision: () => workbookRevision.value,
   busy: () => loading.value || fileBusy.value || xlsxBusy.value,
@@ -5437,6 +5438,7 @@ watch(
           :active-field="pivotActiveField?.name ?? ''"
           :group-enabled="pivotGroupField !== undefined"
           :ungroup-enabled="activePivot.groups?.some((group) => group.field === pivotGroupField)"
+          :slicer-disabled="!canUseSheetPermission(activeSheet, 'editObjects')"
           @group="pivotGrouping.open()"
           @ungroup="pivotGrouping.ungroup()"
           @rename="pivotActions.update({ ...activePivot, name: $event })"
@@ -5448,6 +5450,7 @@ watch(
           @remove="pivotActions.remove(true)"
           @convert="pivotActions.remove(false)"
           @chart="pivotActions.chart"
+          @insert-slicer="tableSlicers.openForPivot(activePivot)"
           @fields="pivotFieldsVisible = !pivotFieldsVisible"
         />
       </template>
@@ -5840,7 +5843,7 @@ watch(
             fileBusy ||
             xlsxBusy ||
             !canUseSheetPermission(activeSheet, 'editObjects') ||
-            tableSlicers.availableTables.value.length === 0
+            tableSlicers.availableTargets.value.length === 0
           "
           :has-table="!!activeTable"
           :edit-session-id="cellEditSession.id"
@@ -7704,7 +7707,7 @@ watch(
     v-if="tableSlicers.fields.value"
     :fields="tableSlicers.fields.value"
     :tables="tableSlicers.dialogTables.value"
-    :table-id="tableSlicers.target.value?.tableId"
+    :table-id="tableSlicers.target.value?.targetKey"
     @select-table="tableSlicers.selectTargetTable"
     @confirm="tableSlicers.insert"
     @close="tableSlicers.target.value = undefined"

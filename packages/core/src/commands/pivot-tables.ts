@@ -382,14 +382,24 @@ export function applyRemovePivotTableCommand(
       }
     }
   const evaluator = createWorkbookEvaluator(workbook, sheet.id);
-  temporary.drawings = (temporary.drawings ?? []).map((drawing) => {
-    if (drawing.kind !== "chart" || drawing.chart.pivotTableId !== table.id) return drawing;
-    const { pivotTableId: _pivotId, ...chart } = drawing.chart;
-    return {
-      ...drawing,
-      chart: { ...chart, dataCache: getSheetChartData(sheet, drawing.chart, evaluator) },
-    };
-  });
+  temporary.drawings = (temporary.drawings ?? [])
+    .filter(
+      (drawing) =>
+        !(
+          drawing.kind === "slicer" &&
+          "pivotTableId" in drawing.slicer &&
+          drawing.slicer.pivotTableId === table.id &&
+          (!drawing.slicer.sourceSheetId || drawing.slicer.sourceSheetId === sheet.id)
+        ),
+    )
+    .map((drawing) => {
+      if (drawing.kind !== "chart" || drawing.chart.pivotTableId !== table.id) return drawing;
+      const { pivotTableId: _pivotId, ...chart } = drawing.chart;
+      return {
+        ...drawing,
+        chart: { ...chart, dataCache: getSheetChartData(sheet, drawing.chart, evaluator) },
+      };
+    });
   replaceSheetSparseState(sheet, createSheetSparseState(temporary));
   return createRestoreSheetStateCommand(sheet.id, before);
 }

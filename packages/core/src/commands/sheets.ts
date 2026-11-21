@@ -247,6 +247,14 @@ export function createDuplicateSheetCommand(
         (drawing.slicer.sourceSheetId && drawing.slicer.sourceSheetId !== sourceSheetId)
       )
         return drawing;
+      if ("pivotTableId" in drawing.slicer)
+        return {
+          ...drawing,
+          slicer: {
+            ...drawing.slicer,
+            ...(drawing.slicer.sourceSheetId ? { sourceSheetId: sheetId } : {}),
+          },
+        };
       return {
         ...drawing,
         slicer: {

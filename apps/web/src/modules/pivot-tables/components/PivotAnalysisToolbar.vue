@@ -12,6 +12,7 @@ import {
   Table2,
   ListTree,
   ListX,
+  ListFilter,
 } from "lucide-vue-next";
 import type { SheetPivotTable } from "@sheetcraft/core/pivot-tables";
 import { useAppI18n } from "../../../shared/i18n";
@@ -24,6 +25,7 @@ const props = defineProps<{
   activeField: string;
   groupEnabled?: boolean;
   ungroupEnabled?: boolean;
+  slicerDisabled?: boolean;
 }>();
 const emit = defineEmits<{
   rename: [name: string];
@@ -34,6 +36,7 @@ const emit = defineEmits<{
   move: [];
   remove: [];
   chart: [];
+  insertSlicer: [];
   fields: [];
   convert: [];
   group: [];
@@ -147,6 +150,15 @@ function rename(value: string): void {
       /></RibbonButton>
     </section>
     <section class="pivot-analysis__group">
+      <RibbonButton
+        variant="tall"
+        :label="t('tables.insertSlicer')"
+        :text="t('tables.insertSlicer')"
+        :disabled="disabled || slicerDisabled"
+        data-pivot-action="insert-slicer"
+        @activate="emit('insertSlicer')"
+        ><ListFilter
+      /></RibbonButton>
       <RibbonButton
         variant="tall"
         :label="t('pivot.chart')"

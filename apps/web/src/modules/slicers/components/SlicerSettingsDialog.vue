@@ -9,15 +9,15 @@ import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
 import type { SheetSlicerDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
   MAX_TABLE_SLICER_COLUMNS,
+  type SheetSlicerState,
   type TableSlicerSortOrder,
-  type TableSlicerState,
 } from "@sheetcraft/core/table-slicers";
 import { useAppI18n } from "../../../shared/i18n";
 import type { TableSlicerOptionsPatch } from "../useTableSlicers";
 
 const props = defineProps<{
   drawing: SheetSlicerDrawing;
-  state?: TableSlicerState;
+  state?: SheetSlicerState;
 }>();
 
 const emit = defineEmits<{

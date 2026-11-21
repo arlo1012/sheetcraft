@@ -2,9 +2,17 @@
 import { describe, expect, test } from "vitest";
 import {
   getTableSlicerState,
+  getPivotSlicerState,
   createTableSlicerFilterCommand,
   createTableSlicerRangeFilterCommand,
+  createPivotSlicerFilterCommand,
+  createPivotSlicerRangeFilterCommand,
 } from "../../table-slicers.js";
+import {
+  createSetPivotTableCommand,
+  createRemovePivotTableCommand,
+} from "../../commands/pivot-tables.js";
+import type { SheetPivotTable } from "../../pivot-tables.js";
 import {
   createSheetFilterHiddenRowIntervals,
   createSetSheetFilterCriteriaCommand,
@@ -272,5 +280,88 @@ describe("table slicers", () => {
     expect(snapshot.version).toBe(113);
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
     expect(() => deserializeWorkbook({ ...snapshot, version: 112 })).toThrow();
+  });
+  test("pivot slicers filter row and report fields, cross-filter availability, undo removal, and persist as V114", () => {
+    const workbook = createWorkbook({ id: "pivot-slicers", sheetId: "data" });
+    const sheet = getActiveSheet(workbook);
+    [
+      ["Region", "Channel", "Amount"],
+      ["North", "Retail", 100],
+      ["South", "Retail", 200],
+      ["East", "Online", 300],
+      ["North", "Online", 400],
+    ].forEach((row, r) =>
+      row.forEach((value, column) =>
+        setCellContent(sheet, { row: r, column }, { kind: "literal", value }),
+      ),
+    );
+    const pivot: SheetPivotTable = {
+      id: "pivot-1",
+      name: "PivotTable1",
+      sourceSheetId: sheet.id,
+      source: { start: { row: 0, column: 0 }, end: { row: 4, column: 2 } },
+      anchor: { row: 0, column: 4 },
+      outputRange: null,
+      rowFields: [0],
+      columnFields: [],
+      values: [{ field: 2, aggregate: "sum", caption: "Sum of Amount" }],
+      filters: [],
+      rowTotals: true,
+      columnTotals: true,
+      includeHidden: false,
+      sort: "ascending",
+      totalLabel: "Grand Total",
+      emptyLabel: "(blank)",
+    };
+    const session = createWorkbookSession({ workbook, idFactory: () => "id" });
+    executeWorkbookCommand(session, createSetPivotTableCommand(sheet.id, pivot));
+
+    const regionSource = { pivotTableId: pivot.id, fieldIndex: 0 };
+    const channelSource = { pivotTableId: pivot.id, fieldIndex: 1 };
+    const regionState = () => getPivotSlicerState(workbook, sheet, regionSource)!;
+    const channelState = () => getPivotSlicerState(workbook, sheet, channelSource)!;
+
+    // Filter Channel (not on rows/columns -> report filter) to "Retail"
+    const retailKey = channelState().items.find(
+      (item) => item.value.kind === "string" && item.value.value === "Retail",
+    )!.key;
+    executeWorkbookCommand(session, createPivotSlicerFilterCommand(channelState(), retailKey));
+    // East only has Online, so Region slicer marks East unavailable and places it last
+    expect(regionState().items.map((item) => [item.value, item.available])).toEqual([
+      [{ kind: "string", value: "North" }, true],
+      [{ kind: "string", value: "South" }, true],
+      [{ kind: "string", value: "East" }, false],
+    ]);
+
+    // Shift+Click range select North..South on Region (row field -> axisFilters)
+    const rState = regionState();
+    executeWorkbookCommand(
+      session,
+      createPivotSlicerRangeFilterCommand(rState, rState.items[0]!.key, rState.items[1]!.key),
+    );
+    expect(regionState().filtered).toBe(true);
+    expect(
+      regionState()
+        .items.filter((item) => item.selected)
+        .map((item) => item.value),
+    ).toEqual([
+      { kind: "string", value: "North" },
+      { kind: "string", value: "South" },
+    ]);
+
+    // V114 serialization & V113 rejection
+    sheet.drawings = [slicer(regionSource), { ...slicer(channelSource), id: "slicer-2" }];
+    const snapshot = serializeWorkbook(workbook);
+    expect(snapshot.version).toBe(114);
+    expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
+    expect(() => deserializeWorkbook({ ...snapshot, version: 113 })).toThrow();
+
+    // Removing pivot table removes bound pivot slicers; Undo restores both
+    executeWorkbookCommand(session, createRemovePivotTableCommand(sheet.id, pivot.id, true));
+    expect(sheet.pivotTables).toEqual([]);
+    expect(sheet.drawings).toEqual([]);
+    undoWorkbookCommand(session);
+    expect(sheet.pivotTables?.length).toBe(1);
+    expect(sheet.drawings?.length).toBe(2);
   });
 });

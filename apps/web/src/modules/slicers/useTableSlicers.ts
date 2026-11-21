@@ -7,25 +7,42 @@ import {
   type Workbook,
 } from "@sheetcraft/core/workbook";
 import { createSetSheetDrawingsCommand, type WorkbookCommand } from "@sheetcraft/core/commands";
-import type { SheetSlicerDrawing, TableSlicerSource } from "@sheetcraft/core/sheet-drawings";
 import {
+  isPivotSlicerSource,
+  type SheetSlicerDrawing,
+  type SheetSlicerSource,
+  type SlicerDisplayOptions,
+} from "@sheetcraft/core/sheet-drawings";
+import {
+  getPivotSlicerState,
   getTableSlicerState,
+  createPivotSlicerFilterCommand,
+  createPivotSlicerRangeFilterCommand,
   createTableSlicerFilterCommand,
   createTableSlicerRangeFilterCommand,
-  type TableSlicerState,
+  type SheetSlicerState,
 } from "@sheetcraft/core/table-slicers";
+import { getPivotTableSource, type SheetPivotTable } from "@sheetcraft/core/pivot-tables";
 import { canUseSheetPermission } from "@sheetcraft/core";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 
 export type TableSlicerOptionsPatch = Partial<
   Pick<
-    TableSlicerSource,
+    SlicerDisplayOptions,
     "caption" | "showHeader" | "columns" | "styleId" | "sortOrder" | "hideNoData"
   >
 >;
 
+export type SlicerTargetOption = {
+  key: string;
+  kind: "table" | "pivot";
+  id: string;
+  name: string;
+  fields: readonly { id: string; name: string }[];
+};
+
 export const tableSlicerContext: InjectionKey<{
-  state: (owner: Sheet, drawing: SheetSlicerDrawing) => TableSlicerState | undefined;
+  state: (owner: Sheet, drawing: SheetSlicerDrawing) => SheetSlicerState | undefined;
   editable: (owner: Sheet, drawing: SheetSlicerDrawing) => boolean;
   select: (owner: Sheet, drawing: SheetSlicerDrawing, key?: string, multi?: boolean) => void;
   selectRange: (owner: Sheet, drawing: SheetSlicerDrawing, fromKey: string, toKey: string) => void;
@@ -35,10 +52,49 @@ function isSliceableTable(table: SheetTable): boolean {
   return table.headerRow && table.filterButton && table.columns.length > 0;
 }
 
+function getSliceablePivotFields(
+  workbook: Workbook,
+  pivot: SheetPivotTable,
+): readonly { id: string; name: string }[] {
+  try {
+    const source = getPivotTableSource(workbook, pivot);
+    return source.headers.map((name, index) => ({ id: String(index), name }));
+  } catch {
+    return [];
+  }
+}
+
+function listSheetSlicerTargets(workbook: Workbook, sheet: Sheet): SlicerTargetOption[] {
+  const targets: SlicerTargetOption[] = [];
+  for (const table of sheet.tables ?? []) {
+    if (!isSliceableTable(table)) continue;
+    targets.push({
+      key: `table:${table.id}`,
+      kind: "table",
+      id: table.id,
+      name: table.name,
+      fields: table.columns,
+    });
+  }
+  for (const pivot of sheet.pivotTables ?? []) {
+    const fields = getSliceablePivotFields(workbook, pivot);
+    if (!fields.length) continue;
+    targets.push({
+      key: `pivot:${pivot.id}`,
+      kind: "pivot",
+      id: pivot.id,
+      name: pivot.name,
+      fields,
+    });
+  }
+  return targets;
+}
+
 export function useTableSlicers(options: {
   workbook: () => Workbook;
   sheet: () => Sheet;
   table: () => SheetTable | undefined | null;
+  pivot?: () => SheetPivotTable | undefined | null;
   address: () => CellAddress;
   revision: () => number;
   busy: () => boolean;
@@ -46,41 +102,39 @@ export function useTableSlicers(options: {
   execute: (command: WorkbookCommand) => unknown;
   selectDrawing: (id: string) => void;
 }) {
-  const target = shallowRef<{ sheet: Sheet; tableId: string }>();
+  const target = shallowRef<{ sheet: Sheet; targetKey: string }>();
   const settingsTarget = shallowRef<{ sheet: Sheet; drawingId: string }>();
   const id = createBrowserIdFactory();
 
-  const availableTables = computed(() => {
+  const availableTargets = computed(() => {
     void options.revision();
-    const sheet = options.sheet();
-    return (sheet.tables ?? []).filter(isSliceableTable);
+    return listSheetSlicerTargets(options.workbook(), options.sheet());
   });
 
   const dialogTables = computed(() => {
     void options.revision();
     const view = target.value;
     if (!view || options.sheet() !== view.sheet) return undefined;
-    const tables = (view.sheet.tables ?? []).filter(isSliceableTable);
-    return tables.length ? tables : undefined;
+    const targets = listSheetSlicerTargets(options.workbook(), view.sheet);
+    return targets.length ? targets.map((item) => ({ id: item.key, name: item.name })) : undefined;
   });
 
   const fields = computed(() => {
     void options.revision();
     const view = target.value;
-    return view && options.sheet() === view.sheet
-      ? view.sheet.tables?.find((table) => table.id === view.tableId && isSliceableTable(table))
-          ?.columns
-      : undefined;
+    if (!view || options.sheet() !== view.sheet) return undefined;
+    return listSheetSlicerTargets(options.workbook(), view.sheet).find(
+      (item) => item.key === view.targetKey,
+    )?.fields;
   });
 
   const settingsDrawing = computed<SheetSlicerDrawing | undefined>(() => {
     void options.revision();
     const view = settingsTarget.value;
     if (!view || options.sheet() !== view.sheet) return undefined;
-    const found = view.sheet.drawings?.find(
+    return view.sheet.drawings?.find(
       (item): item is SheetSlicerDrawing => item.id === view.drawingId && item.kind === "slicer",
     );
-    return found;
   });
 
   const settingsState = computed(() => {
@@ -98,36 +152,55 @@ export function useTableSlicers(options: {
     if (options.busy() || !options.flush()) return;
     const sheet = options.sheet();
     if (!canUseSheetPermission(sheet, "editObjects")) return;
-    const active = options.table();
-    const chosen =
-      active && isSliceableTable(active)
-        ? active
-        : (sheet.tables ?? []).find((item) => isSliceableTable(item));
-    if (chosen) target.value = { sheet, tableId: chosen.id };
+    const targets = listSheetSlicerTargets(options.workbook(), sheet);
+    if (!targets.length) return;
+    const activePivot = options.pivot?.();
+    const activeTable = options.table();
+    const preferredKey = activePivot
+      ? `pivot:${activePivot.id}`
+      : activeTable && isSliceableTable(activeTable)
+        ? `table:${activeTable.id}`
+        : undefined;
+    const chosen = targets.find((item) => item.key === preferredKey) ?? targets[0]!;
+    target.value = { sheet, targetKey: chosen.key };
   }
 
-  function selectTargetTable(tableId: string) {
+  function openForPivot(pivot: SheetPivotTable | undefined | null) {
+    if (!pivot || options.busy() || !options.flush()) return;
+    const sheet = options.sheet();
+    if (!canUseSheetPermission(sheet, "editObjects")) return;
+    const key = `pivot:${pivot.id}`;
+    if (listSheetSlicerTargets(options.workbook(), sheet).some((item) => item.key === key))
+      target.value = { sheet, targetKey: key };
+  }
+
+  function selectTargetTable(targetKey: string) {
     const view = target.value;
     if (!view || options.sheet() !== view.sheet) return;
-    if (view.sheet.tables?.some((table) => table.id === tableId && isSliceableTable(table)))
-      target.value = { sheet: view.sheet, tableId };
+    if (
+      listSheetSlicerTargets(options.workbook(), view.sheet).some((item) => item.key === targetKey)
+    )
+      target.value = { sheet: view.sheet, targetKey };
   }
 
-  function insert(selected: readonly string[], tableId?: string) {
+  function insert(selected: readonly string[], targetKey?: string) {
     const view = target.value;
     if (!view || options.busy() || !canUseSheetPermission(view.sheet, "editObjects")) return;
-    const resolvedTableId = tableId ?? view.tableId;
-    const table = view.sheet.tables?.find(
-      (item) => item.id === resolvedTableId && isSliceableTable(item),
+    const resolvedKey = targetKey ?? view.targetKey;
+    const chosen = listSheetSlicerTargets(options.workbook(), view.sheet).find(
+      (item) => item.key === resolvedKey,
     );
-    if (!table) return;
-    const drawings: SheetSlicerDrawing[] = table.columns
+    if (!chosen) return;
+    const drawings: SheetSlicerDrawing[] = chosen.fields
       .filter((field) => selected.includes(field.id))
       .map((field, index) => ({
         id: id("slicer"),
         name: field.name,
         kind: "slicer",
-        slicer: { tableId: table.id, columnId: field.id },
+        slicer:
+          chosen.kind === "pivot"
+            ? { pivotTableId: chosen.id, fieldIndex: Number(field.id) }
+            : { tableId: chosen.id, columnId: field.id },
         anchor: { ...options.address() },
         offsetX: 16 + index * 28,
         offsetY: 16 + index * 28,
@@ -156,22 +229,25 @@ export function useTableSlicers(options: {
     return options.workbook().sheets.get(drawing.slicer.sourceSheetId ?? owner.id);
   }
 
-  function state(owner: Sheet, drawing: SheetSlicerDrawing) {
+  function state(owner: Sheet, drawing: SheetSlicerDrawing): SheetSlicerState | undefined {
     void options.revision();
     const source = sourceSheet(owner, drawing);
-    return (
-      source &&
-      getTableSlicerState(
-        source,
-        drawing.slicer,
-        createWorkbookEvaluator(options.workbook(), source.id),
-      )
+    if (!source) return undefined;
+    if (isPivotSlicerSource(drawing.slicer))
+      return getPivotSlicerState(options.workbook(), source, drawing.slicer);
+    return getTableSlicerState(
+      source,
+      drawing.slicer,
+      createWorkbookEvaluator(options.workbook(), source.id),
     );
   }
 
   function editable(owner: Sheet, drawing: SheetSlicerDrawing) {
     const source = sourceSheet(owner, drawing);
-    return !!source && !options.busy() && canUseSheetPermission(source, "autoFilter");
+    if (!source || options.busy()) return false;
+    return isPivotSlicerSource(drawing.slicer)
+      ? canUseSheetPermission(source, "pivotTables")
+      : canUseSheetPermission(source, "autoFilter");
   }
 
   function canEditSlicerObject(owner: Sheet) {
@@ -188,7 +264,7 @@ export function useTableSlicers(options: {
     );
     if (index < 0) return false;
     const current = drawings[index] as SheetSlicerDrawing;
-    const merged: TableSlicerSource = { ...current.slicer };
+    const merged: SheetSlicerSource = { ...current.slicer };
     if ("caption" in patch) {
       const trimmed = patch.caption?.trim();
       if (trimmed) merged.caption = trimmed;
@@ -222,6 +298,14 @@ export function useTableSlicers(options: {
     return true;
   }
 
+  function applyFilterCommand(currentState: SheetSlicerState, key?: string, multi?: boolean) {
+    options.execute(
+      currentState.kind === "pivot"
+        ? createPivotSlicerFilterCommand(currentState, key, multi)
+        : createTableSlicerFilterCommand(currentState, key, multi),
+    );
+  }
+
   function clearFilter(owner: Sheet, drawing: SheetSlicerDrawing) {
     if (owner !== options.sheet() || !editable(owner, drawing) || !options.flush()) return;
     const current = owner.drawings?.find(
@@ -229,7 +313,7 @@ export function useTableSlicers(options: {
     );
     if (!current) return;
     const currentState = state(owner, current);
-    if (currentState?.filtered) options.execute(createTableSlicerFilterCommand(currentState));
+    if (currentState?.filtered) applyFilterCommand(currentState);
   }
 
   function openSettings(drawing: SheetSlicerDrawing) {
@@ -262,7 +346,7 @@ export function useTableSlicers(options: {
       );
       if (!current) return;
       const currentState = state(owner, current);
-      if (currentState) options.execute(createTableSlicerFilterCommand(currentState, key, multi));
+      if (currentState) applyFilterCommand(currentState, key, multi);
     },
     selectRange(owner, drawing, fromKey, toKey) {
       if (owner !== options.sheet() || !editable(owner, drawing) || !options.flush()) return;
@@ -272,19 +356,24 @@ export function useTableSlicers(options: {
       if (!current) return;
       const currentState = state(owner, current);
       if (currentState)
-        options.execute(createTableSlicerRangeFilterCommand(currentState, fromKey, toKey));
+        options.execute(
+          currentState.kind === "pivot"
+            ? createPivotSlicerRangeFilterCommand(currentState, fromKey, toKey)
+            : createTableSlicerRangeFilterCommand(currentState, fromKey, toKey),
+        );
     },
   });
 
   return {
     target,
-    availableTables,
+    availableTargets,
     dialogTables,
     fields,
     settingsTarget,
     settingsDrawing,
     settingsState,
     open,
+    openForPivot,
     selectTargetTable,
     insert,
     state,

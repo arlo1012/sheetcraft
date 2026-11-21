@@ -7,7 +7,7 @@ import { InputNumber } from "tdesign-vue-next/es/input-number";
 import type { SheetSlicerDrawing } from "@sheetcraft/core/sheet-drawings";
 import {
   MAX_TABLE_SLICER_COLUMNS,
-  type TableSlicerState,
+  type SheetSlicerState,
   type TableSlicerStyleId,
 } from "@sheetcraft/core/table-slicers";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
@@ -18,7 +18,7 @@ import type { TableSlicerOptionsPatch } from "../useTableSlicers";
 
 const props = defineProps<{
   drawing: SheetSlicerDrawing;
-  state?: TableSlicerState;
+  state?: SheetSlicerState;
   disabled?: boolean;
   filterEditable?: boolean;
 }>();

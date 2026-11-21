@@ -139,9 +139,7 @@ export const TABLE_SLICER_STYLE_IDS = [
 export type TableSlicerStyleId = (typeof TABLE_SLICER_STYLE_IDS)[number];
 export type TableSlicerSortOrder = "asc" | "desc";
 export const MAX_TABLE_SLICER_COLUMNS = 8;
-export type TableSlicerSource = {
-  tableId: string;
-  columnId: string;
+export type SlicerDisplayOptions = {
   sourceSheetId?: string;
   caption?: string;
   showHeader?: boolean;
@@ -150,7 +148,19 @@ export type TableSlicerSource = {
   sortOrder?: TableSlicerSortOrder;
   hideNoData?: boolean;
 };
-export type SheetSlicerDrawing = DrawingBase & { kind: "slicer"; slicer: TableSlicerSource };
+export type TableSlicerSource = SlicerDisplayOptions & {
+  tableId: string;
+  columnId: string;
+};
+export type PivotSlicerSource = SlicerDisplayOptions & {
+  pivotTableId: string;
+  fieldIndex: number;
+};
+export type SheetSlicerSource = TableSlicerSource | PivotSlicerSource;
+export type SheetSlicerDrawing = DrawingBase & { kind: "slicer"; slicer: SheetSlicerSource };
+export function isPivotSlicerSource(source: SheetSlicerSource): source is PivotSlicerSource {
+  return "pivotTableId" in source;
+}
 export type SheetControlDrawing = DrawingBase & { kind: "control"; control: SheetFormControl };
 export type SheetLegacyDrawing =
   | SheetGraphicDrawing
@@ -324,17 +334,17 @@ export function hasTableSlicerOptions(source: unknown): boolean {
     Object.hasOwn(record, "hideNoData")
   );
 }
-function normalizeTableSlicer(source: TableSlicerSource): TableSlicerSource {
+export function hasPivotSlicerSource(source: unknown): boolean {
+  return !!source && typeof source === "object" && Object.hasOwn(source, "pivotTableId");
+}
+function normalizeTableSlicer(source: SheetSlicerSource): SheetSlicerSource {
+  if (!source || typeof source !== "object")
+    throw new TypeError("A slicer requires a valid source.");
   if (
-    !source ||
-    typeof source.tableId !== "string" ||
-    !source.tableId ||
-    typeof source.columnId !== "string" ||
-    !source.columnId ||
-    (source.sourceSheetId !== undefined &&
-      (typeof source.sourceSheetId !== "string" || !source.sourceSheetId))
+    source.sourceSheetId !== undefined &&
+    (typeof source.sourceSheetId !== "string" || !source.sourceSheetId)
   )
-    throw new TypeError("A table slicer requires table and column identities.");
+    throw new TypeError("Slicer sourceSheetId must be a non-empty string.");
   if (source.caption !== undefined && typeof source.caption !== "string")
     throw new TypeError("Slicer caption must be a string.");
   const caption = source.caption?.trim();
@@ -358,9 +368,7 @@ function normalizeTableSlicer(source: TableSlicerSource): TableSlicerSource {
     throw new TypeError("Unsupported slicer sort order.");
   if (source.hideNoData !== undefined && typeof source.hideNoData !== "boolean")
     throw new TypeError("Slicer hideNoData option must be a boolean.");
-  return {
-    tableId: source.tableId,
-    columnId: source.columnId,
+  const options: SlicerDisplayOptions = {
     ...(source.sourceSheetId ? { sourceSheetId: source.sourceSheetId } : {}),
     ...(caption ? { caption } : {}),
     ...(source.showHeader === false ? { showHeader: false } : {}),
@@ -369,6 +377,24 @@ function normalizeTableSlicer(source: TableSlicerSource): TableSlicerSource {
     ...(source.sortOrder === "desc" ? { sortOrder: "desc" } : {}),
     ...(source.hideNoData === true ? { hideNoData: true } : {}),
   };
+  if (isPivotSlicerSource(source)) {
+    if (
+      typeof source.pivotTableId !== "string" ||
+      !source.pivotTableId ||
+      !Number.isInteger(source.fieldIndex) ||
+      source.fieldIndex < 0
+    )
+      throw new TypeError("A pivot slicer requires pivotTableId and a non-negative fieldIndex.");
+    return { pivotTableId: source.pivotTableId, fieldIndex: source.fieldIndex, ...options };
+  }
+  if (
+    typeof source.tableId !== "string" ||
+    !source.tableId ||
+    typeof source.columnId !== "string" ||
+    !source.columnId
+  )
+    throw new TypeError("A table slicer requires table and column identities.");
+  return { tableId: source.tableId, columnId: source.columnId, ...options };
 }
 export function normalizeSheetShapeGeometry(
   value: SheetShapeGeometry | undefined,
