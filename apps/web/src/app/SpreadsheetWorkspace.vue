@@ -157,6 +157,8 @@ import PivotTableDialog from "../modules/pivot-tables/components/PivotTableDialo
 import { useFormControlActions } from "../modules/form-controls/useFormControlActions";
 import { useTableSlicers } from "../modules/slicers/useTableSlicers";
 import InsertSlicerDialog from "../modules/slicers/components/InsertSlicerDialog.vue";
+import SlicerToolbar from "../modules/slicers/components/SlicerToolbar.vue";
+import SlicerSettingsDialog from "../modules/slicers/components/SlicerSettingsDialog.vue";
 import FormControlDialog from "../modules/form-controls/components/FormControlDialog.vue";
 import { useAttachmentActions } from "../modules/attachments/useAttachmentActions";
 import AttachmentDialog from "../modules/attachments/components/AttachmentDialog.vue";
@@ -1594,7 +1596,7 @@ const tableSlicers = useTableSlicers({
   flush: () => cellEditSession.finish(),
   execute: executeCommand,
   selectDrawing: (id) => {
-    sheetGridRef.value?.selectShapeObjects([[id]]);
+    sheetGridRef.value?.selectDrawing(id);
   },
 });
 const controlActions = useFormControlActions({
@@ -1744,6 +1746,22 @@ watch(
   { flush: "sync" },
 );
 const selectedChartId = ref<string | null>(null);
+const selectedSlicerId = ref<string | null>(null);
+const selectedSlicer = computed(() => {
+  void workbookRevision.value;
+  const id =
+    selectedSlicerId.value ??
+    (selectedShapeObjectPaths.value.length === 1 && selectedShapeObjectPaths.value[0]?.length === 1
+      ? selectedShapeObjectPaths.value[0][0]
+      : null);
+  if (!id) return undefined;
+  const drawing = activeSheet.value.drawings?.find((node) => node.id === id);
+  return drawing?.kind === "slicer" ? drawing : undefined;
+});
+const selectedSlicerState = computed(() => {
+  const drawing = selectedSlicer.value;
+  return drawing ? tableSlicers.state(activeSheet.value, drawing) : undefined;
+});
 const chartFormatPaneVisible = ref(false);
 const chartFormatPaneRef = ref<InstanceType<typeof ChartFormatPane>>();
 const chartFormatTarget = shallowRef<ChartFormatTarget>({ kind: "chart" });
@@ -1751,6 +1769,7 @@ watch(
   [activeSheet, workbookGeneration],
   () => {
     selectedChartId.value = null;
+    selectedSlicerId.value = null;
     chartFormatPaneVisible.value = false;
     chartFormatTarget.value = { kind: "chart" };
   },
@@ -2035,8 +2054,10 @@ function editSheetDrawing(drawing: SheetDrawing): void {
     if (!flowcharts.open("gallery", drawing) && !mindMaps.open("workbook", drawing))
       attachmentActions.viewing.value = drawing;
   } else if (drawing.kind === "camera") cameraActions.open(drawing);
-  else if (drawing.kind === "slicer") sheetGridRef.value?.selectShapeObjects([[drawing.id]]);
-  else if (drawing.kind === "equation") beginEquationEdit(drawing);
+  else if (drawing.kind === "slicer") {
+    sheetGridRef.value?.selectDrawing(drawing.id);
+    tableSlicers.openSettings(drawing);
+  } else if (drawing.kind === "equation") beginEquationEdit(drawing);
   else drawingActions.edit(drawing);
 }
 const symbolDialog = shallowRef<{
@@ -2919,6 +2940,11 @@ function selectedShapeChanged(id: string | null) {
   }
   selectedChartId.value = activeSheet.value.drawings?.some(
     (node) => node.id === id && node.kind === "chart",
+  )
+    ? id
+    : null;
+  selectedSlicerId.value = activeSheet.value.drawings?.some(
+    (node) => node.id === id && node.kind === "slicer",
   )
     ? id
     : null;
@@ -5273,6 +5299,7 @@ watch(
       v-if="!activeSheet.dashboard"
       :print-disabled="loading || fileBusy || xlsxBusy"
       :has-chart="!!chartObjectContext"
+      :has-slicer="!!selectedSlicer"
       :has-sparkline="!!sparklineToolContext"
       :has-image="!!selectedPicture"
       :has-shape="!!shapeObjectControls.snapshot.value?.paths.length"
@@ -5722,6 +5749,20 @@ watch(
           :format-targets="chartFormatChoices"
         />
       </template>
+      <template #slicer-tools>
+        <SlicerToolbar
+          v-if="selectedSlicer"
+          :drawing="selectedSlicer"
+          :state="selectedSlicerState"
+          :disabled="
+            loading || fileBusy || xlsxBusy || !canUseSheetPermission(activeSheet, 'editObjects')
+          "
+          :filter-editable="tableSlicers.editable(activeSheet, selectedSlicer)"
+          @update="tableSlicers.updateOptions(activeSheet, selectedSlicer.id, $event)"
+          @clear-filter="tableSlicers.clearFilter(activeSheet, selectedSlicer)"
+          @open-settings="tableSlicers.openSettings(selectedSlicer)"
+        />
+      </template>
       <template #sparkline-tools>
         <SparklineToolsToolbar
           v-if="sparklineToolContext"
@@ -5794,11 +5835,19 @@ watch(
             !canUseSheetPermission(activeSheet, 'insertHyperlinks') ||
             !canEditCell(activeSheet, activeAddress)
           "
+          :slicer-disabled="
+            loading ||
+            fileBusy ||
+            xlsxBusy ||
+            !canUseSheetPermission(activeSheet, 'editObjects') ||
+            tableSlicers.availableTables.value.length === 0
+          "
           :has-table="!!activeTable"
           :edit-session-id="cellEditSession.id"
           @insert-image="imageActions.requestInsert"
           @insert-hyperlink="hyperlinkActions.edit"
           @insert-table="tableActions.requestCreate"
+          @insert-slicer="tableSlicers.open"
           @manage-table="tableActions.openSettings"
         >
           <template #watermark>
@@ -7654,8 +7703,18 @@ watch(
   <InsertSlicerDialog
     v-if="tableSlicers.fields.value"
     :fields="tableSlicers.fields.value"
+    :tables="tableSlicers.dialogTables.value"
+    :table-id="tableSlicers.target.value?.tableId"
+    @select-table="tableSlicers.selectTargetTable"
     @confirm="tableSlicers.insert"
     @close="tableSlicers.target.value = undefined"
+  />
+  <SlicerSettingsDialog
+    v-if="tableSlicers.settingsDrawing.value"
+    :drawing="tableSlicers.settingsDrawing.value"
+    :state="tableSlicers.settingsState.value"
+    @confirm="tableSlicers.applySettings"
+    @close="tableSlicers.closeSettings"
   />
   <FormControlDialog
     v-if="controlDialog"

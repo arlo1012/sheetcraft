@@ -1,6 +1,20 @@
 export type TableMessageSchema = {
   tables: {
     insertSlicer: string;
+    slicer: string;
+    slicerTools: string;
+    slicerSettings: string;
+    slicerOptions: string;
+    slicerCaption: string;
+    slicerCaptionPlaceholder: string;
+    slicerShowHeader: string;
+    slicerColumns: string;
+    slicerStyles: string;
+    slicerSortOrder: string;
+    slicerSortAsc: string;
+    slicerSortDesc: string;
+    slicerHideNoData: string;
+    slicerTable: string;
     slicerMultiple: string;
     slicerClear: string;
     slicerBlank: string;

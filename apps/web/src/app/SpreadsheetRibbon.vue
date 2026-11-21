@@ -57,6 +57,7 @@ const props = withDefaults(
     beforeShapeContextChange?: () => boolean;
     hasEquation?: boolean;
     hasChart?: boolean;
+    hasSlicer?: boolean;
     hasSparkline?: boolean;
     pivotId?: string;
   }>(),
@@ -121,6 +122,7 @@ type Category =
   | "shape-text"
   | "equation"
   | "chart"
+  | "slicer"
   | "sparkline"
   | "pivot-analysis"
   | "pivot-design"
@@ -141,6 +143,7 @@ let previousCategory: Exclude<
   | "shape-text"
   | "equation"
   | "chart"
+  | "slicer"
   | "sparkline"
   | "pivot-analysis"
   | "pivot-design"
@@ -152,6 +155,7 @@ const pivotDesignTab = ref<HTMLButtonElement>();
 const imageTab = ref<HTMLButtonElement>();
 const equationTab = ref<HTMLButtonElement>();
 const chartTab = ref<HTMLButtonElement>();
+const slicerTab = ref<HTMLButtonElement>();
 const sparklineTab = ref<HTMLButtonElement>();
 const shapeTab = ref<HTMLButtonElement>();
 const shapeTextTab = ref<HTMLButtonElement>();
@@ -172,6 +176,7 @@ watch(activeCategory, (category) => {
     category !== "shape-text" &&
     category !== "equation" &&
     category !== "chart" &&
+    category !== "slicer" &&
     category !== "sparkline" &&
     category !== "pivot-analysis" &&
     category !== "pivot-design"
@@ -202,7 +207,7 @@ watch(
         activeCategory.value = previousCategory;
       return;
     }
-    if (props.hasEquation || props.hasChart) return;
+    if (props.hasEquation || props.hasChart || props.hasSlicer) return;
     if (
       text &&
       session !== undefined &&
@@ -230,9 +235,23 @@ watch(
   },
 );
 watch(
+  () => props.hasSlicer,
+  (active) => {
+    if (active) activeCategory.value = "slicer";
+    else if (activeCategory.value === "slicer") activeCategory.value = previousCategory;
+  },
+);
+watch(
   () => props.hasSparkline,
   (active) => {
-    if (active && !props.hasImage && !props.hasShape && !props.hasChart && !props.hasEquation)
+    if (
+      active &&
+      !props.hasImage &&
+      !props.hasShape &&
+      !props.hasChart &&
+      !props.hasSlicer &&
+      !props.hasEquation
+    )
       activeCategory.value = "sparkline";
     else if (!active && activeCategory.value === "sparkline")
       activeCategory.value = previousCategory;
@@ -241,7 +260,14 @@ watch(
 watch(
   () => props.pivotId,
   (id) => {
-    if (id && !props.hasImage && !props.hasShape && !props.hasEquation && !props.hasChart)
+    if (
+      id &&
+      !props.hasImage &&
+      !props.hasShape &&
+      !props.hasEquation &&
+      !props.hasChart &&
+      !props.hasSlicer
+    )
       activeCategory.value = "pivot-analysis";
     else if (
       !id &&
@@ -266,6 +292,10 @@ function onCategoryKeydown(event: KeyboardEvent): void {
   if (props.hasChart) {
     categories.push("chart");
     tabs.push(chartTab);
+  }
+  if (props.hasSlicer) {
+    categories.push("slicer");
+    tabs.push(slicerTab);
   }
   if (props.hasSparkline) {
     categories.push("sparkline");
@@ -336,6 +366,7 @@ defineSlots<{
   "shape-text-tools"?: () => unknown;
   "equation-tools"?: () => unknown;
   "chart-tools"?: () => unknown;
+  "slicer-tools"?: () => unknown;
   "sparkline-tools"?: () => unknown;
   "pivot-analysis-tools"?: () => unknown;
   "pivot-design-tools"?: () => unknown;
@@ -512,6 +543,22 @@ defineSlots<{
             @click="activeCategory = 'chart'"
           >
             {{ t("chart.contextTools") }}
+          </button>
+          <button
+            v-if="hasSlicer"
+            :id="`${tabId}-slicer`"
+            ref="slicerTab"
+            class="spreadsheet-ribbon__category spreadsheet-ribbon__category--contextual"
+            :class="{ 'is-active': activeCategory === 'slicer' }"
+            data-ribbon-category="slicer"
+            type="button"
+            role="tab"
+            :aria-selected="activeCategory === 'slicer'"
+            :aria-controls="`${tabId}-panel`"
+            :tabindex="activeCategory === 'slicer' ? 0 : -1"
+            @click="activeCategory = 'slicer'"
+          >
+            {{ t("tables.slicerTools") }}
           </button>
           <button
             v-if="hasSparkline"
@@ -712,6 +759,7 @@ defineSlots<{
       <slot v-else-if="activeCategory === 'shape-text'" name="shape-text-tools" />
       <slot v-else-if="activeCategory === 'equation'" name="equation-tools" />
       <slot v-else-if="activeCategory === 'chart'" name="chart-tools" />
+      <slot v-else-if="activeCategory === 'slicer'" name="slicer-tools" />
       <slot v-else-if="activeCategory === 'sparkline'" name="sparkline-tools" />
       <slot v-else-if="activeCategory === 'pivot-analysis'" name="pivot-analysis-tools" />
       <slot v-else-if="activeCategory === 'pivot-design'" name="pivot-design-tools" />

@@ -124,7 +124,32 @@ export type SheetAttachmentDrawing = DrawingBase & {
   kind: "attachment";
   attachment: SheetAttachment;
 };
-export type TableSlicerSource = { tableId: string; columnId: string; sourceSheetId?: string };
+export const TABLE_SLICER_STYLE_IDS = [
+  "light-blue",
+  "light-orange",
+  "light-gray",
+  "light-gold",
+  "light-teal",
+  "light-green",
+  "dark-blue",
+  "dark-orange",
+  "dark-gray",
+  "dark-green",
+] as const;
+export type TableSlicerStyleId = (typeof TABLE_SLICER_STYLE_IDS)[number];
+export type TableSlicerSortOrder = "asc" | "desc";
+export const MAX_TABLE_SLICER_COLUMNS = 8;
+export type TableSlicerSource = {
+  tableId: string;
+  columnId: string;
+  sourceSheetId?: string;
+  caption?: string;
+  showHeader?: boolean;
+  columns?: number;
+  styleId?: TableSlicerStyleId;
+  sortOrder?: TableSlicerSortOrder;
+  hideNoData?: boolean;
+};
 export type SheetSlicerDrawing = DrawingBase & { kind: "slicer"; slicer: TableSlicerSource };
 export type SheetControlDrawing = DrawingBase & { kind: "control"; control: SheetFormControl };
 export type SheetLegacyDrawing =
@@ -286,6 +311,19 @@ const shapes = new Set([
   "star",
   "heart",
 ]);
+const slicerStyleIdSet = new Set<string>(TABLE_SLICER_STYLE_IDS);
+export function hasTableSlicerOptions(source: unknown): boolean {
+  if (!source || typeof source !== "object") return false;
+  const record = source as Record<string, unknown>;
+  return (
+    Object.hasOwn(record, "caption") ||
+    Object.hasOwn(record, "showHeader") ||
+    Object.hasOwn(record, "columns") ||
+    Object.hasOwn(record, "styleId") ||
+    Object.hasOwn(record, "sortOrder") ||
+    Object.hasOwn(record, "hideNoData")
+  );
+}
 function normalizeTableSlicer(source: TableSlicerSource): TableSlicerSource {
   if (
     !source ||
@@ -297,10 +335,39 @@ function normalizeTableSlicer(source: TableSlicerSource): TableSlicerSource {
       (typeof source.sourceSheetId !== "string" || !source.sourceSheetId))
   )
     throw new TypeError("A table slicer requires table and column identities.");
+  if (source.caption !== undefined && typeof source.caption !== "string")
+    throw new TypeError("Slicer caption must be a string.");
+  const caption = source.caption?.trim();
+  if (source.showHeader !== undefined && typeof source.showHeader !== "boolean")
+    throw new TypeError("Slicer header visibility must be a boolean.");
+  if (
+    source.columns !== undefined &&
+    (!Number.isInteger(source.columns) ||
+      source.columns < 1 ||
+      source.columns > MAX_TABLE_SLICER_COLUMNS)
+  )
+    throw new RangeError(
+      `Slicer columns must be an integer between 1 and ${MAX_TABLE_SLICER_COLUMNS}.`,
+    );
+  if (
+    source.styleId !== undefined &&
+    (typeof source.styleId !== "string" || !slicerStyleIdSet.has(source.styleId))
+  )
+    throw new TypeError("Unsupported slicer style.");
+  if (source.sortOrder !== undefined && source.sortOrder !== "asc" && source.sortOrder !== "desc")
+    throw new TypeError("Unsupported slicer sort order.");
+  if (source.hideNoData !== undefined && typeof source.hideNoData !== "boolean")
+    throw new TypeError("Slicer hideNoData option must be a boolean.");
   return {
     tableId: source.tableId,
     columnId: source.columnId,
     ...(source.sourceSheetId ? { sourceSheetId: source.sourceSheetId } : {}),
+    ...(caption ? { caption } : {}),
+    ...(source.showHeader === false ? { showHeader: false } : {}),
+    ...(source.columns !== undefined && source.columns > 1 ? { columns: source.columns } : {}),
+    ...(source.styleId && source.styleId !== "light-blue" ? { styleId: source.styleId } : {}),
+    ...(source.sortOrder === "desc" ? { sortOrder: "desc" } : {}),
+    ...(source.hideNoData === true ? { hideNoData: true } : {}),
   };
 }
 export function normalizeSheetShapeGeometry(

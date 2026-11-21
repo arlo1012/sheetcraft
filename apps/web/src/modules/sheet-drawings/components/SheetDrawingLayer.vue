@@ -3294,7 +3294,7 @@ function clearOutside(event: PointerEvent) {
     event.target instanceof Element &&
     !event.target.closest("[data-sheet-drawing-id]") &&
     !event.target.closest(
-      '[role="dialog"],[role="menu"],[role="listbox"],[data-chart-tools-toolbar],[data-chart-format-pane],.chart-format-options-popup,.chart-element-options-popup,.chart-source-options-popup,.chart-editor-options-popup,[data-shape-format-pane],[data-shape-format-trigger],[data-shape-selection-toolbar],[data-shape-selection-reference-menu],[data-shape-group-selection],[data-shape-canvas-text-editor],[data-shape-canvas-text-toolbar],[data-shape-tools-toolbar],[data-shape-selection-pane]',
+      '[role="dialog"],[role="menu"],[role="listbox"],[data-chart-tools-toolbar],[data-chart-format-pane],.chart-format-options-popup,.chart-element-options-popup,.chart-source-options-popup,.chart-editor-options-popup,[data-slicer-tools-toolbar],[data-ribbon-category="slicer"],[data-shape-format-pane],[data-shape-format-trigger],[data-shape-selection-toolbar],[data-shape-selection-reference-menu],[data-shape-group-selection],[data-shape-canvas-text-editor],[data-shape-canvas-text-toolbar],[data-shape-tools-toolbar],[data-shape-selection-pane]',
     )
   ) {
     selectRoots([]);

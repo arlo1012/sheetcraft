@@ -29,6 +29,7 @@ import {
   Paperclip,
   Link2,
   Table2,
+  ListFilter,
   Shapes,
   Type,
   ALargeSmall,
@@ -53,6 +54,7 @@ defineProps<{
   symbolDisabled: boolean;
   sparklineDisabled: boolean;
   hyperlinkDisabled: boolean;
+  slicerDisabled?: boolean;
   hasTable: boolean;
   editSessionId?: string;
   insertSymbolTextHandler?: (payload: SymbolInsertion) => boolean;
@@ -85,6 +87,7 @@ const emit = defineEmits<{
   insertImage: [mode: "cell" | "floating"];
   insertHyperlink: [];
   insertTable: [];
+  insertSlicer: [];
   manageTable: [];
 }>();
 defineSlots<{ watermark(): unknown }>();
@@ -116,6 +119,15 @@ const { t, locale } = useAppI18n();
         data-insert-tool="table"
         @activate="hasTable ? emit('manageTable') : emit('insertTable')"
         ><Table2
+      /></RibbonButton>
+      <RibbonButton
+        variant="tall"
+        :label="t('tables.insertSlicer')"
+        :text="t('tables.slicer')"
+        :disabled="slicerDisabled ?? true"
+        data-insert-tool="slicer"
+        @activate="emit('insertSlicer')"
+        ><ListFilter
       /></RibbonButton>
     </section>
     <section

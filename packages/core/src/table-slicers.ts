@@ -1,4 +1,11 @@
-import type { TableSlicerSource } from "./sheet-drawings.js";
+import {
+  MAX_TABLE_SLICER_COLUMNS,
+  TABLE_SLICER_STYLE_IDS,
+  hasTableSlicerOptions,
+  type TableSlicerSortOrder,
+  type TableSlicerSource,
+  type TableSlicerStyleId,
+} from "./sheet-drawings.js";
 import type { Sheet, SheetEvaluator, SheetFilter, SheetFilterValue } from "./workbook.js";
 import {
   createSetSheetFilterCommand,
@@ -8,6 +15,15 @@ import {
   createSheetFilterColumnMatcher,
   getSheetFilterValue,
 } from "./commands/filter.js";
+
+export {
+  MAX_TABLE_SLICER_COLUMNS,
+  TABLE_SLICER_STYLE_IDS,
+  hasTableSlicerOptions,
+  type TableSlicerSortOrder,
+  type TableSlicerSource,
+  type TableSlicerStyleId,
+};
 
 export function getTableSlicerState(
   sheet: Sheet,
@@ -45,16 +61,33 @@ export function getTableSlicerState(
           getSheetFilterValueKey(getSheetFilterValue(evaluator.getComputedValue({ row, column }))),
         );
   }
-  const items = values.map((value) => {
+  const sortOrder: TableSlicerSortOrder = source.sortOrder === "desc" ? "desc" : "asc";
+  const orderedValues = sortOrder === "desc" ? [...values].reverse() : values;
+  const allMapped = orderedValues.map((value) => {
     const key = getSheetFilterValueKey(value);
     return { value, key, available: available.has(key), selected: !criterion || selected.has(key) };
   });
+  const availableItems = allMapped.filter((item) => item.available);
+  const unavailableItems = allMapped.filter((item) => !item.available);
+  const allItems = [...availableItems, ...unavailableItems];
+  const hideNoData = source.hideNoData === true;
+  const items = hideNoData
+    ? allItems.filter((item) => item.available || (!!criterion && item.selected))
+    : allItems;
+  const fieldName = table.columns[index]!.name;
   return {
     sheetId: sheet.id,
     column,
-    caption: table.columns[index]!.name,
+    fieldName,
+    caption: source.caption?.trim() ? source.caption.trim() : fieldName,
+    showHeader: source.showHeader !== false,
+    columns: source.columns ?? 1,
+    styleId: source.styleId ?? ("light-blue" as TableSlicerStyleId),
+    sortOrder,
+    hideNoData,
     filter,
     filtered: !!criterion,
+    allItems,
     items,
   };
 }
@@ -67,16 +100,33 @@ export function createTableSlicerFilterCommand(
 ) {
   const columns = state.filter.columns.filter((field) => field.column !== state.column);
   if (itemKey !== undefined) {
-    const clicked = state.items.find((item) => item.key === itemKey);
+    const clicked = state.allItems.find((item) => item.key === itemKey);
     if (!clicked) throw new RangeError("Unknown slicer member.");
     const values: SheetFilterValue[] =
       multi && state.filtered
-        ? state.items
+        ? state.allItems
             .filter((item) => (item.key === itemKey ? !item.selected : item.selected))
             .map((item) => item.value)
         : [clicked.value];
-    if (values.length && values.length < state.items.length)
+    if (values.length && values.length < state.allItems.length)
       columns.push({ column: state.column, allowedValues: values });
   }
+  return createSetSheetFilterCommand(state.sheetId, { ...state.filter, columns });
+}
+
+export function createTableSlicerRangeFilterCommand(
+  state: TableSlicerState,
+  fromKey: string,
+  toKey: string,
+) {
+  const fromIndex = state.items.findIndex((item) => item.key === fromKey);
+  const toIndex = state.items.findIndex((item) => item.key === toKey);
+  if (fromIndex < 0 || toIndex < 0) throw new RangeError("Unknown slicer member.");
+  const start = Math.min(fromIndex, toIndex);
+  const end = Math.max(fromIndex, toIndex);
+  const values = state.items.slice(start, end + 1).map((item) => item.value);
+  const columns = state.filter.columns.filter((field) => field.column !== state.column);
+  if (values.length && values.length < state.allItems.length)
+    columns.push({ column: state.column, allowedValues: values });
   return createSetSheetFilterCommand(state.sheetId, { ...state.filter, columns });
 }

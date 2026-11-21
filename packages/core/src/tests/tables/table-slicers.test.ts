@@ -1,6 +1,10 @@
 // 未执行：按约定仅编写单测，待功能完成后统一验证。
 import { describe, expect, test } from "vitest";
-import { getTableSlicerState, createTableSlicerFilterCommand } from "../../table-slicers.js";
+import {
+  getTableSlicerState,
+  createTableSlicerFilterCommand,
+  createTableSlicerRangeFilterCommand,
+} from "../../table-slicers.js";
 import {
   createSheetFilterHiddenRowIntervals,
   createSetSheetFilterCriteriaCommand,
@@ -200,5 +204,73 @@ describe("table slicers", () => {
     undoWorkbookCommand(f.session);
     undoWorkbookCommand(f.session);
     expect(f.workbook.sheets.has("copy")).toBe(false);
+  });
+  test("supports custom caption, sort order, no-data ordering/hiding, shift range selection and V113 persistence", () => {
+    const f = fixture();
+    const range = f.state().filter.range;
+    executeWorkbookCommand(
+      f.session,
+      createSetSheetFilterCriteriaCommand(f.sheet.id, range, [
+        { column: 1, allowedValues: [{ kind: "string", value: "Retail" }] },
+      ]),
+    );
+    const descSource = {
+      ...f.source,
+      caption: "Sales Region",
+      showHeader: false,
+      columns: 3,
+      styleId: "dark-green" as const,
+      sortOrder: "desc" as const,
+      hideNoData: false,
+    };
+    const descState = getTableSlicerState(
+      f.sheet,
+      descSource,
+      createWorkbookEvaluator(f.workbook, f.sheet.id),
+    )!;
+    expect(descState.caption).toBe("Sales Region");
+    expect(descState.fieldName).toBe("Region");
+    expect(descState.showHeader).toBe(false);
+    expect(descState.columns).toBe(3);
+    expect(descState.styleId).toBe("dark-green");
+    // Available items (South, North) sorted descending first, unavailable (East) last.
+    expect(descState.items.map((item) => item.value)).toEqual([
+      { kind: "string", value: "South" },
+      { kind: "string", value: "North" },
+      { kind: "string", value: "East" },
+    ]);
+    const hiddenNoDataState = getTableSlicerState(
+      f.sheet,
+      { ...descSource, hideNoData: true },
+      createWorkbookEvaluator(f.workbook, f.sheet.id),
+    )!;
+    expect(hiddenNoDataState.items.map((item) => item.value)).toEqual([
+      { kind: "string", value: "South" },
+      { kind: "string", value: "North" },
+    ]);
+    // Shift+Click range selection across first two visible items selects South + North.
+    executeWorkbookCommand(
+      f.session,
+      createTableSlicerRangeFilterCommand(
+        descState,
+        descState.items[0]!.key,
+        descState.items[1]!.key,
+      ),
+    );
+    expect(f.sheet.tables![0]!.filter!.columns).toEqual([
+      {
+        column: 0,
+        allowedValues: [
+          { kind: "string", value: "North" },
+          { kind: "string", value: "South" },
+        ],
+      },
+      { column: 1, allowedValues: [{ kind: "string", value: "Retail" }] },
+    ]);
+    f.sheet.drawings = [slicer(descSource)];
+    const snapshot = serializeWorkbook(f.workbook);
+    expect(snapshot.version).toBe(113);
+    expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
+    expect(() => deserializeWorkbook({ ...snapshot, version: 112 })).toThrow();
   });
 });
