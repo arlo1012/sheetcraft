@@ -586,9 +586,9 @@ watch(
     flex-wrap: wrap;
     gap: 8px;
     padding: 8px 10px;
-    border: 1px solid var(--sheetcraft-border-default);
+    border: 1px solid var(--sheetcraft-border-subtle);
     border-radius: 8px;
-    background: var(--sheetcraft-surface-default);
+    background: var(--sheetcraft-surface-panel);
     box-shadow: var(--sheetcraft-shadow-menu);
     cursor: default;
     z-index: 1;
@@ -600,9 +600,9 @@ watch(
   }
   &__controls button {
     padding: 4px 8px;
-    border: 1px solid var(--sheetcraft-border-default);
+    border: 1px solid var(--sheetcraft-border-subtle);
     border-radius: 4px;
-    background: var(--sheetcraft-surface-default);
+    background: var(--sheetcraft-surface-panel);
     color: var(--sheetcraft-text-primary);
     cursor: pointer;
     white-space: nowrap;
@@ -620,9 +620,11 @@ watch(
     left: 12px;
     max-width: calc(100% - 24px);
     padding: 6px 10px;
+    border: 1px solid var(--sheetcraft-border-subtle);
     border-radius: 6px;
     color: var(--sheetcraft-text-secondary);
-    background: var(--sheetcraft-surface-default);
+    background: var(--sheetcraft-surface-panel);
+    box-shadow: var(--sheetcraft-shadow-menu);
     font-size: 12px;
     pointer-events: none;
   }

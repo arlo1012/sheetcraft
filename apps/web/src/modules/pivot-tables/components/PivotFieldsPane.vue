@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onBeforeUnmount } from "vue";
 import { X, GripVertical, Search } from "lucide-vue-next";
-import { vIconAction } from "../../../shared/focus/icon-action";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Input } from "tdesign-vue-next/es/input";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import {
@@ -204,14 +204,16 @@ defineExpose({
   <aside class="pivot-fields-pane" :aria-label="t('pivot.fieldList')">
     <header class="pivot-fields-pane__header">
       <strong>{{ t("pivot.title") }}</strong>
-      <span
-        v-icon-action
-        class="pivot-fields-pane__close"
+      <TButton
+        variant="text"
+        shape="square"
+        size="small"
         :aria-label="t('picture.close')"
         :title="t('picture.close')"
         @click="emit('close')"
-        ><X class="sheetcraft-action-icon" aria-hidden="true"
-      /></span>
+      >
+        <template #icon><X class="sheetcraft-action-icon" aria-hidden="true" /></template>
+      </TButton>
     </header>
     <section
       class="pivot-fields-pane__available"
@@ -340,27 +342,31 @@ defineExpose({
 .pivot-fields-pane {
   display: grid;
   grid-template-rows: auto minmax(180px, 1.1fr) minmax(260px, 1fr);
-  width: 380px;
-  flex: 0 0 380px;
+  width: clamp(320px, 26vw, 380px);
+  flex: 0 0 clamp(320px, 26vw, 380px);
   max-width: 45vw;
   min-height: 0;
   gap: 16px;
   padding: 12px 14px;
   border-left: 1px solid var(--sheetcraft-border-subtle);
-  background: var(--sheetcraft-surface-secondary);
+  background: var(--sheetcraft-surface-panel);
+  color: var(--sheetcraft-text-primary);
+  font-family: var(--sheetcraft-font-sans);
   font-size: var(--sheetcraft-font-size-body-medium);
   line-height: var(--sheetcraft-line-height-body-medium);
   overflow: auto;
+  overscroll-behavior: contain;
   &__header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: var(--sheetcraft-space-2);
     min-height: 24px;
-  }
-  &__close {
-    padding: 4px;
-    border-radius: 3px;
-    color: var(--sheetcraft-text-secondary);
+    strong {
+      font-size: var(--sheetcraft-font-size-title-small);
+      line-height: var(--sheetcraft-line-height-title-small);
+      font-weight: var(--sheetcraft-font-weight-semibold);
+    }
   }
   h3 {
     margin: 0;

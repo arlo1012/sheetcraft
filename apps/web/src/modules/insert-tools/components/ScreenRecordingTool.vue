@@ -210,7 +210,7 @@ function openFile(event: Event) {
   box-shadow: var(--sheetcraft-shadow-floating);
   font-variant-numeric: tabular-nums;
   &__dot {
-    color: var(--td-error-color);
+    color: var(--sheetcraft-status-error);
   }
   &__dot.is-paused {
     color: var(--sheetcraft-text-muted);

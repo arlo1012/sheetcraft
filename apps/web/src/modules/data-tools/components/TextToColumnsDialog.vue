@@ -745,7 +745,7 @@ function confirm(): void {
   }
   &__error {
     margin: 0;
-    color: var(--td-error-color);
+    color: var(--sheetcraft-status-error);
   }
   &__delimiter-group {
     margin-bottom: 8px;

@@ -505,7 +505,7 @@ watch(
 
     &.is-active {
       color: var(--sheetcraft-action-primary);
-      background: var(--sheetcraft-action-subtle, var(--sheetcraft-action-hover));
+      background: var(--sheetcraft-action-primary-subtle);
     }
     &[aria-disabled="true"] {
       cursor: default;
@@ -648,7 +648,7 @@ watch(
     }
     button:hover {
       color: var(--sheetcraft-action-primary);
-      background: var(--sheetcraft-action-hover);
+      background: var(--sheetcraft-surface-hover);
       outline: none;
     }
     &--rows {

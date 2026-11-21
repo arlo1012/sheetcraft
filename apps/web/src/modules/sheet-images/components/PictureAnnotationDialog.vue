@@ -640,7 +640,7 @@ onBeforeUnmount(() => {
     align-items: center;
     max-height: 60vh;
     min-height: 120px;
-    background: var(--sheetcraft-bg-secondary);
+    background: var(--sheetcraft-surface-secondary);
     canvas {
       max-width: 100%;
       height: auto;

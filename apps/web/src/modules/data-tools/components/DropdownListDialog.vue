@@ -437,7 +437,7 @@ async function selectRange(current: string): Promise<string | undefined> {
 }
 .dropdown-list-dialog__error {
   margin: 0;
-  color: var(--td-error-color);
+  color: var(--sheetcraft-status-error);
 }
 .dropdown-list-dialog__footer {
   display: flex;

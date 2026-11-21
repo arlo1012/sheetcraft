@@ -236,7 +236,7 @@ async function restoreLocalFonts(): Promise<void> {
     display: grid;
     gap: 8px;
     padding: 10px;
-    border: 1px solid var(--sheetcraft-border-default);
+    border: 1px solid var(--sheetcraft-border-subtle);
     border-radius: 4px;
   }
   &__hint {

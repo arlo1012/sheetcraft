@@ -156,7 +156,7 @@ function choose(index?: number, more = false) {
 }
 .pie-gallery button:hover,
 .pie-gallery button:focus-visible {
-  background: var(--td-bg-color-container-hover);
+  background: var(--sheetcraft-surface-hover);
 }
 .pie-gallery__head button {
   display: flex;
@@ -173,7 +173,7 @@ function choose(index?: number, more = false) {
   padding: 1px;
 }
 .pie-gallery__families button[aria-pressed="true"] {
-  border-bottom: 2px solid var(--td-brand-color);
+  border-bottom: 2px solid var(--sheetcraft-action-primary);
 }
 .pie-gallery__cards {
   display: grid;
@@ -187,7 +187,7 @@ function choose(index?: number, more = false) {
 }
 .pie-gallery__cards button {
   padding: 4px;
-  border-color: var(--td-component-border);
+  border-color: var(--sheetcraft-border-subtle);
 }
 .pie-gallery__cards .pie-gallery__more {
   grid-column: 1/-1;
@@ -201,7 +201,7 @@ function choose(index?: number, more = false) {
   width: 14px;
 }
 .pie-gallery__cards button:hover {
-  border-color: var(--td-brand-color);
+  border-color: var(--sheetcraft-action-primary);
 }
 .pie-gallery svg {
   display: block;

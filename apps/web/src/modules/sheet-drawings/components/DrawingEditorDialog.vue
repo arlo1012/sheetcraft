@@ -532,8 +532,8 @@ const shapes: DrawingShape[] = [
     align-items: center;
     justify-content: center;
     min-height: 180px;
-    background: var(--sheetcraft-surface-default);
-    border: 1px solid var(--sheetcraft-border-default);
+    background: var(--sheetcraft-surface-panel);
+    border: 1px solid var(--sheetcraft-border-subtle);
     overflow: hidden;
   }
   @media (max-width: 760px) {

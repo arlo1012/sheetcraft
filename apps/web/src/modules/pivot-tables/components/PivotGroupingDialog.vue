@@ -237,7 +237,7 @@ function apply(): void {
   }
   p {
     margin: 0;
-    color: var(--td-error-color);
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

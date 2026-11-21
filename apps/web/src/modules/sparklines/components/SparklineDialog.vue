@@ -170,8 +170,8 @@ const { t, locale } = useAppI18n();
     font-size: 12px;
     color: var(--sheetcraft-text-secondary);
   }
-  &__error {
-    color: var(--sheetcraft-color-error) !important;
+  p#{&}__error {
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

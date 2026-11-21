@@ -248,7 +248,7 @@ function endComposition(event: CompositionEvent): void {
   font-style: normal;
 }
 .equation-text-slot.is-selected:focus {
-  background: var(--sheetcraft-selection-background, rgb(86 123 174 / 12%));
+  background: color-mix(in srgb, var(--sheetcraft-action-primary) 14%, transparent);
 }
 .equation-text-slot.hide-placeholder:not(:focus) {
   border-color: transparent;

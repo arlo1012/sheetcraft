@@ -166,9 +166,9 @@ const borderLines = computed<PreviewBorderLine[]>(() => {
   min-width: 0;
   height: 28px;
   overflow: hidden;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: var(--td-radius-default);
-  background: var(--td-bg-color-container);
+  border: 1px solid var(--sheetcraft-border-control);
+  border-radius: var(--sheetcraft-radius-default);
+  background: var(--sheetcraft-surface-panel);
   color: var(--sheetcraft-text-primary);
   font-size: var(--sheetcraft-font-size-body-small);
 

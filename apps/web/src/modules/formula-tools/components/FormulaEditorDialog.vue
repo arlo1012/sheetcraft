@@ -534,7 +534,7 @@ watch(
   &__error {
     flex: none;
     margin: 0;
-    color: var(--sheetcraft-text-danger);
+    color: var(--sheetcraft-status-error);
     font-size: var(--sheetcraft-font-size-body-small);
   }
 }

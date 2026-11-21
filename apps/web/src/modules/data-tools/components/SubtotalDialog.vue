@@ -138,9 +138,9 @@ function apply(): void {
     gap: var(--sheetcraft-space-1);
     max-height: 180px;
     padding: var(--sheetcraft-space-2);
-    border-color: var(--td-border-level-2-color);
-    border-radius: var(--td-radius-default);
-    background: var(--td-bg-color-specialcomponent);
+    border-color: var(--sheetcraft-border-control);
+    border-radius: var(--sheetcraft-radius-default);
+    background: var(--sheetcraft-surface-special);
   }
   &__column {
     min-width: max-content;

@@ -186,11 +186,11 @@ function navigate(event: KeyboardEvent, id: SheetIconId) {
   }
   &__filters button:hover,
   &__filters button:focus-visible {
-    background: var(--td-bg-color-container-hover);
+    background: var(--sheetcraft-surface-hover);
   }
   &__filters button[aria-pressed="true"] {
-    background: var(--td-brand-color-light);
-    color: var(--td-brand-color);
+    background: var(--sheetcraft-action-primary-subtle);
+    color: var(--sheetcraft-action-primary);
   }
   &__results {
     grid-area: results;
@@ -219,8 +219,8 @@ function navigate(event: KeyboardEvent, id: SheetIconId) {
   }
   &__grid button:hover,
   &__grid button:focus-visible {
-    background: var(--td-brand-color-light);
-    border-color: var(--td-brand-color);
+    background: var(--sheetcraft-action-primary-subtle);
+    border-color: var(--sheetcraft-action-primary);
   }
   &__grid button svg:not(.icon-library__mark) {
     width: 64%;
@@ -232,7 +232,7 @@ function navigate(event: KeyboardEvent, id: SheetIconId) {
     position: absolute;
     right: 2px;
     bottom: 2px;
-    color: var(--td-brand-color);
+    color: var(--sheetcraft-action-primary);
   }
   &__preview {
     grid-area: preview;
@@ -240,7 +240,7 @@ function navigate(event: KeyboardEvent, id: SheetIconId) {
     align-items: center;
     flex-direction: column;
     gap: 8px;
-    border-inline-start: 1px solid var(--td-component-border);
+    border-inline-start: 1px solid var(--sheetcraft-border-subtle);
     padding: 12px 0 0 8px;
     text-align: center;
   }
@@ -254,7 +254,7 @@ function navigate(event: KeyboardEvent, id: SheetIconId) {
     width: 100%;
     aspect-ratio: 1;
     max-height: 110px;
-    background: var(--td-bg-color-secondarycontainer);
+    background: var(--sheetcraft-surface-secondary);
     border-radius: 5px;
   }
   &__sample svg {

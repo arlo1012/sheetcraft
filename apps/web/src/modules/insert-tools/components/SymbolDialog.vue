@@ -1186,7 +1186,7 @@ function onCustomListKey(event: KeyboardEvent): void {
     gap: 12px;
     align-items: center;
     min-width: 0;
-    border-top: 1px solid var(--sheetcraft-border-default);
+    border-top: 1px solid var(--sheetcraft-border-subtle);
     padding-top: 10px;
     > div {
       display: flex;
@@ -1215,7 +1215,7 @@ function onCustomListKey(event: KeyboardEvent): void {
   &__extensions {
     flex: 0 0 auto;
     min-width: 0;
-    border-top: 1px solid var(--sheetcraft-border-default);
+    border-top: 1px solid var(--sheetcraft-border-subtle);
     > summary {
       padding-block: 3px;
       color: var(--sheetcraft-text-secondary);

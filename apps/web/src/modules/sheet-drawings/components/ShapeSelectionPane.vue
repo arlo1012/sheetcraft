@@ -297,8 +297,9 @@ const renderedRows = computed(() => {
         :aria-label="labels.close"
         data-shape-pane-close
         @click="paneActions.close"
-        ><X :size="16"
-      /></TButton>
+      >
+        <template #icon><X class="sheetcraft-action-icon" aria-hidden="true" /></template>
+      </TButton>
     </header>
     <div class="shape-selection-pane__order" role="group" :aria-label="labels.order">
       <TButton
@@ -451,26 +452,18 @@ const renderedRows = computed(() => {
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/format-pane/side-pane" as sidePane;
+
 .shape-selection-pane {
-  display: flex;
-  flex: 0 0 300px;
-  flex-direction: column;
-  width: 300px;
-  min-height: 0;
+  @include sidePane.shell(300px);
   padding: var(--sheetcraft-tool-panel-padding);
-  border-left: 1px solid var(--sheetcraft-border-subtle);
-  background: var(--sheetcraft-surface-panel);
-  color: var(--sheetcraft-text-primary);
   &__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sheetcraft-space-2);
+    @include sidePane.header(0);
     strong {
       min-width: 0;
-      font-size: var(--sheetcraft-font-size-body-large);
-      line-height: var(--sheetcraft-line-height-body-large);
-      font-weight: 600;
+      font-size: var(--sheetcraft-font-size-title-small);
+      line-height: var(--sheetcraft-line-height-title-small);
+      font-weight: var(--sheetcraft-font-weight-semibold);
     }
   }
   &__order,

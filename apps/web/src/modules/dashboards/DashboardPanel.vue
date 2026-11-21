@@ -487,8 +487,8 @@ article {
   grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
-  background: #fff;
-  color: #24272c;
+  background: var(--sheetcraft-surface-panel);
+  color: var(--sheetcraft-text-primary);
   border: 1px solid var(--sheetcraft-border-subtle);
   border-radius: 5px;
   padding: 7px;
@@ -516,7 +516,7 @@ article strong {
   cursor: nwse-resize;
 }
 .drop-target {
-  outline: 2px solid var(--td-brand-color);
+  outline: 2px solid var(--sheetcraft-action-primary);
 }
 .card-tools {
   display: flex;
@@ -543,13 +543,13 @@ article:focus-within .card-tools {
   display: grid;
   justify-items: center;
   gap: 14px;
-  background: white;
+  background: var(--sheetcraft-surface-panel);
   border: 1px solid var(--sheetcraft-border-subtle);
 }
 .choices svg {
   width: 40px;
   height: 40px;
-  color: #4e89bd;
+  color: var(--sheetcraft-action-primary);
 }
 .add-list {
   display: grid;

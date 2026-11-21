@@ -141,7 +141,7 @@ onBeforeUnmount(() => visibilityObserver?.disconnect());
     width: 24px;
     height: 24px;
     z-index: var(--sheetcraft-layer-popover);
-    color: var(--sheetcraft-text-warning, #a16207);
+    color: var(--sheetcraft-status-warning-strong);
   }
   &__panel {
     width: min(320px, calc(100vw - 16px));

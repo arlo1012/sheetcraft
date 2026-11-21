@@ -53,10 +53,10 @@ const text = computed(() =>
   height: 100%;
   width: 100%;
   padding: 10px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  background: #fff;
-  color: #202124;
+  border: 1px solid var(--sheetcraft-border-subtle);
+  border-radius: var(--sheetcraft-radius-default);
+  background: var(--sheetcraft-surface-panel);
+  color: var(--sheetcraft-text-primary);
   overflow: hidden;
   &__heading {
     display: flex;
@@ -69,7 +69,7 @@ const text = computed(() =>
     }
     svg {
       flex-shrink: 0;
-      color: #2563eb;
+      color: var(--sheetcraft-action-primary);
     }
   }
   pre {
@@ -80,7 +80,7 @@ const text = computed(() =>
   small {
     display: block;
     margin-top: 8px;
-    color: #666;
+    color: var(--sheetcraft-text-secondary);
   }
 }
 </style>

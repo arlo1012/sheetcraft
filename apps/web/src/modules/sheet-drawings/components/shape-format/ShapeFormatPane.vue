@@ -448,45 +448,17 @@ defineExpose({
   </aside>
 </template>
 <style scoped lang="scss">
+@use "../../../../shared/format-pane/side-pane" as sidePane;
 @use "../../../../shared/tabs/tab-label";
 
 .shape-format-pane {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  flex: 0 0 clamp(320px, 26vw, 380px);
-  width: clamp(320px, 26vw, 380px);
-  max-width: 100%;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  border-left: 1px solid var(--sheetcraft-border-subtle);
-  background: var(--sheetcraft-surface-panel);
-  color: var(--sheetcraft-text-primary);
-  font-family: var(--sheetcraft-font-sans);
-  font-size: var(--sheetcraft-font-size-body-medium);
-  line-height: var(--sheetcraft-line-height-body-medium);
+  @include sidePane.shell;
+  @include sidePane.mobile-width;
   &__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 12px 12px 8px;
+    @include sidePane.header;
   }
   &__heading {
-    min-width: 0;
-    display: grid;
-    strong {
-      font-size: var(--sheetcraft-font-size-title-small);
-      line-height: var(--sheetcraft-line-height-title-small);
-      font-weight: var(--sheetcraft-font-weight-semibold);
-    }
-    span {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      color: var(--sheetcraft-text-secondary);
-    }
+    @include sidePane.heading;
   }
   &__modes {
     margin: 0 12px 6px;
@@ -511,11 +483,7 @@ defineExpose({
     }
   }
   &__body {
-    flex: 1;
-    min-height: 0;
-    overflow: auto;
-    overscroll-behavior: contain;
-    padding: 0 12px 12px;
+    @include sidePane.body;
   }
   &__hint,
   &__error {
@@ -539,13 +507,7 @@ defineExpose({
     }
   }
   &__error {
-    color: var(--sheetcraft-text-primary);
-  }
-}
-@media (max-width: 600px) {
-  .shape-format-pane {
-    flex-basis: min(320px, 100%);
-    width: min(320px, 100%);
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

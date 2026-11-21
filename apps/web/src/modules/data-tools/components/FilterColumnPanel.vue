@@ -447,7 +447,7 @@ onBeforeUnmount(() => {
   }
   &__error {
     margin: 0;
-    color: var(--sheetcraft-text-danger);
+    color: var(--sheetcraft-status-error);
   }
   &__bottom {
     position: sticky;

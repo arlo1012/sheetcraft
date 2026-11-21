@@ -249,7 +249,7 @@ function rotateKey(event: KeyboardEvent): void {
       inset: 4px;
       border: 1px solid var(--sheetcraft-action-primary);
       border-radius: 50%;
-      background: var(--sheetcraft-surface-default);
+      background: var(--sheetcraft-surface-panel);
       box-shadow: 0 0 0 1px white;
     }
     &.is-rotation::after {

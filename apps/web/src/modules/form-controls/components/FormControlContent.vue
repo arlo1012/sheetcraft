@@ -184,16 +184,16 @@ function scrollByKey(event: KeyboardEvent) {
   display: flex;
   flex-direction: column;
   padding: 4px 8px;
-  background: #fff;
+  background: var(--sheetcraft-surface-panel);
   &--radio {
     background: transparent;
   }
-  color: #202124;
+  color: var(--sheetcraft-text-primary);
   pointer-events: auto;
   &__caption {
     font-size: 12px;
     line-height: 18px;
-    color: #666;
+    color: var(--sheetcraft-text-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -208,9 +208,9 @@ function scrollByKey(event: KeyboardEvent) {
     select {
       width: 100%;
       height: 100%;
-      border: 1px solid #d1d5db;
-      background: #fff;
-      color: #202124;
+      border: 1px solid var(--sheetcraft-border-subtle);
+      background: var(--sheetcraft-surface-panel);
+      color: var(--sheetcraft-text-primary);
     }
   }
   &__label {
@@ -218,7 +218,7 @@ function scrollByKey(event: KeyboardEvent) {
   }
   fieldset {
     flex: 1;
-    border: 1px solid #9ca3af;
+    border: 1px solid var(--sheetcraft-border-control);
     margin: 0;
   }
 }

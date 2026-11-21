@@ -94,9 +94,9 @@ const needsEnd = computed(() => {
   vertical-align: middle;
 }
 .equation-sequence.is-selected {
-  background: var(--sheetcraft-selection-background, rgb(86 123 174 / 8%));
+  background: color-mix(in srgb, var(--sheetcraft-action-primary) 10%, transparent);
 }
 .is-range-selected {
-  background: var(--sheetcraft-selection-background, rgb(86 123 174 / 24%));
+  background: color-mix(in srgb, var(--sheetcraft-action-primary) 24%, transparent);
 }
 </style>

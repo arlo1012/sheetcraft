@@ -879,13 +879,13 @@ function onDialogKeydown(event: KeyboardEvent): void {
   width: 56px;
   padding: 3px;
   background: transparent;
-  border: 1px solid var(--td-component-border);
-  border-radius: 4px;
+  border: 1px solid var(--sheetcraft-border-subtle);
+  border-radius: var(--sheetcraft-radius-default);
   cursor: pointer;
 }
 .scatter-variants button[aria-pressed="true"] {
-  background: var(--td-brand-color-light);
-  border-color: var(--td-brand-color);
+  background: var(--sheetcraft-action-primary-subtle);
+  border-color: var(--sheetcraft-action-primary);
 }
 .scatter-variants svg {
   display: block;

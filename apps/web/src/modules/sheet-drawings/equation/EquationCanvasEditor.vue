@@ -159,8 +159,8 @@ void nextTick(() => surface.value?.focus());
   max-width: 100%;
   overflow: auto;
   transform-origin: 50% 50%;
-  background: var(--sheetcraft-surface-background, #fff);
-  border: 1px solid var(--sheetcraft-accent-color, #4275bc);
+  background: var(--sheetcraft-surface-panel);
+  border: 1px solid var(--sheetcraft-action-primary);
   cursor: text;
 }
 .equation-canvas-editor textarea {
@@ -182,7 +182,7 @@ void nextTick(() => surface.value?.focus());
 }
 .equation-canvas-editor__cancel {
   display: block;
-  font: 11px sans-serif;
+  font: 12px var(--sheetcraft-font-sans);
   border: 0;
   background: transparent;
   color: inherit;
@@ -191,8 +191,8 @@ void nextTick(() => surface.value?.focus());
   margin: 4px;
 }
 .equation-canvas-editor__error {
-  font: 12px sans-serif;
-  color: var(--sheetcraft-status-error, #b42318);
+  font: 12px var(--sheetcraft-font-sans);
+  color: var(--sheetcraft-status-error);
   margin: 4px;
 }
 </style>

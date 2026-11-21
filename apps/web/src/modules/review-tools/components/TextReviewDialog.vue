@@ -141,11 +141,11 @@ function location(cell: ReviewTextCell) {
     margin: 0;
   }
   &__hint {
-    color: var(--td-text-color-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   &__context {
     padding: 12px;
-    background: var(--td-bg-color-secondarycontainer);
+    background: var(--sheetcraft-surface-secondary);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }

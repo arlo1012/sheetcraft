@@ -327,7 +327,7 @@ async function importFile(event: Event) {
     flex-direction: column;
     align-items: stretch;
     gap: 4px;
-    border-right: 1px solid var(--td-component-border);
+    border-right: 1px solid var(--sheetcraft-border-subtle);
     padding-right: 16px;
     button {
       @include option-list.item;
@@ -356,7 +356,7 @@ async function importFile(event: Event) {
     gap: 4px;
     padding-bottom: 8px;
     margin-bottom: 4px;
-    border-bottom: 1px solid var(--td-component-border);
+    border-bottom: 1px solid var(--sheetcraft-border-subtle);
   }
   &__heading {
     display: flex;

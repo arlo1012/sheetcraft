@@ -153,7 +153,7 @@ function choose(style?: ScatterStyle, accent = 0) {
 }
 .scatter-gallery button:hover,
 .scatter-gallery button:focus-visible {
-  background: var(--td-bg-color-container-hover);
+  background: var(--sheetcraft-surface-hover);
 }
 .scatter-gallery__heading button {
   display: flex;
@@ -174,8 +174,8 @@ function choose(style?: ScatterStyle, accent = 0) {
 }
 .scatter-gallery__families button[aria-pressed="true"],
 .scatter-gallery__cards button:hover {
-  background: var(--td-brand-color-light);
-  border-color: var(--td-brand-color);
+  background: var(--sheetcraft-action-primary-subtle);
+  border-color: var(--sheetcraft-action-primary);
 }
 .scatter-gallery__families svg {
   width: 34px;
@@ -191,7 +191,7 @@ function choose(style?: ScatterStyle, accent = 0) {
 }
 .scatter-gallery__cards button {
   padding: 4px;
-  border-color: var(--td-component-border);
+  border-color: var(--sheetcraft-border-subtle);
 }
 .scatter-gallery__cards svg {
   display: block;

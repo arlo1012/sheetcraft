@@ -1196,8 +1196,9 @@ function escapeDraft(event: KeyboardEvent): void {
         variant="text"
         :aria-label="t('chart.formatClose')"
         @click="emit('close')"
-        ><X :size="16" aria-hidden="true"
-      /></TButton>
+      >
+        <template #icon><X class="sheetcraft-action-icon" aria-hidden="true" /></template>
+      </TButton>
     </header>
     <div class="chart-format-pane__selector">
       <label :for="`${paneId}-element`">{{ t("chart.formatElement") }}</label>
@@ -2313,43 +2314,17 @@ function escapeDraft(event: KeyboardEvent): void {
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/format-pane/side-pane" as sidePane;
 @use "../../../shared/tabs/tab-label";
 .chart-format-pane {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  width: clamp(320px, 26vw, 380px);
-  max-width: 100%;
-  min-width: 0;
-  min-height: 0;
+  @include sidePane.shell;
+  @include sidePane.mobile-width;
   height: 100%;
-  border-left: 1px solid var(--sheetcraft-border-subtle);
-  background: var(--sheetcraft-surface-panel);
-  color: var(--sheetcraft-text-primary);
-  font-family: var(--sheetcraft-font-sans);
-  font-size: 12px;
-  line-height: 20px;
   &__header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 12px 8px;
+    @include sidePane.header;
   }
   &__heading {
-    flex: 1;
-    min-width: 0;
-    display: grid;
-    strong {
-      font-size: 14px;
-      line-height: 22px;
-      font-weight: 600;
-    }
-    span {
-      color: var(--sheetcraft-text-secondary);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
+    @include sidePane.heading;
   }
   &__selector {
     display: grid;
@@ -2370,11 +2345,7 @@ function escapeDraft(event: KeyboardEvent): void {
     overflow-wrap: anywhere;
   }
   &__body {
-    flex: 1;
-    min-height: 0;
-    overflow: auto;
-    padding: 8px 12px 12px;
-    overscroll-behavior: contain;
+    @include sidePane.body(8px 12px 12px);
   }
   &__field {
     display: grid;
@@ -2470,11 +2441,6 @@ function escapeDraft(event: KeyboardEvent): void {
   }
   &__reset {
     padding-top: 12px;
-  }
-}
-@media (max-width: 600px) {
-  .chart-format-pane {
-    width: min(320px, 100%);
   }
 }
 </style>

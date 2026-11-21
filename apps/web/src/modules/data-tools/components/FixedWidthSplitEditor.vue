@@ -216,7 +216,7 @@ onBeforeUnmount(() => endDrag?.());
     position: absolute;
     top: 0;
     bottom: 0;
-    border-left: 1px solid var(--td-brand-color);
+    border-left: 1px solid var(--sheetcraft-action-primary);
     pointer-events: none;
   }
   &__line {
@@ -228,7 +228,7 @@ onBeforeUnmount(() => endDrag?.());
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--td-brand-color);
+    color: var(--sheetcraft-action-primary);
     cursor: col-resize;
     touch-action: none;
     &::after {

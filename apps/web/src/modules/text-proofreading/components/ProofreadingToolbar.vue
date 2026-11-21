@@ -80,6 +80,6 @@ const { t } = useAppI18n();
   display: flex;
   gap: 2px;
   padding-inline: 8px;
-  border-right: 1px solid var(--td-component-border);
+  border-right: 1px solid var(--sheetcraft-border-subtle);
 }
 </style>

@@ -253,9 +253,15 @@ const rows = computed(() => {
   <aside class="picture-selection-pane" :aria-label="t('picture.selectionPane')">
     <header class="picture-selection-pane__header">
       <strong>{{ t("picture.selectionPane") }}</strong
-      ><TButton variant="text" shape="square" :aria-label="t('picture.close')" @click="closeAction"
-        ><X :size="16"
-      /></TButton>
+      ><TButton
+        size="small"
+        variant="text"
+        shape="square"
+        :aria-label="t('picture.close')"
+        @click="closeAction"
+      >
+        <template #icon><X class="sheetcraft-action-icon" aria-hidden="true" /></template>
+      </TButton>
     </header>
     <TButton
       size="small"
@@ -323,25 +329,26 @@ const rows = computed(() => {
   </aside>
 </template>
 <style scoped lang="scss">
+@use "../../../shared/format-pane/side-pane" as sidePane;
+
 .picture-selection-pane {
-  display: flex;
-  flex-direction: column;
-  width: 280px;
-  flex: 0 0 280px;
-  min-height: 0;
-  padding: 8px;
-  border-left: 1px solid var(--sheetcraft-border-subtle);
-  background: var(--sheetcraft-surface-panel);
+  @include sidePane.shell(300px);
+  padding: var(--sheetcraft-tool-panel-padding);
   &__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    @include sidePane.header(0);
+    strong {
+      min-width: 0;
+      font-size: var(--sheetcraft-font-size-title-small);
+      line-height: var(--sheetcraft-line-height-title-small);
+      font-weight: var(--sheetcraft-font-weight-semibold);
+    }
   }
   &__list {
     padding: 0;
-    margin: 8px 0;
+    margin: var(--sheetcraft-space-2) 0;
     list-style: none;
     overflow: auto;
+    overscroll-behavior: contain;
   }
   &__name {
     flex: 1;
@@ -356,11 +363,11 @@ const rows = computed(() => {
   }
   &__row {
     display: flex;
-    gap: 4px;
+    gap: var(--sheetcraft-space-1);
     align-items: center;
-    padding: 4px;
+    padding: var(--sheetcraft-space-1);
     &.is-selected {
-      background: var(--sheetcraft-surface-hover);
+      background: var(--sheetcraft-surface-active);
     }
   }
 }

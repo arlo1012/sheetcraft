@@ -468,49 +468,20 @@ defineExpose({
   </aside>
 </template>
 <style scoped lang="scss">
+@use "../../../../shared/format-pane/side-pane" as sidePane;
 @use "../../../../shared/tabs/tab-label" as tabLabel;
 .picture-format-pane {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  flex: 0 0 clamp(320px, 26vw, 380px);
-  width: clamp(320px, 26vw, 380px);
-  max-width: 100%;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  border-left: 1px solid var(--sheetcraft-border-subtle);
-  background: var(--sheetcraft-surface-panel);
-  color: var(--sheetcraft-text-primary);
-  font-family: var(--sheetcraft-font-sans);
-  font-size: 12px;
-  line-height: 20px;
+  @include sidePane.shell;
+  @include sidePane.mobile-width;
   &__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 8px 10px 6px;
+    @include sidePane.header;
   }
   &__heading {
-    min-width: 0;
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    strong {
-      font-size: 14px;
-      line-height: 22px;
-      font-weight: 600;
-    }
-    span {
-      color: var(--sheetcraft-text-secondary);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
+    @include sidePane.heading;
   }
   &__tabs {
     min-width: 0;
+    margin: 0 8px;
   }
   &__tab-label {
     @include tabLabel.label;
@@ -520,7 +491,7 @@ defineExpose({
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
-    padding: 5px 10px 2px;
+    padding: 10px 12px 4px;
     > span {
       color: var(--sheetcraft-text-secondary);
     }
@@ -529,11 +500,7 @@ defineExpose({
     }
   }
   &__body {
-    flex: 1;
-    min-height: 0;
-    overflow: auto;
-    overscroll-behavior: contain;
-    padding: 0 10px 10px;
+    @include sidePane.body;
   }
   &__status {
     color: var(--sheetcraft-text-secondary);
@@ -546,12 +513,6 @@ defineExpose({
   &__empty {
     color: var(--sheetcraft-text-secondary);
     margin: 16px 0;
-  }
-}
-@media (max-width: 600px) {
-  .picture-format-pane {
-    flex-basis: min(320px, 100%);
-    width: min(320px, 100%);
   }
 }
 </style>

@@ -3245,7 +3245,7 @@ watch(
     height: 6px;
     border: 1px solid #727b86;
     border-radius: 50%;
-    background: var(--sheetcraft-surface-default);
+    background: var(--sheetcraft-surface-panel);
     transform: translate(-50%, -50%);
   }
   &__connector-status {

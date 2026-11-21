@@ -452,7 +452,7 @@ watch(
   padding-block: var(--sheetcraft-space-2);
 }
 .lookup-fill-dialog__error {
-  color: var(--td-error-color);
+  color: var(--sheetcraft-status-error);
 }
 .lookup-fill-dialog__summary {
   display: grid;

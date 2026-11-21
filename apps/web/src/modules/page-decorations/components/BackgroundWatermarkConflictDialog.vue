@@ -82,7 +82,7 @@ watch(
 
   p {
     margin: 0;
-    color: var(--td-text-color-primary);
+    color: var(--sheetcraft-text-primary);
   }
 
   &__choices {
@@ -104,12 +104,12 @@ watch(
     }
 
     strong {
-      color: var(--td-text-color-primary);
+      color: var(--sheetcraft-text-primary);
       font-weight: 600;
     }
 
     span {
-      color: var(--td-text-color-secondary);
+      color: var(--sheetcraft-text-secondary);
       line-height: 1.5;
     }
   }
