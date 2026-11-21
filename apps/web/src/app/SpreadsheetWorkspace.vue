@@ -32,7 +32,6 @@ import {
   isPictureGroup,
   type PictureGroupPath,
 } from "@sheetcraft/core";
-import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import { useProtectionController } from "../modules/review-tools/useProtectionController";
 const UnlockRangeDialog = defineAsyncComponent(
   () => import("../modules/review-tools/components/UnlockRangeDialog.vue"),
@@ -68,14 +67,12 @@ import {
 import {
   createSetSheetOutlineGroupCollapsedCommand,
   createSetSheetOutlineLevelCommand,
-  createSetSheetPageSetupCommand,
   createSetSheetPageDecorationCommand,
   createSetSheetsWatermarkCommand,
   createSetWorkbookWatermarkPresetsCommand,
   type CellFormatChange,
 } from "@sheetcraft/core/commands";
-import { DEFAULT_SHEET_PAGE_SETUP, type SheetPageSetup } from "@sheetcraft/core/page-setup";
-import type { SheetViewMode } from "@sheetcraft/sheet-engine/page-layout";
+import { DEFAULT_SHEET_PAGE_SETUP } from "@sheetcraft/core/page-setup";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import { useWorkbookFullscreen } from "../modules/workbook/composables/useWorkbookFullscreen";
 import { useEyeComfortMode } from "../modules/workbook/composables/useEyeComfortMode";
@@ -161,7 +158,6 @@ import { workbookThemeKey } from "../shared/color/workbook-theme-context";
 const PageBackgroundMenu = defineAsyncComponent(
   () => import("../modules/page-decorations/components/PageBackgroundMenu.vue"),
 );
-import type { SheetWatermark, WatermarkPreset } from "@sheetcraft/core/page-decoration";
 import { usePictureAssetTools } from "../modules/sheet-images/usePictureAssetTools";
 import { usePictureCellConversion } from "../modules/sheet-images/usePictureCellConversion";
 const PictureCellOverwriteDialog = defineAsyncComponent(
@@ -333,22 +329,17 @@ const SymbolDialog = defineAsyncComponent(
 );
 import {
   resolveSymbolShortcut,
-  useSymbolPreferences,
-  validSymbolInsertion,
   withRecentSymbol,
-  type SymbolInsertion,
 } from "../modules/insert-tools/symbols/symbol-preferences";
 import { ensureCellFontResource } from "../shared/cell-text/font-resources";
 import { useSheetDisplaySnapshot } from "../modules/sheet-grid/canvas/sheet-display-snapshot";
 import { DEFAULT_CELL_FONT_FAMILY } from "@sheetcraft/core/style";
-import { captureScreen } from "../modules/insert-tools/captureScreen";
 const ScreenRecordingTool = defineAsyncComponent(
   () => import("../modules/insert-tools/components/ScreenRecordingTool.vue"),
 );
 const ScreenCaptureSourceDialog = defineAsyncComponent(
   () => import("../modules/insert-tools/components/ScreenCaptureSourceDialog.vue"),
 );
-import type { CaptureShape } from "../modules/insert-tools/capture-region";
 const ScreenCaptureDialog = defineAsyncComponent(
   () => import("../modules/insert-tools/components/ScreenCaptureDialog.vue"),
 );
@@ -443,37 +434,14 @@ const PageWatermarkMenu = defineAsyncComponent(
 const WatermarkDialog = defineAsyncComponent(
   () => import("../modules/page-decorations/components/WatermarkDialog.vue"),
 );
-import {
-  usePageDecorationActions,
-  type WatermarkScope,
-} from "../modules/page-decorations/usePageDecorationActions";
+import { usePageDecorationActions } from "../modules/page-decorations/usePageDecorationActions";
 const PageToolbar = defineAsyncComponent(
   () => import("../modules/page-layout/components/PageToolbar.vue"),
 );
-import {
-  isPresetPageMargins,
-  pageMarginsMatch,
-  type PageMargins,
-} from "../modules/page-layout/page-margin-presets";
-import {
-  readPageMarginHistory,
-  recordPageMarginHistory,
-} from "../modules/page-layout/page-margin-history";
 import TableStylesMenu from "../modules/table-styles/components/TableStylesMenu.vue";
-import {
-  getPageBreakPatch,
-  type PageBreakAction,
-  type PageSetupTab,
-} from "../modules/page-layout/page-toolbar-actions";
 const PageSetupDialog = defineAsyncComponent(
   () => import("../modules/page-layout/components/PageSetupDialog.vue"),
 );
-import {
-  formatPickedPageSetupReference,
-  type PageSetupReferenceField,
-} from "../modules/page-layout/page-setup-inputs";
-import type { HeaderFooterEditTarget } from "../modules/page-layout/header-footer-editor";
-import type { PageLayoutRulerUnit } from "../modules/page-layout/components/PageLayoutRulers.vue";
 const DataToolsDialogs = defineAsyncComponent(
   () => import("../modules/data-tools/components/DataToolsDialogs.vue"),
 );
@@ -514,7 +482,6 @@ const AdvancedFilterDialog = defineAsyncComponent(
   () => import("../modules/data-tools/components/AdvancedFilterDialog.vue"),
 );
 import type { FillDirection } from "@sheetcraft/sheet-engine/fill-selection";
-import type { AdvancedFilterDraft } from "../modules/data-tools/data-tools-types";
 const FilterColumnPanel = defineAsyncComponent(
   () => import("../modules/data-tools/components/FilterColumnPanel.vue"),
 );
@@ -522,10 +489,7 @@ const DataValidationFeedbackDialog = defineAsyncComponent(
   () => import("../modules/data-tools/components/DataValidationFeedbackDialog.vue"),
 );
 import RangeReferencePicker from "../shared/range-reference/RangeReferencePicker.vue";
-import {
-  useRangeReferencePicker,
-  type RangeReferenceSelectionOptions,
-} from "../shared/range-reference/useRangeReferencePicker";
+import { useRangeReferencePicker } from "../shared/range-reference/useRangeReferencePicker";
 const NamedRangesDialog = defineAsyncComponent(
   () => import("../modules/formula-tools/components/NamedRangesDialog.vue"),
 );
@@ -539,6 +503,9 @@ import { SUPPORTED_IMAGE_FILE_ACCEPT } from "../modules/image-assets/supportedIm
 import { usePictureDialogSessions } from "../modules/sheet-images/usePictureDialogSessions";
 import SpreadsheetRibbon from "./SpreadsheetRibbon.vue";
 import { useSheetContextActions } from "./composables/useSheetContextActions";
+import { useWorkspaceDataRangePickers } from "./composables/useWorkspaceDataRangePickers";
+import { useWorkspaceInsertCapture } from "./composables/useWorkspaceInsertCapture";
+import { useWorkspacePageLayout } from "./composables/useWorkspacePageLayout";
 import type { SheetContextMenuState } from "../modules/sheet-grid/context-menu-contracts";
 const SheetColumnStatisticsDialog = defineAsyncComponent(
   () => import("../modules/sheet-grid/components/SheetColumnStatisticsDialog.vue"),
@@ -884,57 +851,6 @@ const { active: pickingTableRange, reference: pickedTableReference } = tableRang
 watch(tableModalOpen, (open) => {
   if (!open) tableRangePicker.cancel();
 });
-const pageViewModes = shallowReactive(new Map<string, SheetViewMode>());
-const pageSetupVisible = ref(false);
-const pageSetupRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
-const { active: pickingPageSetupRange, reference: pickedPageSetupReference } = pageSetupRangePicker;
-const pageSetupRangeField = ref<PageSetupReferenceField>("printArea");
-async function selectPageSetupReference(
-  current: string,
-  field: PageSetupReferenceField,
-): Promise<string | undefined> {
-  const workbook = session.workbook;
-  const generation = workbookGeneration.value;
-  const sheetId = activeSheet.value.id;
-  pageSetupRangeField.value = field;
-  const selected = await pageSetupRangePicker.selectReference(current);
-  if (
-    selected === undefined ||
-    !pageSetupVisible.value ||
-    session.workbook !== workbook ||
-    workbookGeneration.value !== generation
-  )
-    return undefined;
-  const resolved = resolveRangeReference(workbook, selected, sheetId);
-  if (!resolved || resolved.sheetId !== sheetId) return undefined;
-  return formatPickedPageSetupReference(resolved.range, field);
-}
-watch(pageSetupVisible, (visible) => {
-  if (!visible) pageSetupRangePicker.cancel();
-});
-const showPageBreaksBySheet = shallowReactive(new Map<string, boolean>());
-const showPageBreaks = computed({
-  get: () => showPageBreaksBySheet.get(activeSheet.value.id) ?? false,
-  set: (show: boolean) => showPageBreaksBySheet.set(activeSheet.value.id, show),
-});
-const printPreviewVisible = ref(false);
-const returnToPrintPreview = ref(false);
-watch(pageSetupVisible, (visible) => {
-  if (!visible && returnToPrintPreview.value) {
-    returnToPrintPreview.value = false;
-    printPreviewVisible.value = true;
-  }
-});
-const watermarkVisible = ref(false);
-const backgroundConflictVisible = ref(false);
-const editingWatermarkPreset = shallowRef<WatermarkPreset>();
-const watermarkDialogValue = shallowRef<SheetWatermark>();
-const showPageRulers = ref(true);
-const showPageMargins = ref(false);
-const showPageWhiteSpace = ref(true);
-const pageRulerUnit = ref<PageLayoutRulerUnit>("cm");
-const pageSetupTab = ref<"page" | "margins" | "header-footer" | "sheet">("page");
-const headerFooterTarget = shallowRef<HeaderFooterEditTarget>();
 const picturePreviewOnDoubleClick = ref(true);
 const selectedPictureId = ref<string | null>(null);
 const selectedPictureIds = ref<string[]>([]);
@@ -959,163 +875,59 @@ function setSheetGridRef(value: Element | ComponentPublicInstance | null): void 
   sheetGridRef.value = value as InstanceType<typeof SheetGrid> | null;
   setGridNavigator(value);
 }
-function setPageWhiteSpace(value: boolean): void {
-  if (sheetGridRef.value?.flushPendingEdit() === false) return;
-  showPageWhiteSpace.value = value;
-}
-function openHeaderFooter(target: HeaderFooterEditTarget): void {
-  if (activeSheet.value.properties.protected || sheetGridRef.value?.flushPendingEdit() === false)
-    return;
-  pageSetupTab.value = "header-footer";
-  headerFooterTarget.value = target;
-  pageSetupVisible.value = true;
-}
-const activeViewMode = computed(() => pageViewModes.get(activeSheet.value.id) ?? "normal");
-watch(
-  [activeSheet, activeViewMode, () => activeSheet.value.floatingImages],
-  () => {
-    if (
-      activeViewMode.value === "page-layout" &&
-      activeSheet.value.floatingImages.some(
-        (root) => isPictureGroup(root) || isFramedPictureObject(root),
-      )
-    ) {
-      pageViewModes.set(activeSheet.value.id, "normal");
-      showImageFeedback("picture.pageLayoutUnsupported");
-    }
-  },
-  { flush: "sync", immediate: true },
-);
-const activePageSetup = computed(() => activeSheet.value.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
-const lastCustomMargins = ref<PageMargins | undefined>(readPageMarginHistory());
-function setViewMode(mode: SheetViewMode): void {
-  if (
-    mode === "page-layout" &&
-    activeSheet.value.floatingImages.some(
-      (root) => isPictureGroup(root) || isFramedPictureObject(root),
-    )
-  ) {
-    showImageFeedback("picture.pageLayoutUnsupported");
-    return;
-  }
-  if (sheetGridRef.value?.flushPendingEdit() === false) return;
-  pageViewModes.set(activeSheet.value.id, mode);
-  void nextTick(focusCellEditor);
-}
-function applyPageSetup(setup: SheetPageSetup): void {
-  const marginsChanged = !pageMarginsMatch(activePageSetup.value.margins, setup.margins);
-  const changed = executeCommand(createSetSheetPageSetupCommand(activeSheet.value.id, setup));
-  if (changed && marginsChanged && !isPresetPageMargins(setup.margins)) {
-    lastCustomMargins.value = recordPageMarginHistory(setup.margins);
-  }
-}
-function openPageSetup(tab: PageSetupTab): void {
-  if (
-    loading.value ||
-    fileBusy.value ||
-    xlsxBusy.value ||
-    activeSheet.value.properties.protected ||
-    sheetGridRef.value?.flushPendingEdit() === false
-  )
-    return;
-  headerFooterTarget.value = undefined;
-  pageSetupTab.value = tab;
-  pageSetupVisible.value = true;
-}
-function changePageSetup(patch: Partial<SheetPageSetup>): void {
-  if (
-    loading.value ||
-    fileBusy.value ||
-    xlsxBusy.value ||
-    activeSheet.value.properties.protected ||
-    sheetGridRef.value?.flushPendingEdit() === false
-  )
-    return;
-  applyPageSetup({ ...activePageSetup.value, ...patch });
-}
-function setPrintAreaFromSelection(): void {
-  const { start, end } = activeSelectionRange.value;
-  changePageSetup({ printArea: { start: { ...start }, end: { ...end } } });
-}
-function changePageBreak(action: PageBreakAction): void {
-  changePageSetup(
-    getPageBreakPatch(
-      activePageSetup.value,
-      activeAddress.value,
-      activeSelectionMode.value,
-      action,
-    ),
-  );
-}
-function applyWatermark(watermark: SheetWatermark): void {
-  decorations.setWatermark(watermark);
-}
-async function saveCustomWatermark(
-  watermark: SheetWatermark,
-  scope: WatermarkScope,
-  imageFile?: File,
-): Promise<void> {
-  if (loading.value || fileBusy.value || xlsxBusy.value) return;
-  if (
-    await decorations.applyWatermark(watermark, scope, imageFile, {
-      id: editingWatermarkPreset.value?.id,
-      name:
-        watermark.text.trim() ||
-        imageFile?.name ||
-        editingWatermarkPreset.value?.name ||
-        t("pageDecoration.imageWatermark"),
-    })
-  ) {
-    watermarkVisible.value = false;
-  }
-}
-function openWatermark(preset?: WatermarkPreset, watermark?: SheetWatermark): void {
-  if (loading.value || fileBusy.value || xlsxBusy.value || activeSheet.value.properties.protected)
-    return;
-  if (sheetGridRef.value?.flushPendingEdit() === false) return;
-  editingWatermarkPreset.value = preset;
-  watermarkDialogValue.value = preset?.watermark ?? watermark;
-  watermarkVisible.value = true;
-}
-function applyWatermarkPreset(preset: WatermarkPreset, scope: WatermarkScope): void {
-  if (loading.value || fileBusy.value || xlsxBusy.value) return;
-  void decorations.applyWatermark(preset.watermark, scope);
-}
-function openPrintPreview(): void {
-  if (loading.value || fileBusy.value || xlsxBusy.value) return;
-  if (sheetGridRef.value?.flushPendingEdit() === false) return;
-  printPreviewVisible.value = true;
-}
-function openPrintPageSetup(): void {
-  openPageSetup("page");
-  if (!pageSetupVisible.value) return;
-  returnToPrintPreview.value = true;
-  printPreviewVisible.value = false;
-}
-function savePageSetup(setup: SheetPageSetup): void {
-  if (loading.value || fileBusy.value || xlsxBusy.value || activeSheet.value.properties.protected)
-    return;
-  applyPageSetup(setup);
-  pageSetupVisible.value = false;
-  void nextTick(focusCellEditor);
-}
-watch(workbookGeneration, () => {
-  returnToPrintPreview.value = false;
-  pageViewModes.clear();
-  showPageBreaksBySheet.clear();
-  printPreviewVisible.value = false;
-  watermarkVisible.value = false;
-  pageSetupVisible.value = false;
+const {
+  pageSetupVisible,
+  pageSetupRangePicker,
+  pickingPageSetupRange,
+  pickedPageSetupReference,
+  pageSetupRangeField,
+  selectPageSetupReference,
+  showPageBreaks,
+  printPreviewVisible,
+  returnToPrintPreview,
+  watermarkVisible,
+  backgroundConflictVisible,
+  editingWatermarkPreset,
+  watermarkDialogValue,
+  showPageRulers,
+  showPageMargins,
+  showPageWhiteSpace,
+  pageRulerUnit,
+  pageSetupTab,
+  headerFooterTarget,
+  activeViewMode,
+  activePageSetup,
+  lastCustomMargins,
+  setPageWhiteSpace,
+  openHeaderFooter,
+  setViewMode,
+  applyPageSetup,
+  openPageSetup,
+  changePageSetup,
+  setPrintAreaFromSelection,
+  changePageBreak,
+  applyWatermark,
+  saveCustomWatermark,
+  openWatermark,
+  applyWatermarkPreset,
+  openPrintPreview,
+  openPrintPageSetup,
+  savePageSetup,
+} = useWorkspacePageLayout({
+  getWorkbook: () => session.workbook,
+  getActiveSheet: () => activeSheet.value,
+  getWorkbookGeneration: () => workbookGeneration.value,
+  getSelectionRange: () => activeSelectionRange.value,
+  getActiveAddress: () => activeAddress.value,
+  getSelectionMode: () => activeSelectionMode.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  flushPendingEdit: () => sheetGridRef.value?.flushPendingEdit() !== false,
+  executeCommand,
+  focusCellEditor,
+  getDecorations: () => decorations,
+  showImageFeedback,
+  t,
 });
-watch(
-  () => activeSheet.value.id,
-  () => {
-    returnToPrintPreview.value = false;
-    pageSetupVisible.value = false;
-    printPreviewVisible.value = false;
-    watermarkVisible.value = false;
-  },
-);
 const duplicateInputError = computed(() => {
   const feedback = validationFeedback.value;
   if (feedback?.source !== "duplicate" || feedback.target.sheetId !== activeSheet.value.id)
@@ -2276,250 +2088,42 @@ function editSheetDrawing(drawing: SheetDrawing): void {
   } else if (drawing.kind === "equation") beginEquationEdit(drawing);
   else drawingActions.edit(drawing);
 }
-const symbolDialog = shallowRef<{
-  dialogId: number;
-  insert: (symbol: SymbolInsertion) => boolean;
-  close: () => void;
-}>();
-const symbolVisible = computed(() => !!symbolDialog.value);
-const symbolPreferences = useSymbolPreferences();
-let symbolDialogSequence = 0;
-const captureBusy = ref(false);
-const recordingToolOpen = ref(false);
-const recordingModal = ref(false);
-function openRecorder() {
-  if (recordingToolOpen.value || !cellEditSession.finish()) return;
-  recordingModal.value = true;
-  recordingToolOpen.value = true;
-}
-function closeRecorder() {
-  recordingToolOpen.value = false;
-  recordingModal.value = false;
-}
-function insertRecording(file: File) {
-  if (attachmentActions.requestInsert("icon", file)) closeRecorder();
-}
-const canCaptureScreen = !!navigator.mediaDevices?.getDisplayMedia;
-const screenCapture = shallowRef<{
-  file?: File;
-  shape: CaptureShape;
-  excludeSelf: boolean;
-  workbook: Workbook;
-  sheet: Sheet;
-  generation: number;
-  address: CellAddress;
-}>();
-const requestingCapture = shallowRef<typeof screenCapture.value>();
-const preparingFrame = shallowRef<typeof screenCapture.value>();
-watch([workbookGeneration, () => activeSheet.value.id], () => {
-  screenCapture.value = undefined;
+const {
+  symbolDialog,
+  symbolVisible,
+  symbolPreferences,
+  openSymbolDialog,
+  insertSymbol,
+  quickSymbolInsert,
+  captureBusy,
+  recordingToolOpen,
+  recordingModal,
+  openRecorder,
+  closeRecorder,
+  insertRecording,
+  canCaptureScreen,
+  screenCapture,
+  requestingCapture,
+  preparingFrame,
+  insertScreenCapture,
+  acquireScreenCapture,
+  insertCapturedRegion,
+} = useWorkspaceInsertCapture({
+  getWorkbook: () => session.workbook,
+  getActiveSheet: () => activeSheet.value,
+  getWorkbookGeneration: () => workbookGeneration.value,
+  getWorkbookRevision: () => workbookRevision.value,
+  getActiveAddress: () => activeAddress.value,
+  getActiveCellInput: () => activeCellInput.value,
+  cellEditSession,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  isImageBusy: () => imageBusy.value,
+  focusCellEditor,
+  focusFormulaBarOrGrid,
+  pasteFloatingImage: (file, address) => imageActions.pasteImageFile(file, "floating", address),
+  insertRecordingAttachment: (file) => attachmentActions.requestInsert("icon", file),
+  t,
 });
-function openSymbolDialog(): void {
-  if (
-    loading.value ||
-    fileBusy.value ||
-    xlsxBusy.value ||
-    !canEditCell(activeSheet.value, activeAddress.value)
-  )
-    return;
-  const generation = workbookGeneration.value;
-  const sheet = activeSheet.value;
-  const address = { ...activeAddress.value };
-  const priorSurface = cellEditSession.state.active ? cellEditSession.state.surface : "grid";
-  if (
-    !cellEditSession.begin(
-      {
-        sheetId: sheet.id,
-        address,
-        input: activeCellInput.value,
-        content: getCellContent(sheet, address),
-        asText: isTextCellNumberFormat(getCellStyle(sheet, address)?.numberFormat),
-      },
-      { surface: priorSurface, mode: "append" },
-    )
-  )
-    return;
-  const editGeneration = cellEditSession.state.generation;
-  const documentRevision = workbookRevision.value;
-  let revision = cellEditSession.state.revision;
-  const current = {
-    dialogId: ++symbolDialogSequence,
-    insert: (symbol: SymbolInsertion) => {
-      if (
-        symbolDialog.value !== current ||
-        workbookGeneration.value !== generation ||
-        activeSheet.value !== sheet ||
-        activeAddress.value.row !== address.row ||
-        activeAddress.value.column !== address.column ||
-        cellEditSession.state.generation !== editGeneration ||
-        workbookRevision.value !== documentRevision ||
-        cellEditSession.state.revision !== revision
-      )
-        return false;
-      const accepted = insertSymbol(symbol, false);
-      if (accepted) revision = cellEditSession.state.revision;
-      return accepted;
-    },
-    close: () => {
-      if (symbolDialog.value !== current) return;
-      symbolDialog.value = undefined;
-      if (cellEditSession.state.generation === editGeneration) {
-        cellEditSession.activateSurface(priorSurface);
-        void nextTick(priorSurface === "formula-bar" ? focusFormulaBarOrGrid : focusCellEditor);
-      }
-    },
-  };
-  symbolDialog.value = current;
-}
-function insertSymbol(symbol: SymbolInsertion, restoreFocus = true): boolean {
-  if (
-    loading.value ||
-    fileBusy.value ||
-    xlsxBusy.value ||
-    !canEditCell(activeSheet.value, activeAddress.value) ||
-    cellEditSession.state.composing ||
-    !validSymbolInsertion(symbol)
-  )
-    return false;
-  const formula =
-    (cellEditSession.state.active ? cellEditSession.state.draft : activeCellInput.value).startsWith(
-      "=",
-    ) &&
-    !isTextCellNumberFormat(getCellStyle(activeSheet.value, activeAddress.value)?.numberFormat);
-  if (symbol.fontFamily && !formula && !canUseSheetPermission(activeSheet.value, "formatCells")) {
-    void MessagePlugin.warning(t("workspace.cellEditUnavailable"));
-    return false;
-  }
-  if (
-    !cellEditSession.begin(
-      {
-        sheetId: activeSheet.value.id,
-        address: activeAddress.value,
-        input: activeCellInput.value,
-        content: getCellContent(activeSheet.value, activeAddress.value),
-        asText: isTextCellNumberFormat(
-          getCellStyle(activeSheet.value, activeAddress.value)?.numberFormat,
-        ),
-      },
-      {
-        surface: cellEditSession.state.active ? cellEditSession.state.surface : "grid",
-        mode: "append",
-      },
-    )
-  )
-    return false;
-  if (
-    !cellEditSession.replaceSelection(symbol.text, formula ? undefined : symbol.fontFamily, {
-      preserveLiteral: !formula,
-      preserveTypingFont: !formula,
-    })
-  )
-    return false;
-  if (restoreFocus)
-    void nextTick(
-      cellEditSession.state.surface === "formula-bar" ? focusFormulaBarOrGrid : focusCellEditor,
-    );
-  return true;
-}
-const quickSymbolInsert = computed(() => {
-  const generation = workbookGeneration.value;
-  const sheet = activeSheet.value;
-  const address = { ...activeAddress.value };
-  const editGeneration = cellEditSession.state.generation;
-  const revision = cellEditSession.state.revision;
-  const documentRevision = workbookRevision.value;
-  const selection = { ...cellEditSession.state.selection };
-  return (symbol: SymbolInsertion): boolean => {
-    if (
-      workbookGeneration.value !== generation ||
-      activeSheet.value !== sheet ||
-      activeAddress.value.row !== address.row ||
-      activeAddress.value.column !== address.column ||
-      cellEditSession.state.generation !== editGeneration ||
-      cellEditSession.state.revision !== revision ||
-      workbookRevision.value !== documentRevision ||
-      symbolVisible.value ||
-      cellEditSession.state.selection.start !== selection.start ||
-      cellEditSession.state.selection.end !== selection.end ||
-      cellEditSession.state.selection.direction !== selection.direction
-    )
-      return false;
-    return insertSymbol(symbol);
-  };
-});
-watch(
-  () => activeSheet.value.id,
-  () => {
-    symbolDialog.value = undefined;
-  },
-);
-function insertScreenCapture(
-  shape: CaptureShape = "rectangle",
-  tools = false,
-  excludeSelf = false,
-): void {
-  if (
-    captureBusy.value ||
-    screenCapture.value ||
-    imageBusy.value ||
-    loading.value ||
-    fileBusy.value ||
-    xlsxBusy.value ||
-    !canUseSheetPermission(activeSheet.value, "editObjects") ||
-    !cellEditSession.finish()
-  )
-    return;
-  screenCapture.value = {
-    workbook: session.workbook,
-    sheet: activeSheet.value,
-    generation: workbookGeneration.value,
-    address: { ...activeAddress.value },
-    shape,
-    excludeSelf,
-  };
-  if (!tools && canCaptureScreen) void acquireScreenCapture(true);
-}
-async function acquireScreenCapture(direct: boolean) {
-  const target = screenCapture.value;
-  if (!target || requestingCapture.value === target) return;
-  requestingCapture.value = target;
-  try {
-    const file = await captureScreen(target.excludeSelf, async () => {
-      if (target !== screenCapture.value) return false;
-      preparingFrame.value = target;
-      await nextTick();
-      return screenCapture.value === target;
-    });
-    if (screenCapture.value !== target) return;
-    if (file) screenCapture.value = { ...target, file };
-    else if (direct) screenCapture.value = undefined;
-  } catch {
-    if (screenCapture.value === target) void MessagePlugin.error(t("drawing.captureFailed"));
-  } finally {
-    if (requestingCapture.value === target) requestingCapture.value = undefined;
-    if (preparingFrame.value === target) preparingFrame.value = undefined;
-  }
-}
-async function insertCapturedRegion(file: File): Promise<void> {
-  const target = screenCapture.value;
-  if (!target?.file || captureBusy.value) return;
-  if (
-    target.workbook !== session.workbook ||
-    target.sheet !== activeSheet.value ||
-    target.generation !== workbookGeneration.value ||
-    !canUseSheetPermission(target.sheet, "editObjects")
-  ) {
-    screenCapture.value = undefined;
-    return;
-  }
-  captureBusy.value = true;
-  try {
-    const inserted = await imageActions.pasteImageFile(file, "floating", target.address);
-    if (inserted && screenCapture.value === target) screenCapture.value = undefined;
-  } finally {
-    captureBusy.value = false;
-  }
-}
 const persistence = useWorkbookPersistence({
   store: props.workbookStore ?? createIndexedDbWorkbookStore(),
   getWorkbook: () => session.workbook,
@@ -4589,219 +4193,66 @@ watch(workbookGeneration, () => {
   findFormatPicker.cancel();
   findFormatDraft.value = undefined;
 });
-const simulationRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
-const { active: pickingSimulationRange, reference: pickedSimulationReference } =
-  simulationRangePicker;
-async function selectSimulationReference(
-  current: string,
-  options: RangeReferenceSelectionOptions = { singleCell: true },
-): Promise<string | undefined> {
-  const workbook = session.workbook;
-  const generation = workbookGeneration.value;
-  const sheetId = activeSheet.value.id;
-  const dialog = simulationDialog.value;
-  const selected = await simulationRangePicker.selectReference(current, options);
-  if (
-    session.workbook !== workbook ||
-    workbookGeneration.value !== generation ||
-    !dialog ||
-    simulationDialog.value !== dialog
-  )
-    return undefined;
-  if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
-  return selected;
-}
-watch(simulationDialog, () => simulationRangePicker.cancel());
-const proofreadingRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
-const { active: pickingProofreadingRange, reference: pickedProofreadingReference } =
-  proofreadingRangePicker;
-async function selectProofreadingReference(current: string): Promise<string | undefined> {
-  const workbook = session.workbook;
-  const generation = workbookGeneration.value;
-  const sheetId = activeSheet.value.id;
-  const selected = await proofreadingRangePicker.selectReference(current);
-  if (
-    session.workbook !== workbook ||
-    workbookGeneration.value !== generation ||
-    !proofreadingVisible.value
-  )
-    return undefined;
-  if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
-  return selected;
-}
-watch(proofreadingVisible, (visible) => {
-  if (!visible) proofreadingRangePicker.cancel();
+const {
+  simulationRangePicker,
+  pickingSimulationRange,
+  pickedSimulationReference,
+  selectSimulationReference,
+  proofreadingRangePicker,
+  pickingProofreadingRange,
+  pickedProofreadingReference,
+  selectProofreadingReference,
+  splitRangePicker,
+  pickingSplitRange,
+  pickedSplitReference,
+  selectSplitReference,
+  validationRangePicker,
+  pickingValidationRange,
+  pickedValidationReference,
+  validationPickingCell,
+  selectValidationReference,
+  dropdownRangePicker,
+  pickingDropdownRange,
+  pickedDropdownReference,
+  selectDropdownReference,
+  fillRankRangePicker,
+  pickingFillRankRange,
+  pickedFillRankReference,
+  fillRankPickingDestination,
+  selectFillRankSource,
+  selectFillRankDestination,
+  advancedRangePicker,
+  pickingAdvancedRange,
+  pickedAdvancedReference,
+  advancedRangeField,
+  pickAdvancedFilterRange,
+  duplicateRangePicker,
+  pickingDuplicateRange,
+  pickedDuplicateReference,
+  pickDuplicateRange,
+  comparisonRangePicker,
+  pickingComparisonRange,
+  pickedComparisonReference,
+  pickComparisonRange,
+  lookupFillRangePicker,
+  pickingLookupFillRange,
+  pickedLookupFillReference,
+  pickLookupFillRange,
+  consolidateRangePicker,
+  pickingConsolidateRange,
+  pickedConsolidateReference,
+  selectConsolidateSourceReference,
+  pickConsolidateRange,
+  dataToolsModalOpen,
+  activeDataRangePicker,
+} = useWorkspaceDataRangePickers({
+  getWorkbook: () => session.workbook,
+  getActiveSheet: () => activeSheet.value,
+  getWorkbookGeneration: () => workbookGeneration.value,
+  selectSheet,
+  dataTools,
+  duplicateErrorOptionsVisible,
 });
-const splitRangePicker = useRangeReferencePicker(() => activeSheet.value.name, {
-  singleCell: true,
-});
-const { active: pickingSplitRange, reference: pickedSplitReference } = splitRangePicker;
-async function selectSplitReference(
-  current: string,
-  options: RangeReferenceSelectionOptions = { singleCell: true },
-): Promise<string | undefined> {
-  const workbook = session.workbook;
-  const sheetId = activeSheet.value.id;
-  const selected = await splitRangePicker.selectReference(current, options);
-  if (session.workbook !== workbook || !dataTextToColumnsVisible.value) return undefined;
-  if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
-  return selected;
-}
-watch(dataTextToColumnsVisible, (visible) => {
-  if (!visible) splitRangePicker.cancel();
-});
-const validationRangePicker = useRangeReferencePicker(() => activeSheet.value.name, {
-  singleCell: true,
-});
-const { active: pickingValidationRange, reference: pickedValidationReference } =
-  validationRangePicker;
-const validationPickingCell = ref(true);
-async function selectValidationReference(
-  current: string,
-  options: RangeReferenceSelectionOptions = { singleCell: true },
-): Promise<string | undefined> {
-  const workbook = session.workbook;
-  const sheetId = activeSheet.value.id;
-  validationPickingCell.value = options.singleCell === true;
-  const selected = await validationRangePicker.selectReference(current, options);
-  if (session.workbook !== workbook || !dataValidationVisible.value) return undefined;
-  if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
-  return selected;
-}
-watch(dataValidationVisible, (visible) => {
-  if (!visible) validationRangePicker.cancel();
-});
-const dropdownRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
-const { active: pickingDropdownRange, reference: pickedDropdownReference } = dropdownRangePicker;
-async function selectDropdownReference(current: string): Promise<string | undefined> {
-  const workbook = session.workbook;
-  const sheetId = activeSheet.value.id;
-  const selected = await dropdownRangePicker.selectReference(current);
-  if (session.workbook !== workbook || !dropdownListVisible.value) return undefined;
-  if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
-  return selected;
-}
-watch(dropdownListVisible, (visible) => {
-  if (!visible) dropdownRangePicker.cancel();
-});
-const fillRankRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
-const { active: pickingFillRankRange, reference: pickedFillRankReference } = fillRankRangePicker;
-const fillRankPickingDestination = ref(false);
-async function selectFillRankReference(
-  current: string,
-  singleCell: boolean,
-): Promise<string | undefined> {
-  const workbook = session.workbook;
-  const generation = workbookGeneration.value;
-  const sheetId = activeSheet.value.id;
-  fillRankPickingDestination.value = singleCell;
-  const selected = await fillRankRangePicker.selectReference(current, { singleCell });
-  if (
-    session.workbook !== workbook ||
-    workbookGeneration.value !== generation ||
-    !fillRankVisible.value
-  )
-    return undefined;
-  if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
-  return selected;
-}
-const selectFillRankSource = (current: string) => selectFillRankReference(current, false);
-const selectFillRankDestination = (current: string) => selectFillRankReference(current, true);
-watch(fillRankVisible, (visible) => {
-  if (!visible) fillRankRangePicker.cancel();
-});
-const advancedRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
-const { active: pickingAdvancedRange, reference: pickedAdvancedReference } = advancedRangePicker;
-const advancedRangeField = ref<"listRange" | "criteriaRange" | "destination">();
-async function pickAdvancedFilterRange(field: "listRange" | "criteriaRange" | "destination") {
-  advancedRangeField.value = field;
-  const selected = await advancedRangePicker.selectReference(dataAdvancedFilterDraft.value[field]);
-  advancedRangeField.value = undefined;
-  if (selected !== undefined && dataAdvancedFilterVisible.value) {
-    const draft: AdvancedFilterDraft = { ...dataAdvancedFilterDraft.value, [field]: selected };
-    dataTools.updateAdvancedFilterDraft(draft);
-  }
-}
-watch(dataAdvancedFilterVisible, (visible) => {
-  if (!visible) advancedRangePicker.cancel();
-});
-const duplicateRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
-const { active: pickingDuplicateRange, reference: pickedDuplicateReference } = duplicateRangePicker;
-async function pickDuplicateRange() {
-  const selected = await duplicateRangePicker.selectReference(duplicateValuesDraft.value.range);
-  if (selected !== undefined && duplicateValuesVisible.value) {
-    dataTools.updateDuplicateValuesDraft({ ...duplicateValuesDraft.value, range: selected });
-  }
-}
-watch(duplicateValuesVisible, (visible) => {
-  if (!visible) duplicateRangePicker.cancel();
-});
-const comparisonRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
-const { active: pickingComparisonRange, reference: pickedComparisonReference } =
-  comparisonRangePicker;
-async function pickComparisonRange(field: "firstRange" | "secondRange") {
-  const selected = await comparisonRangePicker.selectReference(comparisonDraft.value[field]);
-  if (selected !== undefined && comparisonVisible.value) {
-    dataTools.updateComparisonDraft({ ...comparisonDraft.value, [field]: selected });
-  }
-}
-watch(comparisonVisible, (visible) => {
-  if (!visible) comparisonRangePicker.cancel();
-});
-const lookupFillRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
-const { active: pickingLookupFillRange, reference: pickedLookupFillReference } =
-  lookupFillRangePicker;
-async function pickLookupFillRange(field: "sourceRange" | "targetRange") {
-  const selected = await lookupFillRangePicker.selectReference(lookupFillDraft.value[field]);
-  if (selected !== undefined && lookupFillVisible.value) {
-    dataTools.updateLookupFillDraft({ ...lookupFillDraft.value, [field]: selected });
-  }
-}
-watch(lookupFillVisible, (visible) => {
-  if (!visible) lookupFillRangePicker.cancel();
-});
-const consolidateRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
-const { active: pickingConsolidateRange, reference: pickedConsolidateReference } =
-  consolidateRangePicker;
-async function selectConsolidateSourceReference(current: string): Promise<string | undefined> {
-  const workbook = session.workbook;
-  const selected = await consolidateRangePicker.selectReference(current);
-  return session.workbook === workbook && consolidateVisible.value ? selected : undefined;
-}
-async function pickConsolidateRange() {
-  const selected = await consolidateRangePicker.selectReference(
-    consolidateDraft.value.destination,
-    { singleCell: true },
-  );
-  if (selected === undefined || !consolidateVisible.value) return;
-  dataTools.updateConsolidateDraft({ ...consolidateDraft.value, destination: selected });
-}
-watch(consolidateVisible, (visible) => {
-  if (!visible) consolidateRangePicker.cancel();
-});
-const dataToolsModalOpen = computed(
-  () =>
-    (Boolean(simulationDialog.value) && !pickingSimulationRange.value) ||
-    (proofreadingVisible.value && !pickingProofreadingRange.value) ||
-    fillNumberSequenceVisible.value ||
-    (fillRankVisible.value && !pickingFillRankRange.value) ||
-    fillSeriesVisible.value ||
-    fillBlanksVisible.value ||
-    fillTextVisible.value ||
-    fillCurrentDateVisible.value ||
-    duplicateErrorOptionsVisible.value ||
-    dataTools.sortVisible.value ||
-    (dataTools.textToColumnsVisible.value && !pickingSplitRange.value) ||
-    dataTools.removeDuplicatesVisible.value ||
-    (dataValidationVisible.value && !pickingValidationRange.value) ||
-    dataTools.subtotalVisible.value ||
-    (dataAdvancedFilterVisible.value && !pickingAdvancedRange.value) ||
-    (duplicateValuesVisible.value && !pickingDuplicateRange.value) ||
-    (comparisonVisible.value && !pickingComparisonRange.value) ||
-    (lookupFillVisible.value && !pickingLookupFillRange.value) ||
-    (dropdownListVisible.value && !pickingDropdownRange.value) ||
-    (consolidateVisible.value && !pickingConsolidateRange.value),
-);
 
 function chooseValidationValue(payload: {
   address: CellAddress;
@@ -4930,17 +4381,7 @@ const activeRangePicker = computed(() => {
   if (pickingSparklineRange.value) return sparklineRangePicker;
   if (pickingPageSetupRange.value) return pageSetupRangePicker;
   if (pickingFindFormat.value) return findFormatPicker;
-  if (pickingSimulationRange.value) return simulationRangePicker;
-  if (pickingProofreadingRange.value) return proofreadingRangePicker;
-  if (pickingSplitRange.value) return splitRangePicker;
-  if (pickingFillRankRange.value) return fillRankRangePicker;
-  if (pickingValidationRange.value) return validationRangePicker;
-  if (pickingDropdownRange.value) return dropdownRangePicker;
-  if (pickingConsolidateRange.value) return consolidateRangePicker;
-  if (pickingLookupFillRange.value) return lookupFillRangePicker;
-  if (pickingComparisonRange.value) return comparisonRangePicker;
-  if (pickingDuplicateRange.value) return duplicateRangePicker;
-  if (pickingAdvancedRange.value) return advancedRangePicker;
+  if (activeDataRangePicker.value) return activeDataRangePicker.value;
   if (pickingConditionalFormatRange.value) return conditionalFormatRangePicker;
   if (pickingNameRange.value) return nameRangePicker;
   return undefined;
