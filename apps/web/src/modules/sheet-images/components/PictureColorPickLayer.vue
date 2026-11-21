@@ -28,6 +28,7 @@ onMounted(() => root.value?.focus({ preventScroll: true }));
       :label="t('picture.pickTransparentColor')"
       padding="compact"
       :scrollable="false"
+      @pointerdown.stop
     >
       <div class="picture-color-pick__hint-content" @pointerdown.stop>
         <span role="status">{{ t("picture.pickTransparentColorHint") }}</span>

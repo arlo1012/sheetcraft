@@ -16,8 +16,10 @@ import type { SheetChartDrawing, SheetDrawing } from "@sheetcraft/core/sheet-dra
 import type { SheetPivotTable } from "@sheetcraft/core/pivot-tables";
 import {
   MAX_SHEET_COLUMNS,
+  MAX_SHEET_ROWS,
   type Workbook,
   type Sheet,
+  type CellAddress,
   type CellRange,
   type SheetEvaluator,
 } from "@sheetcraft/core/workbook";
@@ -64,6 +66,37 @@ type ChartDialog = ChartTarget & {
   close: () => void;
   editPivot: (id: string) => void;
 };
+/** Place a newly inserted chart beside (or below) its source range and stagger stacked anchors. */
+export function resolveNewChartAnchor(
+  sheet: Sheet,
+  range: CellRange | null,
+  fallback: CellAddress,
+): { anchor: CellAddress; offsetX: number; offsetY: number } {
+  let anchor: CellAddress;
+  if (range) {
+    if (range.end.column + 2 < MAX_SHEET_COLUMNS) {
+      anchor = { row: range.start.row, column: range.end.column + 2 };
+    } else if (range.end.row + 2 < MAX_SHEET_ROWS) {
+      anchor = { row: range.end.row + 2, column: range.start.column };
+    } else {
+      anchor = { ...fallback };
+    }
+  } else {
+    anchor = { ...fallback };
+  }
+  const existingAtAnchor = (sheet.drawings ?? []).filter(
+    (item) =>
+      item.kind === "chart" &&
+      item.anchor.row === anchor.row &&
+      item.anchor.column === anchor.column,
+  ).length;
+  return {
+    anchor,
+    offsetX: 8 + existingAtAnchor * 24,
+    offsetY: 8 + existingAtAnchor * 24,
+  };
+}
+
 export function useChartActions(options: {
   getWorkbook: () => Workbook;
   getSheet: () => Sheet;
@@ -188,16 +221,16 @@ export function useChartActions(options: {
     type: ChartType,
     name: string,
     range: CellRange | null,
-    anchor: SheetChartDrawing["anchor"],
+    placement: { anchor: SheetChartDrawing["anchor"]; offsetX?: number; offsetY?: number },
     title = name,
   ): SheetChartDrawing {
     return {
       id: idFactory("chart"),
       kind: "chart",
       name,
-      anchor: { ...anchor },
-      offsetX: 8,
-      offsetY: 8,
+      anchor: { ...placement.anchor },
+      offsetX: placement.offsetX ?? 8,
+      offsetY: placement.offsetY ?? 8,
       width: 480,
       height: 300,
       text: "",
@@ -240,7 +273,8 @@ export function useChartActions(options: {
     const selection = options.getRange();
     const range = resolveDataRange(target.sheet, selection) ?? selection;
     const type = typeof request === "string" ? request : request.type;
-    const drawing = createDrawing(type, options.name(), range, selection.start, options.title?.());
+    const placement = resolveNewChartAnchor(target.sheet, range, selection.start);
+    const drawing = createDrawing(type, options.name(), range, placement, options.title?.());
     let invalidSelection = false;
     try {
       drawing.chart = normalizeSheetChart({
@@ -277,10 +311,11 @@ export function useChartActions(options: {
     if (!target || !prepare(target) || !target.report) return;
     const report = target.report,
       range = report.outputRange;
-    const drawing = createDrawing("column", report.name, range, {
-      row: range?.start.row ?? report.anchor.row,
-      column: Math.min(MAX_SHEET_COLUMNS - 1, (range?.end.column ?? report.anchor.column) + 2),
+    const placement = resolveNewChartAnchor(target.sheet, range, {
+      row: report.anchor.row,
+      column: Math.min(MAX_SHEET_COLUMNS - 1, report.anchor.column + 2),
     });
+    const drawing = createDrawing("column", report.name, range, placement);
     drawing.chart.pivotTableId = report.id;
     drawing.chart.showHidden = true;
     open(target, drawing);
