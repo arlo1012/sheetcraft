@@ -94,37 +94,63 @@ function paintRangeOutline(
       const strokeWidth = pixels.screenStrokeWidth(width);
       const inset = 1 / frame.scale;
       const half = strokeWidth / 2;
-      const left = hasNeighbour(rect, fragments, "left")
-        ? pixels.snapX(rect.x)
-        : pixels.snapX(rect.x - inset) + half;
-      const top = hasNeighbour(rect, fragments, "top")
-        ? pixels.snapY(rect.y)
-        : pixels.snapY(rect.y - inset) + half;
-      const right = hasNeighbour(rect, fragments, "right")
+      const hasLeft = hasNeighbour(rect, fragments, "left");
+      const hasTop = hasNeighbour(rect, fragments, "top");
+      const hasRight = hasNeighbour(rect, fragments, "right");
+      const hasBottom = hasNeighbour(rect, fragments, "bottom");
+      const left = hasLeft ? pixels.snapX(rect.x) : pixels.snapX(rect.x - inset) + half;
+      const top = hasTop ? pixels.snapY(rect.y) : pixels.snapY(rect.y - inset) + half;
+      const right = hasRight
         ? pixels.snapX(rect.x + rect.width)
         : pixels.snapX(rect.x + rect.width) - half;
-      const bottom = hasNeighbour(rect, fragments, "bottom")
+      const bottom = hasBottom
         ? pixels.snapY(rect.y + rect.height)
         : pixels.snapY(rect.y + rect.height) - half;
       context.lineWidth = strokeWidth;
-      const edges: readonly Edge[] = ["top", "right", "bottom", "left"];
-      for (const edge of edges) {
-        if (hasNeighbour(rect, fragments, edge)) continue;
+      if (!dash) {
         context.beginPath();
-        if (edge === "top") {
+        if (!hasTop) {
           context.moveTo(left, top);
           context.lineTo(right, top);
-        } else if (edge === "right") {
+        }
+        if (!hasRight) {
           context.moveTo(right, top);
           context.lineTo(right, bottom);
-        } else if (edge === "bottom") {
+        }
+        if (!hasBottom) {
           context.moveTo(right, bottom);
           context.lineTo(left, bottom);
-        } else {
+        }
+        if (!hasLeft) {
           context.moveTo(left, bottom);
           context.lineTo(left, top);
         }
         context.stroke();
+      } else {
+        if (!hasTop) {
+          context.beginPath();
+          context.moveTo(left, top);
+          context.lineTo(right, top);
+          context.stroke();
+        }
+        if (!hasRight) {
+          context.beginPath();
+          context.moveTo(right, top);
+          context.lineTo(right, bottom);
+          context.stroke();
+        }
+        if (!hasBottom) {
+          context.beginPath();
+          context.moveTo(right, bottom);
+          context.lineTo(left, bottom);
+          context.stroke();
+        }
+        if (!hasLeft) {
+          context.beginPath();
+          context.moveTo(left, bottom);
+          context.lineTo(left, top);
+          context.stroke();
+        }
       }
     });
   }
@@ -340,30 +366,32 @@ export function paintSheetChrome(
   state: SheetOverlayState,
   palette: SheetOverlayPalette,
 ): void {
-  context.save();
-  context.fillStyle = palette.mutedText;
-  context.globalAlpha = 0.72;
-  if (frame.layout.freeze.rows > 0)
-    fillScreenRule(
-      context,
-      frame,
-      "row",
-      frame.body.y + frame.layout.frozenSize.height,
-      0,
-      frame.size.width,
-      1,
-    );
-  if (frame.layout.freeze.columns > 0)
-    fillScreenRule(
-      context,
-      frame,
-      "column",
-      frame.body.x + frame.layout.frozenSize.width,
-      0,
-      frame.size.height,
-      1,
-    );
-  context.restore();
+  if (frame.layout.freeze.rows > 0 || frame.layout.freeze.columns > 0) {
+    context.save();
+    context.fillStyle = palette.mutedText;
+    context.globalAlpha = 0.72;
+    if (frame.layout.freeze.rows > 0)
+      fillScreenRule(
+        context,
+        frame,
+        "row",
+        frame.body.y + frame.layout.frozenSize.height,
+        0,
+        frame.size.width,
+        1,
+      );
+    if (frame.layout.freeze.columns > 0)
+      fillScreenRule(
+        context,
+        frame,
+        "column",
+        frame.body.x + frame.layout.frozenSize.width,
+        0,
+        frame.size.height,
+        1,
+      );
+    context.restore();
+  }
 
   paintFreezeHandles(context, frame, state, palette);
   const freezeDrag = state.freezeDrag;

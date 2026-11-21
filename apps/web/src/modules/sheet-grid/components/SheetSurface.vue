@@ -143,10 +143,24 @@ function retryVisibleFonts(): void {
 let borderPlan: SheetBorderPaintPlan | undefined;
 let context: CanvasRenderingContext2D | null = null;
 let foregroundContext: CanvasRenderingContext2D | null = null;
+let foregroundDirty = false;
 let scheduler: ReturnType<typeof createSheetRenderScheduler> | undefined;
 const images = createCanvasImageCache(() => invalidate());
 const backgroundImages = createCanvasImageCache(() => invalidate());
 const watermarkImages = createCanvasImageCache(() => invalidate());
+const headerPalette = computed(() => {
+  const base = props.environment.headers;
+  const pageMode = props.pageView?.mode === "page-layout";
+  const uiScale = props.pageView?.uiScale ?? 1;
+  if (!pageMode && uiScale === 1) return base;
+  return {
+    ...base,
+    font: base.font.replace(
+      /([\d.]+)px/,
+      (_match, size) => `${(pageMode ? 10 : Number(size)) * uiScale}px`,
+    ),
+  };
+});
 const sizeStyle = computed(() => ({
   width: `${props.frame.size.width}px`,
   height: `${props.frame.size.height}px`,
@@ -199,7 +213,14 @@ function rebuildScene(): void {
       for (const run of cell.content.fontRuns ?? [])
         for (const family of getCellFontResourceFamilies(run.fontFamily)) families.add(family);
     }
-  visibleFontFamilies.value = [...families];
+  const nextFamilies = [...families];
+  const prevFamilies = visibleFontFamilies.value;
+  if (
+    nextFamilies.length !== prevFamilies.length ||
+    nextFamilies.some((family, index) => family !== prevFamilies[index])
+  ) {
+    visibleFontFamilies.value = nextFamilies;
+  }
   for (const family of families) void ensureCellFontResource(family).catch(() => undefined);
   borderPlan = createBorderPaintPlan(
     props.display.sheet,
@@ -223,8 +244,9 @@ function resize(element: HTMLCanvasElement, context: CanvasRenderingContext2D): 
 function paint(): void {
   if (!context || !scene || !borderPlan) return;
   const frame = props.frame;
+  const splitTextLayer = renderedAttributedDomCells.value.length > 0;
   resize(surfaceCanvas.value!, context);
-  if (foregroundContext && foregroundCanvas.value) {
+  if (foregroundContext && foregroundCanvas.value && (splitTextLayer || foregroundDirty)) {
     resize(foregroundCanvas.value, foregroundContext);
     // Clear the entire backing store, including fractional-density edge pixels.
     // This layer must remain transparent between changed selections and objects.
@@ -232,8 +254,8 @@ function paint(): void {
     foregroundContext.setTransform(1, 0, 0, 1, 0, 0);
     foregroundContext.clearRect(0, 0, foregroundCanvas.value.width, foregroundCanvas.value.height);
     foregroundContext.restore();
+    foregroundDirty = splitTextLayer;
   }
-  const splitTextLayer = renderedAttributedDomCells.value.length > 0;
   const overlayContext = splitTextLayer ? foregroundContext! : context;
   context.fillStyle = props.environment.cells.background;
   context.fillRect(0, 0, frame.size.width, frame.size.height);
@@ -367,14 +389,7 @@ function paint(): void {
       ...props.headers,
       frame,
       backdrop: props.pageView?.mode === "page-layout" ? PAGE_LAYOUT_DESKTOP_COLOR : undefined,
-      palette: {
-        ...props.environment.headers,
-        font: props.environment.headers.font.replace(
-          /([\d.]+)px/,
-          (_match, size) =>
-            `${(props.pageView?.mode === "page-layout" ? 10 : Number(size)) * (props.pageView?.uiScale ?? 1)}px`,
-        ),
-      },
+      palette: headerPalette.value,
     });
   paintSheetChrome(overlayContext, frame, props.overlays, props.environment.overlays);
 }

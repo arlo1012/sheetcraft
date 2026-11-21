@@ -127,10 +127,10 @@ function findSegmentByLogicalRow(
   return undefined;
 }
 
-function findSegmentByVisibleIndex(
+function findSegmentIndexByVisibleIndex(
   segments: readonly VisibleSegment[],
   visibleIndex: number,
-): VisibleSegment | undefined {
+): number {
   let low = 0;
   let high = segments.length - 1;
   while (low <= high) {
@@ -139,9 +139,17 @@ function findSegmentByVisibleIndex(
     const end = segment.visibleStart + segment.end - segment.start;
     if (visibleIndex < segment.visibleStart) high = middle - 1;
     else if (visibleIndex > end) low = middle + 1;
-    else return segment;
+    else return middle;
   }
-  return undefined;
+  return -1;
+}
+
+function findSegmentByVisibleIndex(
+  segments: readonly VisibleSegment[],
+  visibleIndex: number,
+): VisibleSegment | undefined {
+  const index = findSegmentIndexByVisibleIndex(segments, visibleIndex);
+  return index >= 0 ? segments[index] : undefined;
 }
 
 function findSegmentByOffset(
@@ -298,6 +306,9 @@ export function createRowVisibilityIndex(options: {
     if (!Number.isFinite(offset) || offset < 0 || offset >= totalHeight) return null;
     const segment = findSegmentByOffset(segments, offset);
     if (!segment) return null;
+    if (segment.overrideRows.length === 0) {
+      return segment.start + Math.floor((offset - segment.offsetStart) / defaultRowHeight);
+    }
     let low = segment.start;
     let high = segment.end;
     while (low <= high) {
@@ -394,11 +405,32 @@ export function createRowVisibilityIndex(options: {
       const rows: VisibleRow[] = [];
       const first = Math.max(0, startIndex - normalizedOverscan);
       const last = Math.min(visibleRowCount - 1, endIndex + normalizedOverscan);
-      for (let visibleIndex = first; visibleIndex <= last; visibleIndex += 1) {
-        const logicalRow = getLogicalRow(visibleIndex);
-        if (logicalRow === null) continue;
-        const row = getVisibleRow(logicalRow);
-        if (row) rows.push(row);
+      let segmentIndex = findSegmentIndexByVisibleIndex(segments, first);
+      let visibleIndex = first;
+      while (visibleIndex <= last && segmentIndex >= 0 && segmentIndex < segments.length) {
+        const segment = segments[segmentIndex]!;
+        const segmentVisibleEnd = segment.visibleStart + segment.end - segment.start;
+        const segmentLastVisible = Math.min(last, segmentVisibleEnd);
+        let logicalRow = segment.start + (visibleIndex - segment.visibleStart);
+        let rowOffset = getRowOffsetInSegment(segment, logicalRow, defaultRowHeight);
+        const { overrideRows, overrideSizes } = segment;
+        let overridePointer =
+          overrideRows.length > 0 ? lowerBound(overrideRows, logicalRow) : overrideRows.length;
+        while (visibleIndex <= segmentLastVisible) {
+          let height = defaultRowHeight;
+          if (
+            overridePointer < overrideRows.length &&
+            overrideRows[overridePointer] === logicalRow
+          ) {
+            height = overrideSizes[overridePointer]!;
+            overridePointer += 1;
+          }
+          rows.push({ logicalRow, visibleIndex, offset: rowOffset, height });
+          rowOffset += height;
+          logicalRow += 1;
+          visibleIndex += 1;
+        }
+        segmentIndex += 1;
       }
       return rows;
     },

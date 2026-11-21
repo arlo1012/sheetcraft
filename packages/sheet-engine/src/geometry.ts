@@ -123,17 +123,22 @@ function createSparseAxisMetrics(
     cumulativeDeltas.push(cumulativeDelta);
   }
 
+  const hasOverrides = indexes.length > 0;
+
   function getDeltaBefore(index: number): number {
+    if (!hasOverrides) return 0;
     const position = lowerBound(indexes, index) - 1;
     return position >= 0 ? cumulativeDeltas[position]! : 0;
   }
 
   function getSize(index: number): number {
+    if (!hasOverrides) return defaultSize;
     const position = lowerBound(indexes, index);
     return indexes[position] === index ? sizes[position]! : defaultSize;
   }
 
   function getOffset(index: number): number {
+    if (!hasOverrides) return index * defaultSize;
     return index * defaultSize + getDeltaBefore(index);
   }
 
@@ -146,6 +151,9 @@ function createSparseAxisMetrics(
     getIndexAt(offset) {
       if (offset < 0 || offset >= totalSize) {
         return null;
+      }
+      if (!hasOverrides) {
+        return Math.floor(offset / defaultSize);
       }
 
       let low = 0;

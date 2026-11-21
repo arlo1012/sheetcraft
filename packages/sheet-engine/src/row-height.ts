@@ -174,13 +174,14 @@ function getAvailableTextWidth(
   const indent = style?.indent ?? 0;
   // OOXML defines indentation in units of three spaces of the Normal style,
   // independently of the formatted cell's font.
-  const indentWidth = measurer.measure("   ", NORMAL_STYLE_FONT) * indent;
-  const indentAllowance =
-    horizontalAlign === "distributed"
-      ? indentWidth * 2
-      : horizontalAlign === "left" || horizontalAlign === "right"
-        ? indentWidth
-        : 0;
+  let indentAllowance = 0;
+  if (
+    indent > 0 &&
+    (horizontalAlign === "distributed" || horizontalAlign === "left" || horizontalAlign === "right")
+  ) {
+    const indentWidth = measurer.measure("   ", NORMAL_STYLE_FONT) * indent;
+    indentAllowance = horizontalAlign === "distributed" ? indentWidth * 2 : indentWidth;
+  }
   return Math.max(
     1,
     columnWidth - WRAPPED_CELL_HORIZONTAL_PADDING - WRAPPED_CELL_GRIDLINE_WIDTH - indentAllowance,
@@ -209,9 +210,10 @@ function getSingleLineAvailableTextWidth(
   measurer: TextMeasurer,
 ): number {
   const horizontalAlign = style?.horizontalAlign;
+  const indentUnits = style?.indent ?? 0;
   const indent =
-    horizontalAlign === "left" || horizontalAlign === "right"
-      ? (style?.indent ?? 0) * measurer.measure("   ", NORMAL_STYLE_FONT)
+    indentUnits > 0 && (horizontalAlign === "left" || horizontalAlign === "right")
+      ? indentUnits * measurer.measure("   ", NORMAL_STYLE_FONT)
       : 0;
   const isCentered = horizontalAlign === "center" || horizontalAlign === "centerContinuous";
   return Math.max(1, columnWidth - WRAPPED_CELL_GRIDLINE_WIDTH - (isCentered ? 10 : 5) - indent);

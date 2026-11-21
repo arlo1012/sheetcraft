@@ -273,15 +273,18 @@ export function createSheetViewportLayout(options: {
     const range = geometry.getVisibleRange({ x: offset, y: 0 }, { width, height: 1 }, overscan);
     const start = Math.max(range.startColumn, bounds.start);
     const end = Math.min(range.endColumn, bounds.end - 1);
+    if (start > end) return [];
     const columns: ViewportAxisItem[] = [];
+    let columnOffset = geometry.getColumnOffset(start);
     for (let column = start; column <= end; column += 1) {
       const size = geometry.getColumnWidth(column);
       if (size === 0) continue;
       columns.push({
         index: column,
-        offset: geometry.getColumnOffset(column),
+        offset: columnOffset,
         size,
       });
+      columnOffset += size;
     }
     return columns;
   }
@@ -549,6 +552,17 @@ export function createSheetViewportLayout(options: {
   function forEachVisibleCell(
     callback: (address: CellAddress, paneId: FrozenPaneId) => void,
   ): void {
+    if (!options.mergeResolver) {
+      for (const paneId of ["topLeft", "top", "left", "body"] as const) {
+        const pane = panes[paneId];
+        for (const row of pane.rows) {
+          for (const column of pane.columns) {
+            callback({ row: row.index, column: column.index }, paneId);
+          }
+        }
+      }
+      return;
+    }
     const visited = new Set<string>();
     for (const paneId of ["topLeft", "top", "left", "body"] as const) {
       const pane = panes[paneId];
