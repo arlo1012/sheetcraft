@@ -50,8 +50,6 @@ const ReviewToolbar = defineAsyncComponent(
 );
 import { useReviewController } from "../modules/review-tools/useReviewController";
 import { formatCellAddress } from "@sheetcraft/core/coordinates";
-import { cloneConditionalFormatRule } from "@sheetcraft/core/conditional-formatting";
-import type { SheetGoToOptions } from "@sheetcraft/core/go-to";
 import {
   computed,
   defineAsyncComponent,
@@ -70,7 +68,6 @@ import {
   createSetSheetPageDecorationCommand,
   createSetSheetsWatermarkCommand,
   createSetWorkbookWatermarkPresetsCommand,
-  type CellFormatChange,
 } from "@sheetcraft/core/commands";
 import { DEFAULT_SHEET_PAGE_SETUP } from "@sheetcraft/core/page-setup";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
@@ -503,7 +500,9 @@ import { SUPPORTED_IMAGE_FILE_ACCEPT } from "../modules/image-assets/supportedIm
 import { usePictureDialogSessions } from "../modules/sheet-images/usePictureDialogSessions";
 import SpreadsheetRibbon from "./SpreadsheetRibbon.vue";
 import { useSheetContextActions } from "./composables/useSheetContextActions";
+import { useWorkspaceCellFormatting } from "./composables/useWorkspaceCellFormatting";
 import { useWorkspaceDataRangePickers } from "./composables/useWorkspaceDataRangePickers";
+import { useWorkspaceFindAndGoTo } from "./composables/useWorkspaceFindAndGoTo";
 import { useWorkspaceInsertCapture } from "./composables/useWorkspaceInsertCapture";
 import { useWorkspacePageLayout } from "./composables/useWorkspacePageLayout";
 import type { SheetContextMenuState } from "../modules/sheet-grid/context-menu-contracts";
@@ -527,45 +526,18 @@ import SheetGrid from "../modules/sheet-grid/components/SheetGrid.vue";
 import SheetHorizontalScrollbar from "../modules/sheet-grid/components/SheetHorizontalScrollbar.vue";
 import type { SheetHorizontalScrollState } from "../modules/sheet-grid/horizontal-scroll";
 import WorkbookFormulaBar from "../modules/workbook/components/WorkbookFormulaBar.vue";
-import {
-  applyFindFormatChange,
-  buildFindFormatFromCell,
-  createFindFormatDraft,
-} from "../modules/workbook/workbook-find-format";
-import type {
-  WorkbookFindFormatMode,
-  WorkbookFindMode,
-  WorkbookFindResult,
-} from "../modules/workbook/workbook-find-types";
-import {
-  formatRangeReference,
-  resolveRangeReference,
-} from "../shared/range-reference/formatRangeReference";
+import type { WorkbookFindMode } from "../modules/workbook/workbook-find-types";
+import { resolveRangeReference } from "../shared/range-reference/formatRangeReference";
 import WorkbookFindDialog from "../modules/workbook/components/WorkbookFindDialog.vue";
-import { useWorkbookFindShortcuts } from "../modules/workbook/composables/useWorkbookFindShortcuts";
 import WorkbookStatusBar from "../modules/workbook/components/WorkbookStatusBar.vue";
-import {
-  useSpreadsheetWorkspaceController,
-  type CellFormatSelection,
-  type ConditionalFormattingSelection,
-} from "./composables/useSpreadsheetWorkspaceController";
-import type { CellFormatTab } from "../modules/cell-format/components/CellFormatDialog.vue";
+import { useSpreadsheetWorkspaceController } from "./composables/useSpreadsheetWorkspaceController";
 const CellFormatDialog = defineAsyncComponent(
   () => import("../modules/cell-format/components/CellFormatDialog.vue"),
 );
 const ConditionalFormatManagerDialog = defineAsyncComponent(
   () => import("../modules/conditional-formatting/components/ConditionalFormatManagerDialog.vue"),
 );
-import type { ConditionalFormatQuickRule } from "../modules/conditional-formatting/components/ConditionalFormattingMenu.vue";
-import { getConditionalFormatPreset } from "../modules/conditional-formatting/conditional-format-presets";
-import {
-  createConditionalFormatRuleId,
-  formatConditionalFormatRanges,
-} from "../modules/conditional-formatting/conditional-formatting-ui";
-import type {
-  ConditionalFormatManagerSheet,
-  ConditionalFormatSheetChange,
-} from "../modules/conditional-formatting/conditional-format-manager-types";
+import { formatConditionalFormatRanges } from "../modules/conditional-formatting/conditional-formatting-ui";
 import WorkbookFileActions from "../modules/workbook-persistence/components/WorkbookFileActions.vue";
 import WorkbookFileFeedback from "../modules/workbook-persistence/components/WorkbookFileFeedback.vue";
 import { createIndexedDbWorkbookStore } from "../modules/workbook-persistence/indexedDbWorkbookStore";
@@ -1092,177 +1064,42 @@ const contextActions = useSheetContextActions({
 });
 const { statisticsRange, choiceAddress, filterState: contextFilterState } = contextActions;
 watch(workbookGeneration, () => cellEditSession.cancel(), { flush: "sync" });
-const cellFormatSelection = shallowRef<CellFormatSelection>();
-const cellFormatInitialTab = ref<CellFormatTab>("border");
-const conditionalFormattingSelection = shallowRef<ConditionalFormattingSelection>();
-const conditionalFormattingSheets = shallowRef<readonly ConditionalFormatManagerSheet[]>([]);
-const conditionalFormatQuickRule = ref<ConditionalFormatQuickRule>();
-const conditionalFormatRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
-const conditionalFormatPickingValue = ref(false);
-const { active: pickingConditionalFormatRange, reference: pickedConditionalFormatReference } =
-  conditionalFormatRangePicker;
-watch(workbookGeneration, () => {
-  cellFormatSelection.value = undefined;
-  conditionalFormattingSelection.value = undefined;
-  conditionalFormattingSheets.value = [];
-  conditionalFormatRangePicker.cancel();
+const {
+  cellFormatSelection,
+  cellFormatInitialTab,
+  conditionalFormattingSelection,
+  conditionalFormattingSheets,
+  conditionalFormatQuickRule,
+  conditionalFormatRangePicker,
+  conditionalFormatPickingValue,
+  pickingConditionalFormatRange,
+  pickedConditionalFormatReference,
+  openCellFormat,
+  closeCellFormat,
+  confirmCellFormat,
+  openConditionalFormatting,
+  closeConditionalFormatting,
+  selectConditionalFormatReference,
+  selectConditionalFormatValueReference,
+  saveConditionalFormats,
+  saveConditionalFormatSheets,
+  clearConditionalFormatRules,
+} = useWorkspaceCellFormatting({
+  getWorkbook: () => session.workbook,
+  getActiveSheet: () => activeSheet.value,
+  getSheets: () => sheets.value,
+  getWorkbookGeneration: () => workbookGeneration.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  cellEditSession,
+  selectSheet,
+  focusCellEditor,
+  captureCellFormatSelection,
+  applyCellFormat,
+  captureConditionalFormattingSelection,
+  setConditionalFormats,
+  setConditionalFormatsForSheets,
+  clearConditionalFormats,
 });
-
-function openCellFormat(tab: CellFormatTab = "border"): void {
-  if (loading.value || fileBusy.value || xlsxBusy.value || !cellEditSession.finish()) return;
-  cellFormatInitialTab.value = tab;
-  cellFormatSelection.value = captureCellFormatSelection();
-}
-
-function closeCellFormat(): void {
-  cellFormatSelection.value = undefined;
-  void nextTick(focusCellEditor);
-}
-
-function confirmCellFormat(change: CellFormatChange): void {
-  const target = cellFormatSelection.value;
-  if (!target) return;
-  applyCellFormat(change, target);
-  closeCellFormat();
-}
-
-function openConditionalFormatting(kind?: ConditionalFormatQuickRule): void {
-  if (loading.value || fileBusy.value || xlsxBusy.value || !cellEditSession.finish()) return;
-  const target = captureConditionalFormattingSelection();
-  if (!target) return;
-  const preset = kind ? getConditionalFormatPreset(kind) : undefined;
-  if (preset) {
-    setConditionalFormats(
-      [
-        {
-          id: createConditionalFormatRuleId(),
-          ranges: [target.range],
-          anchor: { ...target.range.start },
-          condition: preset,
-          style: {},
-        },
-        ...target.rules,
-      ],
-      target,
-    );
-    void nextTick(focusCellEditor);
-    return;
-  }
-  conditionalFormatQuickRule.value = kind;
-  conditionalFormattingSelection.value = target;
-  conditionalFormattingSheets.value = sheets.value.map((sheet) => ({
-    id: sheet.id,
-    name: sheet.name,
-    rules: (sheet.conditionalFormats ?? []).map(cloneConditionalFormatRule),
-    selectionRanges: formatConditionalFormatRanges([
-      sheet.id === target.sheetId
-        ? target.range
-        : { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
-    ]),
-    protected: sheet.properties.protected,
-  }));
-}
-
-function closeConditionalFormatting(): void {
-  conditionalFormatRangePicker.cancel();
-  conditionalFormattingSelection.value = undefined;
-  conditionalFormattingSheets.value = [];
-  conditionalFormatQuickRule.value = undefined;
-  void nextTick(focusCellEditor);
-}
-
-async function selectConditionalFormatReference(
-  current: string,
-  requestedSheetId?: string,
-): Promise<string | undefined> {
-  const workbook = session.workbook;
-  const generation = workbookGeneration.value;
-  const previousSheetId = activeSheet.value.id;
-  const sheetId =
-    requestedSheetId ?? conditionalFormattingSelection.value?.sheetId ?? previousSheetId;
-  if (!workbook.sheets.has(sheetId)) return undefined;
-  if (sheetId !== previousSheetId) selectSheet(sheetId);
-  let selected: string | undefined;
-  try {
-    selected = await conditionalFormatRangePicker.selectReference(current);
-  } finally {
-    if (
-      session.workbook === workbook &&
-      workbookGeneration.value === generation &&
-      activeSheet.value.id !== previousSheetId &&
-      workbook.sheets.has(previousSheetId)
-    ) {
-      selectSheet(previousSheetId);
-    }
-  }
-  if (
-    session.workbook !== workbook ||
-    workbookGeneration.value !== generation ||
-    !conditionalFormattingSelection.value
-  )
-    return undefined;
-  if (selected === undefined) return undefined;
-  const target = resolveRangeReference(workbook, selected, sheetId);
-  if (!target || target.sheetId !== sheetId) return undefined;
-  return formatConditionalFormatRanges([target.range]);
-}
-
-async function selectConditionalFormatValueReference(
-  current: string,
-  requestedSheetId?: string,
-): Promise<string | undefined> {
-  const workbook = session.workbook;
-  const generation = workbookGeneration.value;
-  const previousSheetId = activeSheet.value.id;
-  const sheetId =
-    requestedSheetId ?? conditionalFormattingSelection.value?.sheetId ?? previousSheetId;
-  if (!workbook.sheets.has(sheetId)) return undefined;
-  if (sheetId !== previousSheetId) selectSheet(sheetId);
-  conditionalFormatPickingValue.value = true;
-  try {
-    const selected = await conditionalFormatRangePicker.selectReference(current);
-    if (
-      session.workbook !== workbook ||
-      workbookGeneration.value !== generation ||
-      !conditionalFormattingSelection.value
-    )
-      return undefined;
-    if (selected === undefined) return undefined;
-    const target = resolveRangeReference(workbook, selected, sheetId);
-    if (!target) return undefined;
-    const reference = formatRangeReference(workbook.sheets.get(target.sheetId)!.name, target.range);
-    return target.sheetId === sheetId
-      ? `=${reference.slice(reference.lastIndexOf("!") + 1)}`
-      : reference;
-  } finally {
-    if (
-      session.workbook === workbook &&
-      workbookGeneration.value === generation &&
-      activeSheet.value.id !== previousSheetId &&
-      workbook.sheets.has(previousSheetId)
-    ) {
-      selectSheet(previousSheetId);
-    }
-    conditionalFormatPickingValue.value = false;
-  }
-}
-
-function saveConditionalFormats(rules: Parameters<typeof setConditionalFormats>[0]): void {
-  const target = conditionalFormattingSelection.value;
-  if (!target) return;
-  if (setConditionalFormats(rules, target)) closeConditionalFormatting();
-}
-
-function saveConditionalFormatSheets(changes: ConditionalFormatSheetChange[]): void {
-  const target = conditionalFormattingSelection.value;
-  if (!target) return;
-  if (setConditionalFormatsForSheets(changes, target.generation)) closeConditionalFormatting();
-}
-
-function clearConditionalFormatRules(scope: "selection" | "sheet"): void {
-  if (loading.value || fileBusy.value || xlsxBusy.value || !cellEditSession.finish()) return;
-  clearConditionalFormats(scope);
-}
 
 function onSelectSheet(sheetId: string): void {
   if (sparklineActions.pickerOwner.value) {
@@ -4080,118 +3917,38 @@ const {
   status: findStatus,
   formatSummary: findFormatSummary,
 } = workbookFind;
-const findFormatTarget = ref<"find" | "replace">("find");
-const findFormatDraft = shallowRef<ReturnType<typeof createFindFormatDraft>>();
-const findFormatPicker = useRangeReferencePicker(() => activeSheet.value.name, {
-  singleCell: true,
-});
-const { active: pickingFindFormat, reference: pickedFindFormatReference } = findFormatPicker;
-function openFind(mode: WorkbookFindMode = "find"): void {
-  if (!cellEditSession.finish()) return;
-  findMode.value = mode;
-  findDialogVisible.value = true;
-  void nextTick(() => findDialogRef.value?.focusQuery());
-}
-useWorkbookFindShortcuts({
-  canOpen: (event) => {
-    if (
-      event.target instanceof Element &&
-      event.target.closest("[data-shape-canvas-text-editor], [data-shape-canvas-text-toolbar]")
-    )
-      return false;
-    if (
-      cellEditSession.state.composing ||
-      formulaEditorVisible.value ||
-      formulaInsertVisible.value ||
-      activeRangePicker.value ||
-      cellFormatSelection.value ||
-      findFormatDraft.value
-    )
-      return false;
-    const dialog = event.target instanceof Element ? event.target.closest(".t-dialog") : null;
-    return !dialog || dialog.classList.contains("workbook-find-dialog-frame");
-  },
-  open: openFind,
-});
-function runFind(direction: "forward" | "backward"): void {
-  if (cellEditSession.finish()) workbookFind.find(direction);
-}
-function runFindAll(): void {
-  if (cellEditSession.finish()) workbookFind.findAll();
-}
-function runReplace(all = false): void {
-  if (!cellEditSession.finish()) return;
-  if (all) workbookFind.replaceAll();
-  else workbookFind.replace();
-}
-function runGoTo(options: SheetGoToOptions): void {
-  if (cellEditSession.finish()) workbookGoTo.locate(options);
-}
-function selectGoToResult(result: WorkbookFindResult): void {
-  if (cellEditSession.finish()) workbookGoTo.selectResult(result);
-}
-function selectFindResult(result: WorkbookFindResult): void {
-  if (cellEditSession.finish()) workbookFind.selectResult(result);
-}
-function configureFindFormat(target: "find" | "replace" = "find"): void {
-  if (!cellEditSession.finish()) return;
-  findFormatTarget.value = target;
-  findFormatDraft.value = createFindFormatDraft(
-    target === "replace" ? workbookFind.replacementFormat.value : workbookFind.format.value,
-  );
-}
-function confirmFindFormat(change: CellFormatChange): void {
-  if (findFormatTarget.value === "replace") {
-    workbookFind.setReplacementFormat(
-      applyFindFormatChange(workbookFind.replacementFormat.value, change),
-    );
-  } else {
-    workbookFind.setFormat(applyFindFormatChange(workbookFind.format.value, change));
-  }
-  findFormatDraft.value = undefined;
-}
-async function pickFindFormat(
-  mode: WorkbookFindFormatMode,
-  purpose: "find" | "replace" = "find",
-): Promise<void> {
-  if (!cellEditSession.finish()) return;
-  const workbook = session.workbook;
-  const generation = workbookGeneration.value;
-  const sheetId = activeSheet.value.id;
-  const selected = await findFormatPicker.selectReference(
-    formatRangeReference(activeSheet.value.name, {
-      start: activeAddress.value,
-      end: activeAddress.value,
-    }),
-  );
-  if (
-    !selected ||
-    workbook !== session.workbook ||
-    generation !== workbookGeneration.value ||
-    !findDialogVisible.value
-  )
-    return;
-  const target = resolveRangeReference(workbook, selected, sheetId);
-  if (!target) return;
-  const sheet = workbook.sheets.get(target.sheetId);
-  if (!sheet) return;
-  const address = target.range.start;
-  const setFormat =
-    purpose === "replace" ? workbookFind.setReplacementFormat : workbookFind.setFormat;
-  setFormat(
-    buildFindFormatFromCell(sheet.cells.get(`${address.row}:${address.column}`)?.style, mode),
-    `${sheet.name}!${formatCellAddress(address)}`,
-  );
-}
-watch(findDialogVisible, (visible) => {
-  if (!visible) {
-    findFormatPicker.cancel();
-    findFormatDraft.value = undefined;
-  }
-});
-watch(workbookGeneration, () => {
-  findFormatPicker.cancel();
-  findFormatDraft.value = undefined;
+const {
+  findFormatTarget,
+  findFormatDraft,
+  findFormatPicker,
+  pickingFindFormat,
+  pickedFindFormatReference,
+  openFind,
+  runFind,
+  runFindAll,
+  runReplace,
+  runGoTo,
+  selectGoToResult,
+  selectFindResult,
+  configureFindFormat,
+  confirmFindFormat,
+  pickFindFormat,
+} = useWorkspaceFindAndGoTo({
+  getWorkbook: () => session.workbook,
+  getActiveSheet: () => activeSheet.value,
+  getWorkbookGeneration: () => workbookGeneration.value,
+  getActiveAddress: () => activeAddress.value,
+  cellEditSession,
+  workbookFind,
+  workbookGoTo,
+  findDialogVisible,
+  findDialogRef,
+  findMode,
+  isShortcutBlocked: () =>
+    formulaEditorVisible.value ||
+    formulaInsertVisible.value ||
+    Boolean(activeRangePicker.value) ||
+    Boolean(cellFormatSelection.value),
 });
 const {
   simulationRangePicker,

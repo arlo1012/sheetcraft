@@ -84,16 +84,15 @@ import { columnIndexToLabel, getCellAddressLabel } from "@sheetcraft/core/coordi
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import { normalizeSheetZoom } from "../../../shared/sheet-view/zoom";
 import { getSelectionFitZoom } from "../selection-zoom";
+import { createSheetGridEditorKeydownHandler } from "../useSheetGridEditorKeydown";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { createContextMenuPoint } from "../../../shared/menu/useContextMenu";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
-import {
-  isExplicitWarningConfirmationKey,
-  type CellEditFinishOptions,
-  type CellEditSession,
-  type CellEditCommit,
+import type {
+  CellEditFinishOptions,
+  CellEditSession,
+  CellEditCommit,
 } from "../../../shared/cell-editing/useCellEditSession";
-import { completeFormulaForCommit } from "../../../shared/formula-editing/formula-commit";
 import type { FormulaReferenceToken } from "../../../shared/formula-editing/formula-reference-tokens";
 import { getWorkbookHistoryShortcut } from "../../../shared/keyboard/workbook-history-shortcuts";
 import { restoreFocusAfterRemount } from "../../../shared/floating/useDismissibleFloatingPanel";
@@ -4074,240 +4073,57 @@ function requestTableExpansion(commitEdit: boolean, finishOptions: CellEditFinis
   return true;
 }
 
-function onEditorKeydown(event: KeyboardEvent): void {
-  if (isComposing.value || event.isComposing) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      cancelEdit();
-    }
-    return;
-  }
-
-  if (
-    !isEditing.value &&
-    event.altKey &&
-    !event.ctrlKey &&
-    !event.metaKey &&
-    event.key === "Enter" &&
-    getSelectionMode(selection.value) === "cells" &&
-    getCellHyperlink(props.sheet, activeCell.value)
-  ) {
-    event.preventDefault();
-    emit("openHyperlink", activeCell.value);
-    return;
-  }
-
-  if (
-    event.altKey &&
-    !event.ctrlKey &&
-    !event.metaKey &&
-    event.key === "ArrowDown" &&
-    !isEditing.value &&
-    !props.readOnly &&
-    getSelectionMode(selection.value) === "cells"
-  ) {
-    event.preventDefault();
-    emit("contextAction", {
-      action: { type: "chooseFromColumn" },
-      range: getSelectionRange(selection.value),
-    });
-    return;
-  }
-  if (props.formatPainterActive && !props.readOnly && event.key === "Enter") {
-    event.preventDefault();
-    event.stopPropagation();
-    emit("formatPainterTarget", getSelectionRange(selection.value));
-    return;
-  }
-
-  if (
-    !isEditing.value &&
-    (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey))
-  ) {
-    const mode = getSelectionMode(selection.value);
-    if (mode === "cells") openActiveCellContextMenu();
-    else if (mode === "rows" || mode === "columns") {
-      const axis = mode === "rows" ? "row" : "column";
-      const index = axis === "row" ? activeCell.value.row : activeCell.value.column;
-      const frame = renderFrame.value;
-      const item = (axis === "row" ? frame.rowHeaders : frame.columnHeaders)
-        .flatMap((pane) => pane.items)
-        .find((item) => item.index === index);
-      const bounds = rootRef.value!.getBoundingClientRect();
-      const x =
-        axis === "row"
-          ? frame.headerSize.width - ROW_HEADER_WIDTH / 2
-          : (item?.offset ?? frame.body.x) + (item?.size ?? 0) / 2;
-      const y =
-        axis === "column"
-          ? frame.headerSize.height / 2
-          : (item?.offset ?? frame.body.y) + (item?.size ?? 0) / 2;
-      openAxisContextMenu(
-        axis,
-        index,
-        bounds.left + x * scale.value,
-        bounds.top + y * scale.value,
-        event.currentTarget as HTMLElement,
-      );
-    } else return;
-    event.preventDefault();
-    event.stopPropagation();
-    return;
-  }
-
-  if (handleHistoryShortcut(event)) {
-    return;
-  }
-
-  if (cellReadOnly.value) {
-    if (
-      event.key === "F2" ||
-      event.key === "Delete" ||
-      event.key === "Backspace" ||
-      (event.key.length === 1 && !event.ctrlKey && !event.metaKey)
-    )
-      emit("unlockRange", selectedRange.value);
-    if (
-      event.key === "Delete" ||
-      event.key === "Backspace" ||
-      event.key === "F2" ||
-      event.key.length === 1
-    ) {
-      event.preventDefault();
-      return;
-    }
-  }
-
-  if (isEditing.value) {
-    if (handleReferenceKeydown(event)) return;
-    if (event.key === "Escape") {
-      event.preventDefault();
-      cancelEdit();
-      return;
-    }
-    if (event.key === "Enter") {
-      event.preventDefault();
-      if (event.altKey) {
-        editorRef.value?.insertLineBreak();
-        return;
-      }
-      if (!editSession.state.asText)
-        editingValue.value = completeFormulaForCommit(editingValue.value);
-      traverseSelection("Enter", event.shiftKey, true, {
-        confirmPendingWarning: isExplicitWarningConfirmationKey(event),
-      });
-      return;
-    }
-    if (event.key === "Tab") {
-      event.preventDefault();
-      if (!editSession.state.asText)
-        editingValue.value = completeFormulaForCommit(editingValue.value);
-      traverseSelection("Tab", event.shiftKey, true);
-    }
-    return;
-  }
-
-  if (
-    !selectionReadOnly.value &&
-    (event.ctrlKey || event.metaKey) &&
-    !event.altKey &&
-    !event.shiftKey &&
-    event.key.toLowerCase() === "e" &&
-    !props.formatPainterActive &&
-    !getReferenceEditor() &&
-    !selectedImageId.value &&
-    !dimensionResize.value &&
-    !freezeDragging.value &&
-    !axisMoveDrag.value &&
-    getSelectionMode(selection.value) === "cells"
-  ) {
-    event.preventDefault();
-    event.stopPropagation();
-    emit("flashFill");
-    return;
-  }
-
-  if (
-    !selectionReadOnly.value &&
-    (event.ctrlKey || event.metaKey) &&
-    !event.altKey &&
-    !event.shiftKey &&
-    (event.key.toLowerCase() === "d" || event.key.toLowerCase() === "r")
-  ) {
-    event.preventDefault();
-    fillSelection(event.key.toLowerCase() === "d" ? "down" : "right");
-    return;
-  }
-
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
-    event.preventDefault();
-    selectAxis("all", { row: 0, column: 0 }, false);
-    return;
-  }
-
-  if (event.key === " " || event.key === "Spacebar") {
-    if (event.shiftKey && !event.ctrlKey && !event.metaKey) {
-      event.preventDefault();
-      selectAxis("rows", activeCell.value, false);
-      return;
-    }
-    if ((event.ctrlKey || event.metaKey) && !event.shiftKey) {
-      event.preventDefault();
-      selectAxis("columns", activeCell.value, false);
-      return;
-    }
-  }
-
-  if (event.key === "Delete" || event.key === "Backspace") {
-    event.preventDefault();
-    clearPendingClipboard();
-    if (!selectionReadOnly.value) emit("clearCells", getSelectionRange(selection.value));
-    return;
-  }
-
-  const navigation: Record<string, { rows?: number; columns?: number }> = {
-    ArrowUp: { rows: -1 },
-    ArrowDown: { rows: 1 },
-    ArrowLeft: { columns: -1 },
-    ArrowRight: { columns: 1 },
-  };
-  const delta = navigation[event.key];
-  if (delta) {
-    event.preventDefault();
-    moveSelection(delta, false, event.shiftKey);
-    return;
-  }
-
-  if (event.key === "Enter" || event.key === "Tab") {
-    event.preventDefault();
-    traverseSelection(event.key, event.shiftKey, false);
-    return;
-  }
-
-  if (
-    event.key === "F2" &&
-    event.shiftKey &&
-    !event.ctrlKey &&
-    !event.metaKey &&
-    !event.altKey &&
-    getSelectionMode(selection.value) === "cells"
-  ) {
-    event.preventDefault();
-    emit("editNote", layout.value.getAnchorForAddress(activeCell.value));
-    return;
-  }
-
-  if (event.key === "F2") {
-    event.preventDefault();
-    if (getCellContent(props.sheet, activeCell.value)?.kind !== "image") beginEdit("append");
-    return;
-  }
-
-  if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
-    event.preventDefault();
-    beginEdit("replace", event.key);
-  }
-}
+const onEditorKeydown = createSheetGridEditorKeydownHandler({
+  rowHeaderWidth: ROW_HEADER_WIDTH,
+  getSheet: () => props.sheet,
+  getSelection: () => selection.value,
+  getSelectedRange: () => selectedRange.value,
+  getActiveCell: () => activeCell.value,
+  getLayout: () => layout.value,
+  getRenderFrame: () => renderFrame.value,
+  getRootElement: () => rootRef.value,
+  getScale: () => scale.value,
+  isEditing: () => isEditing.value,
+  isComposing: () => isComposing.value,
+  isReadOnly: () => Boolean(props.readOnly),
+  isCellReadOnly: () => cellReadOnly.value,
+  isSelectionReadOnly: () => selectionReadOnly.value,
+  isFormatPainterActive: () => Boolean(props.formatPainterActive),
+  isFlashFillBlocked: () =>
+    Boolean(props.formatPainterActive) ||
+    Boolean(getReferenceEditor()) ||
+    Boolean(selectedImageId.value) ||
+    Boolean(dimensionResize.value) ||
+    Boolean(freezeDragging.value) ||
+    Boolean(axisMoveDrag.value),
+  editSession,
+  getEditingValue: () => editingValue.value,
+  setEditingValue: (value) => {
+    editingValue.value = value;
+  },
+  insertEditorLineBreak: () => {
+    editorRef.value?.insertLineBreak();
+  },
+  handleHistoryShortcut,
+  handleReferenceKeydown,
+  openActiveCellContextMenu,
+  openAxisContextMenu,
+  beginEdit,
+  cancelEdit,
+  traverseSelection,
+  moveSelection,
+  selectAxis,
+  fillSelection,
+  clearPendingClipboard,
+  onOpenHyperlink: (address) => emit("openHyperlink", address),
+  onChooseFromColumn: (range) =>
+    emit("contextAction", { action: { type: "chooseFromColumn" }, range }),
+  onFormatPainterTarget: (range) => emit("formatPainterTarget", range),
+  onUnlockRange: (range) => emit("unlockRange", range),
+  onFlashFill: () => emit("flashFill"),
+  onClearCells: (range) => emit("clearCells", range),
+  onEditNote: (address) => emit("editNote", address),
+});
 
 function restoreViewState(viewState?: SheetGridViewState): void {
   const nextViewState = viewState
