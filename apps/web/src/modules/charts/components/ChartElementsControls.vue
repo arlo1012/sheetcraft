@@ -149,6 +149,15 @@ function toggleLabels(value: unknown): void {
 function toggleStacked(value: unknown): void {
   if (!props.disabled && capabilities.value.stacked) submitPatch({ stacked: !!value });
 }
+function setTrendline(value: unknown): void {
+  if (
+    props.disabled ||
+    !capabilities.value.trendline ||
+    (value !== "none" && value !== "linear" && value !== "exponential" && value !== "movingAverage")
+  )
+    return;
+  patchElements({ trendline: value });
+}
 
 const titleOptions = computed(() => [
   { value: "none", label: t("chart.elementNone") },
@@ -169,6 +178,12 @@ const labelOptions = computed(() => [
   { value: "insideEnd", label: t("chart.labelInsideEnd") },
   { value: "insideBase", label: t("chart.labelInsideBase") },
   { value: "outsideEnd", label: t("chart.labelOutsideEnd") },
+]);
+const trendlineOptions = computed(() => [
+  { value: "none", label: t("chart.elementNone") },
+  { value: "linear", label: t("chart.trendlineLinear") },
+  { value: "exponential", label: t("chart.trendlineExponential") },
+  { value: "movingAverage", label: t("chart.trendlineMovingAverage") },
 ]);
 
 defineExpose({
@@ -270,6 +285,19 @@ defineExpose({
       @change="toggleStacked"
       >{{ t("chart.stacked") }}</Checkbox
     >
+    <div v-if="capabilities.trendline" class="chart-elements-controls__field">
+      <span>{{ t("chart.trendline") }}</span>
+      <Select
+        :value="settings.trendline"
+        :options="trendlineOptions"
+        :popup-props="popupProps"
+        size="small"
+        :disabled="disabled"
+        :aria-label="t('chart.trendline')"
+        data-chart-trendline-select
+        @change="setTrendline"
+      />
+    </div>
     <p v-if="chart.type === 'wordCloud'" class="chart-elements-controls__hint">
       {{ t("chart.wordCloudElementsHint") }}
     </p>

@@ -52,6 +52,10 @@ export const chartsEnUS = {
   "chart.labelInsideEnd": "Inside end",
   "chart.labelInsideBase": "Inside base",
   "chart.labelOutsideEnd": "Outside end",
+  "chart.trendline": "Trendline",
+  "chart.trendlineLinear": "Linear",
+  "chart.trendlineExponential": "Exponential",
+  "chart.trendlineMovingAverage": "Moving average",
   "chart.legendNonOverlapping": "Show legend without overlapping the chart",
   "chart.wordCloudElementsHint": "Word clouds do not use legends, data labels or stacking.",
   "chart.elementExportBlocked":

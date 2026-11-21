@@ -43,6 +43,10 @@ export function getChartElementCapabilities(
     labels: type !== "wordCloud",
     labelPosition: bars || (type === "combo" && (!chart || hasComboColumns(chart, comboChanges))),
     stacked: bars || type === "line" || type === "area",
+    trendline:
+      ["column", "bar", "line", "area", "scatter", "combo"].includes(type) &&
+      !chart?.stacked &&
+      !chart?.presentation?.percentStacked,
   };
 }
 
@@ -53,5 +57,6 @@ export function getChartElementSettings(chart: SheetChart) {
     legendPosition: chart.elements?.legendPosition ?? "bottom",
     legendOverlay: chart.elements?.legendOverlay ?? false,
     labelPosition: chart.elements?.labelPosition ?? "center",
+    trendline: chart.elements?.trendline ?? "none",
   } as const;
 }

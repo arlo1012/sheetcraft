@@ -373,6 +373,7 @@ export type WorkbookSnapshotV107 = Omit<WorkbookSnapshotV106, "version"> & { ver
 export type WorkbookSnapshotV108 = Omit<WorkbookSnapshotV107, "version"> & { version: 108 };
 export type WorkbookSnapshotV109 = Omit<WorkbookSnapshotV108, "version"> & { version: 109 };
 export type WorkbookSnapshotV110 = Omit<WorkbookSnapshotV109, "version"> & { version: 110 };
+export type WorkbookSnapshotV115 = Omit<WorkbookSnapshotV114, "version"> & { version: 115 };
 export type WorkbookSnapshotV114 = Omit<WorkbookSnapshotV113, "version"> & { version: 114 };
 export type WorkbookSnapshotV113 = Omit<WorkbookSnapshotV112, "version"> & { version: 113 };
 export type WorkbookSnapshotV112 = Omit<WorkbookSnapshotV111, "version"> & { version: 112 };
@@ -449,7 +450,8 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV111
   | WorkbookSnapshotV112
   | WorkbookSnapshotV113
-  | WorkbookSnapshotV114;
+  | WorkbookSnapshotV114
+  | WorkbookSnapshotV115;
 type WorkbookWritePayload = Omit<WorkbookSnapshotV98, "version"> & {
   version: WorkbookSnapshot["version"];
 };
@@ -585,7 +587,8 @@ type SnapshotVersion =
   | 111
   | 112
   | 113
-  | 114;
+  | 114
+  | 115;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -658,6 +661,22 @@ function hasPivotSlicers(drawings: unknown): boolean {
         typeof drawing.slicer === "object" &&
         Object.hasOwn(drawing.slicer, "pivotTableId"),
     )
+  );
+}
+function hasChartTrendline(drawings: unknown): boolean {
+  return (
+    Array.isArray(drawings) &&
+    drawings.some((drawing) => {
+      if (drawing?.kind !== "chart" || !drawing.chart || typeof drawing.chart !== "object")
+        return false;
+      const elements = chartLayoutContainer(drawing.chart, "elements");
+      return (
+        !!elements &&
+        typeof elements === "object" &&
+        Object.hasOwn(elements, "trendline") &&
+        (elements as Record<string, unknown>).trendline !== "none"
+      );
+    })
   );
 }
 function hasCrossSheetControls(drawings: unknown): boolean {
@@ -3014,7 +3033,10 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasSlicers(record.drawings)) version = 112;
     if (hasSlicerOptions(record.drawings)) version = 113;
     if (hasPivotSlicers(record.drawings)) version = 114;
+    if (hasChartTrendline(record.drawings)) version = 115;
   }
+  if (version < 115 && hasChartTrendline(record.drawings))
+    return fail(path + ".drawings", "Chart trendlines require snapshot version 115.");
   if (version < 114 && hasPivotSlicers(record.drawings))
     return fail(path + ".drawings", "PivotTable slicers require snapshot version 114.");
   if (version < 113 && hasSlicerOptions(record.drawings))
@@ -3536,6 +3558,7 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   if (sheets.some((sheet) => hasSlicers(sheet.drawings))) snapshot.version = 112;
   if (sheets.some((sheet) => hasSlicerOptions(sheet.drawings))) snapshot.version = 113;
   if (sheets.some((sheet) => hasPivotSlicers(sheet.drawings))) snapshot.version = 114;
+  if (sheets.some((sheet) => hasChartTrendline(sheet.drawings))) snapshot.version = 115;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -3657,7 +3680,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 111 &&
     record.version !== 112 &&
     record.version !== 113 &&
-    record.version !== 114
+    record.version !== 114 &&
+    record.version !== 115
   ) {
     throw new WorkbookDomainError(
       {

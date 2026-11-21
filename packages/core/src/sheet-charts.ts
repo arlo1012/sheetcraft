@@ -55,6 +55,7 @@ export const chartTypes = [
 ] as const;
 export type ChartType = (typeof chartTypes)[number];
 
+export type ChartTrendlineType = "none" | "linear" | "exponential" | "movingAverage";
 /** Sparse element layout choices; omission retains the existing chart behavior. */
 export type ChartElementSettings = {
   titlePosition?: "none" | "above" | "overlay";
@@ -66,6 +67,7 @@ export type ChartElementSettings = {
   dataTable?: "none" | "withLegendKeys" | "withoutLegendKeys";
   labelContent?: "value" | "seriesAndValue";
   labelScope?: "all" | "lastCategory" | "lastSeries";
+  trendline?: ChartTrendlineType;
 };
 export type SheetChart = {
   /** Source-owned hidden selections, including retired and inactive identities. */
@@ -106,6 +108,7 @@ function normalizeChartElementSettings(value: unknown): ChartElementSettings {
     "dataTable",
     "labelContent",
     "labelScope",
+    "trendline",
   ] as const;
   for (const key of keys)
     if (key in value && !Object.hasOwn(value, key))
@@ -156,6 +159,11 @@ function normalizeChartElementSettings(value: unknown): ChartElementSettings {
     if (!["all", "lastCategory", "lastSeries"].includes(source.labelScope as string))
       throw new RangeError("Invalid chart label scope.");
     result.labelScope = source.labelScope as ChartElementSettings["labelScope"];
+  }
+  if (Object.hasOwn(source, "trendline")) {
+    if (!["none", "linear", "exponential", "movingAverage"].includes(source.trendline as string))
+      throw new RangeError("Invalid chart trendline type.");
+    result.trendline = source.trendline as ChartTrendlineType;
   }
   return result;
 }

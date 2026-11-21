@@ -48,6 +48,10 @@ export const chartsZhCN = {
   "chart.labelInsideEnd": "内侧末端",
   "chart.labelInsideBase": "内侧基部",
   "chart.labelOutsideEnd": "外侧末端",
+  "chart.trendline": "趋势线",
+  "chart.trendlineLinear": "线性",
+  "chart.trendlineExponential": "指数",
+  "chart.trendlineMovingAverage": "移动平均",
   "chart.legendNonOverlapping": "显示图例且不与图表重叠",
   "chart.wordCloudElementsHint": "词云图不使用图例、数据标签或堆积。",
   "chart.elementExportBlocked":
