@@ -13,6 +13,7 @@ export type DiagramWorkspace = {
   isBusy: () => boolean;
   flush: () => boolean;
   execute: (command: WorkbookCommand) => boolean;
+  onInserted?: (drawingId: string) => void;
 };
 export function useDiagramActions<T extends { title: string }, S extends string>(
   options: DiagramWorkspace,
@@ -84,17 +85,33 @@ export function useDiagramActions<T extends { title: string }, S extends string>
         close();
         return;
       }
+      const existingAtAnchor = existing
+        ? 0
+        : drawings.filter(
+            (item) =>
+              item.kind === "attachment" &&
+              item.anchor.row === target.anchor.row &&
+              item.anchor.column === target.anchor.column,
+          ).length;
+      const baseDrawing = existing
+        ? undefined
+        : createAttachmentDrawing(makeId(config.idPrefix), target.anchor, attachment);
       const drawing = existing
         ? { ...existing, name: document.title.trim(), attachment }
         : {
-            ...createAttachmentDrawing(makeId(config.idPrefix), target.anchor, attachment),
+            ...baseDrawing!,
+            offsetX: baseDrawing!.offsetX + existingAtAnchor * 20,
+            offsetY: baseDrawing!.offsetY + existingAtAnchor * 20,
             name: document.title.trim(),
             ...(config.frame?.(document) ?? { width: 480, height: 300 }),
           };
       const updated = existing
         ? drawings.map((item) => (item.id === existing.id ? drawing : item))
         : [...drawings, drawing];
-      if (options.execute(createSetSheetDrawingsCommand(target.sheet.id, updated))) close();
+      if (options.execute(createSetSheetDrawingsCommand(target.sheet.id, updated))) {
+        close();
+        if (!existing) options.onInserted?.(drawing.id);
+      }
     } catch {
       error.value = true;
     }

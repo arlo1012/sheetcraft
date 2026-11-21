@@ -194,12 +194,21 @@ export function useDrawingActions(options: {
   function insertIcon(id: SheetIconId): boolean {
     const target = targets.prepare();
     if (!target) return false;
+    const anchor = options.getAddress();
+    const existingAtAnchor = (target.sheet.drawings ?? []).filter(
+      (item) =>
+        item.kind === "icon" &&
+        item.anchor.row === anchor.row &&
+        item.anchor.column === anchor.column,
+    ).length;
     const initial = createGraphicDrawing(
       idFactory("drawing"),
       "icon",
       options.name("icon"),
-      options.getAddress(),
+      anchor,
     );
+    initial.offsetX += existingAtAnchor * 20;
+    initial.offsetY += existingAtAnchor * 20;
     initial.iconId = id;
     initial.name = options.iconName?.(id) ?? options.name("icon");
     initial.fill = "#2563eb";

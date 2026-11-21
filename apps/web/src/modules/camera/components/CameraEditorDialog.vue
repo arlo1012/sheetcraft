@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, useId } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Input } from "tdesign-vue-next/es/input";
@@ -19,6 +19,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ confirm: [drawing: SheetCameraDrawing, source: string]; close: [] }>();
 const { t, locale } = useAppI18n();
+const titleInputId = `camera-title-${useId()}`;
 const draft = ref({ ...props.drawing, camera: { ...props.drawing.camera } });
 const source = ref(
   props.drawing.camera.range
@@ -53,7 +54,13 @@ const source = ref(
       <FormItem :label="t('chart.title')"
         ><Input
           v-model="draft.name"
-          v-native-control="{ attributes: { 'aria-label': t('chart.title') } }"
+          v-native-control="{
+            attributes: {
+              id: titleInputId,
+              name: titleInputId,
+              'aria-label': t('chart.title'),
+            },
+          }"
       /></FormItem>
       <FormItem
         ><Checkbox v-model="draft.camera.gridLines">{{ t("camera.gridLines") }}</Checkbox></FormItem
@@ -72,7 +79,7 @@ const source = ref(
   }
   p {
     margin: 0;
-    color: var(--text-secondary);
+    color: var(--sheetcraft-text-secondary);
   }
   [role="alert"] {
     color: var(--sheetcraft-status-error);

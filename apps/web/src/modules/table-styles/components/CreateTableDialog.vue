@@ -54,6 +54,7 @@ function confirm(): void {
           :pick-label="t('tables.selectRange')"
           :show-picker="true"
           :select-reference="selectReference"
+          @enter="draft.range.trim() && confirm()"
         />
       </div>
       <RadioGroup

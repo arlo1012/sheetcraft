@@ -22,6 +22,7 @@ export function useCameraActions(options: {
   isBusy: () => boolean;
   flush: () => boolean;
   execute: (command: WorkbookCommand) => unknown;
+  onInserted?: (drawingId: string) => void;
   name: () => string;
 }) {
   const error = ref(false);
@@ -39,13 +40,21 @@ export function useCameraActions(options: {
     const sheet = target.sheet;
     const range = options.getRange();
     const sourceLayout = createCameraRangeLayout(sheet, range, options.getEvaluator?.());
+    const existingAtAnchor = drawing
+      ? 0
+      : (sheet.drawings ?? []).filter(
+          (item) =>
+            item.kind === "camera" &&
+            item.anchor.row === range.start.row &&
+            item.anchor.column === range.start.column,
+        ).length;
     const initial = drawing ?? {
       id: idFactory("camera"),
       kind: "camera",
       name: options.name(),
       anchor: { ...range.start },
-      offsetX: 16,
-      offsetY: 16,
+      offsetX: 16 + existingAtAnchor * 24,
+      offsetY: 16 + existingAtAnchor * 24,
       ...fitCameraSize(sourceLayout.width, sourceLayout.height),
       text: "",
       shape: "rectangle",
@@ -88,19 +97,20 @@ export function useCameraActions(options: {
           camera: { ...drawing.camera, sheetId: sourceSheet.id, range: reference.range },
         });
         const current = currentTarget.sheet.drawings ?? [];
-        if (
-          !targets.commit(
-            currentTarget,
-            createSetSheetDrawingsCommand(
-              currentTarget.sheet.id,
-              currentTarget.existing
-                ? current.map((item) => (item === currentTarget.existing ? next : item))
-                : [...current, next],
-            ),
-          ) &&
-          dialog.value === currentTarget
-        )
+        const committed = targets.commit(
+          currentTarget,
+          createSetSheetDrawingsCommand(
+            currentTarget.sheet.id,
+            currentTarget.existing
+              ? current.map((item) => (item === currentTarget.existing ? next : item))
+              : [...current, next],
+          ),
+        );
+        if (committed) {
+          if (!currentTarget.existing) options.onInserted?.(next.id);
+        } else if (dialog.value === currentTarget) {
           error.value = true;
+        }
       } catch {
         if (dialog.value === currentTarget) error.value = true;
       }

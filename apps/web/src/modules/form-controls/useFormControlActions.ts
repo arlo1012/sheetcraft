@@ -68,13 +68,22 @@ export function useFormControlActions(options: {
     if (pickerOwner.value) return;
     const target = targets.prepare(drawing);
     if (!target) return;
+    const anchor = { ...options.getAddress() };
+    const existingAtAnchor = drawing
+      ? 0
+      : (target.sheet.drawings ?? []).filter(
+          (item) =>
+            item.kind === "control" &&
+            item.anchor.row === anchor.row &&
+            item.anchor.column === anchor.column,
+        ).length;
     let initial: SheetControlDrawing = drawing ?? {
       id: idFactory("control"),
       kind: "control",
       name: options.name(type),
-      anchor: { ...options.getAddress() },
-      offsetX: 8,
-      offsetY: 8,
+      anchor,
+      offsetX: 8 + existingAtAnchor * 20,
+      offsetY: 8 + existingAtAnchor * 20,
       width: type === "group" ? 320 : 220,
       height: type === "group" ? 240 : type === "list" ? 160 : 64,
       text: "",
@@ -230,8 +239,12 @@ export function useFormControlActions(options: {
               });
           }
         }
-        if (!targets.commit(currentTarget, command) && dialog.value === currentTarget)
+        const committed = targets.commit(currentTarget, command);
+        if (committed) {
+          if (!currentTarget.existing) options.selectDrawing?.(next.id);
+        } else if (dialog.value === currentTarget) {
           error.value = true;
+        }
       } catch {
         if (dialog.value === currentTarget) error.value = true;
       }

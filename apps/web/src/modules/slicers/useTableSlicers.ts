@@ -215,32 +215,41 @@ export function useTableSlicers(options: {
         };
       }
     }
+    const existingAtAnchor = (view.sheet.drawings ?? []).filter(
+      (item) =>
+        item.kind === "slicer" &&
+        item.anchor.row === baseAnchor.row &&
+        item.anchor.column === baseAnchor.column,
+    ).length;
     const drawings: SheetSlicerDrawing[] = chosen.fields
       .filter((field) => selected.includes(field.id))
-      .map((field, index) => ({
-        id: id("slicer"),
-        name: field.name,
-        kind: "slicer",
-        slicer:
-          chosen.kind === "pivot"
-            ? { pivotTableId: chosen.id, fieldIndex: Number(field.id) }
-            : { tableId: chosen.id, columnId: field.id },
-        anchor: { ...baseAnchor },
-        offsetX: 12 + index * 180,
-        offsetY: 0,
-        width: 168,
-        height: 210,
-        text: "",
-        shape: "rectangle",
-        fill: "#ffffff",
-        stroke: "#5b9bd5",
-        strokeWidth: 1,
-        color: "#202124",
-        fontSize: 12,
-        bold: false,
-        italic: false,
-        rotation: 0,
-      }));
+      .map((field, index) => {
+        const slot = existingAtAnchor + index;
+        return {
+          id: id("slicer"),
+          name: field.name,
+          kind: "slicer",
+          slicer:
+            chosen.kind === "pivot"
+              ? { pivotTableId: chosen.id, fieldIndex: Number(field.id) }
+              : { tableId: chosen.id, columnId: field.id },
+          anchor: { ...baseAnchor },
+          offsetX: 12 + (slot % 3) * 180,
+          offsetY: Math.floor(slot / 3) * 224,
+          width: 168,
+          height: 210,
+          text: "",
+          shape: "rectangle",
+          fill: "#ffffff",
+          stroke: "#5b9bd5",
+          strokeWidth: 1,
+          color: "#202124",
+          fontSize: 12,
+          bold: false,
+          italic: false,
+          rotation: 0,
+        };
+      });
     if (!drawings.length) return;
     options.execute(
       createSetSheetDrawingsCommand(view.sheet.id, [...(view.sheet.drawings ?? []), ...drawings]),

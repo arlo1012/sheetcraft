@@ -270,6 +270,7 @@ export function useWorkspacePivotAndObjects(options: WorkspacePivotAndObjectsOpt
     isBusy: options.isBusy,
     flush: options.flushCellEdit,
     execute: options.executeCommand,
+    onInserted: options.selectDrawing,
     onError: () => {
       void MessagePlugin.error(t("attachment.failed"));
     },
@@ -289,6 +290,7 @@ export function useWorkspacePivotAndObjects(options: WorkspacePivotAndObjectsOpt
     isBusy: options.isBusy,
     flush: options.flushCellEdit,
     execute: options.executeCommand,
+    onInserted: options.selectDrawing,
   };
   const flowcharts = useFlowchartActions(diagramWorkspace);
   const mindMaps = useMindMapActions(diagramWorkspace);
@@ -309,6 +311,7 @@ export function useWorkspacePivotAndObjects(options: WorkspacePivotAndObjectsOpt
     isBusy: options.isBusy,
     flush: options.flushCellEdit,
     execute: options.executeCommand,
+    onInserted: options.selectDrawing,
     name: () => t("camera.title"),
   });
   const { dialog: cameraDialog, editing: editingCamera, error: cameraError } = cameraActions;

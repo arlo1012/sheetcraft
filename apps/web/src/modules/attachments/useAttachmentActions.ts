@@ -23,6 +23,7 @@ export function useAttachmentActions(options: {
   isBusy: () => boolean;
   flush: () => boolean;
   execute: (command: WorkbookCommand) => unknown;
+  onInserted?: (drawingId: string) => void;
   onError: () => void;
 }) {
   const fileInput = ref<HTMLInputElement>();
@@ -115,15 +116,24 @@ export function useAttachmentActions(options: {
       const dimensions = await wordAttachmentDimensions(attachment);
       if (!isCurrent(pending)) return;
       if (dimensions) Object.assign(drawing, dimensions);
+      const currentDrawings = options.getSheet().drawings ?? [];
+      const existingAtAnchor = currentDrawings.filter(
+        (item) =>
+          item.kind === "attachment" &&
+          item.anchor.row === pending.address.row &&
+          item.anchor.column === pending.address.column,
+      ).length;
+      if (existingAtAnchor > 0) {
+        drawing.offsetX += existingAtAnchor * 20;
+        drawing.offsetY += existingAtAnchor * 20;
+      }
       const accepted = options.execute(
-        createSetSheetDrawingsCommand(pending.sheet.id, [
-          ...(options.getSheet().drawings ?? []),
-          drawing,
-        ]),
+        createSetSheetDrawingsCommand(pending.sheet.id, [...currentDrawings, drawing]),
       );
       if (!isCurrent(pending)) return;
       if (accepted !== true) throw new Error("Attachment insertion was refused.");
       inserting.value = undefined;
+      options.onInserted?.(drawing.id);
     } catch {
       if (isCurrent(pending)) insertError.value = true;
     } finally {
