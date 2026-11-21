@@ -7,8 +7,9 @@ import type { SheetRenderFrame } from "../../sheet-grid/rendering/sheet-render-f
 import type { PageMarginDragStart } from "../usePageMarginDrag";
 import type { PageViewPage, PageViewPaintState } from "../page-view-types";
 
-export const PAGE_LAYOUT_RULER_SIZE = 18;
-export type PageLayoutRulerUnit = "mm" | "cm" | "in";
+import { PAGE_LAYOUT_RULER_SIZE, type PageLayoutRulerUnit } from "../page-layout-ruler";
+
+export { PAGE_LAYOUT_RULER_SIZE, type PageLayoutRulerUnit };
 type Axis = "horizontal" | "vertical";
 type Band = { start: number; end: number; key: string };
 type Tick = { key: string; position: number; label?: string; major: boolean };

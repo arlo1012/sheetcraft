@@ -449,7 +449,9 @@ const FilterColumnPanel = defineAsyncComponent(
 const DataValidationFeedbackDialog = defineAsyncComponent(
   () => import("../modules/data-tools/components/DataValidationFeedbackDialog.vue"),
 );
-import RangeReferencePicker from "../shared/range-reference/RangeReferencePicker.vue";
+const RangeReferencePicker = defineAsyncComponent(
+  () => import("../shared/range-reference/RangeReferencePicker.vue"),
+);
 import { useRangeReferencePicker } from "../shared/range-reference/useRangeReferencePicker";
 const NamedRangesDialog = defineAsyncComponent(
   () => import("../modules/formula-tools/components/NamedRangesDialog.vue"),
@@ -494,7 +496,10 @@ import type { SheetHorizontalScrollState } from "../modules/sheet-grid/horizonta
 import WorkbookFormulaBar from "../modules/workbook/components/WorkbookFormulaBar.vue";
 import type { WorkbookFindMode } from "../modules/workbook/workbook-find-types";
 import { resolveRangeReference } from "../shared/range-reference/formatRangeReference";
-import WorkbookFindDialog from "../modules/workbook/components/WorkbookFindDialog.vue";
+import type WorkbookFindDialogType from "../modules/workbook/components/WorkbookFindDialog.vue";
+const WorkbookFindDialog = defineAsyncComponent(
+  () => import("../modules/workbook/components/WorkbookFindDialog.vue"),
+);
 import WorkbookStatusBar from "../modules/workbook/components/WorkbookStatusBar.vue";
 import { useSpreadsheetWorkspaceController } from "./composables/useSpreadsheetWorkspaceController";
 const CellFormatDialog = defineAsyncComponent(
@@ -521,7 +526,7 @@ const props = defineProps<{
 }>();
 const formulaBarRef = ref<InstanceType<typeof WorkbookFormulaBar> | null>(null);
 const findDialogVisible = ref(false);
-const findDialogRef = ref<InstanceType<typeof WorkbookFindDialog>>();
+const findDialogRef = ref<InstanceType<typeof WorkbookFindDialogType>>();
 const findMode = ref<WorkbookFindMode>("find");
 
 function restoreSearchFocus(): void {
@@ -3255,6 +3260,7 @@ const {
   formatSummary: findFormatSummary,
 } = workbookFind;
 const {
+  findDialogMounted,
   findFormatTarget,
   findFormatDraft,
   findFormatPicker,
@@ -5585,6 +5591,7 @@ watch(
       @close="formulaEditor.close"
     />
     <WorkbookFindDialog
+      v-if="findDialogMounted"
       ref="findDialogRef"
       :mode="findMode"
       :replacement="findReplacement"

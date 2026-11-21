@@ -43,6 +43,8 @@ type WorkspaceFindAndGoToOptions = {
 /** Owns Find/Replace/Go-To dialog actions, format matching picker, and Ctrl+F/H/G shortcuts. */
 export function useWorkspaceFindAndGoTo(options: WorkspaceFindAndGoToOptions) {
   const { workbookFind, workbookGoTo, findDialogVisible, findDialogRef, findMode } = options;
+  const findDialogMounted = ref(false);
+  let pendingFocusQuery = false;
   const findFormatTarget = ref<"find" | "replace">("find");
   const findFormatDraft = shallowRef<ReturnType<typeof createFindFormatDraft>>();
   const findFormatPicker = useRangeReferencePicker(() => options.getActiveSheet().name, {
@@ -53,9 +55,23 @@ export function useWorkspaceFindAndGoTo(options: WorkspaceFindAndGoToOptions) {
   function openFind(mode: WorkbookFindMode = "find"): void {
     if (!options.cellEditSession.finish()) return;
     findMode.value = mode;
+    findDialogMounted.value = true;
     findDialogVisible.value = true;
-    void nextTick(() => findDialogRef.value?.focusQuery());
+    pendingFocusQuery = true;
+    void nextTick(() => {
+      if (pendingFocusQuery && findDialogVisible.value && findDialogRef.value) {
+        pendingFocusQuery = false;
+        findDialogRef.value.focusQuery();
+      }
+    });
   }
+
+  watch(findDialogRef, (dialog) => {
+    if (dialog && pendingFocusQuery && findDialogVisible.value) {
+      pendingFocusQuery = false;
+      void nextTick(() => dialog.focusQuery());
+    }
+  });
 
   useWorkbookFindShortcuts({
     canOpen: (event) => {
@@ -157,7 +173,10 @@ export function useWorkspaceFindAndGoTo(options: WorkspaceFindAndGoToOptions) {
   }
 
   watch(findDialogVisible, (visible) => {
-    if (!visible) {
+    if (visible) {
+      findDialogMounted.value = true;
+    } else {
+      pendingFocusQuery = false;
       findFormatPicker.cancel();
       findFormatDraft.value = undefined;
     }
@@ -169,6 +188,7 @@ export function useWorkspaceFindAndGoTo(options: WorkspaceFindAndGoToOptions) {
   });
 
   return {
+    findDialogMounted,
     findFormatTarget,
     findFormatDraft,
     findFormatPicker,

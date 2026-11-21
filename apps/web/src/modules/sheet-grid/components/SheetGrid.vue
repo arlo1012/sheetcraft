@@ -24,9 +24,13 @@ import {
   type PictureSourcePresentation,
 } from "../../sheet-images/picture-source-presentation";
 import { getPivotActiveField } from "../../pivot-tables/pivot-active-field";
-import PivotReportFilters from "../../pivot-tables/components/PivotReportFilters.vue";
+const PivotReportFilters = defineAsyncComponent(
+  () => import("../../pivot-tables/components/PivotReportFilters.vue"),
+);
 import { isPivotValueCell, type SheetPivotTable } from "@sheetcraft/core/pivot-tables";
-import PivotEmptyReports from "../../pivot-tables/components/PivotEmptyReports.vue";
+const PivotEmptyReports = defineAsyncComponent(
+  () => import("../../pivot-tables/components/PivotEmptyReports.vue"),
+);
 import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { ChartElementSelection } from "../../charts/chart-format-selection";
@@ -34,8 +38,12 @@ import type { ChartFormatTarget } from "../../charts/chart-format-pane";
 import type { ChartLayoutPreview } from "../../charts/chart-layout-preview";
 import type { TextBoxReferenceResolver } from "../../sheet-drawings/textbox-reference-display";
 import SheetDrawingLayer from "../../sheet-drawings/components/SheetDrawingLayer.vue";
-import SheetFreeShapeCreationLayer from "../../sheet-drawings/components/SheetFreeShapeCreationLayer.vue";
-import SheetShapeCreationLayer from "../../sheet-drawings/components/SheetShapeCreationLayer.vue";
+const SheetFreeShapeCreationLayer = defineAsyncComponent(
+  () => import("../../sheet-drawings/components/SheetFreeShapeCreationLayer.vue"),
+);
+const SheetShapeCreationLayer = defineAsyncComponent(
+  () => import("../../sheet-drawings/components/SheetShapeCreationLayer.vue"),
+);
 import type { ShapeCreationRequest } from "../../sheet-drawings/useShapeCreation";
 import type { ShapeCanvasTextEditRequest } from "../../sheet-drawings/shape-canvas-text-edit-contract";
 import type {
@@ -49,6 +57,7 @@ import type {
 import { canEditCell, canEditRange, canSelectCell, canUseSheetPermission } from "@sheetcraft/core";
 import {
   computed,
+  defineAsyncComponent,
   nextTick,
   onBeforeUnmount,
   onMounted,
@@ -68,16 +77,25 @@ import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import { DEFAULT_SHEET_PAGE_SETUP, type SheetPageSetup } from "@sheetcraft/core/page-setup";
 import type { SheetViewMode } from "@sheetcraft/sheet-engine/page-layout";
 import type { PageViewPaintState } from "../../page-layout/page-view-types";
-import PageHeaderFooterOverlay from "../../page-layout/components/PageHeaderFooterOverlay.vue";
+const PageHeaderFooterOverlay = defineAsyncComponent(
+  () => import("../../page-layout/components/PageHeaderFooterOverlay.vue"),
+);
 import { usePageBreakDrag } from "../../page-layout/usePageBreakDrag";
 import { usePageMarginDrag } from "../../page-layout/usePageMarginDrag";
 import { adjustSheetPageMargin } from "@sheetcraft/sheet-engine/page-layout";
-import PageLayoutRulers, {
+import {
   PAGE_LAYOUT_RULER_SIZE,
   type PageLayoutRulerUnit,
-} from "../../page-layout/components/PageLayoutRulers.vue";
-import PageLayoutMargins from "../../page-layout/components/PageLayoutMargins.vue";
-import PageWhiteSpaceControls from "../../page-layout/components/PageWhiteSpaceControls.vue";
+} from "../../page-layout/page-layout-ruler";
+const PageLayoutRulers = defineAsyncComponent(
+  () => import("../../page-layout/components/PageLayoutRulers.vue"),
+);
+const PageLayoutMargins = defineAsyncComponent(
+  () => import("../../page-layout/components/PageLayoutMargins.vue"),
+);
+const PageWhiteSpaceControls = defineAsyncComponent(
+  () => import("../../page-layout/components/PageWhiteSpaceControls.vue"),
+);
 import type { HeaderFooterEditTarget } from "../../page-layout/header-footer-editor";
 import { columnIndexToLabel, getCellAddressLabel } from "@sheetcraft/core/coordinates";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
@@ -166,14 +184,24 @@ import { useSheetViewport } from "../composables/useSheetViewport";
 import type { SheetHorizontalScrollState } from "../horizontal-scroll";
 import type { ImageInsertMode } from "../../sheet-images/useSheetImageActions";
 import SheetFloatingImageLayer from "../../sheet-images/components/SheetFloatingImageLayer.vue";
-import PictureColorPickLayer from "../../sheet-images/components/PictureColorPickLayer.vue";
+const PictureColorPickLayer = defineAsyncComponent(
+  () => import("../../sheet-images/components/PictureColorPickLayer.vue"),
+);
 import { usePictureTransparentColor } from "../../sheet-images/usePictureTransparentColor";
 import { createPicturePaintResources } from "../../../shared/images/picture-paint-resources";
 import SheetOwnedPictureGroupLayer from "../../sheet-images/components/SheetOwnedPictureGroupLayer.vue";
 import type { PictureAlignmentReference } from "../../sheet-images/usePictureTools";
-import SheetPictureAdjustmentHandles from "../../sheet-images/components/SheetPictureAdjustmentHandles.vue";
-import SheetPictureCropOverlay from "../../sheet-images/components/SheetPictureCropOverlay.vue";
-import PictureCropToolbar from "../../sheet-images/components/PictureCropToolbar.vue";
+const SheetPictureAdjustmentHandles = defineAsyncComponent(
+  () => import("../../sheet-images/components/SheetPictureAdjustmentHandles.vue"),
+);
+import type SheetPictureCropOverlayType from "../../sheet-images/components/SheetPictureCropOverlay.vue";
+const SheetPictureCropOverlay = defineAsyncComponent(
+  () => import("../../sheet-images/components/SheetPictureCropOverlay.vue"),
+);
+import type PictureCropToolbarType from "../../sheet-images/components/PictureCropToolbar.vue";
+const PictureCropToolbar = defineAsyncComponent(
+  () => import("../../sheet-images/components/PictureCropToolbar.vue"),
+);
 import {
   usePictureCropSession,
   type PictureCropDirection,
@@ -187,20 +215,23 @@ import {
   type PointerSession,
 } from "../../../shared/sheet-input/pointer-session";
 import { resolveOwnedPictureNode } from "../../sheet-images/picture-group-interaction";
-import SheetImagePreview from "../../sheet-images/components/SheetImagePreview.vue";
-import SheetNotePreview from "./SheetNotePreview.vue";
+const SheetImagePreview = defineAsyncComponent(
+  () => import("../../sheet-images/components/SheetImagePreview.vue"),
+);
+import type SheetNotePreviewType from "./SheetNotePreview.vue";
+const SheetNotePreview = defineAsyncComponent(() => import("./SheetNotePreview.vue"));
 import { useFloatingImageClipboard } from "../../sheet-images/useFloatingImageClipboard";
 import { useOwnedPictureClipboard } from "../../sheet-images/useOwnedPictureClipboard";
 import { createBrowserGridClipboardPort } from "../gridClipboardPort";
 import { captureFloatingImageGroup } from "@sheetcraft/sheet-engine/floating-image-group";
 import CellEditor from "./CellEditor.vue";
-import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
+const SheetAxisContextMenu = defineAsyncComponent(() => import("./SheetAxisContextMenu.vue"));
 import SheetFreezeHandles from "./SheetFreezeHandles.vue";
-import SheetCellContextMenu from "./SheetCellContextMenu.vue";
+const SheetCellContextMenu = defineAsyncComponent(() => import("./SheetCellContextMenu.vue"));
 import SheetCellErrorMenu, { type CellErrorDescription } from "./SheetCellErrorMenu.vue";
 import SheetCellNotice from "./SheetCellNotice.vue";
 import SheetSurface from "./SheetSurface.vue";
-import SheetAutoFillOptions from "./SheetAutoFillOptions.vue";
+const SheetAutoFillOptions = defineAsyncComponent(() => import("./SheetAutoFillOptions.vue"));
 import SheetDataControls, {
   type ActiveCellValidationInfo,
   type SheetFilterControl,
@@ -1537,8 +1568,9 @@ const pictureCrop = usePictureCropSession({
   getThemeEffects: () => drawingThemeEffects.value,
   onFailure: () => emit("imageFeedback", "picture.operationFailed"),
 });
-const cropOverlayRef = ref<InstanceType<typeof SheetPictureCropOverlay>>();
-const cropToolbarRef = ref<InstanceType<typeof PictureCropToolbar>>();
+const cropOverlayRef = ref<InstanceType<typeof SheetPictureCropOverlayType>>();
+const cropToolbarRef = ref<InstanceType<typeof PictureCropToolbarType>>();
+let pendingCropOverlayFocus = false;
 let cropPointer: PointerSession | undefined;
 function stopCropPointer(): void {
   const pointer = cropPointer;
@@ -1549,6 +1581,7 @@ function finishPictureCrop(cancel = false, restoreFocus = true): boolean {
   // Drop mode before releasing capture so pointer cancellation cannot restore an applied draft.
   const accepted = cancel ? (pictureCrop.cancel(), true) : pictureCrop.apply();
   if (accepted) {
+    pendingCropOverlayFocus = false;
     stopCropPointer();
     imageLayerRef.value?.closePictureContextMenu();
     ownedImageLayerRef.value?.closePictureContextMenu();
@@ -1559,13 +1592,26 @@ function finishPictureCrop(cancel = false, restoreFocus = true): boolean {
 function startPictureCrop(): boolean {
   if (pictureCrop.active.value) return finishPictureCrop();
   if (!flushPendingEdit() || !pictureCrop.start()) return false;
-  void nextTick(() =>
-    (cropOverlayRef.value?.$el as HTMLElement | undefined)?.focus({
-      preventScroll: true,
-    }),
-  );
+  pendingCropOverlayFocus = true;
+  void nextTick(() => {
+    const overlay = cropOverlayRef.value?.$el as HTMLElement | undefined;
+    if (overlay && pendingCropOverlayFocus && pictureCrop.active.value) {
+      pendingCropOverlayFocus = false;
+      overlay.focus({ preventScroll: true });
+    }
+  });
   return true;
 }
+watch(cropOverlayRef, (overlay) => {
+  if (overlay && pendingCropOverlayFocus && pictureCrop.active.value) {
+    pendingCropOverlayFocus = false;
+    void nextTick(() =>
+      (overlay.$el as HTMLElement | undefined)?.focus({
+        preventScroll: true,
+      }),
+    );
+  }
+});
 function openCropContextMenu(event: MouseEvent): void {
   if (!pictureCrop.active.value) return;
   if (selectedOwnedPicturePath.value?.length && selectedOwnedPicturePath.value.length > 1)
@@ -2246,7 +2292,7 @@ const visibleNotes = computed(() => {
     return origin ? [{ key: `${props.sheet.id}:${key}`, address, origin, note, draft }] : [];
   });
 });
-const notePreviewRefs = ref<InstanceType<typeof SheetNotePreview>[]>([]);
+const notePreviewRefs = ref<(InstanceType<typeof SheetNotePreviewType> | null)[]>([]);
 function onDocumentPointerDown(event: PointerEvent): void {
   if (
     pictureTransparentColor.session.value &&
@@ -2269,13 +2315,13 @@ function onDocumentPointerDown(event: PointerEvent): void {
     }
   }
   if (!(event.target instanceof Node)) return;
-  for (const preview of notePreviewRefs.value) preview.outsidePointerDown(event.target);
+  for (const preview of notePreviewRefs.value) preview?.outsidePointerDown(event.target);
 }
 watch(
   () => `${props.sheet.id}:${activeCell.value.row}:${activeCell.value.column}`,
   () => {
     hoveredNoteAddress.value = undefined;
-    for (const preview of notePreviewRefs.value) preview.deselect();
+    for (const preview of notePreviewRefs.value) preview?.deselect();
   },
 );
 const selectedRangeRects = computed(() => layout.value.getRangeFragments(selectedRange.value));
@@ -4077,7 +4123,7 @@ defineExpose({
       @toggle="emit('update:showPageWhiteSpace', !showPageWhiteSpace)"
     />
     <PivotReportFilters
-      v-if="workbook"
+      v-if="workbook && (sheet.pivotTables?.length ?? 0) > 0"
       :tables="sheet.pivotTables ?? []"
       :workbook="workbook"
       :revision="workbookRevision ?? 0"
@@ -4096,6 +4142,7 @@ defineExpose({
       "
     />
     <PivotEmptyReports
+      v-if="(sheet.pivotTables?.length ?? 0) > 0"
       :tables="sheet.pivotTables ?? []"
       :layout="layout"
       :body="renderFrame.body"
