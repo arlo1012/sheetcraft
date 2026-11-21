@@ -5,6 +5,8 @@ import { useAppI18n } from "../../../shared/i18n";
 import type { ChartQuickLayoutId } from "../chart-quick-layout";
 
 import BarLayoutThumbnail from "./BarLayoutThumbnail.vue";
+import LineLayoutThumbnail from "./LineLayoutThumbnail.vue";
+import PieLayoutThumbnail from "./PieLayoutThumbnail.vue";
 
 const props = defineProps<{
   chart: SheetChart;
@@ -151,6 +153,12 @@ const bindings = computed(() => {
           :layout="1"
           :stacked="chart.stacked || chart.presentation?.percentStacked === true"
         />
+        <LineLayoutThumbnail v-else-if="chart.type === 'line'" :layout="1" />
+        <PieLayoutThumbnail
+          v-else-if="chart.type === 'pie' || chart.type === 'doughnut'"
+          :layout="1"
+          :doughnut="chart.type === 'doughnut'"
+        />
         <svg v-else viewBox="0 0 112 76" aria-hidden="true">
           <path data-thumbnail-element="title" d="M34 8h44" class="thumbnail-title" />
           <g data-thumbnail-element="gridlines" class="thumbnail-grid">
@@ -189,6 +197,12 @@ const bindings = computed(() => {
           :layout="2"
           :stacked="chart.stacked || chart.presentation?.percentStacked === true"
         />
+        <LineLayoutThumbnail v-else-if="chart.type === 'line'" :layout="2" />
+        <PieLayoutThumbnail
+          v-else-if="chart.type === 'pie' || chart.type === 'doughnut'"
+          :layout="2"
+          :doughnut="chart.type === 'doughnut'"
+        />
         <svg v-else viewBox="0 0 112 76" aria-hidden="true">
           <path data-thumbnail-element="title" d="M34 8h44" class="thumbnail-title" />
           <g data-thumbnail-element="legend-top">
@@ -226,6 +240,12 @@ const bindings = computed(() => {
           v-if="chart.type === 'bar'"
           :layout="3"
           :stacked="chart.stacked || chart.presentation?.percentStacked === true"
+        />
+        <LineLayoutThumbnail v-else-if="chart.type === 'line'" :layout="3" />
+        <PieLayoutThumbnail
+          v-else-if="chart.type === 'pie' || chart.type === 'doughnut'"
+          :layout="3"
+          :doughnut="chart.type === 'doughnut'"
         />
         <svg v-else viewBox="0 0 112 76" aria-hidden="true">
           <path data-thumbnail-element="title" d="M34 8h44" class="thumbnail-title" />
@@ -267,6 +287,12 @@ const bindings = computed(() => {
           :layout="4"
           :stacked="chart.stacked || chart.presentation?.percentStacked === true"
         />
+        <LineLayoutThumbnail v-else-if="chart.type === 'line'" :layout="4" />
+        <PieLayoutThumbnail
+          v-else-if="chart.type === 'pie' || chart.type === 'doughnut'"
+          :layout="4"
+          :doughnut="chart.type === 'doughnut'"
+        />
         <svg v-else viewBox="0 0 112 76" aria-hidden="true">
           <path data-thumbnail-element="axes" d="M16 10v46h84" class="thumbnail-axis" />
           <path
@@ -305,6 +331,12 @@ const bindings = computed(() => {
           v-if="chart.type === 'bar'"
           :layout="5"
           :stacked="chart.stacked || chart.presentation?.percentStacked === true"
+        />
+        <LineLayoutThumbnail v-else-if="chart.type === 'line'" :layout="5" />
+        <PieLayoutThumbnail
+          v-else-if="chart.type === 'pie' || chart.type === 'doughnut'"
+          :layout="5"
+          :doughnut="chart.type === 'doughnut'"
         />
         <svg v-else viewBox="0 0 112 76" aria-hidden="true">
           <path data-thumbnail-element="title" d="M34 8h44" class="thumbnail-title" />
@@ -354,6 +386,12 @@ const bindings = computed(() => {
           :layout="6"
           :stacked="chart.stacked || chart.presentation?.percentStacked === true"
         />
+        <LineLayoutThumbnail v-else-if="chart.type === 'line'" :layout="6" />
+        <PieLayoutThumbnail
+          v-else-if="chart.type === 'pie' || chart.type === 'doughnut'"
+          :layout="6"
+          :doughnut="chart.type === 'doughnut'"
+        />
         <svg v-else viewBox="0 0 112 76" aria-hidden="true">
           <path data-thumbnail-element="title" d="M34 8h44" class="thumbnail-title" />
           <path data-thumbnail-element="axis-title-y" d="M5 31v20" class="thumbnail-title" />
@@ -393,6 +431,12 @@ const bindings = computed(() => {
           :layout="7"
           :stacked="chart.stacked || chart.presentation?.percentStacked === true"
         />
+        <LineLayoutThumbnail v-else-if="chart.type === 'line'" :layout="7" />
+        <PieLayoutThumbnail
+          v-else-if="chart.type === 'pie' || chart.type === 'doughnut'"
+          :layout="7"
+          :doughnut="chart.type === 'doughnut'"
+        />
         <svg v-else viewBox="0 0 112 76" aria-hidden="true">
           <path data-thumbnail-element="axis-title-y" d="M5 27v20" class="thumbnail-title" />
           <path data-thumbnail-element="axis-title-x" d="M39 70h24" class="thumbnail-title" />
@@ -425,6 +469,7 @@ const bindings = computed(() => {
         <span>{{ t("chart.quickLayout7") }}</span>
       </button>
       <button
+        v-if="chart.type !== 'pie' && chart.type !== 'doughnut'"
         type="button"
         role="menuitemradio"
         :aria-checked="selected === 8"
@@ -439,6 +484,7 @@ const bindings = computed(() => {
           :layout="8"
           :stacked="chart.stacked || chart.presentation?.percentStacked === true"
         />
+        <LineLayoutThumbnail v-else-if="chart.type === 'line'" :layout="8" />
         <svg v-else viewBox="0 0 112 76" aria-hidden="true">
           <path data-thumbnail-element="title" d="M34 8h44" class="thumbnail-title" />
           <path data-thumbnail-element="axis-title-y" d="M5 30v18" class="thumbnail-title" />
@@ -457,6 +503,7 @@ const bindings = computed(() => {
         <span>{{ t("chart.quickLayout8") }}</span>
       </button>
       <button
+        v-if="chart.type !== 'pie' && chart.type !== 'doughnut'"
         type="button"
         role="menuitemradio"
         :aria-checked="selected === 9"
@@ -471,6 +518,7 @@ const bindings = computed(() => {
           :layout="9"
           :stacked="chart.stacked || chart.presentation?.percentStacked === true"
         />
+        <LineLayoutThumbnail v-else-if="chart.type === 'line'" :layout="9" />
         <svg v-else viewBox="0 0 112 76" aria-hidden="true">
           <path data-thumbnail-element="title" d="M34 8h44" class="thumbnail-title" />
           <path data-thumbnail-element="axis-title-y" d="M5 31v18" class="thumbnail-title" />
@@ -499,6 +547,7 @@ const bindings = computed(() => {
         <span>{{ t("chart.quickLayout9") }}</span>
       </button>
       <button
+        v-if="chart.type !== 'pie' && chart.type !== 'doughnut'"
         type="button"
         role="menuitemradio"
         :aria-checked="selected === 10"
@@ -513,6 +562,7 @@ const bindings = computed(() => {
           :layout="10"
           :stacked="chart.stacked || chart.presentation?.percentStacked === true"
         />
+        <LineLayoutThumbnail v-else-if="chart.type === 'line'" :layout="10" />
         <svg v-else viewBox="0 0 112 76" aria-hidden="true">
           <path data-thumbnail-element="title" d="M34 8h44" class="thumbnail-title" />
           <path
@@ -546,7 +596,7 @@ const bindings = computed(() => {
       <button
         type="button"
         role="menuitemradio"
-        v-if="chart.type !== 'bar'"
+        v-if="chart.type === 'column'"
         :aria-checked="selected === 11"
         :aria-disabled="disabled"
         :disabled="disabled"

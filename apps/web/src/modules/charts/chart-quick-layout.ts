@@ -1,5 +1,6 @@
 import { initializeChartAxisTitle } from "./chart-format-pane";
 import { normalizeSheetChart, type SheetChart } from "@sheetcraft/core/sheet-charts";
+import type { PieLabel } from "@sheetcraft/core/chart-presentation";
 
 export type ChartQuickLayoutId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
 type LayoutRecipe = {
@@ -14,6 +15,14 @@ type LayoutRecipe = {
   gap: number;
   overlap: number;
 };
+
+export type PieQuickLayoutId = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type PieLayoutRecipe = {
+  title: "above" | "none";
+  legend: "none" | "top" | "bottom" | "right";
+  labels: "none" | "value" | PieLabel;
+};
+
 // These are concrete element patches. No recipe identity is saved in a workbook.
 // Exact gap/overlap and minor divisions are Sheetcraft's declared layout math;
 // the reference establishes their visible topology, not those hidden values.
@@ -153,6 +162,8 @@ const layouts: Record<ChartQuickLayoutId, LayoutRecipe> = {
 };
 
 export type BarQuickLayoutId = Exclude<ChartQuickLayoutId, 11>;
+export type LineQuickLayoutId = Exclude<ChartQuickLayoutId, 11>;
+
 const barLayouts = {
   1: { ...layouts[1], gap: 150, overlap: 0 },
   2: { ...layouts[2], gap: 150, overlap: -25 },
@@ -165,6 +176,30 @@ const barLayouts = {
   9: { ...layouts[10], gap: 75, overlap: 40 },
   10: { ...layouts[11], gap: 150, overlap: 0 },
 } satisfies Record<BarQuickLayoutId, LayoutRecipe>;
+
+const lineLayouts = {
+  1: { ...layouts[1] },
+  2: { ...layouts[2] },
+  3: { ...layouts[3], overlap: 0 },
+  4: { ...layouts[1], labels: "outside" },
+  5: { ...layouts[5] },
+  6: { ...layouts[7] },
+  7: { ...layouts[6] },
+  8: { ...layouts[9] },
+  9: { ...layouts[4] },
+  10: { ...layouts[11] },
+} satisfies Record<LineQuickLayoutId, LayoutRecipe>;
+
+const pieLayouts: Record<PieQuickLayoutId, PieLayoutRecipe> = {
+  1: { title: "above", legend: "none", labels: "categoryPercent" },
+  2: { title: "above", legend: "top", labels: "percent" },
+  3: { title: "none", legend: "bottom", labels: "none" },
+  4: { title: "none", legend: "none", labels: "categoryPercent" },
+  5: { title: "above", legend: "none", labels: "value" },
+  6: { title: "above", legend: "right", labels: "percent" },
+  7: { title: "above", legend: "bottom", labels: "none" },
+};
+
 const stackedBarGap: Record<BarQuickLayoutId, number> = {
   1: 55,
   2: 95,
@@ -177,14 +212,29 @@ const stackedBarGap: Record<BarQuickLayoutId, number> = {
   9: 300,
   10: 150,
 };
+
 export function getBarLayoutRecipe(id: ChartQuickLayoutId, stacked: boolean): LayoutRecipe {
   if (id === 11 || !Object.hasOwn(barLayouts, id))
     throw new RangeError("Unknown horizontal bar chart layout.");
   const choice = barLayouts[id];
   return stacked ? { ...choice, gap: stackedBarGap[id], overlap: id === 9 ? 0 : 100 } : choice;
 }
+
+export function getLineLayoutRecipe(id: ChartQuickLayoutId): LayoutRecipe {
+  if (id === 11 || !Object.hasOwn(lineLayouts, id))
+    throw new RangeError("Unknown line chart layout.");
+  return lineLayouts[id];
+}
+
+export function getPieLayoutRecipe(id: ChartQuickLayoutId): PieLayoutRecipe {
+  if (!Object.hasOwn(pieLayouts, id)) throw new RangeError("Unknown pie chart layout.");
+  return pieLayouts[id as PieQuickLayoutId];
+}
+
 export function supportsChartQuickLayouts(type: SheetChart["type"]): boolean {
-  return type === "column" || type === "bar";
+  return (
+    type === "column" || type === "bar" || type === "line" || type === "pie" || type === "doughnut"
+  );
 }
 
 function recipe(id: ChartQuickLayoutId): LayoutRecipe {
@@ -205,10 +255,38 @@ export function applyChartQuickLayout(
   if (typeof axisTitle !== "string" || !axisTitle.trim() || axisTitle.length > 1000)
     throw new RangeError("Chart axis placeholder must be bounded text.");
   const next = normalizeSheetChart(chart);
+  if (chart.type === "pie" || chart.type === "doughnut") {
+    const choice = getPieLayoutRecipe(id);
+    if (choice.title === "above" && !next.title.trim()) next.title = defaultChartTitle;
+    next.legend = choice.legend !== "none";
+    next.labels = choice.labels !== "none";
+    next.elements = {
+      ...next.elements,
+      titlePosition: choice.title,
+      ...(choice.legend !== "none" ? { legendPosition: choice.legend } : {}),
+      legendOverlay: false,
+    };
+    const presentation = { ...next.presentation };
+    if (choice.labels === "percent" || choice.labels === "categoryPercent")
+      presentation.pieLabels = choice.labels;
+    else delete presentation.pieLabels;
+    if (Object.keys(presentation).length) next.presentation = presentation;
+    else delete next.presentation;
+    return normalizeSheetChart(next);
+  }
   const stackedBar =
     chart.type === "bar" && (chart.stacked || chart.presentation?.percentStacked === true);
-  const choice = chart.type === "bar" ? getBarLayoutRecipe(id, stackedBar) : recipe(id);
-  if (chart.type === "bar" && choice.title === "above" && !next.title.trim())
+  const choice =
+    chart.type === "bar"
+      ? getBarLayoutRecipe(id, stackedBar)
+      : chart.type === "line"
+        ? getLineLayoutRecipe(id)
+        : recipe(id);
+  if (
+    (chart.type === "bar" || chart.type === "line") &&
+    choice.title === "above" &&
+    !next.title.trim()
+  )
     next.title = defaultChartTitle;
   next.legend = choice.legend !== "none";
   next.labels = choice.labels !== "none";
@@ -217,12 +295,16 @@ export function applyChartQuickLayout(
     titlePosition: choice.title,
     ...(choice.legend !== "none" ? { legendPosition: choice.legend } : {}),
     legendOverlay: false,
-    labelPosition:
-      choice.labels === "inside"
-        ? "insideEnd"
-        : stackedBar && choice.labels !== "none"
-          ? "center"
-          : "outsideEnd",
+    ...(chart.type === "line"
+      ? {}
+      : {
+          labelPosition:
+            choice.labels === "inside"
+              ? "insideEnd"
+              : stackedBar && choice.labels !== "none"
+                ? "center"
+                : "outsideEnd",
+        }),
     labelContent: choice.labels === "lastCategory" ? "seriesAndValue" : "value",
     labelScope:
       choice.labels === "lastCategory"
@@ -257,7 +339,9 @@ export function applyChartQuickLayout(
       majorGridlines: choice.grid !== "none",
       minorGridlines: choice.grid === "majorMinor",
     },
-    bar: { ...next.format?.bar, gapWidth: choice.gap, overlap: choice.overlap },
+    ...(chart.type === "line"
+      ? {}
+      : { bar: { ...next.format?.bar, gapWidth: choice.gap, overlap: choice.overlap } }),
   };
   return normalizeSheetChart(next);
 }
@@ -265,8 +349,23 @@ export function applyChartQuickLayout(
 /** Match only fields owned by the layout; source values and user titles are not IDs. */
 export function getChartQuickLayout(chart: SheetChart): ChartQuickLayoutId | undefined {
   if (!supportsChartQuickLayouts(chart.type)) return undefined;
+  if (chart.type === "pie" || chart.type === "doughnut") {
+    for (const id of [1, 2, 3, 4, 5, 6, 7] as const) {
+      const expected = applyChartQuickLayout(chart, id, "Axis Title");
+      if (
+        chart.legend === expected.legend &&
+        chart.labels === expected.labels &&
+        chart.elements?.titlePosition === expected.elements?.titlePosition &&
+        (!chart.legend || chart.elements?.legendPosition === expected.elements?.legendPosition) &&
+        chart.elements?.legendOverlay === false &&
+        (!chart.labels || chart.presentation?.pieLabels === expected.presentation?.pieLabels)
+      )
+        return id;
+    }
+    return undefined;
+  }
   for (const id of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const) {
-    if (chart.type === "bar" && id === 11) break;
+    if ((chart.type === "bar" || chart.type === "line") && id === 11) break;
     const expected = applyChartQuickLayout(chart, id, "Axis Title");
     if (
       chart.legend === expected.legend &&
@@ -275,7 +374,8 @@ export function getChartQuickLayout(chart: SheetChart): ChartQuickLayoutId | und
       (!chart.legend || chart.elements?.legendPosition === expected.elements?.legendPosition) &&
       chart.elements?.legendOverlay === false &&
       (!chart.labels ||
-        (chart.elements?.labelPosition === expected.elements?.labelPosition &&
+        ((chart.type === "line" ||
+          chart.elements?.labelPosition === expected.elements?.labelPosition) &&
           chart.elements?.labelContent === expected.elements?.labelContent &&
           chart.elements?.labelScope === expected.elements?.labelScope)) &&
       chart.elements?.dataTable === expected.elements?.dataTable &&
@@ -285,8 +385,9 @@ export function getChartQuickLayout(chart: SheetChart): ChartQuickLayoutId | und
       chart.format?.valueAxis?.titleVisible === expected.format?.valueAxis?.titleVisible &&
       chart.format?.valueAxis?.majorGridlines === expected.format?.valueAxis?.majorGridlines &&
       chart.format?.valueAxis?.minorGridlines === expected.format?.valueAxis?.minorGridlines &&
-      chart.format?.bar?.gapWidth === expected.format?.bar?.gapWidth &&
-      chart.format?.bar?.overlap === expected.format?.bar?.overlap
+      (chart.type === "line" ||
+        (chart.format?.bar?.gapWidth === expected.format?.bar?.gapWidth &&
+          chart.format?.bar?.overlap === expected.format?.bar?.overlap))
     )
       return id;
   }
