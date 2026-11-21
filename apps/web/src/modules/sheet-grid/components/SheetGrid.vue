@@ -23,7 +23,6 @@ import {
   capturePictureSourcePresentation,
   type PictureSourcePresentation,
 } from "../../sheet-images/picture-source-presentation";
-import { getPictureObjectOriginCell } from "@sheetcraft/core/picture-object-sheet";
 import { getPivotActiveField } from "../../pivot-tables/pivot-active-field";
 import PivotReportFilters from "../../pivot-tables/components/PivotReportFilters.vue";
 import { isPivotValueCell, type SheetPivotTable } from "@sheetcraft/core/pivot-tables";
@@ -86,6 +85,7 @@ import { normalizeSheetZoom } from "../../../shared/sheet-view/zoom";
 import { getSelectionFitZoom } from "../selection-zoom";
 import { createSheetGridEditorKeydownHandler } from "../useSheetGridEditorKeydown";
 import { useSheetGridPictureClipboard } from "../useSheetGridPictureClipboard";
+import { useSheetGridPictureSelection } from "../useSheetGridPictureSelection";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { createContextMenuPoint } from "../../../shared/menu/useContextMenu";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
@@ -2592,205 +2592,59 @@ const {
   focusGrid: focusEditor,
 });
 
-function expandFloatingImageSelection(ids: readonly string[]): string[] {
-  const result = new Set<string>();
-  for (const id of ids) {
-    const image = props.sheet.floatingImages.find((entry) => entry.id === id);
-    if (!image) continue;
-    if (!isPictureGroup(image) && image.groupId)
-      for (const member of props.sheet.floatingImages) {
-        if (!isPictureGroup(member) && member.groupId === image.groupId) result.add(member.id);
-      }
-    else result.add(id);
-  }
-  return [...result];
-}
-function selectFloatingImage(id: string | null, additive = false): void {
-  if (isComposing.value) return;
-  if (id && !canEditPictureSelection(props.sheet, expandFloatingImageSelection([id]))) return;
-  selectedOwnedPicturePath.value = null;
-  if (isEditing.value) finishEdit(undefined, false);
-  stopDragSelection();
-  axisContextMenu.value = undefined;
-  cellContextMenu.value = undefined;
-  const image = props.sheet.floatingImages.find((entry) => entry.id === id);
-  const group =
-    image && !isPictureGroup(image) && image.groupId
-      ? props.sheet.floatingImages
-          .filter((entry) => !isPictureGroup(entry) && entry.groupId === image.groupId)
-          .map((entry) => entry.id)
-      : id
-        ? [id]
-        : [];
-  if (additive && id) {
-    selectedImageIds.value = selectedImageIds.value.includes(id)
-      ? selectedImageIds.value.filter((entry) => !group.includes(entry))
-      : [...new Set([...selectedImageIds.value, ...group])];
-    selectedImageId.value = selectedImageIds.value.at(-1) ?? null;
-  } else {
-    if (!id || !selectedImageIds.value.includes(id)) selectedImageIds.value = group;
-    selectedImageId.value = id;
-  }
-  if (!id) focusEditor();
-}
-
-function selectOwnedPicturePath(path: PictureGroupPath | null): void {
-  if (!path) {
-    selectedOwnedPicturePath.value = null;
-    return;
-  }
-  const context = pictureFrameContext.value;
-  if (
-    !context ||
-    !canEditPictureSelection(props.sheet, [path[0]!]) ||
-    selectedImageIds.value.length !== 1 ||
-    selectedImageIds.value[0] !== path[0]
-  )
-    return;
-  try {
-    if (resolveOwnedPictureNode(props.sheet.floatingImages, path, context)?.visible)
-      selectedOwnedPicturePath.value = [...path];
-  } catch {
-    emit("imageFeedback", "picture.operationFailed");
-  }
-}
-function ownedActionPaths(path: PictureGroupPath): PictureGroupPath[] {
-  return path.length === 1 && selectedImageIds.value.includes(path[0]!)
-    ? selectedImageIds.value.map((id) => [id])
-    : [[...path]];
-}
-function deleteOwnedPicture(path: PictureGroupPath, owner?: object): void {
-  if (pictureSelectionReadOnly.value || owner !== props.sheet) return;
-  if (pictureCrop.active.value && !finishPictureCrop()) return;
-  try {
-    if (!props.applyOwnedPictureDelete?.(ownedActionPaths(path), props.sheet))
-      emit("imageFeedback", "picture.operationFailed");
-  } catch {
-    emit("imageFeedback", "picture.operationFailed");
-  }
-}
-function ungroupOwnedPicture(rootId: string): void {
-  if (pictureSelectionReadOnly.value) return;
-  try {
-    const ids = selectedImageIds.value.includes(rootId) ? selectedImageIds.value : [rootId];
-    if (!props.applyPictureUngroup?.(ids, props.sheet))
-      emit("imageFeedback", "picture.operationFailed");
-  } catch {
-    emit("imageFeedback", "picture.operationFailed");
-  }
-}
-function formatOwnedPicture(path: PictureGroupPath, owner?: object, paint?: "fill" | "line"): void {
-  if (owner !== props.sheet || !pictureFrameContext.value) return;
-  if (pictureCrop.active.value && !finishPictureCrop()) return;
-  try {
-    const visible =
-      path.length === 1
-        ? props.sheet.floatingImages.some((root) => root.id === path[0] && !root.hidden)
-        : resolveOwnedPictureNode(props.sheet.floatingImages, path, pictureFrameContext.value)
-            ?.visible;
-    if (visible)
-      if (paint) emit("formatOwnedPicture", [...path], props.sheet, paint);
-      else emit("formatOwnedPicture", [...path], props.sheet);
-  } catch {
-    emit("imageFeedback", "picture.operationFailed");
-  }
-}
-function requestPictureSourceAction(
-  action: PictureContextSourceAction,
-  path: PictureGroupPath,
-  owner?: object,
-): void {
-  if (owner !== props.sheet || props.pictureSourceBusy) return;
-  if (action === "format") {
-    formatOwnedPicture(path, owner);
-    return;
-  }
-  if (
-    selectedImageIds.value.length !== 1 ||
-    selectedImageIds.value[0] !== path[0] ||
-    JSON.stringify(path.length > 1 ? path : null) !==
-      JSON.stringify(selectedOwnedPicturePath.value) ||
-    (!(["save", "preview"] as string[]).includes(action) && pictureSelectionReadOnly.value)
-  )
-    return;
-  if (pictureCrop.active.value && !finishPictureCrop()) return;
-  try {
-    const context = pictureFrameContext.value,
-      resolved =
-        path.length > 1 && context
-          ? resolveOwnedPictureNode(props.sheet.floatingImages, path, context)
-          : undefined,
-      node =
-        path.length === 1
-          ? props.sheet.floatingImages.find((root) => root.id === path[0])
-          : resolved?.node,
-      visible = path.length === 1 ? !!node && !node.hidden : resolved?.visible;
-    if (!visible || !node || !("assetId" in node)) return;
-    emit("pictureSourceAction", action, [...path], props.sheet);
-  } catch {
-    emit("imageFeedback", "picture.operationFailed");
-  }
-}
-function requestOwnedPictureCopy(
-  path: PictureGroupPath,
-  mode: "copy" | "cut",
-  owner?: object,
-): void {
-  if (owner !== props.sheet) return;
-  if (pictureCrop.active.value && !finishPictureCrop()) return;
-  if (mode === "cut" && pictureSelectionReadOnly.value) return;
-  void ownedClipboard.copy(ownedActionPaths(path), mode);
-}
-async function requestOwnedPicturePaste(path: PictureGroupPath, owner?: object): Promise<void> {
-  if (owner !== props.sheet || pictureLayerReadOnly.value) return;
-  if (pictureCrop.active.value && !finishPictureCrop()) return;
-  const root = props.sheet.floatingImages.find((entry) => entry.id === path[0]);
-  if (!root) return;
-  setActiveCell(getPictureObjectOriginCell(root, props.sheet));
-  if (!ownedClipboard.paste(activeCell.value) && !floatingClipboard.pastePending(activeCell.value))
-    await pasteSelection();
-  focusEditor();
-}
-function requiresOwnedClipboard(): boolean {
-  return (
-    Boolean(selectedOwnedPicturePath.value) ||
-    props.sheet.floatingImages.some(
-      (root) =>
-        selectedImageIds.value.includes(root.id) &&
-        (isPictureGroup(root) || isFramedPictureObject(root)),
-    )
-  );
-}
-function currentOwnedClipboardPaths(): PictureGroupPath[] {
-  return selectedOwnedPicturePath.value
-    ? [[...selectedOwnedPicturePath.value]]
-    : selectedImageIds.value.map((id) => [id]);
-}
-function deleteSelectedFloatingImage(id: string): void {
-  if (pictureCrop.active.value && (selectedImageId.value !== id || !finishPictureCrop())) return;
-  if (pictureSelectionReadOnly.value) return;
-  if (props.applyOwnedPictureDelete) {
-    deleteOwnedPicture([id], props.sheet);
-    return;
-  }
-  // Preserve the legacy emitted-event contract for consumers without a command callback.
-  if (selectedImageIds.value.includes(id) && selectedImageIds.value.length > 1)
-    emit("deleteFloatingImages", selectedImageIds.value);
-  else emit("deleteFloatingImage", id);
-  if (!props.sheet.floatingImages.some((root) => root.id === id)) {
-    selectedImageId.value = null;
-    focusEditor();
-  }
-}
-
-function convertSelectedFloatingImageToCell(id: string, path?: PictureGroupPath): void {
-  if (pictureCrop.active.value && (selectedImageId.value !== id || !finishPictureCrop())) return;
-  const image = props.sheet.floatingImages.find((entry) => entry.id === id);
-  if (!image || pictureLayerReadOnly.value || !canEditPictureSelection(props.sheet, [id])) return;
-  if (props.applyPictureToCell)
-    props.applyPictureToCell(id, path ?? selectedOwnedPicturePath.value ?? undefined);
-  else if (!props.readOnly) emit("convertFloatingImageToCell", id);
-}
+const {
+  expandFloatingImageSelection,
+  selectFloatingImage,
+  selectOwnedPicturePath,
+  deleteOwnedPicture,
+  ungroupOwnedPicture,
+  formatOwnedPicture,
+  requestPictureSourceAction,
+  requestOwnedPictureCopy,
+  requestOwnedPicturePaste,
+  requiresOwnedClipboard,
+  currentOwnedClipboardPaths,
+  deleteSelectedFloatingImage,
+  convertSelectedFloatingImageToCell,
+} = useSheetGridPictureSelection({
+  getSheet: () => props.sheet,
+  getPictureFrameContext: () => pictureFrameContext.value,
+  selectedImageId,
+  selectedImageIds,
+  selectedOwnedPicturePath,
+  getActiveCell: () => activeCell.value,
+  setActiveCell,
+  isEditing: () => isEditing.value,
+  isComposing: () => isComposing.value,
+  isReadOnly: () => Boolean(props.readOnly),
+  isPictureSourceBusy: () => Boolean(props.pictureSourceBusy),
+  isPictureSelectionReadOnly: () => pictureSelectionReadOnly.value,
+  isPictureLayerReadOnly: () => pictureLayerReadOnly.value,
+  isPictureCropActive: () => pictureCrop.active.value,
+  finishPictureCrop,
+  finishEdit,
+  stopDragSelection,
+  clearContextMenus: () => {
+    axisContextMenu.value = undefined;
+    cellContextMenu.value = undefined;
+  },
+  focusEditor,
+  floatingClipboard,
+  ownedClipboard,
+  pasteSelection,
+  applyOwnedPictureDelete: () => props.applyOwnedPictureDelete,
+  applyPictureUngroup: () => props.applyPictureUngroup,
+  applyPictureToCell: () => props.applyPictureToCell,
+  onDeleteFloatingImages: (ids) => emit("deleteFloatingImages", ids),
+  onDeleteFloatingImage: (id) => emit("deleteFloatingImage", id),
+  onConvertFloatingImageToCell: (id) => emit("convertFloatingImageToCell", id),
+  onFormatOwnedPicture: (path, sheet, paint) => {
+    if (paint) emit("formatOwnedPicture", path, sheet, paint);
+    else emit("formatOwnedPicture", path, sheet);
+  },
+  onPictureSourceAction: (action, path, sheet) => emit("pictureSourceAction", action, path, sheet),
+  onImageFeedback: (key) => emit("imageFeedback", key),
+});
 
 const {
   onImageCopy,

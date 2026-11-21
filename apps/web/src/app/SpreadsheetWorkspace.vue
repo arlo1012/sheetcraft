@@ -4,8 +4,6 @@ import {
   isFormatPaneReadonlyHistoryControl,
   routeFormatPaneHistoryShortcut,
 } from "./format-pane-history-shortcuts";
-import type { PictureEffectEdit } from "../modules/sheet-images/picture-effect-edit";
-import type { PictureContextSourceAction } from "../modules/sheet-images/picture-context-source-action";
 import { canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import { getCellContent, getCellStyle, createWorkbookEvaluator } from "@sheetcraft/core/workbook";
 import { isTextCellNumberFormat } from "@sheetcraft/core/number-format";
@@ -184,7 +182,7 @@ import type PictureToolbarType from "../modules/sheet-images/components/PictureT
 const PictureToolbar = defineAsyncComponent(
   () => import("../modules/sheet-images/components/PictureToolbar.vue"),
 );
-import type { Workbook, Sheet, FloatingImage, ImageAppearance } from "@sheetcraft/core/workbook";
+import type { Workbook, Sheet, FloatingImage } from "@sheetcraft/core/workbook";
 const PictureGroupRibbon = defineAsyncComponent(
   () => import("../modules/sheet-images/components/PictureGroupRibbon.vue"),
 );
@@ -193,18 +191,12 @@ const PictureOwnedLeafRibbon = defineAsyncComponent(
   () => import("../modules/sheet-images/components/PictureOwnedLeafRibbon.vue"),
 );
 import { resolveOwnedPictureNode } from "../modules/sheet-images/picture-group-interaction";
-import type PictureFormatPaneType from "../modules/sheet-images/components/format-pane/PictureFormatPane.vue";
 const PictureFormatPane = defineAsyncComponent(
   () => import("../modules/sheet-images/components/format-pane/PictureFormatPane.vue"),
 );
-import { usePictureIntrinsicSize } from "../modules/sheet-images/usePictureIntrinsicSize";
-import { useOwnedPictureFormatPane } from "../modules/sheet-images/useOwnedPictureFormatPane";
 import { onBeforeUnmount } from "vue";
-import { createPicturePaintAssetSource } from "../modules/sheet-images/picture-paint-asset-source";
-import type { PictureFormatLabelKey } from "../modules/sheet-images/picture-format-pane-model";
 import { restoreFocusAfterRemount } from "../shared/floating/useDismissibleFloatingPanel";
 import { usePictureEffectsFocusReturn } from "../modules/sheet-images/usePictureEffectsFocusReturn";
-import { usePictureToolbarOwner } from "../modules/sheet-images/usePictureToolbarOwner";
 import {
   normalizeSheetDrawing,
   type SheetFramedGraphicDrawing,
@@ -480,7 +472,6 @@ import {
 import { useImageAssetUrls } from "../modules/image-assets/useImageAssetUrls";
 import { useSheetImageActions } from "../modules/sheet-images/useSheetImageActions";
 import { SUPPORTED_IMAGE_FILE_ACCEPT } from "../modules/image-assets/supportedImageTypes";
-import { usePictureDialogSessions } from "../modules/sheet-images/usePictureDialogSessions";
 import SpreadsheetRibbon from "./SpreadsheetRibbon.vue";
 import { useSheetContextActions } from "./composables/useSheetContextActions";
 import { useWorkspaceCellFormatting } from "./composables/useWorkspaceCellFormatting";
@@ -489,6 +480,7 @@ import { useWorkspaceDataRangePickers } from "./composables/useWorkspaceDataRang
 import { useWorkspaceFindAndGoTo } from "./composables/useWorkspaceFindAndGoTo";
 import { useWorkspaceInsertCapture } from "./composables/useWorkspaceInsertCapture";
 import { useWorkspacePageLayout } from "./composables/useWorkspacePageLayout";
+import { useWorkspacePictureFormat } from "./composables/useWorkspacePictureFormat";
 import type { SheetContextMenuState } from "../modules/sheet-grid/context-menu-contracts";
 const SheetColumnStatisticsDialog = defineAsyncComponent(
   () => import("../modules/sheet-grid/components/SheetColumnStatisticsDialog.vue"),
@@ -3157,343 +3149,54 @@ const pictureEffectsFocusReturn = usePictureEffectsFocusReturn({
       ? (pictureOwnedLeafRibbonRef.value?.getEffectsTrigger() ?? null)
       : (pictureToolbarRef.value?.getEffectsTrigger() ?? null),
 });
-const pictureFormatVisible = ref(false);
-const pictureFormatComponentRef = ref<InstanceType<typeof PictureFormatPaneType> | null>(null);
-const pictureFormatInitialTab = ref<"effects" | "size-properties">("size-properties");
-const pictureFormatInitialPaint = ref<"fill" | "line" | undefined>();
-const pictureIntrinsicOwner = computed<readonly unknown[]>((previous) => {
-  const next = [
-    session.workbook,
-    activeSheet.value,
-    pictureOwnerGeneration.value,
-    JSON.stringify(selectedPictureIds.value),
-    JSON.stringify(selectedOwnedPicturePath.value ?? null),
-  ];
-  // Grid revision notifications may replace selection arrays without changing their owner.
-  return previous && next.every((value, index) => value === previous[index]) ? previous : next;
-});
-function selectedPictureIntrinsicSource() {
-  if (selectedPictureIds.value.length !== 1) return;
-  const leaf = selectedOwnedPictureLeaf.value;
-  if (selectedOwnedPicturePath.value && selectedOwnedPicturePath.value.length > 1 && !leaf) return;
-  const node = leaf?.node ?? selectedPicture.value;
-  if (!node || isPictureGroup(node)) return;
-  const url = imageAssetUrls.value.get(node.assetId);
-  return url ? { assetId: node.assetId, url } : undefined;
-}
-const pictureIntrinsic = usePictureIntrinsicSize({
-  getOwner: () => pictureIntrinsicOwner.value,
-  getSource: selectedPictureIntrinsicSource,
-});
-const pictureIntrinsicRetry = computed(() => {
-  const owner = pictureIntrinsicOwner.value,
-    source = selectedPictureIntrinsicSource();
-  return () => {
-    const now = selectedPictureIntrinsicSource();
-    if (
-      owner === pictureIntrinsicOwner.value &&
-      source?.assetId === now?.assetId &&
-      source?.url === now?.url
-    )
-      pictureIntrinsic.retry();
-  };
-});
-const pictureOriginalResetOwner = computed(() => {
-  const owner = pictureIntrinsicOwner.value,
-    node = selectedOwnedPictureLeaf.value?.node ?? selectedPicture.value,
-    size = pictureIntrinsic.size.value,
-    source = selectedPictureIntrinsicSource(),
-    path =
-      selectedOwnedPictureLeaf.value?.path ??
-      (selectedPictureIds.value.length === 1 ? [selectedPictureIds.value[0]!] : []),
-    signature = node ? JSON.stringify(node) : undefined;
-  const available =
-    !!node &&
-    !isPictureGroup(node) &&
-    !!size &&
-    size.assetId === source?.assetId &&
-    size.url === source?.url;
-  return {
-    available,
-    reason: t(
-      pictureIntrinsic.status.value === "loading"
-        ? "pictureFormat.originalSizeLoading"
-        : "pictureFormat.originalSizeUnavailable",
-    ),
-    apply: (): boolean => {
-      const current = selectedOwnedPictureLeaf.value?.node ?? selectedPicture.value,
-        now = selectedPictureIntrinsicSource();
-      if (
-        !available ||
-        !size ||
-        owner !== pictureIntrinsicOwner.value ||
-        size !== pictureIntrinsic.size.value ||
-        source?.assetId !== now?.assetId ||
-        source?.url !== now?.url ||
-        JSON.stringify(current) !== signature ||
-        loading.value ||
-        fileBusy.value ||
-        xlsxBusy.value ||
-        imageBusy.value ||
-        !beforePictureFormatInteraction()
-      )
-        return false;
-      return pictureTools.restoreOriginal(path, {
-        assetId: size.assetId,
-        width: size.width,
-        height: size.height,
-      });
-    },
-  };
-});
-function pictureFormatBusy(): boolean {
-  return loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value;
-}
-function beforePictureFormatPaneInteraction(): boolean {
-  if (pictureFormatBusy()) return false;
-  // Viewing a protected object's settings must never flush a pending crop edit.
-  if (!canEditPictureSelection(activeSheet.value, selectedPictureIds.value)) return true;
-  return beforePictureFormatInteraction();
-}
-function beforePictureFormatInteraction(): boolean {
-  const workbook = session.workbook,
-    sheet = activeSheet.value,
-    generation = pictureOwnerGeneration.value;
-  const ids = JSON.stringify(selectedPictureIds.value),
-    path = JSON.stringify(selectedOwnedPicturePath.value);
-  if (sheetGridRef.value?.applyPendingPictureCrop() === false) return false;
-  return (
-    session.workbook === workbook &&
-    activeSheet.value === sheet &&
-    pictureOwnerGeneration.value === generation &&
-    JSON.stringify(selectedPictureIds.value) === ids &&
-    JSON.stringify(selectedOwnedPicturePath.value) === path
-  );
-}
-const pictureFormatPane = useOwnedPictureFormatPane({
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getGeneration: () => pictureOwnerGeneration.value,
-  getRevision: () => workbookRevision.value,
-  getContext: () => sheetGridRef.value?.getPictureFrameContext(activeSheet.value),
-  getSelectedPath: () => selectedOwnedPicturePath.value,
-  getSelectedIds: () => selectedPictureIds.value,
-  isOpen: () => pictureFormatVisible.value,
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
-  execute: pictureTools.replaceAll,
-  onCropShapeApplied: (path) => {
-    const owner = activeSheet.value,
-      generation = pictureOwnerGeneration.value;
-    void nextTick(() => {
-      if (
-        activeSheet.value !== owner ||
-        pictureOwnerGeneration.value !== generation ||
-        selectedPictureIds.value.length !== 1 ||
-        selectedPictureIds.value[0] !== path[0]
-      )
-        return;
-      const selected = selectedOwnedPicturePath.value;
-      if (path.length > 1 && JSON.stringify(selected) !== JSON.stringify(path)) return;
-      if (path.length === 1 && selected && selected.length > 1) return;
-      if (sheetGridRef.value?.canCropPicture()) sheetGridRef.value.cropImage();
-    });
-  },
-  getDisabledReason: () => t("pictureFormat.capabilityReasons.unsupportedFeature"),
-  getUnsupportedCropReason: () => t("picture.groupReflectionUnsupported"),
-  isImageAssetAvailable: (assetId) =>
-    imageAssetUrls.value.has(assetId) || picturePaintAssets.has(assetId),
-  getIntrinsicSize: (assetId) => {
-    const size = pictureIntrinsic.size.value;
-    return size?.assetId === assetId && imageAssetUrls.value.get(assetId) === size.url
-      ? size
-      : undefined;
-  },
-  getMissingIntrinsicReason: () =>
-    t(
-      pictureIntrinsic.status.value === "loading"
-        ? "pictureFormat.originalSizeLoading"
-        : "pictureFormat.originalSizeUnavailable",
-    ),
-  getOriginalSizeLimitReason: () => t("pictureFormat.originalSizeTooLarge"),
-  getInheritedLineReason: () => t("pictureFormat.capabilityReasons.inheritedLine"),
-  getCompositeLineReason: () => t("pictureFormat.capabilityReasons.compositeLine"),
-  getInheritedPropertiesReason: () => t("pictureFormat.capabilityReasons.inheritedProperties"),
-  getProtectedReason: () => t("pictureFormat.capabilityReasons.protectedObject"),
-  getLockPermissionReason: () => t("pictureFormat.capabilityReasons.lockPermission"),
-});
-const picturePaintAssets = createPicturePaintAssetSource({
-  getSnapshot: () => pictureFormatPane.snapshot.value,
-  store: assetStore,
-});
-onBeforeUnmount(picturePaintAssets.dispose);
-function pictureFormatLabel(key: PictureFormatLabelKey): string {
-  return t(`pictureFormat.${key}`);
-}
-function openOwnedPictureFormat(
-  path?: PictureGroupPath,
-  owner = activeSheet.value,
-  paint?: "fill" | "line",
-  target?: "effects",
-): void {
-  if (owner !== activeSheet.value || pictureFormatBusy()) return;
-  if (path) selectedOwnedPicturePath.value = path.length > 1 ? [...path] : null;
-  if (!pictureFormatVisible.value) {
-    pictureFormatInitialPaint.value = paint;
-    pictureFormatInitialTab.value = target ?? "size-properties";
-  }
-  pictureFormatVisible.value = true;
-  if (paint) pictureFormatComponentRef.value?.showPaint(paint);
-  else if (target === "effects") pictureFormatComponentRef.value?.showEffects();
-}
-function closeOwnedPictureFormat(): void {
-  pictureFormatVisible.value = false;
-  pictureFormatPane.close();
-}
-let sourceRibbonSequence = 0;
-let sourceRibbonDisplaySequence = 0;
-let sourceRibbonDisplayOwner: readonly unknown[] | undefined;
-const pictureSourceRibbonOwner = computed(() => {
-  void workbookRevision.value;
-  const leaf = selectedOwnedPictureLeaf.value,
-    image = leaf?.node ?? selectedPicture.value;
-  if (!image || isPictureGroup(image)) {
-    sourceRibbonDisplayOwner = undefined;
-    return;
-  }
-  const workbook = session.workbook,
-    sheet = activeSheet.value,
-    generation = pictureOwnerGeneration.value,
-    revision = workbookRevision.value;
-  const path = leaf?.path,
-    selected = [...selectedPictureIds.value],
-    context = sheetGridRef.value?.getPictureFrameContext(sheet);
-  // Command leases refresh with frame context. Rendering identity must not:
-  // late layout notifications otherwise remove a trigger already safely focused.
-  const displayOwner = [
-    workbook,
-    sheet,
-    generation,
-    revision,
-    JSON.stringify(selected),
-    JSON.stringify(path ?? null),
-    image.id,
-    image.assetId,
-  ];
-  if (
-    !sourceRibbonDisplayOwner ||
-    !displayOwner.every((value, index) => value === sourceRibbonDisplayOwner![index])
-  ) {
-    sourceRibbonDisplayOwner = displayOwner;
-    sourceRibbonDisplaySequence++;
-  }
-  const displayKey = `picture-source-display-${sourceRibbonDisplaySequence}`;
-  const key = `picture-source-owner-${++sourceRibbonSequence}`;
-  const current = (): boolean =>
-    key === pictureSourceRibbonOwner.value?.key &&
-    workbook === session.workbook &&
-    sheet === activeSheet.value &&
-    generation === pictureOwnerGeneration.value &&
-    revision === workbookRevision.value &&
-    selected.length === selectedPictureIds.value.length &&
-    selected.every((id, index) => id === selectedPictureIds.value[index]) &&
-    JSON.stringify(path ?? null) === JSON.stringify(selectedOwnedPicturePath.value ?? null) &&
-    context?.metrics === sheetGridRef.value?.getPictureFrameContext(sheet)?.metrics;
-  return {
-    key,
-    displayKey,
-    appearance: (patch: Partial<ImageAppearance> | undefined) => {
-      if (!current() || !beforePictureFormatInteraction()) return false;
-      return pictureTools.applyAppearance(patch);
-    },
-    effect: (edit: PictureEffectEdit) => {
-      if (!current() || !beforePictureFormatInteraction()) return false;
-      return pictureTools.applyEffect(edit);
-    },
-    save: () => {
-      if (current()) void pictureAssetTools.exportPictures("png");
-    },
-    canReplace: imageActions.canReplace(image.id, path),
-    canAnnotate: pictureDialogs.canAnnotate(),
-    annotate: () => current() && pictureDialogs.openAnnotation(),
-    canConvert: pictureCellConversion.canConvert(path?.[0] ?? image.id, path),
-    convert: () => current() && pictureCellConversion.request(path?.[0] ?? image.id, path),
-    canCrop: sheetGridRef.value?.canCropPicture() ?? false,
-    canPreview: sheetGridRef.value?.canPreviewPicture() ?? false,
-    preview: () => current() && (sheetGridRef.value?.previewSelectedPicture() ?? false),
-    crop: () => current() && (sheetGridRef.value?.cropImage() ?? false),
-    replace: () => {
-      if (current()) void imageActions.requestReplace(image.id, path);
-    },
-    format: (target?: "effects") => {
-      if (current()) openOwnedPictureFormat(path, sheet, undefined, target);
-    },
-  };
-});
-function performPictureContextSourceAction(
-  action: PictureContextSourceAction,
-  path: PictureGroupPath,
-  owner: Sheet,
-): void {
-  if (
-    owner !== activeSheet.value ||
-    loading.value ||
-    fileBusy.value ||
-    xlsxBusy.value ||
-    imageBusy.value ||
-    selectedPictureIds.value.length !== 1 ||
-    selectedPictureIds.value[0] !== path[0] ||
-    JSON.stringify(path.length > 1 ? path : null) !== JSON.stringify(selectedOwnedPicturePath.value)
-  )
-    return;
-  const source = pictureSourceRibbonOwner.value;
-  if (!source) return;
-  if (action === "replace" && source.canReplace) source.replace();
-  else if (action === "save") source.save();
-  else if (action === "crop" && source.canCrop) source.crop();
-  else if (action === "annotate" && source.canAnnotate) source.annotate();
-  else if (action === "preview" && source.canPreview) source.preview();
-  else if (action === "format") source.format();
-}
-const pictureToolbarOwner = usePictureToolbarOwner({
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getGeneration: () => pictureOwnerGeneration.value,
-  getImage: () => selectedPicture.value,
-  getSelectedIds: () => selectedPictureIds.value,
-  getFrameContext: () => sheetGridRef.value?.getPictureFrameContext?.(activeSheet.value),
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
-  resize: pictureTools.resizeOne,
-  aspectRatio: pictureTools.setAspectRatio,
-  appearance: pictureTools.applyAppearance,
-  effect: pictureTools.applyEffect,
-});
-watch([pictureOwnerGeneration, selectedPictureId], pictureTools.clearFeedback, { flush: "sync" });
-const pictureDialogs = usePictureDialogSessions({
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getGeneration: () => pictureOwnerGeneration.value,
-  getSelectedImage: () => selectedPicture.value ?? undefined,
-  getSelectedIds: () => selectedPictureIds.value,
-  getSelectedPath: () => selectedOwnedPicturePath.value,
-  getFrameContext: () => sheetGridRef.value?.getPictureFrameContext(activeSheet.value),
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
-  hasAsset: (id) => Boolean(imageAssetUrls.value.get(id)),
-  setImage: setFloatingImage,
-  setImages: (images, sheetId) =>
-    sheetId === activeSheet.value.id && pictureTools.replaceAll(images),
-  flushPendingEdits: () =>
-    cellEditSession.finish() && (sheetGridRef.value?.applyPendingPictureCrop() ?? false),
-  compress: pictureAssetTools.compress,
-  resize: pictureTools.resizeMany,
-  resizeFeedback: () => pictureTools.sizeFeedback.value,
-});
 const {
-  annotation: pictureAnnotation,
-  compression: pictureCompression,
-  batch: pictureBatchSize,
-} = pictureDialogs;
-watch(selectedPictureId, (id) => {
-  if (!id) pictureDialogs.closeBatchSize();
+  pictureFormatVisible,
+  pictureFormatComponentRef,
+  pictureFormatInitialTab,
+  pictureFormatInitialPaint,
+  pictureIntrinsic,
+  pictureIntrinsicRetry,
+  pictureOriginalResetOwner,
+  beforePictureFormatPaneInteraction,
+  beforePictureFormatInteraction,
+  pictureFormatPane,
+  picturePaintAssets,
+  pictureFormatLabel,
+  openOwnedPictureFormat,
+  closeOwnedPictureFormat,
+  pictureSourceRibbonOwner,
+  performPictureContextSourceAction,
+  pictureToolbarOwner,
+  pictureDialogs,
+  pictureAnnotation,
+  pictureCompression,
+  pictureBatchSize,
+} = useWorkspacePictureFormat({
+  getWorkbook: () => session.workbook,
+  getActiveSheet: () => activeSheet.value,
+  getWorkbookRevision: () => workbookRevision.value,
+  getPictureOwnerGeneration: () => pictureOwnerGeneration.value,
+  selectedPictureId,
+  selectedPictureIds,
+  selectedOwnedPicturePath,
+  selectedPicture,
+  selectedOwnedPictureLeaf,
+  imageAssetUrls,
+  assetStore,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
+  getPictureFrameContext: (sheet) => sheetGridRef.value?.getPictureFrameContext?.(sheet),
+  applyPendingPictureCrop: () => sheetGridRef.value?.applyPendingPictureCrop(),
+  canCropPicture: () => sheetGridRef.value?.canCropPicture() ?? false,
+  cropImage: () => sheetGridRef.value?.cropImage() ?? false,
+  canPreviewPicture: () => sheetGridRef.value?.canPreviewPicture() ?? false,
+  previewSelectedPicture: () => sheetGridRef.value?.previewSelectedPicture() ?? false,
+  finishCellEdit: () => cellEditSession.finish(),
+  setFloatingImage,
+  pictureTools,
+  pictureAssetTools,
+  pictureCellConversion,
+  imageActions,
+  t,
 });
 
 const encryptDocumentVisible = ref(false);
