@@ -13,6 +13,7 @@ import {
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { SheetChart } from "@sheetcraft/core/sheet-charts";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
@@ -71,6 +72,7 @@ const layoutSurface = ref<InstanceType<typeof MenuSurface> | null>(null);
 const layoutMenuId = `chart-layouts-${useId()}`;
 const subtypeMenuId = `chart-subtypes-${useId()}`;
 const styleMenuId = `chart-styles-${useId()}`;
+const formatSelectId = `chart-format-element-${useId()}`;
 const commonType = computed(() =>
   isCommonChartType(props.chart.type) ? props.chart.type : undefined,
 );
@@ -473,6 +475,13 @@ onBeforeUnmount(() => {
   <RibbonToolbar ref="toolbarRef" :label="t('chart.contextTools')" data-chart-tools-toolbar>
     <section v-if="onFormat" class="chart-elements-toolbar__group" data-ribbon-group="chart-format">
       <TSelect
+        v-native-control="{
+          attributes: {
+            id: formatSelectId,
+            name: formatSelectId,
+            'aria-label': t('chart.formatElement'),
+          },
+        }"
         :aria-label="t('chart.formatElement')"
         :value="formatTarget ? chartFormatTargetKey(formatTarget) : 'chart'"
         :options="formatOptions"

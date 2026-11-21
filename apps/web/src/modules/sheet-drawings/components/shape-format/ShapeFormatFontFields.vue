@@ -3,7 +3,7 @@ import { computed } from "vue";
 import ColorPaletteSelect from "../../../../shared/color/ColorPaletteSelect.vue";
 import ShapeFontFamilyField from "../ShapeFontFamilyField.vue";
 import FormatSection from "../../../../shared/format-pane/FormatSection.vue";
-import PictureFormatField from "../../../sheet-images/components/format-pane/PictureFormatField.vue";
+import FormatField from "../../../../shared/format-pane/FormatField.vue";
 import ShapeFormatNumberField from "./ShapeFormatNumberField.vue";
 import ShapeFormatCheckbox from "./ShapeFormatCheckbox.vue";
 import ShapeFormatChoiceField from "./ShapeFormatChoiceField.vue";
@@ -27,18 +27,15 @@ const colorAction = computed(() => props.controller.session.fieldAction("textCol
         }
       "
     >
-      <PictureFormatField
+      <FormatField
         :label="controller.s.value('fontFamily')"
         :reason="controller.fieldCapability('fontFamily').reason"
         data-shape-format-field="fontFamily"
       >
         <ShapeFontFamilyField :controller="controller" />
-      </PictureFormatField>
+      </FormatField>
       <ShapeFormatNumberField :controller="controller" field="fontSizePt" />
-      <PictureFormatField
-        :label="controller.s.value('textColor')"
-        data-shape-format-field="textColor"
-      >
+      <FormatField :label="controller.s.value('textColor')" data-shape-format-field="textColor">
         <ColorPaletteSelect
           :model-value="controller.props.snapshot?.values.textColor || null"
           :mixed="controller.isMixedField('textColor')"
@@ -47,7 +44,7 @@ const colorAction = computed(() => props.controller.session.fieldAction("textCol
           show-value
           @select="(color) => colorAction(color ?? '')"
         />
-      </PictureFormatField>
+      </FormatField>
       <div class="shape-format-font-fields__toggles">
         <ShapeFormatCheckbox :controller="controller" field="textBold" />
         <ShapeFormatCheckbox :controller="controller" field="textItalic" />

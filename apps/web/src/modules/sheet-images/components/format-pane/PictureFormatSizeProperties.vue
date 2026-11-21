@@ -13,6 +13,7 @@ import {
 } from "../../picture-format-pane-model";
 import type { PictureFormatPaneController } from "./usePictureFormatPane";
 import FormatSection from "../../../../shared/format-pane/FormatSection.vue";
+import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import PictureFormatNumberField from "./PictureFormatNumberField.vue";
 import PictureFormatField from "./PictureFormatField.vue";
 import PictureFormatCheckbox from "./PictureFormatCheckbox.vue";
@@ -24,6 +25,8 @@ const props = defineProps<{
   retryIntrinsic?: () => void;
 }>();
 const anchorFeedbackId = `picture-format-anchor-${useId()}`;
+const altTitleId = `picture-format-alt-title-${useId()}`;
+const altDescriptionId = `picture-format-alt-description-${useId()}`;
 const anchor = computed(() => props.controller.choice("anchor"));
 const title = computed(() => props.controller.text("altTitle"));
 const description = computed(() => props.controller.text("altDescription"));
@@ -108,6 +111,15 @@ const original = computed(() => {
       >
         <template #default="{ feedbackId }"
           ><TInput
+            v-native-control="{
+              attributes: {
+                id: altTitleId,
+                name: altTitleId,
+                'aria-label': controller.t('altTitle'),
+                'aria-describedby': feedbackId,
+                'aria-invalid': title.error ? 'true' : undefined,
+              },
+            }"
             :model-value="title.text"
             :disabled="title.disabled"
             :aria-label="controller.t('altTitle')"
@@ -130,6 +142,15 @@ const original = computed(() => {
       >
         <template #default="{ feedbackId }"
           ><TTextarea
+            v-native-control="{
+              attributes: {
+                id: altDescriptionId,
+                name: altDescriptionId,
+                'aria-label': controller.t('altDescription'),
+                'aria-describedby': feedbackId,
+                'aria-invalid': description.error ? 'true' : undefined,
+              },
+            }"
             :model-value="description.text"
             :disabled="description.disabled"
             :aria-label="controller.t('altDescription')"

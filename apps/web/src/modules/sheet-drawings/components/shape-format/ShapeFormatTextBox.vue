@@ -4,7 +4,7 @@ import { useNativePopupOwnership } from "../../../../shared/floating/useNativePo
 import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import FormatSection from "../../../../shared/format-pane/FormatSection.vue";
-import PictureFormatField from "../../../sheet-images/components/format-pane/PictureFormatField.vue";
+import FormatField from "../../../../shared/format-pane/FormatField.vue";
 import type { PictureFormatLengthUnit } from "../../../sheet-images/picture-format-pane-model";
 import ShapeFormatNumberField from "./ShapeFormatNumberField.vue";
 import ShapeFormatChoiceField from "./ShapeFormatChoiceField.vue";
@@ -39,19 +39,24 @@ const marginsCapability = computed(() => {
   return { enabled: true, reason: undefined };
 });
 const root = ref<HTMLElement>();
+const marginInputId = `shape-format-margins-${useId()}`;
 const marginsPopup = useNativePopupOwnership({
   owner: () =>
     props.controller.props.snapshot ? `${props.controller.ownerKey.value}:margins` : undefined,
   disabled: () => !marginsCapability.value.enabled,
   root: () => root.value,
+  focus: {
+    owner: () => (props.controller.props.snapshot ? props.controller.ownerKey.value : undefined),
+    input: () => root.value?.querySelector<HTMLInputElement>(`input[id="${marginInputId}"]`),
+  },
 });
 function setMarginsPopupHost(element: Element | ComponentPublicInstance | null): void {
   marginsPopup.host.value = element instanceof HTMLElement ? element : undefined;
 }
-const marginInputId = `shape-format-margins-${useId()}`;
 const marginNativeControl = computed(() => ({
   attributes: {
     id: marginInputId,
+    name: marginInputId,
     role: "combobox",
     "aria-label": props.controller.s.value("textMargins"),
     "aria-expanded": String(marginsPopup.visible.value),
@@ -80,9 +85,12 @@ const options = computed(() => [
 const action = computed(() => {
   const apply = props.controller.session.marginsAction();
   return (value: unknown) =>
-    typeof value === "string" &&
-    Object.prototype.hasOwnProperty.call(marginPresets, value) &&
-    apply(marginPresets[value as keyof typeof marginPresets]);
+    marginsPopup.acceptChoice(
+      () =>
+        typeof value === "string" &&
+        Object.prototype.hasOwnProperty.call(marginPresets, value) &&
+        apply(marginPresets[value as keyof typeof marginPresets]),
+    );
 });
 </script>
 <template>
@@ -110,7 +118,7 @@ const action = computed(() => {
         :controller="controller"
         field="textLineOrder"
       />
-      <PictureFormatField
+      <FormatField
         :label="controller.s.value('textMargins')"
         :reason="marginsCapability.enabled ? undefined : marginsCapability.reason"
         data-shape-format-margins
@@ -130,7 +138,7 @@ const action = computed(() => {
           :aria-label="controller.s.value('textMargins')"
           :onChange="action"
         />
-      </PictureFormatField>
+      </FormatField>
       <ShapeFormatNumberField :controller="controller" field="textMarginLeftPt" :unit="unit" />
       <ShapeFormatNumberField :controller="controller" field="textMarginRightPt" :unit="unit" />
       <ShapeFormatNumberField :controller="controller" field="textMarginTopPt" :unit="unit" />

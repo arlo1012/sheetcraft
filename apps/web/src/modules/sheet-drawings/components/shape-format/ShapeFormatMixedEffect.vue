@@ -3,7 +3,7 @@ import { computed, ref, useId, type ComponentPublicInstance } from "vue";
 import { useNativePopupOwnership } from "../../../../shared/floating/useNativePopupOwnership";
 import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
-import PictureFormatField from "../../../sheet-images/components/format-pane/PictureFormatField.vue";
+import FormatField from "../../../../shared/format-pane/FormatField.vue";
 import {
   createPictureShadow,
   createPictureReflection,
@@ -22,6 +22,7 @@ const props = defineProps<{
 }>();
 const capability = computed(() => props.controller.styleCapability(props.target, props.category));
 const root = ref<HTMLElement>();
+const inputId = `shape-mixed-effect-${useId()}`;
 const popup = useNativePopupOwnership({
   owner: () =>
     props.controller.props.snapshot
@@ -29,14 +30,18 @@ const popup = useNativePopupOwnership({
       : undefined,
   disabled: () => !capability.value.enabled,
   root: () => root.value,
+  focus: {
+    owner: () => (props.controller.props.snapshot ? props.controller.ownerKey.value : undefined),
+    input: () => root.value?.querySelector<HTMLInputElement>(`input[id="${inputId}"]`),
+  },
 });
 function setPopupHost(element: Element | ComponentPublicInstance | null): void {
   popup.host.value = element instanceof HTMLElement ? element : undefined;
 }
-const inputId = `shape-mixed-effect-${useId()}`;
 const nativeControl = computed(() => ({
   attributes: {
     id: inputId,
+    name: inputId,
     role: "combobox",
     "aria-label": props.controller.s.value("mixedEffectSetting"),
     "aria-expanded": String(popup.visible.value),
@@ -56,25 +61,28 @@ const action = computed(() => {
   const category = props.category,
     apply = props.controller.session.styleAction(props.target, category);
   return (value: unknown) => {
-    if (value === "none") return apply({ kind: "none" });
-    if (value === "inherit") return apply(undefined);
-    if (value !== "default" || capability.value.valueEnabled === false) return false;
-    // Only an explicit choice creates a default effect. No leaf's effect is
-    // presented as the committed aggregate of a mixed category.
-    switch (category) {
-      case "shadow":
-        return apply({ kind: "value", value: createPictureShadow() });
-      case "reflection":
-        return apply({ kind: "value", value: createPictureReflection() });
-      case "glow":
-        return apply({ kind: "value", value: createPictureGlow() });
-      case "softEdges":
-        return apply({ kind: "value", value: createPictureSoftEdges() });
-      case "format3d":
-        return apply({ kind: "value", value: createPictureFormat3d() });
-      case "rotation3d":
-        return apply({ kind: "value", value: createPictureRotation3d() });
-    }
+    const commit = () => {
+      if (value === "none") return apply({ kind: "none" });
+      if (value === "inherit") return apply(undefined);
+      if (value !== "default" || capability.value.valueEnabled === false) return false;
+      // Only an explicit choice creates a default effect. No leaf's effect is
+      // presented as the committed aggregate of a mixed category.
+      switch (category) {
+        case "shadow":
+          return apply({ kind: "value", value: createPictureShadow() });
+        case "reflection":
+          return apply({ kind: "value", value: createPictureReflection() });
+        case "glow":
+          return apply({ kind: "value", value: createPictureGlow() });
+        case "softEdges":
+          return apply({ kind: "value", value: createPictureSoftEdges() });
+        case "format3d":
+          return apply({ kind: "value", value: createPictureFormat3d() });
+        case "rotation3d":
+          return apply({ kind: "value", value: createPictureRotation3d() });
+      }
+    };
+    return popup.acceptChoice(commit);
   };
 });
 </script>
@@ -84,7 +92,7 @@ const action = computed(() => {
       ><div :ref="setPopupHost" :data-shape-mixed-effect-popup="category"
     /></Teleport>
     <p class="shape-format-mixed-effect__notice">{{ controller.s.value("mixedStyleNotice") }}</p>
-    <PictureFormatField :label="controller.s.value('mixedEffectSetting')">
+    <FormatField :label="controller.s.value('mixedEffectSetting')">
       <TSelect
         v-native-control="nativeControl"
         :popup-visible="popup.visible.value"
@@ -98,7 +106,7 @@ const action = computed(() => {
         size="small"
         :onChange="action"
       />
-    </PictureFormatField>
+    </FormatField>
   </div>
 </template>
 <style scoped lang="scss">

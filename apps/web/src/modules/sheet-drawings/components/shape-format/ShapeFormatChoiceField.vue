@@ -3,7 +3,7 @@ import { computed, ref, useId, type ComponentPublicInstance } from "vue";
 import { useNativePopupOwnership } from "../../../../shared/floating/useNativePopupOwnership";
 import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
-import PictureFormatField from "../../../sheet-images/components/format-pane/PictureFormatField.vue";
+import FormatField from "../../../../shared/format-pane/FormatField.vue";
 import type {
   ShapeFormatChoiceField,
   ShapeFormatOption,
@@ -12,7 +12,7 @@ import type {
 import type { ShapeFormatController } from "./useShapeFormatPane";
 const props = defineProps<{ controller: ShapeFormatController; field: ShapeFormatChoiceField }>();
 const capability = computed(() => props.controller.fieldCapability(props.field));
-const root = ref<InstanceType<typeof PictureFormatField>>();
+const root = ref<InstanceType<typeof FormatField>>();
 const inputId = `shape-format-choice-${useId()}`;
 const popup = useNativePopupOwnership({
   owner: () =>
@@ -116,7 +116,7 @@ const action = computed(() => {
 });
 </script>
 <template>
-  <PictureFormatField
+  <FormatField
     ref="root"
     :label="controller.fieldLabel(field)"
     :reason="capability.enabled ? undefined : capability.reason"
@@ -140,5 +140,5 @@ const action = computed(() => {
       :aria-label="controller.fieldLabel(field)"
       :onChange="action"
     />
-  </PictureFormatField>
+  </FormatField>
 </template>

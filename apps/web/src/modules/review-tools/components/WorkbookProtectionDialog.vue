@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, useId, watch } from "vue";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 const props = defineProps<{
   visible: boolean;
   protected: boolean;
@@ -12,6 +13,8 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ close: []; save: [password: string] }>();
 const { t, locale } = useAppI18n();
+const passwordInputId = `workbook-protection-password-${useId()}`;
+const confirmInputId = `workbook-protection-confirm-${useId()}`;
 const password = ref(""),
   confirmation = ref(""),
   validationError = ref("");
@@ -45,13 +48,37 @@ function save(): void {
     <TForm label-align="right" :label-width="locale === 'zh-CN' ? 96 : 144">
       <TFormItem
         v-if="!protected || hasPassword"
+        :for="passwordInputId"
         :label="t(protected ? 'review.password' : 'review.optionalPassword')"
       >
-        <TInput v-model="password" type="password" autocomplete="new-password" :maxlength="255" />
+        <TInput
+          v-model="password"
+          v-native-control="{
+            attributes: {
+              id: passwordInputId,
+              name: passwordInputId,
+              'aria-label': t(protected ? 'review.password' : 'review.optionalPassword'),
+            },
+          }"
+          type="password"
+          autocomplete="new-password"
+          :maxlength="255"
+        />
       </TFormItem>
-      <TFormItem v-if="!protected && password" :label="t('review.confirmPassword')">
+      <TFormItem
+        v-if="!protected && password"
+        :for="confirmInputId"
+        :label="t('review.confirmPassword')"
+      >
         <TInput
           v-model="confirmation"
+          v-native-control="{
+            attributes: {
+              id: confirmInputId,
+              name: confirmInputId,
+              'aria-label': t('review.confirmPassword'),
+            },
+          }"
           type="password"
           autocomplete="new-password"
           :maxlength="255"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from "vue";
+import { nextTick, ref, useId, watch } from "vue";
 import { FilterX, Settings2 } from "lucide-vue-next";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { Input } from "tdesign-vue-next/es/input";
@@ -13,6 +13,7 @@ import {
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import { TABLE_SLICER_STYLES } from "../slicer-styles";
 import type { TableSlicerOptionsPatch } from "../useTableSlicers";
 
@@ -30,6 +31,8 @@ const emit = defineEmits<{
 }>();
 
 const { t, locale } = useAppI18n();
+const captionInputId = `slicer-caption-${useId()}`;
+const columnsInputId = `slicer-columns-${useId()}`;
 const caption = ref(props.drawing.slicer.caption ?? props.state?.fieldName ?? props.drawing.name);
 const columns = ref(props.drawing.slicer.columns ?? 1);
 
@@ -91,10 +94,17 @@ function currentStyleId(): TableSlicerStyleId {
       data-ribbon-group="slicer-options"
       :aria-label="t('tables.slicerOptions')"
     >
-      <label class="slicer-toolbar__caption">
+      <label :for="captionInputId" class="slicer-toolbar__caption">
         <span>{{ t("tables.slicerCaption") }}</span>
         <Input
           v-model="caption"
+          v-native-control="{
+            attributes: {
+              id: captionInputId,
+              name: captionInputId,
+              'aria-label': t('tables.slicerCaption'),
+            },
+          }"
           size="small"
           :disabled="disabled"
           :placeholder="state?.fieldName ?? t('tables.slicerCaptionPlaceholder')"
@@ -182,6 +192,13 @@ function currentStyleId(): TableSlicerStyleId {
       <div class="slicer-toolbar__field" role="group" :aria-label="t('tables.slicerColumns')">
         <span class="slicer-toolbar__field-label">{{ t("tables.slicerColumns") }}</span>
         <InputNumber
+          v-native-control="{
+            attributes: {
+              id: columnsInputId,
+              name: columnsInputId,
+              'aria-label': t('tables.slicerColumns'),
+            },
+          }"
           :value="columns"
           theme="column"
           size="small"

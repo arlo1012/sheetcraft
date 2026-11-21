@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, ref, useId, watch } from "vue";
 import {
   ListFilter,
   Eraser,
@@ -16,6 +16,7 @@ import type { SheetTable } from "@sheetcraft/core/workbook";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import type { TableOptionsPatch } from "../table-ui-types";
 import TableStyleGallery from "./TableStyleGallery.vue";
 import TableStylesMenu from "./TableStylesMenu.vue";
@@ -46,6 +47,7 @@ const emit = defineEmits<{
   settings: [];
 }>();
 const { t } = useAppI18n();
+const tableNameInputId = `table-tools-name-${useId()}`;
 const name = ref(props.table.name);
 watch(
   () => [props.table.id, props.table.name],
@@ -88,10 +90,17 @@ function onNameKeydown(_value: string | number, context: { e: KeyboardEvent }): 
       data-ribbon-group="table-properties"
       :aria-label="t('tables.settings')"
     >
-      <label class="table-tools-toolbar__name">
+      <label :for="tableNameInputId" class="table-tools-toolbar__name">
         <span>{{ t("tables.name") }}</span>
         <Input
           v-model="name"
+          v-native-control="{
+            attributes: {
+              id: tableNameInputId,
+              name: tableNameInputId,
+              'aria-label': t('tables.name'),
+            },
+          }"
           size="small"
           :disabled="disabled"
           data-table-name

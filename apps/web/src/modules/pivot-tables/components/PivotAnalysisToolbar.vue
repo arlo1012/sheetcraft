@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useId } from "vue";
 import { Input } from "tdesign-vue-next/es/input";
 import {
   Settings2,
@@ -16,6 +17,7 @@ import {
 } from "lucide-vue-next";
 import type { SheetPivotTable } from "@sheetcraft/core/pivot-tables";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 const props = defineProps<{
@@ -43,6 +45,7 @@ const emit = defineEmits<{
   ungroup: [];
 }>();
 const { t } = useAppI18n();
+const nameInputId = `pivot-analysis-name-${useId()}`;
 function rename(value: string): void {
   const name = value.trim();
   if (name && name !== props.table.name && !props.disabled) emit("rename", name);
@@ -52,9 +55,16 @@ function rename(value: string): void {
   <RibbonToolbar :label="t('pivot.analysis')">
     <section class="pivot-analysis__group">
       <div class="pivot-analysis__stack">
-        <label>{{ t("pivot.name") }}</label>
+        <label :for="nameInputId">{{ t("pivot.name") }}</label>
         <Input
           :key="`${table.id}-${table.name}`"
+          v-native-control="{
+            attributes: {
+              id: nameInputId,
+              name: nameInputId,
+              'aria-label': t('pivot.name'),
+            },
+          }"
           :default-value="table.name"
           size="small"
           :maxlength="200"
@@ -67,8 +77,8 @@ function rename(value: string): void {
     </section>
     <section class="pivot-analysis__group">
       <div class="pivot-analysis__stack">
-        <label>{{ t("pivot.activeField") }}</label
-        ><span class="pivot-analysis__field">{{ activeField || "—" }}</span>
+        <span>{{ t("pivot.activeField") }}</span>
+        <span class="pivot-analysis__field">{{ activeField || "—" }}</span>
       </div>
       <RibbonButton
         variant="tall"

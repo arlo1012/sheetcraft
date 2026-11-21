@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, onBeforeUnmount } from "vue";
+import { computed, ref, useId, watch, onBeforeUnmount } from "vue";
 import { X, GripVertical, Search } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Input } from "tdesign-vue-next/es/input";
@@ -13,6 +13,7 @@ import {
 import { isFormulaError } from "@sheetcraft/core/formula";
 import type { Workbook } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import PivotFieldArea from "./PivotFieldArea.vue";
 import PivotFieldSettingsDialog from "./PivotFieldSettingsDialog.vue";
 import {
@@ -35,6 +36,7 @@ const emit = defineEmits<{
   settingsOpen: [value: boolean];
 }>();
 const { t } = useAppI18n();
+const searchInputId = `pivot-fields-search-${useId()}`;
 const search = ref("");
 const dragging = ref<PivotFieldDrag>();
 const settings = ref<{ area: PivotArea; index: number }>();
@@ -224,6 +226,13 @@ defineExpose({
       <p>{{ t("pivot.dragHint") }}</p>
       <Input
         v-model="search"
+        v-native-control="{
+          attributes: {
+            id: searchInputId,
+            name: searchInputId,
+            'aria-label': t('pivot.searchFields'),
+          },
+        }"
         :placeholder="t('pivot.searchFields')"
         :aria-label="t('pivot.searchFields')"
         clearable

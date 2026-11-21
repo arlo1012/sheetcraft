@@ -6,7 +6,7 @@ import ShapeFormatChoiceField from "../../../../modules/sheet-drawings/component
 import ShapeFormatMixedEffect from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatMixedEffect.vue";
 import ShapeFormatTextBox from "../../../../modules/sheet-drawings/components/shape-format/ShapeFormatTextBox.vue";
 import ShapeLineEndsControls from "../../../../modules/sheet-drawings/components/ShapeLineEndsControls.vue";
-import PictureFormatField from "../../../../modules/sheet-images/components/format-pane/PictureFormatField.vue";
+import FormatField from "../../../../shared/format-pane/FormatField.vue";
 import { createAppI18n } from "../../../../shared/i18n";
 import type {
   ShapeFormatCapabilities,
@@ -225,7 +225,7 @@ test.each(fields)(
       const root = f.wrapper
         .findAllComponents(ShapeFormatChoiceField)
         .find((c) => c.props("field") === "anchor")!
-        .getComponent(PictureFormatField).element;
+        .getComponent(FormatField).element;
       expect(root).toBeInstanceOf(HTMLElement);
       expect(root.contains(f.select.element)).toBe(true);
     }

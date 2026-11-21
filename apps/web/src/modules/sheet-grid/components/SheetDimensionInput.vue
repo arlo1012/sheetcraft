@@ -10,8 +10,9 @@ import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { SelectValue } from "tdesign-vue-next/es/select/type";
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, ref, useId, watch } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 
 const props = withDefaults(
   defineProps<{
@@ -33,6 +34,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
+const numberInputId = `sheet-dimension-number-${useId()}`;
+const unitSelectId = `sheet-dimension-unit-${useId()}`;
 const rootRef = ref<HTMLElement>();
 const unit = ref<DimensionUnit>(getDefaultDimensionUnit(props.axis));
 const draft = ref<InputNumberValue>(toDisplayValue(props.modelValue, unit.value));
@@ -185,6 +188,13 @@ function onBlur(_value: InputNumberValue, context: { e: FocusEvent }): void {
     :aria-label="label"
   >
     <TInputNumber
+      v-native-control="{
+        attributes: {
+          id: numberInputId,
+          name: numberInputId,
+          'aria-label': label,
+        },
+      }"
       :model-value="draft"
       class="sheet-dimension-input__number sheetcraft-input-number--persistent-controls"
       :style="{ width: inputWidth, minWidth: '0' }"
@@ -204,6 +214,13 @@ function onBlur(_value: InputNumberValue, context: { e: FocusEvent }): void {
       @enter="onEnter"
     />
     <TSelect
+      v-native-control="{
+        attributes: {
+          id: unitSelectId,
+          name: unitSelectId,
+          'aria-label': t('dimensionUnits.unit'),
+        },
+      }"
       :model-value="unit"
       class="sheet-dimension-input__unit"
       :class="{ 'sheetcraft-select--compact': compact }"

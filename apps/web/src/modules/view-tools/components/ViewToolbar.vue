@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { Eye, Maximize2, Minimize2, FileText, Table2, Search, View } from "lucide-vue-next";
-import { computed } from "vue";
+import { computed, useId } from "vue";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import SheetPageBreakIcon from "../../../shared/sheet-view/SheetPageBreakIcon.vue";
@@ -60,6 +61,7 @@ const emit = defineEmits<{
   unfreeze: [];
 }>();
 const { t } = useAppI18n();
+const rulerUnitSelectId = `view-ruler-unit-${useId()}`;
 const pageRulerUnitOptions = computed(() => [
   { label: t("pageLayout.unitMillimetres"), value: "mm" },
   { label: t("pageLayout.unitCentimetres"), value: "cm" },
@@ -172,9 +174,16 @@ const pageRulerUnitOptions = computed(() => [
           @update:model-value="emit('update:showPageWhiteSpace', Boolean($event))"
           >{{ t("pageLayout.showWhiteSpace") }}</TCheckbox
         >
-        <label>
+        <label :for="rulerUnitSelectId">
           <span class="ui-visually-hidden">{{ t("pageLayout.rulerUnits") }}</span>
           <TSelect
+            v-native-control="{
+              attributes: {
+                id: rulerUnitSelectId,
+                name: rulerUnitSelectId,
+                'aria-label': t('pageLayout.rulerUnits'),
+              },
+            }"
             :model-value="pageRulerUnit"
             :options="pageRulerUnitOptions"
             data-page-layout-option="ruler-unit"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { AutoComplete as TAutoComplete } from "tdesign-vue-next/es/auto-complete";
@@ -31,6 +31,7 @@ const emit = defineEmits<{
   save: [watermark: SheetWatermark, scope: "sheet" | "workbook", imageFile?: File];
 }>();
 const { locale, t } = useAppI18n();
+const dialogId = `watermark-${useId()}`;
 const draft = ref<SheetWatermark>({ ...DEFAULT_SHEET_WATERMARK });
 const textEnabled = ref(true);
 const imageEnabled = ref(false);
@@ -257,7 +258,13 @@ onBeforeUnmount(clearLocalImage);
             <TFormItem :label="t('pageDecoration.scale')">
               <TSelect
                 v-model="imageScale"
-                v-native-control="{ attributes: { 'aria-label': t('pageDecoration.scale') } }"
+                v-native-control="{
+                  attributes: {
+                    id: `${dialogId}-image-scale`,
+                    name: `${dialogId}-image-scale`,
+                    'aria-label': t('pageDecoration.scale'),
+                  },
+                }"
                 :disabled="!imageEnabled || !draft.image || busy"
                 :options="[
                   { label: t('pageDecoration.auto'), value: 'auto' },
@@ -275,6 +282,8 @@ onBeforeUnmount(clearLocalImage);
                   v-model="imageDraft.angle"
                   v-native-control="{
                     attributes: {
+                      id: `${dialogId}-image-layout`,
+                      name: `${dialogId}-image-layout`,
                       'aria-label':
                         t('pageDecoration.imageWatermark') + ': ' + t('pageDecoration.layout'),
                     },
@@ -308,7 +317,13 @@ onBeforeUnmount(clearLocalImage);
           <TFormItem :label="t('pageDecoration.watermarkText')">
             <TAutoComplete
               v-model="draft.text"
-              v-native-control="{ attributes: { 'aria-label': t('pageDecoration.watermarkText') } }"
+              v-native-control="{
+                attributes: {
+                  id: `${dialogId}-text`,
+                  name: `${dialogId}-text`,
+                  'aria-label': t('pageDecoration.watermarkText'),
+                },
+              }"
               :disabled="!textEnabled || busy"
               :options="[
                 {
@@ -325,7 +340,13 @@ onBeforeUnmount(clearLocalImage);
           <TFormItem :label="t('pageDecoration.fontFamily')">
             <TAutoComplete
               v-model="draft.fontFamily"
-              v-native-control="{ attributes: { 'aria-label': t('pageDecoration.fontFamily') } }"
+              v-native-control="{
+                attributes: {
+                  id: `${dialogId}-font-family`,
+                  name: `${dialogId}-font-family`,
+                  'aria-label': t('pageDecoration.fontFamily'),
+                },
+              }"
               :disabled="!textEnabled || busy"
               :options="fontOptions"
               filterable
@@ -335,7 +356,13 @@ onBeforeUnmount(clearLocalImage);
           <TFormItem :label="t('pageDecoration.fontSize')">
             <TSelect
               v-model="draft.fontSize"
-              v-native-control="{ attributes: { 'aria-label': t('pageDecoration.fontSize') } }"
+              v-native-control="{
+                attributes: {
+                  id: `${dialogId}-font-size`,
+                  name: `${dialogId}-font-size`,
+                  'aria-label': t('pageDecoration.fontSize'),
+                },
+              }"
               :disabled="!textEnabled || busy"
               :options="fontSizeOptions"
             />
@@ -354,6 +381,8 @@ onBeforeUnmount(clearLocalImage);
               v-model="draft.angle"
               v-native-control="{
                 attributes: {
+                  id: `${dialogId}-text-layout`,
+                  name: `${dialogId}-text-layout`,
                   'aria-label':
                     t('pageDecoration.textWatermark') + ': ' + t('pageDecoration.layout'),
                 },
@@ -375,7 +404,13 @@ onBeforeUnmount(clearLocalImage);
               />
               <TInputNumber
                 v-model="opacityPercent"
-                v-native-control="{ attributes: { 'aria-label': t('pageDecoration.opacity') } }"
+                v-native-control="{
+                  attributes: {
+                    id: `${dialogId}-opacity`,
+                    name: `${dialogId}-opacity`,
+                    'aria-label': t('pageDecoration.opacity'),
+                  },
+                }"
                 theme="column"
                 class="sheetcraft-input-number--persistent-controls"
                 :disabled="!textEnabled || busy"
@@ -391,7 +426,13 @@ onBeforeUnmount(clearLocalImage);
           <TFormItem :label="t('pageDecoration.applyTo')">
             <TSelect
               v-model="scope"
-              v-native-control="{ attributes: { 'aria-label': t('pageDecoration.applyTo') } }"
+              v-native-control="{
+                attributes: {
+                  id: `${dialogId}-scope`,
+                  name: `${dialogId}-scope`,
+                  'aria-label': t('pageDecoration.applyTo'),
+                },
+              }"
               :disabled="busy"
               :options="[
                 { label: t('pageDecoration.currentSheet'), value: 'sheet' },

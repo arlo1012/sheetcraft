@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, useId, watch } from "vue";
 import { Input as TInput } from "tdesign-vue-next/es/input";
-import PictureFormatField from "../../../sheet-images/components/format-pane/PictureFormatField.vue";
+import FormatField from "../../../../shared/format-pane/FormatField.vue";
+import { vNativeControl } from "../../../../shared/tdesign/native-control";
 
 /** A mixed aggregate has no starting number to nudge, clamp, or expose as a common value. */
 const props = defineProps<{
@@ -16,6 +17,7 @@ const props = defineProps<{
   rejectedMessage: string;
   onCommit: (value: number) => boolean;
 }>();
+const inputId = `shape-mixed-number-${useId()}`;
 const draft = ref(""),
   dirty = ref(false),
   error = ref<string>();
@@ -83,9 +85,18 @@ function keydown(_value: unknown, { e }: { e: KeyboardEvent }) {
 }
 </script>
 <template>
-  <PictureFormatField :label="label" :error="error">
+  <FormatField :label="label" :error="error">
     <template #default="{ feedbackId }">
       <TInput
+        v-native-control="{
+          attributes: {
+            id: inputId,
+            name: inputId,
+            'aria-label': label,
+            'aria-describedby': feedbackId,
+            'aria-invalid': error ? 'true' : undefined,
+          },
+        }"
         :model-value="draft"
         :placeholder="placeholder"
         :disabled="disabled"
@@ -105,7 +116,7 @@ function keydown(_value: unknown, { e }: { e: KeyboardEvent }) {
         >
       </TInput>
     </template>
-  </PictureFormatField>
+  </FormatField>
 </template>
 <style scoped lang="scss">
 .shape-format-mixed-number-unit {

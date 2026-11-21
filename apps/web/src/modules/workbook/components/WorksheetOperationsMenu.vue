@@ -17,6 +17,7 @@ import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import type { Sheet as WorkbookSheet, SheetProperties } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
@@ -55,6 +56,7 @@ const renameDialogOpen = ref(false);
 const renameValue = ref("");
 const renameInputRef = ref<ComponentPublicInstance | null>(null);
 const unhideDialogOpen = ref(false);
+const renameInputId = `worksheet-rename-${useId().replaceAll(":", "")}`;
 const menuId = `worksheet-operations-menu-${useId().replaceAll(":", "")}`;
 
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
@@ -324,6 +326,13 @@ watch(
       <TInput
         ref="renameInputRef"
         v-model="renameValue"
+        v-native-control="{
+          attributes: {
+            id: renameInputId,
+            name: renameInputId,
+            'aria-label': t('sheetTabs.renameAction'),
+          },
+        }"
         :aria-label="t('sheetTabs.renameAction')"
         data-worksheet-rename-input
       />

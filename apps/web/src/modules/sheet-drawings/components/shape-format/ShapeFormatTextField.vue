@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref, useId, watch } from "vue";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Textarea as TTextarea } from "tdesign-vue-next/es/textarea";
-import PictureFormatField from "../../../sheet-images/components/format-pane/PictureFormatField.vue";
+import FormatField from "../../../../shared/format-pane/FormatField.vue";
+import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import type { ShapeFormatTextField } from "../../shape-format-pane-model";
 import type { ShapeFormatController } from "./useShapeFormatPane";
 const props = defineProps<{
@@ -10,6 +11,7 @@ const props = defineProps<{
   field: ShapeFormatTextField;
   multiline?: boolean;
 }>();
+const inputId = `shape-format-text-${useId()}`;
 const capability = computed(() => props.controller.fieldCapability(props.field));
 const value = computed(() =>
   props.controller.isMixedField(props.field)
@@ -68,7 +70,7 @@ function keydown(_value: unknown, context: { e: KeyboardEvent }) {
 }
 </script>
 <template>
-  <PictureFormatField
+  <FormatField
     :label="controller.fieldLabel(field)"
     :reason="capability.enabled ? undefined : capability.reason"
     :error="error"
@@ -78,6 +80,15 @@ function keydown(_value: unknown, context: { e: KeyboardEvent }) {
     <template #default="{ feedbackId }">
       <TTextarea
         v-if="multiline"
+        v-native-control="{
+          attributes: {
+            id: inputId,
+            name: inputId,
+            'aria-label': controller.fieldLabel(field),
+            'aria-describedby': feedbackId,
+            'aria-invalid': error ? 'true' : undefined,
+          },
+        }"
         :model-value="draft"
         :placeholder="
           controller.isMixedField(field) ? controller.s.value('mixedValues') : undefined
@@ -93,6 +104,15 @@ function keydown(_value: unknown, context: { e: KeyboardEvent }) {
       />
       <TInput
         v-else
+        v-native-control="{
+          attributes: {
+            id: inputId,
+            name: inputId,
+            'aria-label': controller.fieldLabel(field),
+            'aria-describedby': feedbackId,
+            'aria-invalid': error ? 'true' : undefined,
+          },
+        }"
         :model-value="draft"
         :placeholder="
           controller.isMixedField(field) ? controller.s.value('mixedValues') : undefined
@@ -108,5 +128,5 @@ function keydown(_value: unknown, context: { e: KeyboardEvent }) {
         @keydown="keydown"
       />
     </template>
-  </PictureFormatField>
+  </FormatField>
 </template>

@@ -22,8 +22,11 @@ const descriptionOnly = computed(
 .picture-format-feedback {
   margin: 4px 0 0;
   color: var(--sheetcraft-text-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--sheetcraft-font-size-body-small);
+  line-height: var(--sheetcraft-line-height-body-small);
+  &[role="alert"] {
+    color: var(--sheetcraft-status-error);
+  }
   &.is-description-only {
     position: absolute;
     width: 1px;
