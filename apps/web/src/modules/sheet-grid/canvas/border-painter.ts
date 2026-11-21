@@ -37,6 +37,7 @@ type BorderLinePaintInstruction = {
   strokeWidth: number;
   lineCap: CanvasLineCap;
   dashArray: number[];
+  dashKey: string;
   parts: readonly BorderLinePart[];
 };
 
@@ -71,6 +72,7 @@ function createOrthogonalLineInstruction(segment: SheetBorderSegment): BorderLin
     strokeWidth: presentation.strokeWidth,
     lineCap: presentation.lineCap,
     dashArray: getDashArray(presentation.dashArray),
+    dashKey: presentation.dashArray ?? "",
     parts: presentation.offsets.map((offset) =>
       segment.orientation === "horizontal"
         ? {
@@ -106,6 +108,7 @@ function createDiagonalLineInstruction(
     strokeWidth: presentation.strokeWidth,
     lineCap: presentation.lineCap,
     dashArray: getDashArray(presentation.dashArray),
+    dashKey: presentation.dashArray ?? "",
     parts: presentation.offsets.map((offset) => ({
       x1: x1 + normalX * offset,
       y1: y1 + normalY * offset,
@@ -179,18 +182,13 @@ export function createBorderPaintPlan(
   return { panes };
 }
 
-function paintLineInstruction(
+function appendInstructionPath(
   context: CanvasRenderingContext2D,
   instruction: BorderLinePaintInstruction,
+  strokeWidth: number,
   pixelGrid: ReturnType<typeof createCanvasPixelGrid>,
 ): void {
-  context.strokeStyle = instruction.color;
-  const strokeWidth = pixelGrid.strokeWidth(instruction.strokeWidth);
-  context.lineWidth = strokeWidth;
-  context.lineCap = instruction.lineCap;
-  context.setLineDash(instruction.dashArray);
   for (const part of instruction.parts) {
-    context.beginPath();
     if (instruction.orientation === "horizontal") {
       const y = pixelGrid.strokeY(part.y1, strokeWidth);
       context.moveTo(pixelGrid.snapX(part.x1), y);
@@ -205,24 +203,76 @@ function paintLineInstruction(
       context.moveTo(part.x1, part.y1);
       context.lineTo(part.x2, part.y2);
     }
-    context.stroke();
   }
 }
 
-function paintJunction(
+function paintLineInstructions(
   context: CanvasRenderingContext2D,
-  junction: SheetBorderJunction,
+  lines: readonly BorderLinePaintInstruction[],
   pixelGrid: ReturnType<typeof createCanvasPixelGrid>,
 ): void {
-  context.fillStyle = junction.color;
-  const left = pixelGrid.snapX(junction.x);
-  const top = pixelGrid.snapY(junction.y);
-  context.fillRect(
-    left,
-    top,
-    pixelGrid.snapX(junction.x + 1) - left,
-    pixelGrid.snapY(junction.y + 1) - top,
-  );
+  if (!lines.length) return;
+  let activeColor: string | undefined;
+  let activeStrokeWidth = -1;
+  let activeLineCap: CanvasLineCap | undefined;
+  let activeDashKey: string | undefined;
+  let openPath = false;
+
+  for (const instruction of lines) {
+    if (!instruction.parts.length) continue;
+    const strokeWidth = pixelGrid.strokeWidth(instruction.strokeWidth);
+    const sameBatch =
+      openPath &&
+      instruction.color === activeColor &&
+      strokeWidth === activeStrokeWidth &&
+      instruction.lineCap === activeLineCap &&
+      instruction.dashKey === activeDashKey;
+    if (!sameBatch) {
+      if (openPath) context.stroke();
+      if (instruction.color !== activeColor) {
+        context.strokeStyle = instruction.color;
+        activeColor = instruction.color;
+      }
+      if (strokeWidth !== activeStrokeWidth) {
+        context.lineWidth = strokeWidth;
+        activeStrokeWidth = strokeWidth;
+      }
+      if (instruction.lineCap !== activeLineCap) {
+        context.lineCap = instruction.lineCap;
+        activeLineCap = instruction.lineCap;
+      }
+      if (instruction.dashKey !== activeDashKey) {
+        context.setLineDash(instruction.dashArray);
+        activeDashKey = instruction.dashKey;
+      }
+      context.beginPath();
+      openPath = true;
+    }
+    appendInstructionPath(context, instruction, strokeWidth, pixelGrid);
+  }
+  if (openPath) context.stroke();
+}
+
+function paintJunctions(
+  context: CanvasRenderingContext2D,
+  junctions: readonly SheetBorderJunction[],
+  pixelGrid: ReturnType<typeof createCanvasPixelGrid>,
+): void {
+  let activeColor: string | undefined;
+  for (const junction of junctions) {
+    if (junction.color !== activeColor) {
+      context.fillStyle = junction.color;
+      activeColor = junction.color;
+    }
+    const left = pixelGrid.snapX(junction.x);
+    const top = pixelGrid.snapY(junction.y);
+    context.fillRect(
+      left,
+      top,
+      pixelGrid.snapX(junction.x + 1) - left,
+      pixelGrid.snapY(junction.y + 1) - top,
+    );
+  }
 }
 
 export function paintSheetBorders(
@@ -231,6 +281,7 @@ export function paintSheetBorders(
   layout: SheetViewportLayout,
 ): void {
   for (const pane of plan.panes) {
+    if (!pane.lines.length && !pane.junctions.length) continue;
     const currentPane = layout.panes[pane.id];
     const currentScrollPosition = getPaneScrollPosition(layout, pane.id);
     context.save();
@@ -244,8 +295,8 @@ export function paintSheetBorders(
     );
     const pixelGrid = createCanvasPixelGrid(context);
 
-    for (const line of pane.lines) paintLineInstruction(context, line, pixelGrid);
-    for (const junction of pane.junctions) paintJunction(context, junction, pixelGrid);
+    paintLineInstructions(context, pane.lines, pixelGrid);
+    paintJunctions(context, pane.junctions, pixelGrid);
     context.restore();
   }
 }

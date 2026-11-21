@@ -16,15 +16,19 @@ function font(value: AutoRowHeightFont): string {
   return `${value.italic ? "italic " : ""}${value.weight} ${value.size}px ${family}`;
 }
 
-function fontMetrics(ctx: CanvasRenderingContext2D, layout: CellTextLayout): FontMetrics {
-  const cached = metricsByFont.get(ctx.font);
+function fontMetrics(
+  ctx: CanvasRenderingContext2D,
+  layout: CellTextLayout,
+  fontCss: string,
+): FontMetrics {
+  const cached = metricsByFont.get(fontCss);
   if (cached) return cached;
   const measured = ctx.measureText("Mg");
   const metrics = {
     ascent: measured.fontBoundingBoxAscent || layout.font.size * 0.8,
     descent: measured.fontBoundingBoxDescent || layout.font.size * 0.2,
   };
-  metricsByFont.set(ctx.font, metrics);
+  metricsByFont.set(fontCss, metrics);
   return metrics;
 }
 
@@ -43,8 +47,9 @@ function attributedLineMetrics(
   let ascent = 0;
   let descent = 0;
   for (const segment of line.segments) {
-    ctx.font = font(segment.font);
-    const metrics = fontMetrics(ctx, layout);
+    const segmentFont = font(segment.font);
+    ctx.font = segmentFont;
+    const metrics = fontMetrics(ctx, layout, segmentFont);
     ascent = Math.max(ascent, metrics.ascent);
     descent = Math.max(descent, metrics.descent);
   }
@@ -242,7 +247,7 @@ export function paintCellText(
   layout: CellTextLayout,
   style: Readonly<CellStyle> | undefined,
   color: string,
-  options?: { attributedBidiMode?: "dom" | "plain" },
+  options?: { attributedBidiMode?: "dom" | "plain"; callerOwnsState?: boolean },
 ): void {
   if (layout.canvasBidiRequired) {
     // A live grid supplies the native logical-span overlay. Canvas-only consumers
@@ -258,14 +263,19 @@ export function paintCellText(
       },
       style,
       color,
+      options?.callerOwnsState ? { callerOwnsState: true } : undefined,
     );
     return;
   }
-  ctx.save();
-  ctx.font = font(layout.font);
-  const metrics = fontMetrics(ctx, layout);
-  ctx.fillStyle = style?.textColor ?? color;
-  ctx.strokeStyle = style?.textColor ?? color;
+  const needsSave = !options?.callerOwnsState;
+  if (needsSave) ctx.save();
+  const baseFont = font(layout.font);
+  ctx.font = baseFont;
+  const metrics = fontMetrics(ctx, layout, baseFont);
+  const textColor = style?.textColor ?? color;
+  ctx.fillStyle = textColor;
+  const hasDecorations = Boolean(style?.underline || style?.strikethrough);
+  if (hasDecorations) ctx.strokeStyle = textColor;
   ctx.textBaseline = "alphabetic";
   ctx.direction = layout.direction;
   ctx.translate(layout.x + layout.rotationX, layout.y + layout.rotationY);
@@ -277,13 +287,18 @@ export function paintCellText(
         ? layout.font.size * 0.2
         : 0;
   if (scriptOffset) ctx.translate(0, scriptOffset);
+  let stateDirty = false;
   for (const line of layout.lines) {
     if (line.segments) {
       paintAttributedLine(ctx, layout, metrics, line);
+      stateDirty = true;
       continue;
     }
-    ctx.font = font(layout.font);
-    ctx.direction = layout.direction;
+    if (stateDirty) {
+      ctx.font = baseFont;
+      ctx.direction = layout.direction;
+      stateDirty = false;
+    }
     ctx.textAlign = line.align === "justify" ? "left" : line.align;
     if (line.align === "justify") paintJustifiedLine(ctx, layout, metrics, line, layout.direction);
     else {
@@ -296,7 +311,9 @@ export function paintCellText(
       ctx.fillText(line.text, x, baseline(layout, metrics, line.y));
     }
   }
-  ctx.font = font(layout.font);
-  paintDecorations(ctx, layout, metrics, style);
-  ctx.restore();
+  if (hasDecorations) {
+    if (stateDirty) ctx.font = baseFont;
+    paintDecorations(ctx, layout, metrics, style);
+  }
+  if (needsSave) ctx.restore();
 }

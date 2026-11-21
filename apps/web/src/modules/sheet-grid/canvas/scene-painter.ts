@@ -144,11 +144,13 @@ export function paintSheetScene(
     context.fillRect(0, 0, layout.viewportSize.width, layout.viewportSize.height);
   }
   const visibleImageUrls = new Set<string>();
-  const pictureResources = createPicturePaintResources(
-    options.imageTheme,
-    options.imageUrls,
-    options.images,
-  );
+  let pictureResources: ReturnType<typeof createPicturePaintResources> | undefined;
+  const getPictureResources = () =>
+    (pictureResources ??= createPicturePaintResources(
+      options.imageTheme,
+      options.imageUrls,
+      options.images,
+    ));
   for (const paneScene of scene.panes) {
     const pane = layout.panes[paneScene.id];
     if (pane.clip.width <= 0 || pane.clip.height <= 0) continue;
@@ -172,18 +174,19 @@ export function paintSheetScene(
           cell.content.sparkline.scale,
           cell.content.sparkline.dates,
         );
-    const drawnSpans = new Set<string>();
+    let drawnSpans: Set<string> | undefined;
     for (const cell of paneScene.cells) {
       const { content, contentRect, span } = cell;
+      if (!content.image && !content.textLayout) continue;
       const source = span?.kind === "centerContinuous" ? span.source : cell.address;
       if (source.row === options.editingCell?.row && source.column === options.editingCell.column)
         continue;
       if (span?.kind === "centerContinuous") {
+        drawnSpans ??= new Set<string>();
         const key = `${span.source.row}:${span.source.column}`;
         if (drawnSpans.has(key)) continue;
         drawnSpans.add(key);
       }
-      if (!content.image && !content.textLayout) continue;
       if (content.image && options.isImageVisible?.(content.image, source) === false) continue;
       context.save();
       clipRect(
@@ -213,7 +216,7 @@ export function paintSheetScene(
               image,
               contentRect,
               content.image.transform,
-              pictureResources,
+              getPictureResources(),
               content.image,
             );
             painted = true;
@@ -236,6 +239,7 @@ export function paintSheetScene(
         context.translate(contentRect.x, contentRect.y);
         paintCellText(context, content.textLayout, content.style, palette.text, {
           attributedBidiMode: options.attributedBidiMode,
+          callerOwnsState: true,
         });
       }
       context.restore();

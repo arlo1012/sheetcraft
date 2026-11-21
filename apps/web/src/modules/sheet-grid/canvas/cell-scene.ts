@@ -243,10 +243,23 @@ export type CellPresentationCache = ReturnType<typeof createCellPresentationCach
 
 /** Only row/column membership invalidates the scene; pixel scrolling is a paint transform. */
 export function getCanvasViewportKey(layout: SheetViewportLayout): string {
-  return SHEET_PANE_IDS.map((id) => {
-    const pane = layout.panes[id];
-    return `${pane.rows.map((row) => row.index).join(",")}/${pane.columns.map((column) => column.index).join(",")}`;
-  }).join(";");
+  let result = "";
+  for (let p = 0; p < SHEET_PANE_IDS.length; p += 1) {
+    if (p > 0) result += ";";
+    const pane = layout.panes[SHEET_PANE_IDS[p]!];
+    const rows = pane.rows;
+    for (let i = 0; i < rows.length; i += 1) {
+      if (i > 0) result += ",";
+      result += rows[i]!.index;
+    }
+    result += "/";
+    const columns = pane.columns;
+    for (let i = 0; i < columns.length; i += 1) {
+      if (i > 0) result += ",";
+      result += columns[i]!.index;
+    }
+  }
+  return result;
 }
 
 function getPaneRange(range: CellRange, id: FrozenPaneId, layout: SheetViewportLayout): CellRange {
@@ -277,19 +290,22 @@ export function createSheetCanvasScene(
 ): SheetCanvasScene {
   const { layout, cache } = options;
   cache.prepare(options, layout, options.columnCount);
+  const hasMergedCells = options.display.sheet.mergedCells.length > 0;
   const retained = new Set<string>();
   const panes = SHEET_PANE_IDS.map((id) => {
     const cells: CanvasCell[] = [];
-    const visited = new Set<string>();
+    const visited = hasMergedCells ? new Set<string>() : undefined;
     const pane = layout.panes[id];
     for (const row of pane.rows) {
       for (const column of pane.columns) {
         const address = { row: row.index, column: column.index };
-        const merged = layout.getMergedRangeAt(address);
+        const merged = hasMergedCells ? layout.getMergedRangeAt(address) : undefined;
         const anchor = merged?.start ?? address;
         const key = `${anchor.row}:${anchor.column}`;
-        if (visited.has(key)) continue;
-        visited.add(key);
+        if (visited) {
+          if (visited.has(key)) continue;
+          visited.add(key);
+        }
         retained.add(key);
         const rect = merged
           ? layout.getRangeRect(getPaneRange(merged, id, layout))
@@ -308,7 +324,7 @@ export function createSheetCanvasScene(
               ? layout.getRangeRect(span.range)
               : rect) ?? rect;
         const source = span?.kind === "centerContinuous" ? span.source : anchor;
-        retained.add(`${source.row}:${source.column}`);
+        if (source !== anchor) retained.add(`${source.row}:${source.column}`);
         cells.push({
           address: anchor,
           hasNote: Boolean(options.display.sheet.cells.get(key)?.note),

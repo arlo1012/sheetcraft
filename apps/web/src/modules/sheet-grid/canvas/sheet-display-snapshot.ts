@@ -93,28 +93,40 @@ export function createSheetDisplaySnapshot(options: {
     options.evaluator,
     { dateSystem: options.dateSystem },
   );
+  const hasTables = Boolean(options.sheet.tables?.length);
+  const hasDuplicates = Boolean(options.sheet.duplicateRules?.length);
+  const hasConditionalFormats = Boolean(options.sheet.conditionalFormats?.length);
+  const theme = options.theme ?? DEFAULT_WORKBOOK_THEME;
+  const minorThemeFont = options.theme ? resolveThemeFontFamily(theme, "minor") : undefined;
+  const defaultThemeStyle: Readonly<CellStyle> | undefined = minorThemeFont
+    ? { fontFamily: minorThemeFont }
+    : undefined;
   const styles = new Map<string, Readonly<CellStyle> | undefined>();
   function getCellStyle(address: CellAddress): Readonly<CellStyle> | undefined {
     const key = addressKey(address);
-    if (styles.has(key)) return styles.get(key);
+    const cached = styles.get(key);
+    if (cached !== undefined || styles.has(key)) return cached;
     const direct =
       options.sheet.cells.get(key)?.style ??
-      (spills.get(key)
+      (spills.size && spills.has(key)
         ? options.sheet.cells.get(addressKey(spills.get(key)!.root))?.style
         : undefined);
-    const table = getTableAtAddress(options.sheet, address);
+    const table = hasTables ? getTableAtAddress(options.sheet, address) : undefined;
+    if (!direct && !table && !hasDuplicates && !hasConditionalFormats) {
+      styles.set(key, defaultThemeStyle);
+      return defaultThemeStyle;
+    }
     const base = table
       ? mergeCellStyle(resolveTableCellStyle(table, address), direct ?? {})
       : direct;
-    const theme = options.theme ?? DEFAULT_WORKBOOK_THEME;
     let style = base ? { ...base } : undefined;
     if (style?.textColorTheme) style.textColor = resolveThemeColor(theme, style.textColorTheme);
     if (style?.fillColorTheme) style.fillColor = resolveThemeColor(theme, style.fillColorTheme);
     if (style?.fontTheme) style.fontFamily = resolveThemeFontFamily(theme, style.fontTheme);
-    if (options.theme && !style?.fontFamily) {
-      style = { ...style, fontFamily: resolveThemeFontFamily(theme, "minor") };
+    if (minorThemeFont && !style?.fontFamily) {
+      style = style ? { ...style, fontFamily: minorThemeFont } : { fontFamily: minorThemeFont };
     }
-    const highlight = resolveHighlight(address);
+    const highlight = hasDuplicates ? resolveHighlight(address) : undefined;
     if (highlight) {
       style = { ...style, ...highlight };
       if (highlight.fillColor) {
@@ -125,7 +137,9 @@ export function createSheetDisplaySnapshot(options: {
     }
     // Conditional rules override product duplicate highlights, while the stored
     // manual style stays untouched and is revealed again when no rule matches.
-    const effectiveStyle = applyConditionalFormatStyle(style, resolveConditionalFormat(address));
+    const effectiveStyle = hasConditionalFormats
+      ? applyConditionalFormatStyle(style, resolveConditionalFormat(address))
+      : style;
     styles.set(key, effectiveStyle);
     return effectiveStyle;
   }
@@ -188,7 +202,7 @@ export function useSheetDisplaySnapshot(options: {
     const sheet = options.getSheet();
     const evaluator = options.getEvaluator();
     const revision = options.getRevision?.();
-    trackSheetDisplayDocument(sheet);
+    if (revision === undefined) trackSheetDisplayDocument(sheet);
     return createSheetDisplaySnapshot({
       sheet,
       evaluator,

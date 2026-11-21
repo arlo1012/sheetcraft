@@ -28,21 +28,8 @@ function mergeMasks(masks: EdgeMasks): void {
   }
 }
 
-function visibleSegments(
-  start: number,
-  end: number,
-  masks: readonly Interval[] | undefined,
-  draw: (start: number, end: number) => void,
-): void {
-  let cursor = start;
-  for (const [maskStart, maskEnd] of masks ?? []) {
-    if (maskEnd <= cursor) continue;
-    if (maskStart >= end) break;
-    if (maskStart > cursor) draw(cursor, Math.min(maskStart, end));
-    cursor = Math.max(cursor, maskEnd);
-    if (cursor >= end) return;
-  }
-  if (cursor < end) draw(cursor, end);
+function hasCellFill(style: Pick<CanvasCell, "style">["style"]): boolean {
+  return Boolean(style?.fillColor || style?.fillPattern || style?.fillGradient);
 }
 
 /** Default gridlines disappear when either adjacent cell has a fill.
@@ -54,38 +41,100 @@ export function paintGridLines(
   color: string,
   screenScale = 1,
 ): void {
-  const filled = cells.filter(({ style }) =>
-    Boolean(style?.fillColor || style?.fillPattern || style?.fillGradient),
-  );
-  const filledCells = new Set(filled);
-  const leftEdges: EdgeMasks = new Map();
-  const topEdges: EdgeMasks = new Map();
-  for (const { rect } of filled) {
-    addMask(leftEdges, rect.x, rect.y, rect.y + rect.height);
-    addMask(topEdges, rect.y, rect.x, rect.x + rect.width);
-  }
-  mergeMasks(leftEdges);
-  mergeMasks(topEdges);
-  context.beginPath();
-  context.strokeStyle = color;
+  if (!cells.length) return;
   const pixels = createCanvasPixelGrid(context, screenScale);
   const lineWidth = pixels.screenStrokeWidth(1);
+  const halfLine = lineWidth / 2;
+
+  let leftEdges: EdgeMasks | undefined;
+  let topEdges: EdgeMasks | undefined;
+  let filledCells: Set<Pick<CanvasCell, "rect" | "style">> | undefined;
+  for (let index = 0; index < cells.length; index += 1) {
+    const cell = cells[index]!;
+    if (!hasCellFill(cell.style)) continue;
+    if (!filledCells) {
+      filledCells = new Set();
+      leftEdges = new Map();
+      topEdges = new Map();
+    }
+    filledCells.add(cell);
+    const { x, y, width, height } = cell.rect;
+    addMask(leftEdges!, x, y, y + height);
+    addMask(topEdges!, y, x, x + width);
+  }
+
+  context.beginPath();
+  context.strokeStyle = color;
   context.lineWidth = lineWidth;
-  for (const cell of cells) {
+
+  if (!filledCells) {
+    for (let index = 0; index < cells.length; index += 1) {
+      const { x, y, width, height } = cells[index]!.rect;
+      const right = x + width;
+      const bottom = y + height;
+      const snappedBottom = pixels.snapY(bottom) - halfLine;
+      context.moveTo(pixels.snapX(x), snappedBottom);
+      context.lineTo(pixels.snapX(right), snappedBottom);
+      const snappedRight = pixels.snapX(right) - halfLine;
+      context.moveTo(snappedRight, pixels.snapY(y));
+      context.lineTo(snappedRight, pixels.snapY(bottom));
+    }
+    context.stroke();
+    return;
+  }
+
+  mergeMasks(leftEdges!);
+  mergeMasks(topEdges!);
+  for (let index = 0; index < cells.length; index += 1) {
+    const cell = cells[index]!;
     if (filledCells.has(cell)) continue;
     const { x, y, width, height } = cell.rect;
     const right = x + width;
     const bottom = y + height;
-    visibleSegments(x, right, topEdges.get(edgeKey(bottom)), (start, end) => {
-      const y = pixels.snapY(bottom) - lineWidth / 2;
-      context.moveTo(pixels.snapX(start), y);
-      context.lineTo(pixels.snapX(end), y);
-    });
-    visibleSegments(y, bottom, leftEdges.get(edgeKey(right)), (start, end) => {
-      const x = pixels.snapX(right) - lineWidth / 2;
-      context.moveTo(x, pixels.snapY(start));
-      context.lineTo(x, pixels.snapY(end));
-    });
+    const bottomMasks = topEdges!.get(edgeKey(bottom));
+    const snappedBottom = pixels.snapY(bottom) - halfLine;
+    if (!bottomMasks) {
+      context.moveTo(pixels.snapX(x), snappedBottom);
+      context.lineTo(pixels.snapX(right), snappedBottom);
+    } else {
+      let cursor = x;
+      for (const [maskStart, maskEnd] of bottomMasks) {
+        if (maskEnd <= cursor) continue;
+        if (maskStart >= right) break;
+        if (maskStart > cursor) {
+          context.moveTo(pixels.snapX(cursor), snappedBottom);
+          context.lineTo(pixels.snapX(Math.min(maskStart, right)), snappedBottom);
+        }
+        cursor = Math.max(cursor, maskEnd);
+        if (cursor >= right) break;
+      }
+      if (cursor < right) {
+        context.moveTo(pixels.snapX(cursor), snappedBottom);
+        context.lineTo(pixels.snapX(right), snappedBottom);
+      }
+    }
+    const rightMasks = leftEdges!.get(edgeKey(right));
+    const snappedRight = pixels.snapX(right) - halfLine;
+    if (!rightMasks) {
+      context.moveTo(snappedRight, pixels.snapY(y));
+      context.lineTo(snappedRight, pixels.snapY(bottom));
+    } else {
+      let cursor = y;
+      for (const [maskStart, maskEnd] of rightMasks) {
+        if (maskEnd <= cursor) continue;
+        if (maskStart >= bottom) break;
+        if (maskStart > cursor) {
+          context.moveTo(snappedRight, pixels.snapY(cursor));
+          context.lineTo(snappedRight, pixels.snapY(Math.min(maskStart, bottom)));
+        }
+        cursor = Math.max(cursor, maskEnd);
+        if (cursor >= bottom) break;
+      }
+      if (cursor < bottom) {
+        context.moveTo(snappedRight, pixels.snapY(cursor));
+        context.lineTo(snappedRight, pixels.snapY(bottom));
+      }
+    }
   }
   context.stroke();
 }
