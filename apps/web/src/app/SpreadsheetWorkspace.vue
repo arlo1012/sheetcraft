@@ -279,26 +279,9 @@ const CameraEditorDialog = defineAsyncComponent(
 const SparklineDialog = defineAsyncComponent(
   () => import("../modules/sparklines/components/SparklineDialog.vue"),
 );
-import { useChartActions } from "../modules/charts/useChartActions";
-import { useChartObjectControls } from "../modules/charts/useChartObjectControls";
-import { useChartFormatControls } from "../modules/charts/useChartFormatControls";
-import { getSheetChartData, getSheetChartSourceData } from "@sheetcraft/core/sheet-charts";
-import {
-  getChartFormatTargets,
-  getChartFormatSeries,
-  chartFormatTargetKey,
-  chartFormatTargetLabelKeys,
-  type ChartFormatTarget,
-} from "../modules/charts/chart-format-pane";
-import type ChartFormatPaneType from "../modules/charts/components/ChartFormatPane.vue";
 const ChartFormatPane = defineAsyncComponent(
   () => import("../modules/charts/components/ChartFormatPane.vue"),
 );
-import { useChartSourceActions } from "../modules/charts/useChartSourceActions";
-import {
-  getChartSourceApplicability,
-  type ChartSourceReferenceRole,
-} from "../modules/charts/chart-source-editor";
 const ChartElementsToolbar = defineAsyncComponent(
   () => import("../modules/charts/components/ChartElementsToolbar.vue"),
 );
@@ -501,6 +484,7 @@ import { usePictureDialogSessions } from "../modules/sheet-images/usePictureDial
 import SpreadsheetRibbon from "./SpreadsheetRibbon.vue";
 import { useSheetContextActions } from "./composables/useSheetContextActions";
 import { useWorkspaceCellFormatting } from "./composables/useWorkspaceCellFormatting";
+import { useWorkspaceCharts } from "./composables/useWorkspaceCharts";
 import { useWorkspaceDataRangePickers } from "./composables/useWorkspaceDataRangePickers";
 import { useWorkspaceFindAndGoTo } from "./composables/useWorkspaceFindAndGoTo";
 import { useWorkspaceInsertCapture } from "./composables/useWorkspaceInsertCapture";
@@ -1627,19 +1611,6 @@ const selectedSlicerState = computed(() => {
   const drawing = selectedSlicer.value;
   return drawing ? tableSlicers.state(activeSheet.value, drawing) : undefined;
 });
-const chartFormatPaneVisible = ref(false);
-const chartFormatPaneRef = ref<InstanceType<typeof ChartFormatPaneType>>();
-const chartFormatTarget = shallowRef<ChartFormatTarget>({ kind: "chart" });
-watch(
-  [activeSheet, workbookGeneration],
-  () => {
-    selectedChartId.value = null;
-    selectedSlicerId.value = null;
-    chartFormatPaneVisible.value = false;
-    chartFormatTarget.value = { kind: "chart" };
-  },
-  { flush: "sync" },
-);
 const dashboards = useDashboardActions({
   workbook: () => session.workbook,
   sheet: () => activeSheet.value,
@@ -1658,244 +1629,62 @@ const {
 } = dashboards;
 const { active: pickingDashboardRange, reference: dashboardReference } = dashboards.picker;
 watch(workbookGeneration, dashboards.close);
-const chartActions = useChartActions({
+const {
+  chartFormatPaneVisible,
+  chartFormatPaneRef,
+  chartFormatTarget,
+  chartActions,
+  chartDialog,
+  editingChart,
+  chartError,
+  chartSourceActions,
+  chartSourceDialog,
+  chartSourceError,
+  openChartSource,
+  chartObjectControls,
+  chartObjectContext,
+  chartLayoutPreview,
+  chartFormatControls,
+  chartFormatContext,
+  chartFormatChoices,
+  openChartFormat,
+  selectChartFormatElement,
+  chartRangePicker,
+  pickingChartRange,
+  pickedChartReference,
+  chartPicker,
+  selectChartReference,
+  selectChartSourceReference,
+} = useWorkspaceCharts({
   getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getRange: () => activeSelectionRange.value,
+  getActiveSheet: () => activeSheet.value,
+  getSelectionRange: () => activeSelectionRange.value,
   getEvaluator: () => activeSheetEvaluator.value,
-  getGeneration: () => workbookGeneration.value,
-  getRevision: () => workbookRevision.value,
+  getWorkbookGeneration: () => workbookGeneration.value,
+  getWorkbookRevision: () => workbookRevision.value,
+  selectedChartId,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
-  flush: () => cellEditSession.finish(),
-  execute: executeCommand,
-  name: () => t("chart.tools"),
-  title: () => t("chart.defaultTitle"),
-  onInserted: (drawingId) => sheetGridRef.value?.selectDrawing(drawingId),
-  onEditPivot: openPivotFields,
-});
-const { dialog: chartDialog, editing: editingChart, error: chartError } = chartActions;
-const chartSourceActions = useChartSourceActions({
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getGeneration: () => workbookGeneration.value,
-  getRevision: () => workbookRevision.value,
-  getEvaluator: () => activeSheetEvaluator.value,
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || !!chartDialog.value,
-  flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
-  execute: executeCommand,
+  flushCellEdit: () => cellEditSession.finish(),
+  flushGridOrCellEdit: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
+  executeCommand,
   selectSheet,
   selectDrawing: (drawingId) => sheetGridRef.value?.selectDrawing(drawingId),
-  selectReference: (current, role) => selectChartSourceReference(current, role),
+  openPivotFields,
+  closeCompetingFormatPanes: () => {
+    shapeFormatPane.close();
+    shapeGroupFormatPane.close();
+    shapeConnectorFormatPane.close();
+    pictureTools.paneVisible.value = false;
+  },
+  t,
 });
-const { dialog: chartSourceDialog, error: chartSourceError } = chartSourceActions;
-function openChartSource(drawing: SheetChartDrawing): void {
-  if (getChartSourceApplicability(drawing.chart) === "editable") chartSourceActions.edit(drawing);
-  else chartActions.edit(drawing);
-}
-const chartObjectControls = useChartObjectControls({
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getGeneration: () => workbookGeneration.value,
-  getRevision: () => workbookRevision.value,
-  getSelectedId: () => selectedChartId.value,
-  isBusy: () =>
-    loading.value ||
-    fileBusy.value ||
-    xlsxBusy.value ||
-    !!chartDialog.value ||
-    !!chartSourceDialog.value,
-  flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
-  execute: executeCommand,
-  edit: chartActions.edit,
-  source: openChartSource,
-  format: openChartFormat,
-  getData: (_drawing, chart) =>
-    getSheetChartData(activeSheet.value, chart, activeSheetEvaluator.value, (sheetId) =>
-      session.workbook.sheets.get(sheetId),
-    ),
-  getSourceData: (_drawing, chart) =>
-    getSheetChartSourceData(activeSheet.value, chart, activeSheetEvaluator.value, (sheetId) =>
-      session.workbook.sheets.get(sheetId),
-    ),
-  getAxisTitle: () => t("chart.axisTitlePlaceholder"),
-  getChartTitle: () => t("chart.defaultTitle"),
-});
-const chartObjectContext = chartObjectControls.snapshot;
-const chartLayoutPreview = chartObjectControls.paintPreview;
-const chartFormatControls = useChartFormatControls({
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getGeneration: () => workbookGeneration.value,
-  getRevision: () => workbookRevision.value,
-  getSelectedId: () => selectedChartId.value,
-  getTarget: () => chartFormatTarget.value,
-  getEvaluator: () => activeSheetEvaluator.value,
-  isOpen: () => chartFormatPaneVisible.value,
-  isBusy: () =>
-    loading.value ||
-    fileBusy.value ||
-    xlsxBusy.value ||
-    !!chartDialog.value ||
-    !!chartSourceDialog.value,
-  flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
-  execute: executeCommand,
-});
-const chartFormatContext = chartFormatControls.snapshot;
-const chartFormatChoices = computed(() => {
-  void workbookRevision.value;
-  const owner = chartObjectContext.value;
-  if (!owner) return [];
-  try {
-    const data = getSheetChartSourceData(
-      activeSheet.value,
-      owner.drawing.chart,
-      activeSheetEvaluator.value,
-      (sheetId) => session.workbook.sheets.get(sheetId),
-    );
-    const visibleData = getSheetChartData(
-      activeSheet.value,
-      owner.drawing.chart,
-      activeSheetEvaluator.value,
-      (sheetId) => session.workbook.sheets.get(sheetId),
-    );
-    const series = getChartFormatSeries(owner.drawing.chart, data);
-    const seriesNames = new Map<string, number>();
-    for (const entry of series) seriesNames.set(entry.name, (seriesNames.get(entry.name) ?? 0) + 1);
-    const hidden = new Set(owner.drawing.chart.seriesFilter?.hiddenSeriesIds);
-    return getChartFormatTargets(owner.drawing.chart, data, visibleData).map((target) => ({
-      target,
-      label:
-        target.kind === "series"
-          ? t(
-              hidden.has(target.seriesId)
-                ? "chart.formatHiddenSeriesName"
-                : "chart.formatSeriesName",
-              {
-                name: (() => {
-                  const index = series.findIndex((entry) => entry.id === target.seriesId);
-                  const entry = series[index];
-                  if (!entry) return target.seriesId;
-                  return (seriesNames.get(entry.name) ?? 0) > 1
-                    ? t("chart.formatDuplicateSeriesName", { name: entry.name, index: index + 1 })
-                    : entry.name;
-                })(),
-              },
-            )
-          : t(chartFormatTargetLabelKeys[target.kind]),
-    }));
-  } catch {
-    return [{ target: { kind: "chart" } as ChartFormatTarget, label: t("chart.formatChartArea") }];
-  }
-});
-function openChartFormat(drawing: SheetChartDrawing, target: ChartFormatTarget): void {
-  if (
-    drawing !== chartObjectContext.value?.drawing ||
-    !activeSheet.value.drawings?.includes(drawing)
-  )
-    return;
-  if (
-    !chartFormatChoices.value.some(
-      (entry) => chartFormatTargetKey(entry.target) === chartFormatTargetKey(target),
-    )
-  )
-    return;
-  if (
-    chartFormatPaneVisible.value &&
-    chartFormatTargetKey(target) !== chartFormatTargetKey(chartFormatTarget.value) &&
-    chartFormatPaneRef.value?.canChangeTarget() === false
-  )
-    return;
-  shapeFormatPane.close();
-  shapeGroupFormatPane.close();
-  shapeConnectorFormatPane.close();
-  pictureTools.paneVisible.value = false;
-  chartFormatTarget.value = target;
-  chartFormatPaneVisible.value = true;
-}
-function selectChartFormatElement(
-  drawing: SheetChartDrawing,
-  target: ChartFormatTarget,
-  openPane: boolean,
-): void {
-  if (
-    !activeSheet.value.drawings?.includes(drawing) ||
-    drawing !== chartObjectContext.value?.drawing
-  )
-    return;
-  if (openPane || chartFormatPaneVisible.value) chartObjectContext.value?.format?.(target);
-  else if (
-    chartFormatChoices.value.some(
-      (entry) => chartFormatTargetKey(entry.target) === chartFormatTargetKey(target),
-    )
-  )
-    chartFormatTarget.value = target;
-}
-const chartRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
-const { active: pickingChartRange, reference: pickedChartReference } = chartRangePicker;
-let chartPickerId = 0;
-const chartPicker = shallowRef<{ id: number; confirm: () => void; cancel: () => void }>();
-const selectChartReference = computed(() => {
-  const dialog = chartDialog.value;
-  return async (current: string): Promise<string | undefined> => {
-    if (!dialog?.isCurrent() || dialog.initial.chart.pivotTableId) return undefined;
-    const selected = chartRangePicker.selectReference(current);
-    const picker = {
-      id: ++chartPickerId,
-      confirm: () => {
-        if (chartPicker.value === picker && dialog.isCurrent()) chartRangePicker.confirm();
-      },
-      cancel: () => {
-        if (chartPicker.value === picker && dialog.isCurrent()) chartRangePicker.cancel();
-      },
-    };
-    chartPicker.value = picker;
-    const result = await selected;
-    const ownedPicker = chartPicker.value === picker;
-    if (ownedPicker) chartPicker.value = undefined;
-    const canRestoreExisting = () =>
-      !!dialog.existing &&
-      dialog.isCurrent() &&
-      !loading.value &&
-      !fileBusy.value &&
-      !xlsxBusy.value &&
-      canUseSheetPermission(dialog.sheet, "editObjects");
-    if (ownedPicker && canRestoreExisting()) {
-      // Grid picking may clear selection; restore only this still-current edit owner.
-      await nextTick();
-      if (chartPickerId === picker.id && !chartPicker.value && canRestoreExisting())
-        sheetGridRef.value?.selectDrawing(dialog.existing!.id);
-    }
-    return dialog.isCurrent() ? result : undefined;
-  };
-});
-async function selectChartSourceReference(
-  current: string,
-  role: ChartSourceReferenceRole,
-): Promise<string | undefined> {
-  const dialog = chartSourceDialog.value;
-  if (!dialog?.isCurrent()) return undefined;
-  const selected = chartRangePicker.selectReference(current, {
-    singleCell: role === "series-name",
-  });
-  const picker = {
-    id: ++chartPickerId,
-    confirm: () => {
-      if (chartPicker.value === picker && dialog.isCurrent()) chartRangePicker.confirm();
-    },
-    cancel: () => {
-      if (chartPicker.value === picker && dialog.isCurrent()) chartRangePicker.cancel();
-    },
-  };
-  chartPicker.value = picker;
-  const result = await selected;
-  if (chartPicker.value === picker) chartPicker.value = undefined;
-  return dialog.isCurrent() ? result : undefined;
-}
 watch(
-  [chartDialog, chartSourceDialog],
+  [activeSheet, workbookGeneration],
   () => {
-    chartRangePicker.cancel();
-    chartPicker.value = undefined;
+    selectedChartId.value = null;
+    selectedSlicerId.value = null;
+    chartFormatPaneVisible.value = false;
+    chartFormatTarget.value = { kind: "chart" };
   },
   { flush: "sync" },
 );

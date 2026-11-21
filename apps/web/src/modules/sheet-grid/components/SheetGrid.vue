@@ -85,6 +85,7 @@ import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import { normalizeSheetZoom } from "../../../shared/sheet-view/zoom";
 import { getSelectionFitZoom } from "../selection-zoom";
 import { createSheetGridEditorKeydownHandler } from "../useSheetGridEditorKeydown";
+import { useSheetGridPictureClipboard } from "../useSheetGridPictureClipboard";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { createContextMenuPoint } from "../../../shared/menu/useContextMenu";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
@@ -96,7 +97,6 @@ import type {
 import type { FormulaReferenceToken } from "../../../shared/formula-editing/formula-reference-tokens";
 import { getWorkbookHistoryShortcut } from "../../../shared/keyboard/workbook-history-shortcuts";
 import { restoreFocusAfterRemount } from "../../../shared/floating/useDismissibleFloatingPanel";
-import { insertTextAtSelection } from "../../../shared/forms/text-selection";
 import {
   MAX_COLUMN_WIDTH,
   MAX_ROW_HEIGHT,
@@ -191,13 +191,8 @@ import SheetImagePreview from "../../sheet-images/components/SheetImagePreview.v
 import SheetNotePreview from "./SheetNotePreview.vue";
 import { useFloatingImageClipboard } from "../../sheet-images/useFloatingImageClipboard";
 import { useOwnedPictureClipboard } from "../../sheet-images/useOwnedPictureClipboard";
-import {
-  areGridClipboardTextsEqual,
-  createBrowserGridClipboardPort,
-  readGridClipboardLocalToken,
-} from "../gridClipboardPort";
+import { createBrowserGridClipboardPort } from "../gridClipboardPort";
 import { captureFloatingImageGroup } from "@sheetcraft/sheet-engine/floating-image-group";
-import { readFloatingImageTransfer } from "../../sheet-images/imageClipboard";
 import CellEditor from "./CellEditor.vue";
 import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
 import SheetFreezeHandles from "./SheetFreezeHandles.vue";
@@ -2797,319 +2792,42 @@ function convertSelectedFloatingImageToCell(id: string, path?: PictureGroupPath)
   else if (!props.readOnly) emit("convertFloatingImageToCell", id);
 }
 
-function onImageCopy(event: ClipboardEvent): void {
-  if (
-    event.target instanceof Element &&
-    event.target.closest("[data-shape-canvas-text-editor], [data-equation-session]")
-  )
-    return;
-  if (pictureCrop.active.value && !finishPictureCrop()) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    return;
-  }
-  if (event.target instanceof Element && event.target.closest("[data-page-header-footer]")) return;
-  const image = props.sheet.floatingImages.find((entry) => entry.id === selectedImageId.value);
-  if (isEditing.value || !image) {
-    floatingClipboard.clear();
-    ownedClipboard.clear();
-    return;
-  }
-  event.stopPropagation();
-  if (requiresOwnedClipboard())
-    void ownedClipboard.copy(currentOwnedClipboardPaths(), "copy", event);
-  else void floatingClipboard.copy(image, "copy", event);
-}
-
-function onImageCut(event: ClipboardEvent): void {
-  if (
-    event.target instanceof Element &&
-    event.target.closest("[data-shape-canvas-text-editor], [data-equation-session]")
-  )
-    return;
-  if (pictureCrop.active.value && !finishPictureCrop()) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    return;
-  }
-  if (event.target instanceof Element && event.target.closest("[data-page-header-footer]")) return;
-  const image = props.sheet.floatingImages.find((entry) => entry.id === selectedImageId.value);
-  if (isEditing.value || !image) {
-    floatingClipboard.clear();
-    ownedClipboard.clear();
-    return;
-  }
-  if (pictureSelectionReadOnly.value) {
-    event.preventDefault();
-    return;
-  }
-  event.stopPropagation();
-  if (requiresOwnedClipboard())
-    void ownedClipboard.copy(currentOwnedClipboardPaths(), "cut", event);
-  else void floatingClipboard.copy(image, "cut", event);
-}
-
-function requestFloatingImageCopy(id: string, mode: "copy" | "cut"): void {
-  if (pictureCrop.active.value && (selectedImageId.value !== id || !finishPictureCrop())) return;
-  const image = props.sheet.floatingImages.find((entry) => entry.id === id);
-  if (image) {
-    if (requiresOwnedClipboard()) void ownedClipboard.copy(currentOwnedClipboardPaths(), mode);
-    else void floatingClipboard.copy(image, mode);
-  }
-}
-
-async function requestFloatingImagePaste(id: string): Promise<void> {
-  if (pictureCrop.active.value && (selectedImageId.value !== id || !finishPictureCrop())) return;
-  if (pictureLayerReadOnly.value) return;
-  const image = props.sheet.floatingImages.find((entry) => entry.id === id);
-  if (!image) return;
-  setActiveCell(getPictureObjectOriginCell(image, props.sheet));
-  if (!ownedClipboard.paste(activeCell.value) && !floatingClipboard.pastePending(activeCell.value))
-    await pasteSelection();
-  focusEditor();
-}
-
-function onImagePaste(event: ClipboardEvent): void {
-  if (
-    event.target instanceof Element &&
-    event.target.closest("[data-shape-canvas-text-editor], [data-equation-session]")
-  )
-    return;
-  if (pictureCrop.active.value && !finishPictureCrop()) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    return;
-  }
-  if (event.target instanceof Element && event.target.closest("[data-page-header-footer]")) return;
-  if (isComposing.value || !event.clipboardData) return;
-  if (pictureLayerReadOnly.value) {
-    event.preventDefault();
-    event.stopPropagation();
-    return;
-  }
-  const file =
-    Array.from(event.clipboardData.files ?? []).find((entry) => entry.type.startsWith("image/")) ??
-    Array.from(event.clipboardData.items ?? [])
-      .find((entry) => entry.kind === "file" && entry.type.startsWith("image/"))
-      ?.getAsFile();
-  if (!isEditing.value) {
-    const data = event.clipboardData;
-    const localTransfer = {
-      ...readFloatingImageTransfer(data),
-      ...(file ? { imageFile: file } : {}),
-      text: data.types.includes("text/plain") ? data.getData("text/plain") : undefined,
-      localToken: readGridClipboardLocalToken(data),
-    };
-    if (
-      ownedClipboard.hasPending() &&
-      !localTransfer.localToken &&
-      !localTransfer.invalidFloatingImage &&
-      !localTransfer.floatingImage &&
-      !localTransfer.imageFile
-    ) {
-      void pasteDeferredOwnedPicture(event);
-      return;
-    }
-    if (ownedClipboard.paste(activeCell.value, localTransfer)) {
-      event.preventDefault();
-      event.stopPropagation();
-      return;
-    }
-  }
-  const transfer = readFloatingImageTransfer(event.clipboardData);
-  const image = transfer.floatingImage;
-  if (transfer.invalidFloatingImage) {
-    floatingClipboard.observeTransfer(transfer);
-    event.preventDefault();
-    event.stopPropagation();
-    emit("imageFeedback", "clipboard.pasteRejected");
-    return;
-  }
-  if (!image && !file) {
-    // Chromium exposes Async Clipboard custom formats only through read(), not paste events.
-    if (floatingClipboard.hasPending() && navigator.clipboard)
-      void pasteDeferredFloatingImage(event);
-    else floatingClipboard.clear();
-    return;
-  }
-  const localToken = readGridClipboardLocalToken(event.clipboardData);
-  floatingClipboard.observeTransfer({ ...transfer, localToken });
-  if (pictureLayerReadOnly.value) {
-    event.preventDefault();
-    event.stopPropagation();
-    return;
-  }
-  event.preventDefault();
-  event.stopPropagation();
-  const mode: ImageInsertMode =
-    isEditing.value ||
-    (!selectedImageId.value && getCellContent(props.sheet, activeCell.value)?.kind === "image")
-      ? "cell"
-      : "floating";
-  // Commit any typed draft before the exclusive image content replaces this cell.
-  if (isEditing.value) finishEdit(undefined, false);
-  clearPendingClipboard();
-  if (image)
-    floatingClipboard.paste(image, mode, activeCell.value, transfer.floatingImages, localToken);
-  else if (file) emit("pasteImageFile", file, mode);
-}
-
-async function pasteDeferredOwnedPicture(event: ClipboardEvent): Promise<void> {
-  event.preventDefault();
-  event.stopPropagation();
-  if (pictureLayerReadOnly.value || isEditing.value) return;
-  const identity = ownedClipboard.getIdentity();
-  if (!identity) return;
-  const operation = ownedClipboard.getOperation();
-  const sheet = props.sheet;
-  const revision = props.workbookRevision;
-  const generation = props.pictureOwnerGeneration;
-  const context = pictureFrameContext.value;
-  const address = { ...activeCell.value };
-  const textPresent = event.clipboardData?.types.includes("text/plain") === true;
-  const text = event.clipboardData?.getData("text/plain") ?? "";
-  let transfer: Awaited<ReturnType<typeof browserClipboard.read>> | undefined;
-  let unavailable = false;
-  try {
-    transfer = await browserClipboard.read({ preferAsync: true });
-  } catch {
-    unavailable = true;
-  }
-  const current = ownedClipboard.getIdentity();
-  if (
-    ownedClipboard.getOperation() !== operation ||
-    current?.token !== identity.token ||
-    current.generation !== identity.generation
-  )
-    return;
-  if (
-    props.sheet !== sheet ||
-    props.workbookRevision !== revision ||
-    props.pictureOwnerGeneration !== generation ||
-    pictureFrameContext.value !== context ||
-    !areCellAddressesEqual(activeCell.value, address) ||
-    isEditing.value ||
-    isComposing.value ||
-    pictureLayerReadOnly.value
-  ) {
-    emit("clipboardFeedback", "documentChanged");
-    return;
-  }
-  // Native paste without a readable lease cannot resurrect an earlier picture copy.
-  // Transfer-free local fallback belongs only to an explicit document-local/menu Paste.
-  if (unavailable) {
-    if (textPresent && text) pasteCapturedText(text);
-    else emit("imageFeedback", "clipboard.pasteRejected");
-    return;
-  }
-  if (!transfer) return;
-  if (textPresent && !areGridClipboardTextsEqual(text, transfer.text)) {
-    ownedClipboard.clear(identity);
-    pasteCapturedText(text);
-    return;
-  }
-  if (ownedClipboard.paste(address, transfer)) return;
-  if (transfer.invalidFloatingImage) {
-    emit("imageFeedback", "clipboard.pasteRejected");
-    return;
-  }
-  const mode: ImageInsertMode =
-    getCellContent(sheet, address)?.kind === "image" ? "cell" : "floating";
-  if (transfer.floatingImage) {
-    clearPendingClipboard();
-    floatingClipboard.paste(
-      transfer.floatingImage,
-      mode,
-      address,
-      transfer.floatingImages,
-      transfer.localToken,
-    );
-    return;
-  }
-  if (transfer.imageFile) {
-    clearPendingClipboard();
-    emit("pasteImageFile", transfer.imageFile, mode, address);
-    return;
-  }
-  // A foreign/missing lease is ordinary captured text, never proof of picture ownership.
-  if (text) pasteCapturedText(text);
-}
-
-async function pasteDeferredFloatingImage(event: ClipboardEvent): Promise<void> {
-  if (pictureLayerReadOnly.value) return;
-  event.preventDefault();
-  event.stopPropagation();
-  const sheet = props.sheet;
-  const revision = props.workbookRevision;
-  const clipboardOperation = floatingClipboard.getOperation();
-  const address = { ...activeCell.value };
-  const editing = isEditing.value;
-  const draft = editingValue.value;
-  const input = event.target instanceof HTMLTextAreaElement ? event.target : undefined;
-  const start = input?.selectionStart ?? null;
-  const end = input?.selectionEnd ?? null;
-  const text = event.clipboardData?.getData("text/plain") ?? "";
-  let image: FloatingImage | undefined;
-  let images: readonly FloatingImage[] | undefined;
-  let localToken: string | undefined;
-  let invalidFloatingImage = false;
-  let unsupportedFloatingImage = false;
-  try {
-    const transfer = await browserClipboard.read({ preferAsync: true });
-    if (areGridClipboardTextsEqual(text, transfer.text)) {
-      image = transfer.floatingImage;
-      images = transfer.floatingImages;
-      localToken = transfer.localToken;
-      invalidFloatingImage = transfer.invalidFloatingImage === true;
-      unsupportedFloatingImage = transfer.unsupportedFloatingImage === true;
-    }
-  } catch {
-    // Keep the captured native text when the browser denies the optional rich read.
-  }
-  if (floatingClipboard.getOperation() !== clipboardOperation) return;
-  if (
-    props.sheet !== sheet ||
-    props.workbookRevision !== revision ||
-    !areCellAddressesEqual(activeCell.value, address) ||
-    isEditing.value !== editing ||
-    (editing && editingValue.value !== draft)
-  ) {
-    emit("clipboardFeedback", "documentChanged");
-    return;
-  }
-  floatingClipboard.observeTransfer({
-    floatingImage: image,
-    localToken,
-    invalidFloatingImage,
-    unsupportedFloatingImage,
-  });
-  if (pictureLayerReadOnly.value) {
-    emit("clipboardFeedback", "documentChanged");
-    return;
-  }
-  if (invalidFloatingImage) {
-    emit("imageFeedback", "clipboard.pasteRejected");
-    return;
-  }
-  if (image) {
-    if (editing) finishEdit(undefined, false);
-    clearPendingClipboard();
-    floatingClipboard.paste(
-      image,
-      editing || getCellContent(sheet, address)?.kind === "image" ? "cell" : "floating",
-      address,
-      images,
-      localToken,
-    );
-  } else {
-    floatingClipboard.clear();
-    if (editing && input) {
-      const insertion = insertTextAtSelection(draft, start, end, text);
-      onEditorInput(insertion.value);
-      void nextTick(() => input.setSelectionRange(insertion.caret, insertion.caret));
-    } else pasteCapturedText(text);
-  }
-}
+const {
+  onImageCopy,
+  onImageCut,
+  requestFloatingImageCopy,
+  requestFloatingImagePaste,
+  onImagePaste,
+} = useSheetGridPictureClipboard({
+  getSheet: () => props.sheet,
+  getWorkbookRevision: () => props.workbookRevision,
+  getPictureOwnerGeneration: () => props.pictureOwnerGeneration,
+  getPictureFrameContext: () => pictureFrameContext.value,
+  getActiveCell: () => activeCell.value,
+  getSelectedImageId: () => selectedImageId.value,
+  isEditing: () => isEditing.value,
+  isComposing: () => isComposing.value,
+  getEditingValue: () => editingValue.value,
+  isPictureCropActive: () => pictureCrop.active.value,
+  finishPictureCrop,
+  isPictureSelectionReadOnly: () => pictureSelectionReadOnly.value,
+  isPictureLayerReadOnly: () => pictureLayerReadOnly.value,
+  requiresOwnedClipboard,
+  currentOwnedClipboardPaths,
+  browserClipboard,
+  floatingClipboard,
+  ownedClipboard,
+  clearPendingClipboard,
+  setActiveCell,
+  pasteSelection,
+  pasteCapturedText,
+  finishEdit,
+  onEditorInput,
+  focusEditor,
+  onPasteImageFile: (file, mode, address) => emit("pasteImageFile", file, mode, address),
+  onImageFeedback: (key) => emit("imageFeedback", key),
+  onClipboardFeedback: (message) => emit("clipboardFeedback", message),
+});
 
 watch(
   [
