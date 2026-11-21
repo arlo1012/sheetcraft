@@ -85,9 +85,15 @@ const original = computed(() => {
         data-picture-format-field="anchor"
         @change="anchor.select"
       >
-        <TRadio value="move-size">{{ controller.t("anchorMoveSize") }}</TRadio>
-        <TRadio value="move">{{ controller.t("anchorMove") }}</TRadio>
-        <TRadio value="fixed">{{ controller.t("anchorFixed") }}</TRadio>
+        <TRadio data-format-pane-history-control="discrete" value="move-size">{{
+          controller.t("anchorMoveSize")
+        }}</TRadio>
+        <TRadio data-format-pane-history-control="discrete" value="move">{{
+          controller.t("anchorMove")
+        }}</TRadio>
+        <TRadio data-format-pane-history-control="discrete" value="fixed">{{
+          controller.t("anchorFixed")
+        }}</TRadio>
       </TRadioGroup>
       <PictureFormatFeedback :id="anchorFeedbackId" :reason="anchor.reason" :error="anchor.error" />
       <PictureFormatCheckbox :controller="controller" field="printObject" />

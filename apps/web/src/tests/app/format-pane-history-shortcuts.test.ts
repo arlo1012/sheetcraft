@@ -202,3 +202,40 @@ test.each([
   expect(f.dispatch().handled).toBe(false);
   expect(f.undo).not.toHaveBeenCalled();
 });
+
+test.each(["data-picture-format-pane", "data-shape-format-pane"])(
+  "routes slider, readonly combobox, and discrete controls in %s",
+  (paneAttr) => {
+    for (const markup of [
+      '<div data-target role="slider" tabindex="0" aria-valuenow="25"></div>',
+      mode,
+      panelSelect,
+      '<label data-target data-format-pane-history-control="discrete"><input type="checkbox"></label>',
+      '<label data-target data-format-pane-history-control="discrete"><input type="radio"></label>',
+      "<button data-target>Reset</button>",
+    ]) {
+      const f = fixture(markup);
+      f.pane.removeAttribute("data-shape-format-pane");
+      f.pane.setAttribute(paneAttr, "");
+      expect(f.dispatch().handled).toBe(true);
+      expect(f.undo).toHaveBeenCalledTimes(1);
+      expect(f.dispatch({ shiftKey: true }).handled).toBe(true);
+      expect(f.redo).toHaveBeenCalledTimes(1);
+      f.current.mockReturnValue(false);
+      expect(f.dispatch().handled).toBe(false);
+    }
+  },
+);
+
+test("rejects disabled slider and slider inside popup dialogs", () => {
+  for (const markup of [
+    '<div data-target role="slider" aria-disabled="true"></div>',
+    '<div role="dialog"><div data-target role="slider" tabindex="0"></div></div>',
+  ]) {
+    const f = fixture(markup);
+    f.pane.removeAttribute("data-shape-format-pane");
+    f.pane.setAttribute("data-picture-format-pane", "");
+    expect(f.dispatch().handled).toBe(false);
+    expect(f.undo).not.toHaveBeenCalled();
+  }
+});

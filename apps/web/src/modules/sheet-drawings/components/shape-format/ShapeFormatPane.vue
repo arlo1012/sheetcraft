@@ -12,6 +12,7 @@ import {
   provideNativePopupScope,
   useNativePopupOwnership,
 } from "../../../../shared/floating/useNativePopupOwnership";
+import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import { useShapeTextFieldDraft } from "../../shape-text-field-drafts";
 import ShapeFormatFillLine from "./ShapeFormatFillLine.vue";
 import ShapeFormatEffects from "./ShapeFormatEffects.vue";
@@ -90,20 +91,40 @@ function rememberScroll() {
     state.scrollTop = paneBody.value.scrollTop;
 }
 
+const paneId = `shape-format-pane-${useId()}`;
+const unitsInputId = `${paneId}-units`;
 const unitsPopup = useNativePopupOwnership({
   owner: () => (props.snapshot ? `${controller.ownerKey.value}:units` : undefined),
   disabled: () => !props.snapshot || controller.hasActiveNumericDraft.value,
   root: () => paneRoot.value,
   scope: popups,
+  focus: {
+    owner: () => (props.snapshot ? controller.ownerKey.value : undefined),
+    input: () => paneRoot.value?.querySelector<HTMLInputElement>(`input[id="${unitsInputId}"]`),
+  },
 });
 function setUnitsPopupHost(element: Element | ComponentPublicInstance | null): void {
   unitsPopup.host.value = element instanceof HTMLElement ? element : undefined;
 }
+const unitsNativeControl = computed(() => ({
+  attributes: {
+    id: unitsInputId,
+    name: "shape-format-units",
+    role: "combobox",
+    "aria-label": props.t("units"),
+    "aria-expanded": String(unitsPopup.visible.value),
+    "data-format-pane-history-control": "readonly-combobox",
+  },
+}));
 const changeUnitAction = computed(() => {
   const owner = controller.ownerKey.value;
-  return (value: unknown) => owner === controller.ownerKey.value && changeUnit(value);
+  return (value: unknown) =>
+    owner === controller.ownerKey.value &&
+    unitsPopup.acceptChoice(() => {
+      changeUnit(value);
+      return true;
+    });
 });
-const paneId = `shape-format-pane-${useId()}`;
 const shapeFillRef = ref<InstanceType<typeof ShapeFormatFillLine>>(),
   textFillRef = ref<InstanceType<typeof ShapeFormatFillLine>>();
 const tabs = computed<readonly ShapeFormatTab[]>(() =>
@@ -321,6 +342,7 @@ defineExpose({
     <div v-if="snapshot" class="shape-format-pane__units">
       <span>{{ t("units") }}</span
       ><TSelect
+        v-native-control="unitsNativeControl"
         :model-value="unit"
         :popup-visible="unitsPopup.visible.value"
         :popup-props="unitsPopup.popupProps"

@@ -185,6 +185,7 @@ const PictureOwnedLeafRibbon = defineAsyncComponent(
   () => import("../modules/sheet-images/components/PictureOwnedLeafRibbon.vue"),
 );
 import type PictureFormatPaneType from "../modules/sheet-images/components/format-pane/PictureFormatPane.vue";
+import { pictureFormatOwnerKey } from "../modules/sheet-images/picture-format-pane-model";
 const PictureFormatPane = defineAsyncComponent(
   () => import("../modules/sheet-images/components/format-pane/PictureFormatPane.vue"),
 );
@@ -2343,6 +2344,37 @@ const { onWorkspaceShapeTextOutsideAction, onWorkspaceNativeTextCopy, onWorkspac
     getChartFormatContext: () => chartFormatContext.value,
     chartFormatPaneRef,
     getSelectedShapePaneFieldLease: () => selectedShapePaneFieldLease(),
+    getPictureFormatHistoryLease: () => {
+      const element = pictureFormatComponentRef.value?.getHistoryElement();
+      const snapshot = pictureFormatPane.snapshot.value;
+      if (!pictureFormatVisible.value || !element || !snapshot) return undefined;
+      const workbook = session.workbook;
+      const sheet = activeSheet.value;
+      const generation = pictureOwnerGeneration.value;
+      const ownerKey = pictureFormatOwnerKey(snapshot.owner);
+      return {
+        element,
+        ownerKey,
+        current: () => {
+          const latest = pictureFormatPane.snapshot.value;
+          return (
+            pictureFormatVisible.value &&
+            session.workbook === workbook &&
+            activeSheet.value === sheet &&
+            pictureOwnerGeneration.value === generation &&
+            !loading.value &&
+            !fileBusy.value &&
+            !xlsxBusy.value &&
+            !imageBusy.value &&
+            pictureFormatComponentRef.value?.getHistoryElement() === element &&
+            pictureFormatComponentRef.value?.hasActiveNumericDraft() !== true &&
+            !!latest &&
+            pictureFormatOwnerKey(latest.owner) === ownerKey &&
+            canEditPictureSelection(sheet, selectedPictureIds.value)
+          );
+        },
+      };
+    },
     shapeClipboard,
     shapeClipboardEpoch,
     symbolPreferences,
@@ -2379,6 +2411,8 @@ const { onWorkspaceShapeTextOutsideAction, onWorkspaceNativeTextCopy, onWorkspac
     @wheel.capture="onWorkspaceWheel"
   >
     <input
+      :id="`${gridId}-image-file`"
+      name="insert-image-file"
       :ref="imageActions.fileInput"
       :key="imageActions.pickerKey.value"
       type="file"
@@ -4688,6 +4722,9 @@ const { onWorkspaceShapeTextOutsideAction, onWorkspaceNativeTextCopy, onWorkspac
     @cancel="chartPicker.cancel"
   />
   <input
+    :id="`${gridId}-attachment-file`"
+    name="insert-attachment-file"
+    :aria-label="t('attachment.title')"
     :ref="attachmentActions.fileInput"
     type="file"
     hidden

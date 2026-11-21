@@ -35,17 +35,22 @@ onBeforeUnmount(() => {
   active = false;
 });
 const root = ref<HTMLElement>();
-function linePopup() {
+const fieldId = `picture-line-${useId()}`;
+function linePopup(field: string) {
   return useNativePopupOwnership({
     owner: () => props.ownerKey,
     disabled: () => !!props.disabled || !line.value,
     root: () => root.value,
+    focus: {
+      owner: () => props.focusOwnerKey ?? props.ownerKey,
+      input: () => root.value?.querySelector<HTMLInputElement>(`input[id="${fieldId}-${field}"]`),
+    },
   });
 }
-const compoundPopup = linePopup();
-const dashPopup = linePopup();
-const capPopup = linePopup();
-const joinPopup = linePopup();
+const compoundPopup = linePopup("lineCompound");
+const dashPopup = linePopup("lineDash");
+const capPopup = linePopup("lineCap");
+const joinPopup = linePopup("lineJoin");
 function setCompoundHost(element: Element | ComponentPublicInstance | null): void {
   compoundPopup.host.value = element instanceof HTMLElement ? element : undefined;
 }
@@ -58,7 +63,6 @@ function setCapHost(element: Element | ComponentPublicInstance | null): void {
 function setJoinHost(element: Element | ComponentPublicInstance | null): void {
   joinPopup.host.value = element instanceof HTMLElement ? element : undefined;
 }
-const fieldId = `picture-line-${useId()}`;
 function nativeControl(field: string, popup: ReturnType<typeof linePopup>) {
   return computed(() => ({
     attributes: {
@@ -145,6 +149,7 @@ const joins = computed(() => [
 function selectAction<K extends "compound" | "dash" | "cap" | "join">(
   field: K,
   choices: () => readonly { value: string }[],
+  popup: ReturnType<typeof linePopup>,
 ) {
   return computed(() => {
     const key = props.ownerKey,
@@ -161,18 +166,19 @@ function selectAction<K extends "compound" | "dash" | "cap" | "join">(
         currentLine !== line.value
       )
         return false;
-      return (
-        typeof value === "string" &&
-        options.some((item) => item.value === value) &&
-        apply({ kind: "value", value: { ...currentLine, [field]: value as PictureLine[K] } })
+      return popup.acceptChoice(
+        () =>
+          typeof value === "string" &&
+          options.some((item) => item.value === value) &&
+          apply({ kind: "value", value: { ...currentLine, [field]: value as PictureLine[K] } }),
       );
     };
   });
 }
-const changeCompound = selectAction("compound", () => compound.value);
-const changeDash = selectAction("dash", () => dash.value);
-const changeCap = selectAction("cap", () => caps.value);
-const changeJoin = selectAction("join", () => joins.value);
+const changeCompound = selectAction("compound", () => compound.value, compoundPopup);
+const changeDash = selectAction("dash", () => dash.value, dashPopup);
+const changeCap = selectAction("cap", () => caps.value, capPopup);
+const changeJoin = selectAction("join", () => joins.value, joinPopup);
 </script>
 <template>
   <div ref="root" class="picture-line-editor">

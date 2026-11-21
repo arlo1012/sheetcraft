@@ -15,6 +15,7 @@ const binding = computed(() => props.controller.boolean(props.field));
 <template>
   <div class="picture-format-checkbox">
     <TCheckbox
+      data-format-pane-history-control="discrete"
       v-native-control="{
         attributes: {
           'aria-describedby': binding.error || binding.reason ? feedbackId : undefined,

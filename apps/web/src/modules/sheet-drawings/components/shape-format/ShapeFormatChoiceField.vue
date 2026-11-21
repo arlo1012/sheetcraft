@@ -13,6 +13,7 @@ import type { ShapeFormatController } from "./useShapeFormatPane";
 const props = defineProps<{ controller: ShapeFormatController; field: ShapeFormatChoiceField }>();
 const capability = computed(() => props.controller.fieldCapability(props.field));
 const root = ref<InstanceType<typeof PictureFormatField>>();
+const inputId = `shape-format-choice-${useId()}`;
 const popup = useNativePopupOwnership({
   owner: () =>
     props.controller.props.snapshot
@@ -20,14 +21,21 @@ const popup = useNativePopupOwnership({
       : undefined,
   disabled: () => !capability.value.enabled,
   root: () => root.value?.$el,
+  focus: {
+    owner: () => (props.controller.props.snapshot ? props.controller.ownerKey.value : undefined),
+    input: () =>
+      (root.value?.$el as HTMLElement | undefined)?.querySelector<HTMLInputElement>(
+        `input[id="${inputId}"]`,
+      ),
+  },
 });
 function setPopupHost(element: Element | ComponentPublicInstance | null): void {
   popup.host.value = element instanceof HTMLElement ? element : undefined;
 }
-const inputId = `shape-format-choice-${useId()}`;
 const nativeControl = computed(() => ({
   attributes: {
     id: inputId,
+    name: `shape-format-${props.field}`,
     role: "combobox",
     "aria-label": props.controller.fieldLabel(props.field),
     "aria-expanded": String(popup.visible.value),
@@ -99,9 +107,12 @@ const action = computed(() => {
   const apply = props.controller.session.fieldAction(props.field),
     choices = options.value;
   return (value: unknown) =>
-    typeof value === "string" &&
-    choices.some((option) => option.value === value && !option.disabled) &&
-    apply(value as ShapeFormatValues[ShapeFormatChoiceField]);
+    popup.acceptChoice(
+      () =>
+        typeof value === "string" &&
+        choices.some((option) => option.value === value && !option.disabled) &&
+        apply(value as ShapeFormatValues[ShapeFormatChoiceField]),
+    );
 });
 </script>
 <template>

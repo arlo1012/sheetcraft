@@ -853,6 +853,7 @@ function patternPreview(preset: PicturePatternPreset) {
       />
       <TCheckbox
         v-if="paint.kind !== 'solid'"
+        data-format-pane-history-control="discrete"
         :model-value="paint.rotateWithShape"
         :disabled="disabled"
         @change="
@@ -866,9 +867,12 @@ function patternPreview(preset: PicturePatternPreset) {
       >
     </template>
     <input
+      :id="`${modeInputId}-file`"
+      name="picture-paint-file"
       ref="fileInput"
       type="file"
       :accept="SUPPORTED_IMAGE_FILE_ACCEPT"
+      :aria-label="t('paintLocalFile')"
       hidden
       :disabled="disabled || !loadAsset"
       @change="chooseFile"

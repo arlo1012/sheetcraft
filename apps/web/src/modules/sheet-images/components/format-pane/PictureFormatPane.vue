@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import type { PictureTextureId } from "../../picture-texture";
-import { computed, nextTick, provide, ref, useId } from "vue";
+import { computed, nextTick, provide, ref, useId, type ComponentPublicInstance } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Tabs as TTabs, TabPanel as TTabPanel } from "tdesign-vue-next/es/tabs";
 import { X } from "lucide-vue-next";
+import {
+  provideNativePopupScope,
+  useNativePopupOwnership,
+} from "../../../../shared/floating/useNativePopupOwnership";
+import { vNativeControl } from "../../../../shared/tdesign/native-control";
 import {
   type PictureFormatCapabilities,
   type PictureFormatField,
@@ -154,10 +159,45 @@ const commonReasons = computed<ReadonlySet<string>>(() => {
 provide(pictureFormatCommonReasons, commonReasons);
 const emit = defineEmits<{ close: []; cancel: [] }>();
 const controller = usePictureFormatPane(props);
+const paneRoot = ref<HTMLElement>();
 const fillLineRef = ref<InstanceType<typeof PictureFormatFillLine> | null>(null);
 const unit = ref<PictureFormatLengthUnit>(props.initialUnit);
 const paneId = `picture-format-pane-${useId()}`;
 const tabs = ["fill-line", "effects", "size-properties", "picture"] as const;
+const popups = provideNativePopupScope({
+  owner: () =>
+    props.snapshot && controller.numericLease.value.ownerKey
+      ? `${controller.numericLease.value.ownerKey}:${tab.value}`
+      : undefined,
+});
+const unitsInputId = `${paneId}-units`;
+const unitsPopup = useNativePopupOwnership({
+  owner: () =>
+    props.snapshot && controller.numericLease.value.ownerKey
+      ? `${controller.numericLease.value.ownerKey}:units`
+      : undefined,
+  disabled: () => !props.snapshot || controller.hasActiveNumericDraft.value,
+  root: () => paneRoot.value,
+  scope: popups,
+  focus: {
+    owner: () =>
+      props.snapshot ? (controller.numericLease.value.ownerKey ?? undefined) : undefined,
+    input: () => paneRoot.value?.querySelector<HTMLInputElement>(`input[id="${unitsInputId}"]`),
+  },
+});
+function setUnitsPopupHost(element: Element | ComponentPublicInstance | null): void {
+  unitsPopup.host.value = element instanceof HTMLElement ? element : undefined;
+}
+const unitsNativeControl = computed(() => ({
+  attributes: {
+    id: unitsInputId,
+    name: "picture-format-units",
+    role: "combobox",
+    "aria-label": props.t("units"),
+    "aria-expanded": String(unitsPopup.visible.value),
+    "data-format-pane-history-control": "readonly-combobox",
+  },
+}));
 
 const unitOptions = computed(() => [
   { value: "in", label: props.t("unitIn") },
@@ -171,7 +211,10 @@ function changeUnit(value: unknown) {
     (value !== "in" && value !== "cm" && value !== "pt")
   )
     return;
-  unit.value = value;
+  unitsPopup.acceptChoice(() => {
+    unit.value = value;
+    return true;
+  });
 }
 function close() {
   controller.cancel();
@@ -251,6 +294,8 @@ function changeTab(value: string | number): void {
 }
 defineExpose({
   cancel: controller.cancel,
+  getHistoryElement: () => paneRoot.value,
+  hasActiveNumericDraft: () => controller.hasActiveNumericDraft.value,
   showEffects: () => {
     tab.value = "effects";
   },
@@ -262,6 +307,8 @@ defineExpose({
 </script>
 <template>
   <aside
+    ref="paneRoot"
+    data-picture-format-pane
     class="picture-format-pane"
     :aria-label="t('paneTitle')"
     @keydown="keydown"
@@ -274,9 +321,9 @@ defineExpose({
         <strong>{{ t("paneTitle") }}</strong
         ><span v-if="snapshot?.name" :title="snapshot.name">{{ snapshot.name }}</span>
       </div>
-      <TButton variant="text" shape="square" size="small" :aria-label="t('close')" @click="close"
-        ><X :size="16"
-      /></TButton>
+      <TButton variant="text" shape="square" size="small" :aria-label="t('close')" @click="close">
+        <template #icon><X class="sheetcraft-action-icon" aria-hidden="true" /></template>
+      </TButton>
     </header>
     <div
       class="picture-format-pane__tabs"
@@ -351,9 +398,14 @@ defineExpose({
         </TTabPanel>
       </TTabs>
     </div>
+    <Teleport to="body"><div :ref="setUnitsPopupHost" data-picture-format-units-popup /></Teleport>
     <div v-if="snapshot" class="picture-format-pane__units">
       <span>{{ t("units") }}</span
       ><TSelect
+        v-native-control="unitsNativeControl"
+        :popup-visible="unitsPopup.visible.value"
+        :popup-props="unitsPopup.popupProps"
+        @popup-visible-change="unitsPopup.onVisibleChange.value"
         :model-value="unit"
         :options="unitOptions"
         :disabled="controller.hasActiveNumericDraft.value"

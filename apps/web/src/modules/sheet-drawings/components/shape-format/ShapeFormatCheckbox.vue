@@ -13,6 +13,7 @@ const action = computed(() => {
 <template>
   <div :data-shape-format-field="field">
     <TCheckbox
+      data-format-pane-history-control="discrete"
       :model-value="
         controller.isMixedField(field) ? false : (controller.props.snapshot?.values[field] ?? false)
       "

@@ -35,6 +35,12 @@ type ShapePaneFieldLease = {
   current: () => boolean;
 };
 
+type PicturePaneHistoryLease = {
+  element: HTMLElement;
+  ownerKey: string;
+  current: () => boolean;
+};
+
 type WorkspaceKeyboardShortcutsOptions = {
   getWorkbook: () => Workbook;
   getActiveSheet: () => Sheet;
@@ -67,6 +73,7 @@ type WorkspaceKeyboardShortcutsOptions = {
   getChartFormatContext: () => { isCurrent: () => boolean; disabled: boolean } | undefined;
   chartFormatPaneRef: Ref<InstanceType<typeof ChartFormatPaneType> | undefined>;
   getSelectedShapePaneFieldLease: () => ShapePaneFieldLease | undefined;
+  getPictureFormatHistoryLease?: () => PicturePaneHistoryLease | undefined;
   shapeClipboard: ReturnType<typeof useShapeClipboard>;
   shapeClipboardEpoch: Ref<number>;
   symbolPreferences: {
@@ -235,21 +242,115 @@ export function useWorkspaceKeyboardShortcuts(options: WorkspaceKeyboardShortcut
       return;
     }
     const chartHistory = options.getChartFormatContext();
+    const chartPaneElement = chartFormatPaneRef.value?.getHistoryElement();
+    const chartHistoryCurrent = () =>
+      !!chartHistory &&
+      chartHistory === options.getChartFormatContext() &&
+      chartHistory.isCurrent() &&
+      !chartHistory.disabled &&
+      !options.isBusy() &&
+      !options.hasChartModalOpen() &&
+      chartFormatPaneRef.value?.canChangeTarget() === true;
     if (
       routeFormatPaneHistoryShortcut(event, {
         ...historyContext,
-        pane: chartFormatPaneRef.value?.getHistoryElement(),
-        current: () =>
-          !!chartHistory &&
-          chartHistory === options.getChartFormatContext() &&
-          chartHistory.isCurrent() &&
-          !chartHistory.disabled &&
-          !options.isBusy() &&
-          !options.hasChartModalOpen() &&
-          chartFormatPaneRef.value?.canChangeTarget() === true,
+        pane: chartPaneElement,
+        current: chartHistoryCurrent,
       })
-    )
+    ) {
+      const input = event.target;
+      if (chartPaneElement && isFormatPaneReadonlyHistoryControl(input)) {
+        const selectKey = input.getAttribute("data-chart-format-select");
+        const id = input.id;
+        restoreFocusAfterRemount(
+          input,
+          () => {
+            const pane = chartFormatPaneRef.value?.getHistoryElement();
+            if (!pane || !chartHistoryCurrent()) return;
+            const controls = [
+              ...pane.querySelectorAll<HTMLInputElement>(
+                "input[data-format-pane-history-control], input[data-panel-select-control]",
+              ),
+            ];
+            return controls.find(
+              (control) =>
+                ((selectKey && control.getAttribute("data-chart-format-select") === selectKey) ||
+                  (id && control.id === id)) &&
+                isFormatPaneReadonlyHistoryControl(control),
+            );
+          },
+          chartHistoryCurrent,
+          activeBeforeHistory,
+        );
+      }
       return;
+    }
+    const picturePaneHistory = options.getPictureFormatHistoryLease?.();
+    const pictureGalleryPaintEditor =
+      event.target instanceof HTMLInputElement &&
+      event.target.getAttribute("data-panel-select-control") === "readonly-combobox"
+        ? event.target.closest<HTMLElement>(".picture-paint-editor")
+        : null;
+    const pictureGalleryModeId =
+      pictureGalleryPaintEditor && picturePaneHistory?.element.contains(pictureGalleryPaintEditor)
+        ? pictureGalleryPaintEditor.querySelector<HTMLInputElement>(
+            'input[id^="picture-paint-mode-"][data-format-pane-history-control="readonly-combobox"]',
+          )?.id
+        : undefined;
+    if (
+      routeFormatPaneHistoryShortcut(event, {
+        ...historyContext,
+        pane: picturePaneHistory?.element,
+        current: () => picturePaneHistory?.current() ?? false,
+      })
+    ) {
+      const input = event.target;
+      if (picturePaneHistory && isFormatPaneReadonlyHistoryControl(input)) {
+        const id = input.id;
+        const ownerKey = picturePaneHistory.ownerKey;
+        const currentPicturePane = () => {
+          const next = options.getPictureFormatHistoryLease?.();
+          return next &&
+            next.element === picturePaneHistory.element &&
+            next.ownerKey === ownerKey &&
+            next.current()
+            ? next
+            : undefined;
+        };
+        restoreFocusAfterRemount(
+          input,
+          () => {
+            const currentPane = currentPicturePane()?.element;
+            if (!currentPane) return;
+            const controls = [
+              ...currentPane.querySelectorAll<HTMLInputElement>(
+                "input[data-format-pane-history-control], input[data-panel-select-control]",
+              ),
+            ];
+            const original = controls.find(
+              (control) => control.id === id && isFormatPaneReadonlyHistoryControl(control),
+            );
+            if (original) return original;
+            if (
+              !pictureGalleryModeId ||
+              !pictureGalleryPaintEditor?.isConnected ||
+              !currentPane.contains(pictureGalleryPaintEditor) ||
+              pictureGalleryPaintEditor.closest("[data-picture-format-pane]") !== currentPane
+            )
+              return;
+            return controls.find(
+              (control) =>
+                control.id === pictureGalleryModeId &&
+                pictureGalleryPaintEditor.contains(control) &&
+                isFormatPaneReadonlyHistoryControl(control),
+            );
+          },
+          () => !!currentPicturePane(),
+          activeBeforeHistory,
+        );
+      }
+      return;
+    }
     const paneHistory = options.getSelectedShapePaneFieldLease();
     const paneFocusOwner = paneHistory
       ? {

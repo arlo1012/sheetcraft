@@ -66,7 +66,9 @@ export function routeFormatPaneHistoryShortcut(
     !(target instanceof Element) ||
     !target.isConnected ||
     !pane.contains(target) ||
-    target.closest("[data-shape-format-pane], [data-chart-format-pane]") !== pane ||
+    target.closest(
+      "[data-shape-format-pane], [data-chart-format-pane], [data-picture-format-pane]",
+    ) !== pane ||
     target.closest(
       '[role="dialog"], [role="menu"], [role="listbox"], [contenteditable]:not([contenteditable="false"]), [role="textbox"]',
     )
@@ -89,7 +91,9 @@ export function routeFormatPaneHistoryShortcut(
     !readonlyMode &&
     !discreteMode &&
     (target.closest("input,textarea,select") ||
-      !target.closest('button,[role="button"],[role="tab"],[role="radio"],[role="checkbox"]'))
+      !target.closest(
+        'button,[role="button"],[role="tab"],[role="radio"],[role="checkbox"],[role="slider"]',
+      ))
   )
     return false;
   if (target.closest(':disabled,[aria-disabled="true"]')) return false;
