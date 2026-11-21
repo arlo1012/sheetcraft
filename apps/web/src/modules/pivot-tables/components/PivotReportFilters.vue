@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, type CSSProperties } from "vue";
+import { computed, defineAsyncComponent, ref, watch, type CSSProperties } from "vue";
 import { ChevronDown, Filter } from "lucide-vue-next";
 import {
   getPivotTableSource,
@@ -12,7 +12,7 @@ import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layo
 import type { Rect } from "@sheetcraft/sheet-engine/geometry";
 import { useAppI18n } from "../../../shared/i18n";
 import { vIconAction } from "../../../shared/focus/icon-action";
-import PivotFieldFilterPanel from "./PivotFieldFilterPanel.vue";
+const PivotFieldFilterPanel = defineAsyncComponent(() => import("./PivotFieldFilterPanel.vue"));
 
 type ReportControl = { id: string; area: "filters" | "rows" | "columns"; index: number };
 

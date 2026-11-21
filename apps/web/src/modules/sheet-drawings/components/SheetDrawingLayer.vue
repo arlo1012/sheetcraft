@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import EquationCanvasEditor from "../equation/EquationCanvasEditor.vue";
+const EquationCanvasEditor = defineAsyncComponent(
+  () => import("../equation/EquationCanvasEditor.vue"),
+);
 import { SlidersHorizontal } from "lucide-vue-next";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import type { ChartElementSelection } from "../../charts/chart-format-selection";
@@ -12,6 +14,7 @@ import type {
 } from "../equation/useEquationEditSession";
 import {
   computed,
+  defineAsyncComponent,
   nextTick,
   onBeforeUnmount,
   onMounted,

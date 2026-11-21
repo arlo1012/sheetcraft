@@ -10,12 +10,22 @@ import { canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import { getCellContent, getCellStyle, createWorkbookEvaluator } from "@sheetcraft/core/workbook";
 import { isTextCellNumberFormat } from "@sheetcraft/core/number-format";
 import { useWordProofreading } from "../modules/text-proofreading/useWordProofreading";
-import ProofreadingToolbar from "../modules/text-proofreading/components/ProofreadingToolbar.vue";
-import WordReviewDialog from "../modules/text-proofreading/components/WordReviewDialog.vue";
-import WordDictionaryDialog from "../modules/text-proofreading/components/WordDictionaryDialog.vue";
-import DocumentPasswordDialog from "../modules/workbook-xlsx/components/DocumentPasswordDialog.vue";
+const ProofreadingToolbar = defineAsyncComponent(
+  () => import("../modules/text-proofreading/components/ProofreadingToolbar.vue"),
+);
+const WordReviewDialog = defineAsyncComponent(
+  () => import("../modules/text-proofreading/components/WordReviewDialog.vue"),
+);
+const WordDictionaryDialog = defineAsyncComponent(
+  () => import("../modules/text-proofreading/components/WordDictionaryDialog.vue"),
+);
+const DocumentPasswordDialog = defineAsyncComponent(
+  () => import("../modules/workbook-xlsx/components/DocumentPasswordDialog.vue"),
+);
 import { useTextReviewController } from "../modules/review-tools/useTextReviewController";
-import TextReviewDialog from "../modules/review-tools/components/TextReviewDialog.vue";
+const TextReviewDialog = defineAsyncComponent(
+  () => import("../modules/review-tools/components/TextReviewDialog.vue"),
+);
 import {
   canEditCell,
   canUseSheetPermission,
@@ -24,17 +34,28 @@ import {
 } from "@sheetcraft/core";
 import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import { useProtectionController } from "../modules/review-tools/useProtectionController";
-import UnlockRangeDialog from "../modules/review-tools/components/UnlockRangeDialog.vue";
-import SheetProtectionDialog from "../modules/review-tools/components/SheetProtectionDialog.vue";
-import EditableRangesDialog from "../modules/review-tools/components/EditableRangesDialog.vue";
-import WorkbookProtectionDialog from "../modules/review-tools/components/WorkbookProtectionDialog.vue";
-import ReviewToolbar from "../modules/review-tools/components/ReviewToolbar.vue";
+const UnlockRangeDialog = defineAsyncComponent(
+  () => import("../modules/review-tools/components/UnlockRangeDialog.vue"),
+);
+const SheetProtectionDialog = defineAsyncComponent(
+  () => import("../modules/review-tools/components/SheetProtectionDialog.vue"),
+);
+const EditableRangesDialog = defineAsyncComponent(
+  () => import("../modules/review-tools/components/EditableRangesDialog.vue"),
+);
+const WorkbookProtectionDialog = defineAsyncComponent(
+  () => import("../modules/review-tools/components/WorkbookProtectionDialog.vue"),
+);
+const ReviewToolbar = defineAsyncComponent(
+  () => import("../modules/review-tools/components/ReviewToolbar.vue"),
+);
 import { useReviewController } from "../modules/review-tools/useReviewController";
 import { formatCellAddress } from "@sheetcraft/core/coordinates";
 import { cloneConditionalFormatRule } from "@sheetcraft/core/conditional-formatting";
 import type { SheetGoToOptions } from "@sheetcraft/core/go-to";
 import {
   computed,
+  defineAsyncComponent,
   nextTick,
   provide,
   ref,
@@ -62,60 +83,127 @@ import { normalizeSheetZoom, SHEET_ZOOM_STEP } from "../shared/sheet-view/zoom";
 import { useCellEditSession } from "../shared/cell-editing/useCellEditSession";
 import { useFormulaToolsController } from "../modules/formula-tools/useFormulaToolsController";
 import { useFormulaEditorController } from "../modules/formula-tools/useFormulaEditorController";
-import FormulaFunctionBrowser from "../modules/formula-tools/components/FormulaFunctionBrowser.vue";
-import FormulaEditorDialog from "../modules/formula-tools/components/FormulaEditorDialog.vue";
+const FormulaFunctionBrowser = defineAsyncComponent(
+  () => import("../modules/formula-tools/components/FormulaFunctionBrowser.vue"),
+);
+const FormulaEditorDialog = defineAsyncComponent(
+  () => import("../modules/formula-tools/components/FormulaEditorDialog.vue"),
+);
 import { useDataToolsController } from "../modules/data-tools/useDataToolsController";
 import { useDuplicateErrorChecks } from "../modules/data-tools/useDuplicateErrorChecks";
 import type { ErrorCheckSettings } from "../modules/data-tools/duplicate-error-preferences";
-import DuplicateErrorCheckOptionsDialog from "../modules/data-tools/components/DuplicateErrorCheckOptionsDialog.vue";
-import DataTableDialog from "../modules/data-tools/components/DataTableDialog.vue";
-import CreateTableDialog from "../modules/table-styles/components/CreateTableDialog.vue";
-import TableSettingsDialog from "../modules/table-styles/components/TableSettingsDialog.vue";
-import ResizeTableDialog from "../modules/table-styles/components/ResizeTableDialog.vue";
-import CalculatedColumnDialog from "../modules/table-styles/components/CalculatedColumnDialog.vue";
-import TableToolsToolbar from "../modules/table-styles/components/TableToolsToolbar.vue";
-import NewTableStyleDialog from "../modules/table-styles/components/NewTableStyleDialog.vue";
-import HyperlinkDialog from "../modules/hyperlinks/components/HyperlinkDialog.vue";
+const DuplicateErrorCheckOptionsDialog = defineAsyncComponent(
+  () => import("../modules/data-tools/components/DuplicateErrorCheckOptionsDialog.vue"),
+);
+const DataTableDialog = defineAsyncComponent(
+  () => import("../modules/data-tools/components/DataTableDialog.vue"),
+);
+const CreateTableDialog = defineAsyncComponent(
+  () => import("../modules/table-styles/components/CreateTableDialog.vue"),
+);
+const TableSettingsDialog = defineAsyncComponent(
+  () => import("../modules/table-styles/components/TableSettingsDialog.vue"),
+);
+const ResizeTableDialog = defineAsyncComponent(
+  () => import("../modules/table-styles/components/ResizeTableDialog.vue"),
+);
+const CalculatedColumnDialog = defineAsyncComponent(
+  () => import("../modules/table-styles/components/CalculatedColumnDialog.vue"),
+);
+const TableToolsToolbar = defineAsyncComponent(
+  () => import("../modules/table-styles/components/TableToolsToolbar.vue"),
+);
+const NewTableStyleDialog = defineAsyncComponent(
+  () => import("../modules/table-styles/components/NewTableStyleDialog.vue"),
+);
+const HyperlinkDialog = defineAsyncComponent(
+  () => import("../modules/hyperlinks/components/HyperlinkDialog.vue"),
+);
 import type { DiagramWorkspace } from "../modules/attachments/useDiagramActions";
 import { useMindMapActions } from "../modules/mind-maps/useMindMapActions";
 import { useDashboardActions } from "../modules/dashboards/useDashboardActions";
 import { useFlowchartActions } from "../modules/flowcharts/useFlowchartActions";
-import AttachmentInsertDialog from "../modules/attachments/components/AttachmentInsertDialog.vue";
+const AttachmentInsertDialog = defineAsyncComponent(
+  () => import("../modules/attachments/components/AttachmentInsertDialog.vue"),
+);
 import { useHyperlinksController } from "../modules/hyperlinks/useHyperlinksController";
-import NewCellStyleDialog from "../modules/cell-styles/components/NewCellStyleDialog.vue";
-import MergeCellStylesDialog from "../modules/cell-styles/components/MergeCellStylesDialog.vue";
+const NewCellStyleDialog = defineAsyncComponent(
+  () => import("../modules/cell-styles/components/NewCellStyleDialog.vue"),
+);
+const MergeCellStylesDialog = defineAsyncComponent(
+  () => import("../modules/cell-styles/components/MergeCellStylesDialog.vue"),
+);
 import { useCellStylesController } from "../modules/cell-styles/useCellStylesController";
 import { useTableStylesController } from "../modules/table-styles/useTableStylesController";
-import GoalSeekDialog from "../modules/data-tools/components/GoalSeekDialog.vue";
-import PlanningSolverDialog from "../modules/data-tools/components/PlanningSolverDialog.vue";
-import DataProofreadingDialog from "../modules/data-tools/components/DataProofreadingDialog.vue";
-import DataToolbar from "../modules/data-tools/components/DataToolbar.vue";
-import ViewToolbar from "../modules/view-tools/components/ViewToolbar.vue";
-import PagePrintPreview from "../modules/page-layout/components/PagePrintPreview.vue";
-import PageThemeMenu from "../modules/page-layout/components/PageThemeMenu.vue";
+const GoalSeekDialog = defineAsyncComponent(
+  () => import("../modules/data-tools/components/GoalSeekDialog.vue"),
+);
+const PlanningSolverDialog = defineAsyncComponent(
+  () => import("../modules/data-tools/components/PlanningSolverDialog.vue"),
+);
+const DataProofreadingDialog = defineAsyncComponent(
+  () => import("../modules/data-tools/components/DataProofreadingDialog.vue"),
+);
+const DataToolbar = defineAsyncComponent(
+  () => import("../modules/data-tools/components/DataToolbar.vue"),
+);
+const ViewToolbar = defineAsyncComponent(
+  () => import("../modules/view-tools/components/ViewToolbar.vue"),
+);
+const PagePrintPreview = defineAsyncComponent(
+  () => import("../modules/page-layout/components/PagePrintPreview.vue"),
+);
+const PageThemeMenu = defineAsyncComponent(
+  () => import("../modules/page-layout/components/PageThemeMenu.vue"),
+);
 import { usePageThemeController } from "../modules/page-layout/usePageThemeController";
 import { workbookThemeKey } from "../shared/color/workbook-theme-context";
-import PageBackgroundMenu from "../modules/page-decorations/components/PageBackgroundMenu.vue";
+const PageBackgroundMenu = defineAsyncComponent(
+  () => import("../modules/page-decorations/components/PageBackgroundMenu.vue"),
+);
 import type { SheetWatermark, WatermarkPreset } from "@sheetcraft/core/page-decoration";
 import { usePictureAssetTools } from "../modules/sheet-images/usePictureAssetTools";
 import { usePictureCellConversion } from "../modules/sheet-images/usePictureCellConversion";
-import PictureCellOverwriteDialog from "../modules/sheet-images/components/PictureCellOverwriteDialog.vue";
-import PictureBatchInsertDialog from "../modules/sheet-images/components/PictureBatchInsertDialog.vue";
+const PictureCellOverwriteDialog = defineAsyncComponent(
+  () => import("../modules/sheet-images/components/PictureCellOverwriteDialog.vue"),
+);
+const PictureBatchInsertDialog = defineAsyncComponent(
+  () => import("../modules/sheet-images/components/PictureBatchInsertDialog.vue"),
+);
 import type { PictureCellOverwriteConfirmation } from "../modules/sheet-images/picture-cell-overwrite-confirmation";
-import PictureCompressDialog from "../modules/sheet-images/components/PictureCompressDialog.vue";
-import PictureBatchSizeDialog from "../modules/sheet-images/components/PictureBatchSizeDialog.vue";
+const PictureCompressDialog = defineAsyncComponent(
+  () => import("../modules/sheet-images/components/PictureCompressDialog.vue"),
+);
+const PictureBatchSizeDialog = defineAsyncComponent(
+  () => import("../modules/sheet-images/components/PictureBatchSizeDialog.vue"),
+);
 import {
   usePictureTools,
   type PictureAlignmentReference,
 } from "../modules/sheet-images/usePictureTools";
-import PictureSelectionPane from "../modules/sheet-images/components/PictureSelectionPane.vue";
-import PictureAnnotationDialog from "../modules/sheet-images/components/PictureAnnotationDialog.vue";
-import PictureToolbar from "../modules/sheet-images/components/PictureToolbar.vue";
+const PictureSelectionPane = defineAsyncComponent(
+  () => import("../modules/sheet-images/components/PictureSelectionPane.vue"),
+);
+const PictureAnnotationDialog = defineAsyncComponent(
+  () => import("../modules/sheet-images/components/PictureAnnotationDialog.vue"),
+);
+import type PictureToolbarType from "../modules/sheet-images/components/PictureToolbar.vue";
+const PictureToolbar = defineAsyncComponent(
+  () => import("../modules/sheet-images/components/PictureToolbar.vue"),
+);
 import type { Workbook, Sheet, FloatingImage, ImageAppearance } from "@sheetcraft/core/workbook";
-import PictureGroupRibbon from "../modules/sheet-images/components/PictureGroupRibbon.vue";
-import PictureOwnedLeafRibbon from "../modules/sheet-images/components/PictureOwnedLeafRibbon.vue";
+const PictureGroupRibbon = defineAsyncComponent(
+  () => import("../modules/sheet-images/components/PictureGroupRibbon.vue"),
+);
+import type PictureOwnedLeafRibbonType from "../modules/sheet-images/components/PictureOwnedLeafRibbon.vue";
+const PictureOwnedLeafRibbon = defineAsyncComponent(
+  () => import("../modules/sheet-images/components/PictureOwnedLeafRibbon.vue"),
+);
 import { resolveOwnedPictureNode } from "../modules/sheet-images/picture-group-interaction";
-import PictureFormatPane from "../modules/sheet-images/components/format-pane/PictureFormatPane.vue";
+import type PictureFormatPaneType from "../modules/sheet-images/components/format-pane/PictureFormatPane.vue";
+const PictureFormatPane = defineAsyncComponent(
+  () => import("../modules/sheet-images/components/format-pane/PictureFormatPane.vue"),
+);
 import { usePictureIntrinsicSize } from "../modules/sheet-images/usePictureIntrinsicSize";
 import { useOwnedPictureFormatPane } from "../modules/sheet-images/useOwnedPictureFormatPane";
 import { onBeforeUnmount } from "vue";
@@ -137,34 +225,67 @@ import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
 import { useSparklineTools } from "../modules/sparklines/useSparklineTools";
 import { useSparklineDataOptions } from "../modules/sparklines/useSparklineDataOptions";
 import { useSparklineDateAxis } from "../modules/sparklines/useSparklineDateAxis";
-import SparklineDateAxisDialog from "../modules/sparklines/components/SparklineDateAxisDialog.vue";
+const SparklineDateAxisDialog = defineAsyncComponent(
+  () => import("../modules/sparklines/components/SparklineDateAxisDialog.vue"),
+);
 import { useSparklineAxisLimit } from "../modules/sparklines/useSparklineAxisLimit";
-import SparklineAxisLimitDialog from "../modules/sparklines/components/SparklineAxisLimitDialog.vue";
-import SparklineDataOptionsDialog from "../modules/sparklines/components/SparklineDataOptionsDialog.vue";
-import SparklineToolsToolbar from "../modules/sparklines/components/SparklineToolsToolbar.vue";
-import PivotGroupingDialog from "../modules/pivot-tables/components/PivotGroupingDialog.vue";
+const SparklineAxisLimitDialog = defineAsyncComponent(
+  () => import("../modules/sparklines/components/SparklineAxisLimitDialog.vue"),
+);
+const SparklineDataOptionsDialog = defineAsyncComponent(
+  () => import("../modules/sparklines/components/SparklineDataOptionsDialog.vue"),
+);
+const SparklineToolsToolbar = defineAsyncComponent(
+  () => import("../modules/sparklines/components/SparklineToolsToolbar.vue"),
+);
+const PivotGroupingDialog = defineAsyncComponent(
+  () => import("../modules/pivot-tables/components/PivotGroupingDialog.vue"),
+);
 import { usePivotGrouping } from "../modules/pivot-tables/usePivotGrouping";
 import { usePivotActions } from "../modules/pivot-tables/usePivotActions";
 import { getPivotTableSource } from "@sheetcraft/core/pivot-tables";
 import { createThemedTableStyles } from "@sheetcraft/core/table-styles";
 import type { PivotArea } from "../modules/pivot-tables/pivot-field-edits";
 import { getPivotActiveField } from "../modules/pivot-tables/pivot-active-field";
-import PivotFieldsPane from "../modules/pivot-tables/components/PivotFieldsPane.vue";
-import PivotAnalysisToolbar from "../modules/pivot-tables/components/PivotAnalysisToolbar.vue";
-import PivotDesignToolbar from "../modules/pivot-tables/components/PivotDesignToolbar.vue";
+import type PivotFieldsPaneType from "../modules/pivot-tables/components/PivotFieldsPane.vue";
+const PivotFieldsPane = defineAsyncComponent(
+  () => import("../modules/pivot-tables/components/PivotFieldsPane.vue"),
+);
+const PivotAnalysisToolbar = defineAsyncComponent(
+  () => import("../modules/pivot-tables/components/PivotAnalysisToolbar.vue"),
+);
+const PivotDesignToolbar = defineAsyncComponent(
+  () => import("../modules/pivot-tables/components/PivotDesignToolbar.vue"),
+);
 import TableStyleGallery from "../modules/table-styles/components/TableStyleGallery.vue";
-import PivotTableDialog from "../modules/pivot-tables/components/PivotTableDialog.vue";
+const PivotTableDialog = defineAsyncComponent(
+  () => import("../modules/pivot-tables/components/PivotTableDialog.vue"),
+);
 import { useFormControlActions } from "../modules/form-controls/useFormControlActions";
 import { useTableSlicers } from "../modules/slicers/useTableSlicers";
-import InsertSlicerDialog from "../modules/slicers/components/InsertSlicerDialog.vue";
-import SlicerToolbar from "../modules/slicers/components/SlicerToolbar.vue";
-import SlicerSettingsDialog from "../modules/slicers/components/SlicerSettingsDialog.vue";
-import FormControlDialog from "../modules/form-controls/components/FormControlDialog.vue";
+const InsertSlicerDialog = defineAsyncComponent(
+  () => import("../modules/slicers/components/InsertSlicerDialog.vue"),
+);
+const SlicerToolbar = defineAsyncComponent(
+  () => import("../modules/slicers/components/SlicerToolbar.vue"),
+);
+const SlicerSettingsDialog = defineAsyncComponent(
+  () => import("../modules/slicers/components/SlicerSettingsDialog.vue"),
+);
+const FormControlDialog = defineAsyncComponent(
+  () => import("../modules/form-controls/components/FormControlDialog.vue"),
+);
 import { useAttachmentActions } from "../modules/attachments/useAttachmentActions";
-import AttachmentDialog from "../modules/attachments/components/AttachmentDialog.vue";
+const AttachmentDialog = defineAsyncComponent(
+  () => import("../modules/attachments/components/AttachmentDialog.vue"),
+);
 import { useCameraActions } from "../modules/camera/useCameraActions";
-import CameraEditorDialog from "../modules/camera/components/CameraEditorDialog.vue";
-import SparklineDialog from "../modules/sparklines/components/SparklineDialog.vue";
+const CameraEditorDialog = defineAsyncComponent(
+  () => import("../modules/camera/components/CameraEditorDialog.vue"),
+);
+const SparklineDialog = defineAsyncComponent(
+  () => import("../modules/sparklines/components/SparklineDialog.vue"),
+);
 import { useChartActions } from "../modules/charts/useChartActions";
 import { useChartObjectControls } from "../modules/charts/useChartObjectControls";
 import { useChartFormatControls } from "../modules/charts/useChartFormatControls";
@@ -176,14 +297,18 @@ import {
   chartFormatTargetLabelKeys,
   type ChartFormatTarget,
 } from "../modules/charts/chart-format-pane";
-import ChartFormatPane from "../modules/charts/components/ChartFormatPane.vue";
+import type ChartFormatPaneType from "../modules/charts/components/ChartFormatPane.vue";
+const ChartFormatPane = defineAsyncComponent(
+  () => import("../modules/charts/components/ChartFormatPane.vue"),
+);
 import { useChartSourceActions } from "../modules/charts/useChartSourceActions";
 import {
   getChartSourceApplicability,
   type ChartSourceReferenceRole,
 } from "../modules/charts/chart-source-editor";
-import ChartElementsToolbar from "../modules/charts/components/ChartElementsToolbar.vue";
-import { defineAsyncComponent } from "vue";
+const ChartElementsToolbar = defineAsyncComponent(
+  () => import("../modules/charts/components/ChartElementsToolbar.vue"),
+);
 const DashboardPanel = defineAsyncComponent(
   () => import("../modules/dashboards/DashboardPanel.vue"),
 );
@@ -203,7 +328,9 @@ const ChartEditorDialog = defineAsyncComponent(
 const ChartSourceDialog = defineAsyncComponent(
   () => import("../modules/charts/components/ChartSourceDialog.vue"),
 );
-import SymbolDialog from "../modules/insert-tools/components/SymbolDialog.vue";
+const SymbolDialog = defineAsyncComponent(
+  () => import("../modules/insert-tools/components/SymbolDialog.vue"),
+);
 import {
   resolveSymbolShortcut,
   useSymbolPreferences,
@@ -215,10 +342,16 @@ import { ensureCellFontResource } from "../shared/cell-text/font-resources";
 import { useSheetDisplaySnapshot } from "../modules/sheet-grid/canvas/sheet-display-snapshot";
 import { DEFAULT_CELL_FONT_FAMILY } from "@sheetcraft/core/style";
 import { captureScreen } from "../modules/insert-tools/captureScreen";
-import ScreenRecordingTool from "../modules/insert-tools/components/ScreenRecordingTool.vue";
-import ScreenCaptureSourceDialog from "../modules/insert-tools/components/ScreenCaptureSourceDialog.vue";
+const ScreenRecordingTool = defineAsyncComponent(
+  () => import("../modules/insert-tools/components/ScreenRecordingTool.vue"),
+);
+const ScreenCaptureSourceDialog = defineAsyncComponent(
+  () => import("../modules/insert-tools/components/ScreenCaptureSourceDialog.vue"),
+);
 import type { CaptureShape } from "../modules/insert-tools/capture-region";
-import ScreenCaptureDialog from "../modules/insert-tools/components/ScreenCaptureDialog.vue";
+const ScreenCaptureDialog = defineAsyncComponent(
+  () => import("../modules/insert-tools/components/ScreenCaptureDialog.vue"),
+);
 import { useShapeCreation } from "../modules/sheet-drawings/useShapeCreation";
 import type { ShapeGalleryChoice } from "../modules/sheet-drawings/shape-gallery";
 import { iconName } from "../modules/sheet-drawings/icon-catalog";
@@ -226,18 +359,31 @@ import { useDrawingActions } from "../modules/sheet-drawings/useDrawingActions";
 import { prepareTextBoxReferenceUpdate } from "../modules/sheet-drawings/prepare-textbox-reference-update";
 import { createTextBoxReferenceResolver } from "../modules/sheet-drawings/textbox-reference-display";
 import { useTextBoxReference } from "../modules/sheet-drawings/useTextBoxReference";
-import TextBoxReferenceDialog from "../modules/sheet-drawings/components/TextBoxReferenceDialog.vue";
-import DrawingEditorDialog from "../modules/sheet-drawings/components/DrawingEditorDialog.vue";
+const TextBoxReferenceDialog = defineAsyncComponent(
+  () => import("../modules/sheet-drawings/components/TextBoxReferenceDialog.vue"),
+);
+const DrawingEditorDialog = defineAsyncComponent(
+  () => import("../modules/sheet-drawings/components/DrawingEditorDialog.vue"),
+);
 import {
   shapeFormatOwnerKey,
   type ShapeFormatTab,
 } from "../modules/sheet-drawings/shape-format-pane-model";
 import { useShapeFormatPresentation } from "../modules/sheet-drawings/useShapeFormatPresentation";
-import ShapeFormatPane from "../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
-import ShapeTextRibbonTools from "../modules/sheet-drawings/components/ShapeTextRibbonTools.vue";
+import type ShapeFormatPaneType from "../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
+const ShapeFormatPane = defineAsyncComponent(
+  () => import("../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue"),
+);
+const ShapeTextRibbonTools = defineAsyncComponent(
+  () => import("../modules/sheet-drawings/components/ShapeTextRibbonTools.vue"),
+);
 import { useShapeRibbonFormat } from "../modules/sheet-drawings/useShapeRibbonFormat";
-import ShapeToolsToolbar from "../modules/sheet-drawings/components/ShapeToolsToolbar.vue";
-import ShapeSelectionPane from "../modules/sheet-drawings/components/ShapeSelectionPane.vue";
+const ShapeToolsToolbar = defineAsyncComponent(
+  () => import("../modules/sheet-drawings/components/ShapeToolsToolbar.vue"),
+);
+const ShapeSelectionPane = defineAsyncComponent(
+  () => import("../modules/sheet-drawings/components/ShapeSelectionPane.vue"),
+);
 import { useShapeObjectControls } from "../modules/sheet-drawings/useShapeObjectControls";
 import { useOwnedShapeGroupFormatPane } from "../modules/sheet-drawings/useOwnedShapeGroupFormatPane";
 import { useOwnedShapeConnectorFormatPane } from "../modules/sheet-drawings/useOwnedShapeConnectorFormatPane";
@@ -265,14 +411,18 @@ import {
 import { ShapeClipboardError } from "../modules/sheet-drawings/shape-clipboard-planning";
 import { useShapeClipboard } from "../modules/sheet-drawings/useShapeClipboard";
 import { useShapeDrawingTransfer } from "../modules/sheet-drawings/useShapeDrawingTransfer";
-import ShapeClipboardTransferDialog from "../modules/sheet-drawings/components/ShapeClipboardTransferDialog.vue";
+const ShapeClipboardTransferDialog = defineAsyncComponent(
+  () => import("../modules/sheet-drawings/components/ShapeClipboardTransferDialog.vue"),
+);
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import type { ShapeTextPreparationMode } from "../modules/sheet-drawings/prepare-shape-text-update";
 import type { ShapeClipboardFailure } from "../modules/sheet-drawings/shape-clipboard-planning";
 import { useShapeTextCharacterFormatPane } from "../modules/sheet-drawings/useShapeTextCharacterFormatPane";
 import { useOwnedShapeFormatPane } from "../modules/sheet-drawings/useOwnedShapeFormatPane";
 import { createShapePaintAssetSource } from "../modules/sheet-drawings/shape-paint-asset-source";
-import EquationTools from "../modules/sheet-drawings/equation/EquationTools.vue";
+const EquationTools = defineAsyncComponent(
+  () => import("../modules/sheet-drawings/equation/EquationTools.vue"),
+);
 import {
   useEquationEditSession,
   type EquationRootEditSource,
@@ -284,14 +434,22 @@ import {
   type EquationSymbolInsertion,
 } from "../modules/sheet-drawings/equation/equation-catalog";
 import type { EquationDraftAction } from "../modules/sheet-drawings/equation/equation-draft";
-import InsertToolbar from "../modules/insert-tools/components/InsertToolbar.vue";
-import PageWatermarkMenu from "../modules/page-decorations/components/PageWatermarkMenu.vue";
-import WatermarkDialog from "../modules/page-decorations/components/WatermarkDialog.vue";
+const InsertToolbar = defineAsyncComponent(
+  () => import("../modules/insert-tools/components/InsertToolbar.vue"),
+);
+const PageWatermarkMenu = defineAsyncComponent(
+  () => import("../modules/page-decorations/components/PageWatermarkMenu.vue"),
+);
+const WatermarkDialog = defineAsyncComponent(
+  () => import("../modules/page-decorations/components/WatermarkDialog.vue"),
+);
 import {
   usePageDecorationActions,
   type WatermarkScope,
 } from "../modules/page-decorations/usePageDecorationActions";
-import PageToolbar from "../modules/page-layout/components/PageToolbar.vue";
+const PageToolbar = defineAsyncComponent(
+  () => import("../modules/page-layout/components/PageToolbar.vue"),
+);
 import {
   isPresetPageMargins,
   pageMarginsMatch,
@@ -307,36 +465,70 @@ import {
   type PageBreakAction,
   type PageSetupTab,
 } from "../modules/page-layout/page-toolbar-actions";
-import PageSetupDialog from "../modules/page-layout/components/PageSetupDialog.vue";
+const PageSetupDialog = defineAsyncComponent(
+  () => import("../modules/page-layout/components/PageSetupDialog.vue"),
+);
 import {
   formatPickedPageSetupReference,
   type PageSetupReferenceField,
 } from "../modules/page-layout/page-setup-inputs";
 import type { HeaderFooterEditTarget } from "../modules/page-layout/header-footer-editor";
 import type { PageLayoutRulerUnit } from "../modules/page-layout/components/PageLayoutRulers.vue";
-import DataToolsDialogs from "../modules/data-tools/components/DataToolsDialogs.vue";
-import DuplicateValuesDialog from "../modules/data-tools/components/DuplicateValuesDialog.vue";
-import ConsolidateDialog from "../modules/data-tools/components/ConsolidateDialog.vue";
-import FillNumberSequenceDialog from "../modules/data-tools/components/FillNumberSequenceDialog.vue";
-import FillRankDialog from "../modules/data-tools/components/FillRankDialog.vue";
-import FillSeriesDialog from "../modules/data-tools/components/FillSeriesDialog.vue";
-import FillBlanksDialog from "../modules/data-tools/components/FillBlanksDialog.vue";
-import FillTextDialog from "../modules/data-tools/components/FillTextDialog.vue";
-import FillCurrentDateDialog from "../modules/data-tools/components/FillCurrentDateDialog.vue";
-import DropdownListDialog from "../modules/data-tools/components/DropdownListDialog.vue";
-import LookupFillDialog from "../modules/data-tools/components/LookupFillDialog.vue";
-import DataComparisonDialog from "../modules/data-tools/components/DataComparisonDialog.vue";
-import AdvancedFilterDialog from "../modules/data-tools/components/AdvancedFilterDialog.vue";
+const DataToolsDialogs = defineAsyncComponent(
+  () => import("../modules/data-tools/components/DataToolsDialogs.vue"),
+);
+const DuplicateValuesDialog = defineAsyncComponent(
+  () => import("../modules/data-tools/components/DuplicateValuesDialog.vue"),
+);
+const ConsolidateDialog = defineAsyncComponent(
+  () => import("../modules/data-tools/components/ConsolidateDialog.vue"),
+);
+const FillNumberSequenceDialog = defineAsyncComponent(
+  () => import("../modules/data-tools/components/FillNumberSequenceDialog.vue"),
+);
+const FillRankDialog = defineAsyncComponent(
+  () => import("../modules/data-tools/components/FillRankDialog.vue"),
+);
+const FillSeriesDialog = defineAsyncComponent(
+  () => import("../modules/data-tools/components/FillSeriesDialog.vue"),
+);
+const FillBlanksDialog = defineAsyncComponent(
+  () => import("../modules/data-tools/components/FillBlanksDialog.vue"),
+);
+const FillTextDialog = defineAsyncComponent(
+  () => import("../modules/data-tools/components/FillTextDialog.vue"),
+);
+const FillCurrentDateDialog = defineAsyncComponent(
+  () => import("../modules/data-tools/components/FillCurrentDateDialog.vue"),
+);
+const DropdownListDialog = defineAsyncComponent(
+  () => import("../modules/data-tools/components/DropdownListDialog.vue"),
+);
+const LookupFillDialog = defineAsyncComponent(
+  () => import("../modules/data-tools/components/LookupFillDialog.vue"),
+);
+const DataComparisonDialog = defineAsyncComponent(
+  () => import("../modules/data-tools/components/DataComparisonDialog.vue"),
+);
+const AdvancedFilterDialog = defineAsyncComponent(
+  () => import("../modules/data-tools/components/AdvancedFilterDialog.vue"),
+);
 import type { FillDirection } from "@sheetcraft/sheet-engine/fill-selection";
 import type { AdvancedFilterDraft } from "../modules/data-tools/data-tools-types";
-import FilterColumnPanel from "../modules/data-tools/components/FilterColumnPanel.vue";
-import DataValidationFeedbackDialog from "../modules/data-tools/components/DataValidationFeedbackDialog.vue";
+const FilterColumnPanel = defineAsyncComponent(
+  () => import("../modules/data-tools/components/FilterColumnPanel.vue"),
+);
+const DataValidationFeedbackDialog = defineAsyncComponent(
+  () => import("../modules/data-tools/components/DataValidationFeedbackDialog.vue"),
+);
 import RangeReferencePicker from "../shared/range-reference/RangeReferencePicker.vue";
 import {
   useRangeReferencePicker,
   type RangeReferenceSelectionOptions,
 } from "../shared/range-reference/useRangeReferencePicker";
-import NamedRangesDialog from "../modules/formula-tools/components/NamedRangesDialog.vue";
+const NamedRangesDialog = defineAsyncComponent(
+  () => import("../modules/formula-tools/components/NamedRangesDialog.vue"),
+);
 import {
   createIndexedDbImageAssetStore,
   type ImageAssetStore,
@@ -348,9 +540,15 @@ import { usePictureDialogSessions } from "../modules/sheet-images/usePictureDial
 import SpreadsheetRibbon from "./SpreadsheetRibbon.vue";
 import { useSheetContextActions } from "./composables/useSheetContextActions";
 import type { SheetContextMenuState } from "../modules/sheet-grid/context-menu-contracts";
-import SheetColumnStatisticsDialog from "../modules/sheet-grid/components/SheetColumnStatisticsDialog.vue";
-import SheetColumnChoiceDialog from "../modules/sheet-grid/components/SheetColumnChoiceDialog.vue";
-import SheetContextFilterDialog from "../modules/sheet-grid/components/SheetContextFilterDialog.vue";
+const SheetColumnStatisticsDialog = defineAsyncComponent(
+  () => import("../modules/sheet-grid/components/SheetColumnStatisticsDialog.vue"),
+);
+const SheetColumnChoiceDialog = defineAsyncComponent(
+  () => import("../modules/sheet-grid/components/SheetColumnChoiceDialog.vue"),
+);
+const SheetContextFilterDialog = defineAsyncComponent(
+  () => import("../modules/sheet-grid/components/SheetContextFilterDialog.vue"),
+);
 import { createAxisToolActions } from "../modules/sheet-grid/axis-tool-actions";
 import { createCellFillActions } from "../modules/sheet-grid/cell-fill-actions";
 import { createCellOperationActions } from "../modules/sheet-grid/cell-operation-actions";
@@ -384,10 +582,13 @@ import {
   type CellFormatSelection,
   type ConditionalFormattingSelection,
 } from "./composables/useSpreadsheetWorkspaceController";
-import CellFormatDialog, {
-  type CellFormatTab,
-} from "../modules/cell-format/components/CellFormatDialog.vue";
-import ConditionalFormatManagerDialog from "../modules/conditional-formatting/components/ConditionalFormatManagerDialog.vue";
+import type { CellFormatTab } from "../modules/cell-format/components/CellFormatDialog.vue";
+const CellFormatDialog = defineAsyncComponent(
+  () => import("../modules/cell-format/components/CellFormatDialog.vue"),
+);
+const ConditionalFormatManagerDialog = defineAsyncComponent(
+  () => import("../modules/conditional-formatting/components/ConditionalFormatManagerDialog.vue"),
+);
 import type { ConditionalFormatQuickRule } from "../modules/conditional-formatting/components/ConditionalFormattingMenu.vue";
 import { getConditionalFormatPreset } from "../modules/conditional-formatting/conditional-format-presets";
 import {
@@ -1509,7 +1710,7 @@ const activePivot = computed(() => {
 });
 const pivotFieldsVisible = ref(false);
 const pivotFieldSettingsOpen = ref(false);
-const pivotFieldsPaneRef = shallowRef<InstanceType<typeof PivotFieldsPane>>();
+const pivotFieldsPaneRef = shallowRef<InstanceType<typeof PivotFieldsPaneType>>();
 const pivotStyles = computed(() => [...createThemedTableStyles(), ...customPivotTableStyles.value]);
 const pivotDisabled = computed(
   () =>
@@ -1564,10 +1765,24 @@ function openPivotFields(id?: string): void {
   sheetGridRef.value?.navigateToCell(table.anchor);
   pivotFieldsVisible.value = true;
 }
+let pendingPivotFieldSettings: typeof pivotActiveField.value | undefined;
+let hasPendingPivotFieldSettings = false;
+watch(pivotFieldsPaneRef, (pane) => {
+  if (!pane || !hasPendingPivotFieldSettings) return;
+  const field = pendingPivotFieldSettings;
+  pendingPivotFieldSettings = undefined;
+  hasPendingPivotFieldSettings = false;
+  pane.openFieldSettings(field);
+});
 function openPivotFieldSettings(): void {
   const field = pivotActiveField.value;
   pivotFieldsVisible.value = true;
-  void nextTick(() => pivotFieldsPaneRef.value?.openFieldSettings(field));
+  if (pivotFieldsPaneRef.value) {
+    void nextTick(() => pivotFieldsPaneRef.value?.openFieldSettings(field));
+    return;
+  }
+  pendingPivotFieldSettings = field;
+  hasPendingPivotFieldSettings = true;
 }
 const pivotRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingPivotRange, reference: pickedPivotReference } = pivotRangePicker;
@@ -1764,7 +1979,7 @@ const selectedSlicerState = computed(() => {
   return drawing ? tableSlicers.state(activeSheet.value, drawing) : undefined;
 });
 const chartFormatPaneVisible = ref(false);
-const chartFormatPaneRef = ref<InstanceType<typeof ChartFormatPane>>();
+const chartFormatPaneRef = ref<InstanceType<typeof ChartFormatPaneType>>();
 const chartFormatTarget = shallowRef<ChartFormatTarget>({ kind: "chart" });
 watch(
   [activeSheet, workbookGeneration],
@@ -2451,7 +2666,7 @@ const drawingActions = useDrawingActions({
     ),
 });
 const { dialog: drawingDialog, editing: editingDrawing } = drawingActions;
-const shapeObjectFormatPaneRef = ref<InstanceType<typeof ShapeFormatPane>>();
+const shapeObjectFormatPaneRef = ref<InstanceType<typeof ShapeFormatPaneType>>();
 const shapeFormatPane = useOwnedShapeFormatPane({
   getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
   getWorkbook: () => session.workbook,
@@ -3675,8 +3890,8 @@ const selectedOwnedPictureLeaf = computed(() => {
     return;
   }
 });
-const pictureToolbarRef = ref<InstanceType<typeof PictureToolbar> | null>(null);
-const pictureOwnedLeafRibbonRef = ref<InstanceType<typeof PictureOwnedLeafRibbon> | null>(null);
+const pictureToolbarRef = ref<InstanceType<typeof PictureToolbarType> | null>(null);
+const pictureOwnedLeafRibbonRef = ref<InstanceType<typeof PictureOwnedLeafRibbonType> | null>(null);
 const pictureEffectsFocusReturn = usePictureEffectsFocusReturn({
   getOwner: () => {
     void workbookRevision.value;
@@ -3713,7 +3928,7 @@ const pictureEffectsFocusReturn = usePictureEffectsFocusReturn({
       : (pictureToolbarRef.value?.getEffectsTrigger() ?? null),
 });
 const pictureFormatVisible = ref(false);
-const pictureFormatComponentRef = ref<InstanceType<typeof PictureFormatPane> | null>(null);
+const pictureFormatComponentRef = ref<InstanceType<typeof PictureFormatPaneType> | null>(null);
 const pictureFormatInitialTab = ref<"effects" | "size-properties">("size-properties");
 const pictureFormatInitialPaint = ref<"fill" | "line" | undefined>();
 const pictureIntrinsicOwner = computed<readonly unknown[]>((previous) => {

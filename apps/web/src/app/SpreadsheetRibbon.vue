@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import type { CellStyleDefinition } from "@sheetcraft/core/cell-styles";
-import { nextTick, ref, useId, watch } from "vue";
+import { defineAsyncComponent, nextTick, ref, useId, watch } from "vue";
 import HomeFormatToolbar from "../modules/home-tools/components/HomeFormatToolbar.vue";
-import FormulaToolbar from "../modules/formula-tools/components/FormulaToolbar.vue";
+const FormulaToolbar = defineAsyncComponent(
+  () => import("../modules/formula-tools/components/FormulaToolbar.vue"),
+);
 import type { CellMergeMode, CellValueConversionMode } from "@sheetcraft/core/commands";
 import type { DefinedNameLabelPosition } from "@sheetcraft/core/commands";
 import type { WorkbookCalculationSettings } from "@sheetcraft/core/workbook";

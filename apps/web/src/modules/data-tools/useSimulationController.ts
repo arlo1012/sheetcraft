@@ -4,11 +4,7 @@ import {
   type GoalSeekRequest,
   type GoalSeekResult,
 } from "@sheetcraft/core/goal-seek";
-import {
-  createApplyPlanningCommand,
-  type PlanningRequest,
-  type PlanningResult,
-} from "@sheetcraft/core/planning-solver";
+import type { PlanningRequest, PlanningResult } from "@sheetcraft/core/planning-solver";
 import {
   createDataTableCommand,
   type DataTableRequest,
@@ -87,6 +83,9 @@ export function useSimulationController(options: Options) {
   const dataTablePreview = ref<DataTablePreview>();
   let tableSolved: DataTableState | undefined;
   let solved: SolveState | undefined;
+  let applyPlanningCommandFn:
+    | typeof import("@sheetcraft/core/planning-solver").createApplyPlanningCommand
+    | undefined;
   let referenceSheetId: string | undefined;
   const activeSheet = computed(() => getActiveSheet(options.getWorkbook()));
   const disabled = computed(() => options.isBusy() || activeSheet.value.properties.protected);
@@ -453,11 +452,17 @@ export function useSimulationController(options: Options) {
     error.value = "";
     result.value = undefined;
     try {
-      const raw = (await runSimulation({
-        kind: "planning",
-        workbook: target.workbook,
-        request,
-      })) as PlanningResult;
+      const [raw, solverModule] = await Promise.all([
+        runSimulation({
+          kind: "planning",
+          workbook: target.workbook,
+          request,
+        }) as Promise<PlanningResult>,
+        applyPlanningCommandFn
+          ? Promise.resolve(undefined)
+          : import("@sheetcraft/core/planning-solver"),
+      ]);
+      if (solverModule) applyPlanningCommandFn = solverModule.createApplyPlanningCommand;
       if (!isCurrent(target)) {
         error.value = tr("simulation.stale");
         return;
@@ -494,7 +499,11 @@ export function useSimulationController(options: Options) {
         );
         options.execute(command);
       } else {
-        const applied = createApplyPlanningCommand(
+        if (!applyPlanningCommandFn) {
+          error.value = tr("simulation.solveFailed");
+          return;
+        }
+        const applied = applyPlanningCommandFn(
           options.getWorkbook(),
           solved.request,
           solved.result as PlanningResult,
