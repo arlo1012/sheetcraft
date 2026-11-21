@@ -95,10 +95,15 @@ const { t, locale } = useAppI18n();
             ]"
         /></FormItem>
         <FormItem :label="t('sparkline.color')"
-          ><input v-model="draft.sparkline.color" type="color" :aria-label="t('sparkline.color')"
+          ><input
+            name="sparkline-color"
+            v-model="draft.sparkline.color"
+            type="color"
+            :aria-label="t('sparkline.color')"
         /></FormItem>
         <FormItem :label="t('sparkline.negative')"
           ><input
+            name="sparkline-negative-color"
             v-model="draft.sparkline.negativeColor"
             type="color"
             :aria-label="t('sparkline.negative')"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, ref, useId, watch } from "vue";
 import { ChevronDown, Eye, Pencil, Search } from "lucide-vue-next";
 import { Textarea } from "tdesign-vue-next/es/textarea";
 import { vNativeControl } from "../../../shared/tdesign/native-control";
@@ -59,6 +59,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
+const formulaInputId = `formula-bar-input-${useId()}`;
 const formulaInput = ref<HTMLTextAreaElement>();
 const richInputRef = ref<InstanceType<typeof CellTextInput>>();
 const formulaBarRoot = ref<HTMLDivElement>();
@@ -498,7 +499,14 @@ defineExpose({
         >
       </div>
       <div class="workbook-formula-bar__formula">
-        <span class="ui-visually-hidden">
+        <label v-if="!useRichText" :for="formulaInputId" class="ui-visually-hidden">
+          {{
+            t("formulaBar.editor", {
+              address: formulaFocused ? formulaTargetLabel : addressLabel,
+            })
+          }}
+        </label>
+        <span v-else class="ui-visually-hidden">
           {{
             t("formulaBar.editor", {
               address: formulaFocused ? formulaTargetLabel : addressLabel,
@@ -534,6 +542,8 @@ defineExpose({
           v-native-control="{
             onElement: setFormulaInput,
             attributes: {
+              id: formulaInputId,
+              name: 'formula-bar-input',
               ...formulaAssistRef?.inputAria,
               'aria-label': t(previewing ? 'formulaBar.previewValue' : 'formulaBar.editor', {
                 address: formulaFocused ? formulaTargetLabel : addressLabel,

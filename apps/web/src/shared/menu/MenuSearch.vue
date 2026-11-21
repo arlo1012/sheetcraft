@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, useId } from "vue";
 import { Input as TInput } from "tdesign-vue-next/es/input";
+import { vNativeControl } from "../tdesign/native-control";
 
 defineOptions({ inheritAttrs: false });
 defineProps<{ label: string }>();
 const query = defineModel<string>({ default: "" });
 const emit = defineEmits<{ keydown: [event: KeyboardEvent] }>();
 const fieldRef = ref<HTMLElement | null>(null);
+const searchInputId = `menu-search-${useId()}`;
 defineExpose({ focus: () => fieldRef.value?.querySelector<HTMLInputElement>("input")?.focus() });
 </script>
 
@@ -15,6 +17,7 @@ defineExpose({ focus: () => fieldRef.value?.querySelector<HTMLInputElement>("inp
     <div ref="fieldRef" class="sheetcraft-menu-search__field">
       <TInput
         v-bind="$attrs"
+        v-native-control="{ attributes: { id: searchInputId, name: 'menu-search' } }"
         v-model="query"
         type="search"
         clearable

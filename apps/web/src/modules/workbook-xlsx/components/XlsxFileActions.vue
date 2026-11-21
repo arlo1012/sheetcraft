@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Download, Upload } from "lucide-vue-next";
-import { ref } from "vue";
+import { ref, useId } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
@@ -12,6 +12,7 @@ const emit = defineEmits<{
   exportXlsx: [];
 }>();
 const { t } = useAppI18n();
+const fileInputId = `xlsx-file-input-${useId()}`;
 const input = ref<HTMLInputElement>();
 
 function onFileChange(event: Event): void {
@@ -37,6 +38,8 @@ function exportFile(): void {
 <template>
   <li hidden role="none">
     <input
+      :id="fileInputId"
+      name="workbook-import-xlsx"
       ref="input"
       type="file"
       accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

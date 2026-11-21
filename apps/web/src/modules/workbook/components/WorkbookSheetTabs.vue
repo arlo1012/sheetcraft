@@ -493,6 +493,8 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
         >
           <input
             v-if="renamingSheetId === sheet.id"
+            :id="`sheet-tab-rename-${sheet.id}`"
+            name="sheet-tab-rename"
             :ref="setRenameInput"
             v-model="renameValue"
             class="workbook-sheet-tabs__rename-input"

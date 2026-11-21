@@ -4,7 +4,7 @@ import SheetPageBreakIcon from "../../../shared/sheet-view/SheetPageBreakIcon.vu
 import SheetHighlightControl from "../../../shared/sheet-view/SheetHighlightControl.vue";
 import SheetZoomMenu from "../../../shared/sheet-view/SheetZoomMenu.vue";
 import WorkbookDisplaySettings from "./WorkbookDisplaySettings.vue";
-import { computed } from "vue";
+import { computed, useId } from "vue";
 import { vIconAction } from "../../../shared/focus/icon-action";
 import { useAppI18n } from "../../../shared/i18n";
 import {
@@ -57,6 +57,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
+const zoomSliderId = `sheet-zoom-slider-${useId()}`;
 const zoomProgress = computed(
   () =>
     `${((normalizeSheetZoom(props.zoom) - MIN_SHEET_ZOOM) / (MAX_SHEET_ZOOM - MIN_SHEET_ZOOM)) * 100}%`,
@@ -167,6 +168,8 @@ function onNativeSliderInput(event: Event): void {
       </span>
       <div class="workbook-view-controls__slider" data-view-control="zoom-slider">
         <input
+          :id="zoomSliderId"
+          name="sheet-zoom"
           class="workbook-view-controls__slider-input"
           type="range"
           :value="normalizeSheetZoom(zoom)"

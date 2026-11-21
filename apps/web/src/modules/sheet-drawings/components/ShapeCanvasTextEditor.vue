@@ -519,6 +519,8 @@ defineExpose({ focus });
     />
     <textarea
       v-else
+      :id="`shape-canvas-text-${sessionId}`"
+      name="shape-canvas-text"
       :key="sessionId"
       ref="input"
       v-on="inputEvents"

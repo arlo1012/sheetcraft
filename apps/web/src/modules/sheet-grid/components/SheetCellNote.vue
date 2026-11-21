@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from "vue";
+import { nextTick, ref, useId, watch } from "vue";
 import type { CellNote } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 
@@ -18,6 +18,7 @@ const emit = defineEmits<{
   cancel: [];
 }>();
 const { t } = useAppI18n();
+const noteId = `cell-note-${useId()}`;
 const rootElement = ref<HTMLElement | null>(null);
 const textAreaRef = ref<HTMLTextAreaElement | null>(null);
 const draftText = ref("");
@@ -86,6 +87,8 @@ defineExpose({ rootElement, save, cancel, dismiss });
   >
     <template v-if="editing()">
       <input
+        :id="`${noteId}-author`"
+        name="cell-note-author"
         v-model="draftAuthor"
         class="sheet-cell-note__author-input"
         :aria-label="t('review.author')"
@@ -94,6 +97,8 @@ defineExpose({ rootElement, save, cancel, dismiss });
         :disabled="readOnly"
       />
       <textarea
+        :id="`${noteId}-text`"
+        name="cell-note-text"
         ref="textAreaRef"
         v-model="draftText"
         class="sheet-cell-note__text-input"
@@ -193,8 +198,8 @@ defineExpose({ rootElement, save, cancel, dismiss });
     margin: 0;
     color: var(--sheetcraft-status-error);
     font-family: var(--sheetcraft-font-sans);
-    font-size: 11px;
-    line-height: 14px;
+    font-size: 12px;
+    line-height: 16px;
   }
 }
 </style>

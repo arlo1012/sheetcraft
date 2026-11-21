@@ -185,6 +185,8 @@ function endComposition(event: CompositionEvent): void {
 
 <template>
   <input
+    :id="`equation-slot-${slotId}-${offset}`"
+    name="equation-slot"
     ref="input"
     class="equation-text-slot"
     :class="{

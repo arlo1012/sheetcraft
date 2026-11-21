@@ -69,7 +69,15 @@ async function importFile(event: Event) {
     />
     <div v-if="category === 'import'">
       <p>{{ t("flowchart.importHint") }}</p>
-      <input ref="file" type="file" accept=".json,.pos" hidden @change="importFile" />
+      <input
+        ref="file"
+        name="flowchart-import-file"
+        type="file"
+        accept=".json,.pos"
+        hidden
+        :aria-label="t('flowchart.choose')"
+        @change="importFile"
+      />
       <Button @click="file?.click()">{{ t("flowchart.choose") }}</Button>
       <p v-if="invalid" role="alert">
         {{ t("flowchart.invalid") }}

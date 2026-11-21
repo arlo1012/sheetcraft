@@ -100,10 +100,12 @@ watch(
   <span class="page-background-menu">
     <input
       ref="input"
+      name="page-background-image"
       type="file"
       accept="image/*"
       hidden
       tabindex="-1"
+      :aria-label="t('pageDecoration.backgroundImage')"
       @change="changed"
       @cancel="cancelFilePicker"
     />

@@ -2,10 +2,12 @@
 import { Languages } from "lucide-vue-next";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { SelectValue } from "tdesign-vue-next/es/select/type";
-import { computed } from "vue";
+import { computed, useId } from "vue";
 import { isAppLocale, useAppI18n } from "../shared/i18n";
+import { vNativeControl } from "../shared/tdesign/native-control";
 
 const { locale, setLocale, t } = useAppI18n();
+const localeSelectId = `locale-switcher-${useId()}`;
 const localeOptions = computed(() => [
   { label: t("app.localeChinese"), value: "zh-CN" },
   { label: t("app.localeEnglish"), value: "en-US" },
@@ -19,10 +21,17 @@ function onLocaleChange(value: SelectValue): void {
 </script>
 
 <template>
-  <label class="locale-switcher">
+  <label :for="localeSelectId" class="locale-switcher">
     <Languages :size="15" aria-hidden="true" />
     <span class="ui-visually-hidden">{{ t("app.language") }}</span>
     <TSelect
+      v-native-control="{
+        attributes: {
+          id: localeSelectId,
+          name: 'workbook-locale',
+          'aria-label': t('app.language'),
+        },
+      }"
       class="locale-switcher__select"
       data-locale-select
       borderless

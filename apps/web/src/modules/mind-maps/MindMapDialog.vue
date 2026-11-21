@@ -309,6 +309,7 @@ function fontSize(value: string | number) {
             /></FormItem>
             <FormItem :label="t('mindMap.fill')">
               <input
+                name="mind-map-node-fill"
                 class="fill"
                 type="color"
                 :aria-label="t('mindMap.fill')"

@@ -130,6 +130,8 @@ function scrollByKey(event: KeyboardEvent) {
         />
         <select
           v-else-if="control.type === 'list'"
+          :id="`form-control-list-${drawing.id}`"
+          :name="`form-control-list-${drawing.id}`"
           :value="value"
           :disabled="disabled"
           :aria-label="control.label"

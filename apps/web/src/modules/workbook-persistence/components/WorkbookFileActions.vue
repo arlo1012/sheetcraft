@@ -151,6 +151,8 @@ function onFileChange(event: Event): void {
       >{{ t(statusKeys[status]) }}</span
     >
     <input
+      :id="`${menuId}-file-input`"
+      name="workbook-import-json"
       ref="fileInputRef"
       type="file"
       accept=".json,application/json"

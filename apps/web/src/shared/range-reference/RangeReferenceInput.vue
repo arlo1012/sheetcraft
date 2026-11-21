@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Input as TInput } from "tdesign-vue-next/es/input";
-import { nextTick, ref } from "vue";
+import { nextTick, ref, useId } from "vue";
 import { useAppI18n } from "../i18n";
 import { SquareMousePointer } from "lucide-vue-next";
 import { vNativeControl } from "../tdesign/native-control";
@@ -21,6 +21,7 @@ const props = withDefaults(
 const reference = defineModel<string>({ required: true });
 const emit = defineEmits<{ enter: [] }>();
 const { t } = useAppI18n();
+const inputId = `range-reference-${useId()}`;
 const root = ref<HTMLElement>();
 const control = ref<{ focus(): void }>();
 defineExpose({ focus: () => control.value?.focus() });
@@ -86,7 +87,13 @@ async function pickReference(): Promise<void> {
   <div ref="root">
     <TInput
       ref="control"
-      v-native-control="{ attributes: { 'aria-label': label ?? t('formulaTools.reference') } }"
+      v-native-control="{
+        attributes: {
+          id: inputId,
+          name: inputId,
+          'aria-label': label ?? t('formulaTools.reference'),
+        },
+      }"
       v-model="reference"
       :disabled="disabled"
       :clearable="clearable"

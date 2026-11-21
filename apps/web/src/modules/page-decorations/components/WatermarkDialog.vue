@@ -223,7 +223,15 @@ onBeforeUnmount(clearLocalImage);
   >
     <div class="watermark-dialog">
       <section class="watermark-dialog__settings">
-        <input ref="imageInput" type="file" accept="image/*" hidden @change="imageChanged" />
+        <input
+          ref="imageInput"
+          name="watermark-image-file"
+          type="file"
+          accept="image/*"
+          hidden
+          :aria-label="t('pageDecoration.imageWatermark')"
+          @change="imageChanged"
+        />
         <TCheckbox v-model="imageEnabled" :disabled="busy">{{
           t("pageDecoration.imageWatermark")
         }}</TCheckbox>

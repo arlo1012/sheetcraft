@@ -61,6 +61,7 @@ watch(displayValue, (value, previous) => {
 const triggerRef = ref<HTMLElement | null>(null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = useId();
+const inputId = `font-format-field-${menuId}`;
 const open = ref(false);
 const query = ref("");
 const filteringFromInput = ref(false);
@@ -240,6 +241,8 @@ function composition(event: CompositionEvent, active: boolean) {
   props.draft.setComposing(active, active ? undefined : (event.target as HTMLInputElement).value);
 }
 const nativeControlAttributes = computed(() => ({
+  id: inputId,
+  name: inputId,
   ...props.nativeAttributes,
   "aria-label": props.nativeAttributes?.["aria-label"] ?? props.label,
   "aria-describedby": props.describedBy || undefined,

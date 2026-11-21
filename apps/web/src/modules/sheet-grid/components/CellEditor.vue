@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch, type CSSProperties } from "vue";
+import { computed, nextTick, ref, useId, watch, type CSSProperties } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { insertTextAtSelection } from "../../../shared/forms/text-selection";
 import FormulaInputAssist from "../../../shared/formula-editing/FormulaInputAssist.vue";
@@ -11,6 +11,7 @@ import CellTextInput from "../../../shared/cell-editing/CellTextInput.vue";
 import type { Rect, Size } from "@sheetcraft/sheet-engine/geometry";
 
 const { t } = useAppI18n();
+const editorId = `cell-editor-${useId()}`;
 
 const props = defineProps<{
   modelValue: string;
@@ -361,6 +362,8 @@ defineExpose({
     />
     <textarea
       v-else
+      :id="editorId"
+      name="cell-editor"
       ref="inputRef"
       class="cell-editor"
       :class="{

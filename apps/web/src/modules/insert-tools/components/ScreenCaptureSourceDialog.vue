@@ -44,7 +44,15 @@ async function openFile(event: Event) {
         t("drawing.captureStart")
       }}</Button>
       <Button :disabled="reading" @click="input?.click()">{{ t("drawing.captureOpen") }}</Button>
-      <input ref="input" type="file" accept="image/png,image/jpeg" hidden @change="openFile" />
+      <input
+        ref="input"
+        name="screen-capture-file"
+        type="file"
+        accept="image/png,image/jpeg"
+        hidden
+        :aria-label="t('drawing.captureOpen')"
+        @change="openFile"
+      />
       <p v-if="!canCapture">{{ t("drawing.captureUnsupported") }}</p>
       <p v-if="failed" role="alert">{{ t("drawing.captureFileError") }}</p>
     </div></Dialog

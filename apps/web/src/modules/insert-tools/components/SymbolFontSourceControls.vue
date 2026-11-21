@@ -164,7 +164,15 @@ async function restoreLocalFonts(): Promise<void> {
         @click="restoreLocalFonts"
         >{{ t("symbolTools.restoreFonts") }}</Button
       >
-      <input ref="fontFileInput" type="file" accept=".ttf,.otf" hidden @change="importFontFile" />
+      <input
+        ref="fontFileInput"
+        name="symbol-font-file"
+        type="file"
+        accept=".ttf,.otf"
+        hidden
+        :aria-label="t('symbolTools.localFonts')"
+        @change="importFontFile"
+      />
     </div>
     <section
       v-if="localSourcesVisible || systemChoices.length"

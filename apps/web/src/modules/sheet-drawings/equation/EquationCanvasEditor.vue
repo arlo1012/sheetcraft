@@ -118,6 +118,8 @@ void nextTick(() => surface.value?.focus());
     />
     <template v-else>
       <textarea
+        :id="`equation-source-${snapshot.sessionId}`"
+        name="equation-source"
         data-equation-source-editor
         :aria-label="labels.source"
         :value="snapshot.sourceText"

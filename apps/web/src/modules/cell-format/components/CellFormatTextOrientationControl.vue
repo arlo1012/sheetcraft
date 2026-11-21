@@ -100,6 +100,7 @@ function endDialDrag(event: PointerEvent): void {
           </g>
         </svg>
         <input
+          name="text-orientation-degrees"
           type="range"
           min="-90"
           max="90"

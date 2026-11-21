@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, useId, watch } from "vue";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { useAppI18n } from "../../../shared/i18n";
 import { vNativeControl } from "../../../shared/tdesign/native-control";
@@ -13,6 +13,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
+const addressInputId = `formula-bar-address-${useId()}`;
 const input = ref<{ blur(): void }>();
 const draft = ref(props.addressLabel);
 const isFocused = ref(false);
@@ -72,7 +73,7 @@ function onKeydown(_value: string | number, context: { e: KeyboardEvent }): void
     :aria-label="t('formulaBar.goToCell')"
     @submit.prevent="submit"
   >
-    <label class="workbook-formula-bar__field">
+    <label :for="addressInputId" class="workbook-formula-bar__field">
       <span class="ui-visually-hidden">{{ t("formulaBar.cellAddress") }}</span>
       <TInput
         ref="input"
@@ -84,6 +85,8 @@ function onKeydown(_value: string | number, context: { e: KeyboardEvent }): void
         :spell-check="false"
         v-native-control="{
           attributes: {
+            id: addressInputId,
+            name: 'cell-address',
             'aria-label': t('formulaBar.cellAddress'),
             'data-address-input': '',
           },

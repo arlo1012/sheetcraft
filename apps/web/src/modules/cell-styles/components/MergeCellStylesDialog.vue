@@ -66,6 +66,7 @@ function confirm(): void {
     <div class="merge-cell-styles-dialog__content">
       <input
         ref="input"
+        name="merge-cell-styles-file"
         type="file"
         accept=".json,application/json,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         hidden
