@@ -1,5 +1,6 @@
 import { computed, provide, shallowRef, watch, type InjectionKey } from "vue";
 import {
+  MAX_SHEET_COLUMNS,
   createWorkbookEvaluator,
   type CellAddress,
   type Sheet,
@@ -22,7 +23,11 @@ import {
   createTableSlicerRangeFilterCommand,
   type SheetSlicerState,
 } from "@sheetcraft/core/table-slicers";
-import { getPivotTableSource, type SheetPivotTable } from "@sheetcraft/core/pivot-tables";
+import {
+  getPivotTableRange,
+  getPivotTableSource,
+  type SheetPivotTable,
+} from "@sheetcraft/core/pivot-tables";
 import { canUseSheetPermission } from "@sheetcraft/core";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 
@@ -191,6 +196,25 @@ export function useTableSlicers(options: {
       (item) => item.key === resolvedKey,
     );
     if (!chosen) return;
+    let baseAnchor: CellAddress = { ...options.address() };
+    if (chosen.kind === "table") {
+      const sourceTable = view.sheet.tables?.find((item) => item.id === chosen.id);
+      if (sourceTable) {
+        baseAnchor = {
+          row: sourceTable.range.start.row,
+          column: Math.min(MAX_SHEET_COLUMNS - 1, sourceTable.range.end.column + 1),
+        };
+      }
+    } else {
+      const sourcePivot = view.sheet.pivotTables?.find((item) => item.id === chosen.id);
+      if (sourcePivot) {
+        const pivotRange = getPivotTableRange(sourcePivot);
+        baseAnchor = {
+          row: pivotRange.start.row,
+          column: Math.min(MAX_SHEET_COLUMNS - 1, pivotRange.end.column + 1),
+        };
+      }
+    }
     const drawings: SheetSlicerDrawing[] = chosen.fields
       .filter((field) => selected.includes(field.id))
       .map((field, index) => ({
@@ -201,9 +225,9 @@ export function useTableSlicers(options: {
           chosen.kind === "pivot"
             ? { pivotTableId: chosen.id, fieldIndex: Number(field.id) }
             : { tableId: chosen.id, columnId: field.id },
-        anchor: { ...options.address() },
-        offsetX: 16 + index * 28,
-        offsetY: 16 + index * 28,
+        anchor: { ...baseAnchor },
+        offsetX: 12 + index * 180,
+        offsetY: 0,
         width: 168,
         height: 210,
         text: "",

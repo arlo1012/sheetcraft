@@ -219,18 +219,18 @@ function currentStyleId(): TableSlicerStyleId {
 
 <style scoped lang="scss">
 @use "../../../shared/ribbon/ribbon-layout" as ribbon;
+@use "../../../shared/gallery/gallery-choice" as gallery;
 
 .slicer-toolbar {
   &__group {
     @include ribbon.columns;
+    gap: var(--sheetcraft-space-2);
   }
 
   &__caption {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 2px;
-    width: 132px;
+    @include ribbon.stack;
+    width: 124px;
+    padding-inline: var(--sheetcraft-space-1);
 
     span {
       font-size: var(--sheetcraft-font-size-body-small);
@@ -241,34 +241,23 @@ function currentStyleId(): TableSlicerStyleId {
 
   &__styles {
     display: grid;
-    grid-template-columns: repeat(5, 34px);
-    grid-template-rows: repeat(2, 24px);
-    gap: 4px;
+    grid-template-columns: repeat(5, 42px);
+    grid-template-rows: repeat(2, 22px);
+    gap: 3px;
+    padding: 3px;
     align-content: center;
+    border: 1px solid var(--sheetcraft-border-control);
+    border-radius: 6px;
+    background: var(--sheetcraft-surface-canvas);
   }
 
   &__swatch {
+    @include gallery.choice(2px);
     display: grid;
     place-items: center;
-    padding: 2px;
-    border: 1px solid transparent;
+    width: 100%;
+    height: 100%;
     border-radius: 4px;
-    background: transparent;
-    cursor: pointer;
-
-    &:hover:not(:disabled) {
-      background: var(--sheetcraft-icon-button-hover-bg);
-    }
-
-    &.is-selected {
-      border-color: var(--sheetcraft-action-primary);
-      background: var(--sheetcraft-surface-selected);
-    }
-
-    &:disabled {
-      opacity: 0.45;
-      cursor: default;
-    }
   }
 
   &__swatch-card {
@@ -280,7 +269,7 @@ function currentStyleId(): TableSlicerStyleId {
     padding: 1px;
     box-sizing: border-box;
     border: 1px solid;
-    border-radius: 2px;
+    border-radius: 3px;
     overflow: hidden;
   }
 
@@ -296,10 +285,8 @@ function currentStyleId(): TableSlicerStyleId {
   }
 
   &__field {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 2px;
+    @include ribbon.stack;
+    padding-inline: var(--sheetcraft-space-1);
   }
 
   &__field-label {
@@ -309,15 +296,15 @@ function currentStyleId(): TableSlicerStyleId {
   }
 
   &__columns-input {
-    width: 74px;
+    width: 76px;
   }
 
   &__toggles {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 4px;
-    padding-left: 4px;
+    display: grid;
+    grid-template-rows: repeat(2, var(--ribbon-control-height, 26px));
+    align-items: center;
+    row-gap: var(--ribbon-row-gap, 2px);
+    padding-left: var(--sheetcraft-space-1);
   }
 }
 </style>

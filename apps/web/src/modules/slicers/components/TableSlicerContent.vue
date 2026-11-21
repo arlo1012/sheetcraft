@@ -136,9 +136,10 @@ function onClear(): void {
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--slicer-border);
-  border-radius: 3px;
+  border-radius: 6px;
   background: var(--slicer-bg);
   color: var(--slicer-item-fg);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
   font-family: var(--sheetcraft-font-sans);
   font-size: 12px;
   line-height: 20px;
@@ -148,11 +149,11 @@ function onClear(): void {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 4px;
+    gap: 6px;
     background: var(--slicer-header-bg);
     color: var(--slicer-header-fg);
     border-bottom: 1px solid var(--slicer-header-border);
-    padding: 4px 6px;
+    padding: 5px 8px;
     cursor: move;
   }
 
@@ -218,23 +219,26 @@ function onClear(): void {
     grid-template-columns: repeat(var(--slicer-columns, 1), minmax(0, 1fr));
     align-content: start;
     gap: 4px;
-    padding: 5px;
+    padding: 6px;
     overflow: auto;
+    scrollbar-width: thin;
     flex: 1 1 auto;
     min-height: 0;
 
     button {
       min-width: 0;
       border: 1px solid var(--slicer-item-border);
-      border-radius: 3px;
+      border-radius: 4px;
       background: var(--slicer-item-bg);
       color: var(--slicer-item-fg);
-      padding: 2px 6px;
+      padding: 3px 7px;
       text-align: start;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      transition: background-color 120ms ease;
+      transition:
+        background-color 120ms ease,
+        border-color 120ms ease;
     }
 
     button:not([aria-pressed="true"]):hover:not(:disabled) {
