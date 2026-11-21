@@ -72,7 +72,7 @@ function choose(index?: number, more = false) {
     >
       <template #header
         ><div class="pie-gallery__head">
-          <strong>{{ t(`chart.pie.${family}`) }}</strong
+          <strong>{{ t(`chart.pieMenu.${family}`) }}</strong
           ><button type="button" @click="choose(undefined, true)">
             {{ t("chart.xy.more") }}<ChevronRight :size="14" />
           </button></div
@@ -85,8 +85,8 @@ function choose(index?: number, more = false) {
                 v-for="tab in pieFamilies"
                 :key="tab"
                 type="button"
-                :title="t(`chart.pie.${tab}`)"
-                :aria-label="t(`chart.pie.${tab}`)"
+                :title="t(`chart.pieMenu.${tab}`)"
+                :aria-label="t(`chart.pieMenu.${tab}`)"
                 :aria-pressed="family === tab"
                 :data-pie-family="tab"
                 @click="family = tab"
@@ -103,9 +103,11 @@ function choose(index?: number, more = false) {
               type="button"
               role="menuitem"
               :data-pie-card="index"
-              :title="t('chart.pie.card', { family: t(`chart.pie.${family}`), index: index + 1 })"
+              :title="
+                t('chart.pieMenu.card', { family: t(`chart.pieMenu.${family}`), index: index + 1 })
+              "
               :aria-label="
-                t('chart.pie.card', { family: t(`chart.pie.${family}`), index: index + 1 })
+                t('chart.pieMenu.card', { family: t(`chart.pieMenu.${family}`), index: index + 1 })
               "
               @click="choose(index)"
             >
@@ -124,7 +126,7 @@ function choose(index?: number, more = false) {
               class="pie-gallery__more"
               @click="choose(undefined, true)"
             >
-              {{ t("chart.pie.moreStyles") }}<ChevronRight :size="14" />
+              {{ t("chart.pieMenu.moreStyles") }}<ChevronRight :size="14" />
             </button>
           </div></div
       ></template> </MenuSurface

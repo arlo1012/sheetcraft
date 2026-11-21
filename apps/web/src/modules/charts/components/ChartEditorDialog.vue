@@ -353,13 +353,13 @@ function typeDisabled(type: ChartType): boolean {
 const selectedSubtype = computed(() => {
   const type = commonType.value;
   if (draft.value.chart.type === "pie" || draft.value.chart.type === "doughnut")
-    return t(`chart.pie.${pieChartFamily(draft.value.chart)}`);
+    return t(`chart.pieMenu.${pieChartFamily(draft.value.chart)}`);
   if (draft.value.chart.type === "bubble")
     return t(
       draft.value.chart.presentation?.bubbleShading ? "chart.bubbleShaded" : "chart.bubbleFlat",
     );
   if (draft.value.chart.type === "stock")
-    return t(`chart.stock.${draft.value.chart.presentation?.stockStyle ?? "hlc"}`);
+    return t(`chart.stockStyle.${draft.value.chart.presentation?.stockStyle ?? "hlc"}`);
   if (draft.value.chart.type === "scatter")
     return t(`chart.xy.variant.${draft.value.chart.presentation?.scatterStyle ?? "marker"}`);
   if (!type) return t(`chart.${draft.value.chart.type}`);
@@ -494,8 +494,8 @@ function onDialogKeydown(event: KeyboardEvent): void {
               :disabled="disabled"
               :aria-pressed="(draft.chart.presentation?.stockStyle ?? 'hlc') === style"
               :data-stock-variant="style"
-              :aria-label="t(`chart.stock.${style}`)"
-              :title="t(`chart.stock.${style}`)"
+              :aria-label="t(`chart.stockStyle.${style}`)"
+              :title="t(`chart.stockStyle.${style}`)"
               @click="selectStockStyle(style)"
             >
               <StockThumbnail :variant="style" />
@@ -534,8 +534,8 @@ function onDialogKeydown(event: KeyboardEvent): void {
               :disabled="disabled"
               :aria-pressed="pieChartFamily(draft.chart) === family"
               :data-pie-variant="family"
-              :aria-label="t(`chart.pie.${family}`)"
-              :title="t(`chart.pie.${family}`)"
+              :aria-label="t(`chart.pieMenu.${family}`)"
+              :title="t(`chart.pieMenu.${family}`)"
               @click="selectPieFamily(family)"
             >
               <PieThumbnail :family="family" :colors="scatterColors" />

@@ -27,7 +27,7 @@ const src = computed(() => {
     : props.family === "pieOfPie" || props.family === "barOfPie"
       ? [28, 21, 16, 14, 12, 9]
       : [35, 27, 19, 12, 7];
-  const categories = sample.map((_, i) => t("chart.pie.sampleCategory", { index: i + 1 }));
+  const categories = sample.map((_, i) => t("chart.pieMenu.sampleCategory", { index: i + 1 }));
   const data: ChartData = { categories, series: [{ name: "", values: sample }], records: [] };
   const colors = props.followTheme
     ? rotateChartPalette(props.themeColors, props.index % 6)
