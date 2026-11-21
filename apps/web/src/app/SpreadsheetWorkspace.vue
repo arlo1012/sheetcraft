@@ -1,9 +1,4 @@
 <script setup lang="ts">
-import { routeRibbonHistoryShortcut } from "./ribbon-history-shortcuts";
-import {
-  isFormatPaneReadonlyHistoryControl,
-  routeFormatPaneHistoryShortcut,
-} from "./format-pane-history-shortcuts";
 import { canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import { getCellContent, getCellStyle, createWorkbookEvaluator } from "@sheetcraft/core/workbook";
 import { isTextCellNumberFormat } from "@sheetcraft/core/number-format";
@@ -111,10 +106,9 @@ const NewTableStyleDialog = defineAsyncComponent(
 const HyperlinkDialog = defineAsyncComponent(
   () => import("../modules/hyperlinks/components/HyperlinkDialog.vue"),
 );
-import type { DiagramWorkspace } from "../modules/attachments/useDiagramActions";
-import { useMindMapActions } from "../modules/mind-maps/useMindMapActions";
-import { useDashboardActions } from "../modules/dashboards/useDashboardActions";
-import { useFlowchartActions } from "../modules/flowcharts/useFlowchartActions";
+import { useWorkspaceKeyboardShortcuts } from "./composables/useWorkspaceKeyboardShortcuts";
+import { useWorkspacePivotAndObjects } from "./composables/useWorkspacePivotAndObjects";
+import { useWorkspaceShapeClipboard } from "./composables/useWorkspaceShapeClipboard";
 const AttachmentInsertDialog = defineAsyncComponent(
   () => import("../modules/attachments/components/AttachmentInsertDialog.vue"),
 );
@@ -206,14 +200,9 @@ import {
 } from "@sheetcraft/core/sheet-drawings";
 import { getShapeTextAssetIds } from "@sheetcraft/core/shape-text";
 import { createCanvasImageCache } from "../modules/sheet-grid/canvas/image-painter";
-import { useSparklineActions } from "../modules/sparklines/useSparklineActions";
-import { useSparklineTools } from "../modules/sparklines/useSparklineTools";
-import { useSparklineDataOptions } from "../modules/sparklines/useSparklineDataOptions";
-import { useSparklineDateAxis } from "../modules/sparklines/useSparklineDateAxis";
 const SparklineDateAxisDialog = defineAsyncComponent(
   () => import("../modules/sparklines/components/SparklineDateAxisDialog.vue"),
 );
-import { useSparklineAxisLimit } from "../modules/sparklines/useSparklineAxisLimit";
 const SparklineAxisLimitDialog = defineAsyncComponent(
   () => import("../modules/sparklines/components/SparklineAxisLimitDialog.vue"),
 );
@@ -226,13 +215,6 @@ const SparklineToolsToolbar = defineAsyncComponent(
 const PivotGroupingDialog = defineAsyncComponent(
   () => import("../modules/pivot-tables/components/PivotGroupingDialog.vue"),
 );
-import { usePivotGrouping } from "../modules/pivot-tables/usePivotGrouping";
-import { usePivotActions } from "../modules/pivot-tables/usePivotActions";
-import { getPivotTableSource } from "@sheetcraft/core/pivot-tables";
-import { createThemedTableStyles } from "@sheetcraft/core/table-styles";
-import type { PivotArea } from "../modules/pivot-tables/pivot-field-edits";
-import { getPivotActiveField } from "../modules/pivot-tables/pivot-active-field";
-import type PivotFieldsPaneType from "../modules/pivot-tables/components/PivotFieldsPane.vue";
 const PivotFieldsPane = defineAsyncComponent(
   () => import("../modules/pivot-tables/components/PivotFieldsPane.vue"),
 );
@@ -246,8 +228,6 @@ import TableStyleGallery from "../modules/table-styles/components/TableStyleGall
 const PivotTableDialog = defineAsyncComponent(
   () => import("../modules/pivot-tables/components/PivotTableDialog.vue"),
 );
-import { useFormControlActions } from "../modules/form-controls/useFormControlActions";
-import { useTableSlicers } from "../modules/slicers/useTableSlicers";
 const InsertSlicerDialog = defineAsyncComponent(
   () => import("../modules/slicers/components/InsertSlicerDialog.vue"),
 );
@@ -260,11 +240,9 @@ const SlicerSettingsDialog = defineAsyncComponent(
 const FormControlDialog = defineAsyncComponent(
   () => import("../modules/form-controls/components/FormControlDialog.vue"),
 );
-import { useAttachmentActions } from "../modules/attachments/useAttachmentActions";
 const AttachmentDialog = defineAsyncComponent(
   () => import("../modules/attachments/components/AttachmentDialog.vue"),
 );
-import { useCameraActions } from "../modules/camera/useCameraActions";
 const CameraEditorDialog = defineAsyncComponent(
   () => import("../modules/camera/components/CameraEditorDialog.vue"),
 );
@@ -299,11 +277,6 @@ const ChartSourceDialog = defineAsyncComponent(
 const SymbolDialog = defineAsyncComponent(
   () => import("../modules/insert-tools/components/SymbolDialog.vue"),
 );
-import {
-  resolveSymbolShortcut,
-  withRecentSymbol,
-} from "../modules/insert-tools/symbols/symbol-preferences";
-import { ensureCellFontResource } from "../shared/cell-text/font-resources";
 import { useSheetDisplaySnapshot } from "../modules/sheet-grid/canvas/sheet-display-snapshot";
 import { DEFAULT_CELL_FONT_FAMILY } from "@sheetcraft/core/style";
 const ScreenRecordingTool = defineAsyncComponent(
@@ -316,7 +289,6 @@ const ScreenCaptureDialog = defineAsyncComponent(
   () => import("../modules/insert-tools/components/ScreenCaptureDialog.vue"),
 );
 import { useShapeCreation } from "../modules/sheet-drawings/useShapeCreation";
-import type { ShapeGalleryChoice } from "../modules/sheet-drawings/shape-gallery";
 import { iconName } from "../modules/sheet-drawings/icon-catalog";
 import { useDrawingActions } from "../modules/sheet-drawings/useDrawingActions";
 import { prepareTextBoxReferenceUpdate } from "../modules/sheet-drawings/prepare-textbox-reference-update";
@@ -350,7 +322,6 @@ const ShapeSelectionPane = defineAsyncComponent(
 import { useShapeObjectControls } from "../modules/sheet-drawings/useShapeObjectControls";
 import { useOwnedShapeGroupFormatPane } from "../modules/sheet-drawings/useOwnedShapeGroupFormatPane";
 import { useOwnedShapeConnectorFormatPane } from "../modules/sheet-drawings/useOwnedShapeConnectorFormatPane";
-import { ownsShapeTextEditTarget } from "../modules/sheet-drawings/shape-text-edit-ownership";
 import {
   createShapeTextFieldDrafts,
   shapeTextFieldDraftsKey,
@@ -361,25 +332,15 @@ import { preflightShapeConnectorPaint } from "../modules/sheet-drawings/shape-co
 import {
   isShapeGroupDrawing,
   findShapeGroupNode,
-  isSheetGroupedEquationDrawing,
   traverseShapeGroup,
   type ShapeGroupDrawing,
   type ShapeGroupPath,
 } from "@sheetcraft/core/shape-group";
-import { useWordArtActions } from "../modules/sheet-drawings/useWordArtActions";
-import {
-  planChartClipboardSourceForTarget,
-  ChartClipboardSourceError,
-} from "../modules/charts/chart-clipboard-source";
-import { ShapeClipboardError } from "../modules/sheet-drawings/shape-clipboard-planning";
-import { useShapeClipboard } from "../modules/sheet-drawings/useShapeClipboard";
-import { useShapeDrawingTransfer } from "../modules/sheet-drawings/useShapeDrawingTransfer";
 const ShapeClipboardTransferDialog = defineAsyncComponent(
   () => import("../modules/sheet-drawings/components/ShapeClipboardTransferDialog.vue"),
 );
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import type { ShapeTextPreparationMode } from "../modules/sheet-drawings/prepare-shape-text-update";
-import type { ShapeClipboardFailure } from "../modules/sheet-drawings/shape-clipboard-planning";
 import { useShapeTextCharacterFormatPane } from "../modules/sheet-drawings/useShapeTextCharacterFormatPane";
 import { useOwnedShapeFormatPane } from "../modules/sheet-drawings/useOwnedShapeFormatPane";
 import { createShapePaintAssetSource } from "../modules/sheet-drawings/shape-paint-asset-source";
@@ -1252,370 +1213,103 @@ watch(
   },
   { flush: "sync" },
 );
-const pivotActions = usePivotActions({
-  getWorkbook: () => session.workbook,
-  getGeneration: () => workbookGeneration.value,
-  getRevision: () => workbookRevision.value,
-  getSheet: () => activeSheet.value,
-  getRange: () => activeSelectionRange.value,
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
-  flush: () => cellEditSession.finish(),
-  execute: executeCommand,
-  name: () => t("pivot.title"),
-  total: () => t("pivot.total"),
-  empty: () => t("pivot.empty"),
-  sumCaption: (field) => `${t("pivot.sum")} · ${field}`,
-  consolidationLabels: () => [
-    t("pivot.rows"),
-    t("pivot.columns"),
-    t("pivot.values"),
-    t("pivot.pageField", { index: 1 }),
-    t("pivot.pageField", { index: 2 }),
-    t("pivot.pageField", { index: 3 }),
-    t("pivot.pageField", { index: 4 }),
-  ],
-  pageItemPrefix: () => t("pivot.pageItemPrefix"),
-  valueCaption: (aggregate, field) =>
-    t(aggregate === "sum" ? "pivot.sumOf" : "pivot.countOf", { field }),
-  reportLayout: () => ({
-    rowLabel: t("pivot.rows"),
-    columnLabel: t("pivot.columns"),
-    allLabel: t("pivot.reportAll"),
-    multipleLabel: t("pivot.reportMultiple"),
-  }),
-  activate: (sheetId, table) => {
-    const workbook = session.workbook;
-    const generation = workbookGeneration.value;
-    selectSheet(sheetId);
-    void nextTick(() => {
-      if (
-        session.workbook !== workbook ||
-        workbookGeneration.value !== generation ||
-        activeSheet.value.id !== sheetId ||
-        !activeSheet.value.pivotTables?.includes(table)
-      )
-        return;
-      sheetGridRef.value?.navigateToCell(table.anchor);
-      pivotFieldsVisible.value = true;
-    });
-  },
-  activateDetails: (sheetId) => {
-    selectSheet(sheetId);
-    void nextTick(() => sheetGridRef.value?.navigateToCell({ row: 0, column: 0 }));
-  },
-  onDetailsError: (reason) => {
-    void MessagePlugin.error(
-      t(
-        reason === "cache"
-          ? "pivot.detailsNeedRefresh"
-          : reason === "protected"
-            ? "pivot.error.protected"
-            : "pivot.detailsFailed",
-      ),
-    );
-  },
-  onError: () => {
-    void MessagePlugin.error(t("pivot.refreshFailed"));
-  },
-});
 const {
-  dialog: pivotDialog,
-  editing: editingPivot,
-  error: pivotError,
-  errorReason: pivotErrorReason,
-} = pivotActions;
-const activePivot = computed(() => {
-  void workbookRevision.value;
-  return pivotActions.selected();
-});
-const pivotFieldsVisible = ref(false);
-const pivotFieldSettingsOpen = ref(false);
-const pivotFieldsPaneRef = shallowRef<InstanceType<typeof PivotFieldsPaneType>>();
-const pivotStyles = computed(() => [...createThemedTableStyles(), ...customPivotTableStyles.value]);
-const pivotDisabled = computed(
-  () =>
-    loading.value ||
-    fileBusy.value ||
-    xlsxBusy.value ||
-    !canUseSheetPermission(activeSheet.value, "pivotTables"),
-);
-const pivotActiveField = computed<{ area: PivotArea; index: number; name: string } | undefined>(
-  () => {
-    const table = activePivot.value;
-    if (!table) return undefined;
-    let headers: string[] = [];
-    try {
-      headers = getPivotTableSource(session.workbook, table).headers;
-    } catch {
-      return undefined;
-    }
-    return getPivotActiveField(table, headers, activeAddress.value);
-  },
-);
-const pivotGroupField = computed(() => {
-  const table = activePivot.value,
-    field = pivotActiveField.value;
-  if (!table || !field || (field.area !== "rows" && field.area !== "columns")) return undefined;
-  return (field.area === "rows" ? table.rowFields : table.columnFields)[field.index];
-});
-const pivotGrouping = usePivotGrouping({
+  pivotActions,
+  pivotDialog,
+  editingPivot,
+  pivotError,
+  pivotErrorReason,
+  activePivot,
+  pivotFieldsVisible,
+  pivotFieldSettingsOpen,
+  pivotFieldsPaneRef,
+  pivotStyles,
+  pivotDisabled,
+  pivotActiveField,
+  pivotGroupField,
+  pivotGrouping,
+  pivotGroupingDraft,
+  openPivotFields,
+  openPivotFieldSettings,
+  pivotRangePicker,
+  pickingPivotRange,
+  pickedPivotReference,
+  selectPivotReference,
+  tableSlicers,
+  controlActions,
+  controlDialog,
+  editingControl,
+  controlError,
+  controlRangePicker,
+  pickingControlRange,
+  pickedControlReference,
+  attachmentActions,
+  viewingAttachment,
+  attachmentBusy,
+  insertingAttachment,
+  flowcharts,
+  mindMaps,
+  mindMapEditor,
+  mindMapError,
+  flowchartEditor,
+  flowchartError,
+  cameraActions,
+  cameraDialog,
+  editingCamera,
+  cameraError,
+  cameraRangePicker,
+  pickingCameraRange,
+  pickedCameraReference,
+  sparklineActions,
+  sparklineDialog,
+  sparklineDraft,
+  sparklineError,
+  sparklineFailed,
+  sparklineToolContext,
+  sparklineRangePicker,
+  sparklineDataOptions,
+  sparklineDates,
+  sparklineAxisLimit,
+  pickingSparklineRange,
+  pickedSparklineReference,
+  sparklinePicker,
+  selectSparklineReference,
+  selectedChartId,
+  selectedSlicerId,
+  selectedSlicer,
+  selectedSlicerState,
+  dashboards,
+  creatingDashboard,
+  editingDashboard,
+  dashboardError,
+  pickingDashboardRange,
+  dashboardReference,
+} = useWorkspacePivotAndObjects({
   getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  selected: pivotActions.selected,
-  getField: () => pivotGroupField.value,
+  getActiveSheet: () => activeSheet.value,
+  getActiveAddress: () => activeAddress.value,
+  getSelectionRange: () => activeSelectionRange.value,
+  getEvaluator: () => activeSheetEvaluator.value,
+  getActiveTable: () => activeTable.value,
+  customPivotTableStyles,
+  getSelectedShapeObjectPaths: () => selectedShapeObjectPaths.value,
+  workbookGeneration,
+  workbookRevision,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
-  flush: () => cellEditSession.finish(),
-  execute: executeCommand,
-  onError: () => {
-    void MessagePlugin.error(t("pivot.groupFailed"));
+  flushCellEdit: () => cellEditSession.finish(),
+  executeCommand,
+  selectSheet,
+  navigateToCell: (address) => {
+    sheetGridRef.value?.navigateToCell(address);
   },
-});
-const { draft: pivotGroupingDraft } = pivotGrouping;
-watch(workbookGeneration, pivotGrouping.close);
-watch(() => activeSheet.value.id, pivotGrouping.close);
-watch(
-  () => activePivot.value?.id,
-  (id) => {
-    pivotFieldsVisible.value = !!id;
-  },
-);
-function openPivotFields(id?: string): void {
-  const table = pivotActions.selected(id);
-  if (!table) return;
-  sheetGridRef.value?.navigateToCell(table.anchor);
-  pivotFieldsVisible.value = true;
-}
-let pendingPivotFieldSettings: typeof pivotActiveField.value | undefined;
-let hasPendingPivotFieldSettings = false;
-watch(pivotFieldsPaneRef, (pane) => {
-  if (!pane || !hasPendingPivotFieldSettings) return;
-  const field = pendingPivotFieldSettings;
-  pendingPivotFieldSettings = undefined;
-  hasPendingPivotFieldSettings = false;
-  pane.openFieldSettings(field);
-});
-function openPivotFieldSettings(): void {
-  const field = pivotActiveField.value;
-  pivotFieldsVisible.value = true;
-  if (pivotFieldsPaneRef.value) {
-    void nextTick(() => pivotFieldsPaneRef.value?.openFieldSettings(field));
-    return;
-  }
-  pendingPivotFieldSettings = field;
-  hasPendingPivotFieldSettings = true;
-}
-const pivotRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
-const { active: pickingPivotRange, reference: pickedPivotReference } = pivotRangePicker;
-const selectPivotReference = computed(() => {
-  const dialog = pivotDialog.value;
-  return (current: string): Promise<string | undefined> =>
-    dialog && pivotDialog.value === dialog
-      ? pivotRangePicker.selectReference(current)
-      : Promise.resolve(undefined);
-});
-watch(editingPivot, () => pivotRangePicker.cancel(), { flush: "sync" });
-watch(
-  () => activeSheet.value.id,
-  () => {
-    if (!pickingPivotRange.value) pivotActions.closeOnSheetChange();
-  },
-  { flush: "sync" },
-);
-const tableSlicers = useTableSlicers({
-  workbook: () => session.workbook,
-  sheet: () => activeSheet.value,
-  table: () => activeTable.value,
-  pivot: () => activePivot.value,
-  address: () => activeAddress.value,
-  revision: () => workbookRevision.value,
-  busy: () => loading.value || fileBusy.value || xlsxBusy.value,
-  flush: () => cellEditSession.finish(),
-  execute: executeCommand,
   selectDrawing: (id) => {
     sheetGridRef.value?.selectDrawing(id);
   },
-});
-const controlActions = useFormControlActions({
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getGeneration: () => workbookGeneration.value,
-  getRevision: () => workbookRevision.value,
-  getAddress: () => activeAddress.value,
-  getEvaluator: () => activeSheetEvaluator.value,
-  selectSheet,
-  selectDrawing: (id) => {
-    sheetGridRef.value?.selectShapeObjects([[id]]);
+  selectShapeObjects: (paths) => {
+    sheetGridRef.value?.selectShapeObjects(paths);
   },
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
-  flush: () => cellEditSession.finish(),
-  execute: executeCommand,
-  name: (type) => t(`control.${type}`),
+  t,
 });
-const { dialog: controlDialog, editing: editingControl, error: controlError } = controlActions;
-const controlRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
-const { active: pickingControlRange, reference: pickedControlReference } = controlRangePicker;
-watch(controlDialog, () => controlRangePicker.cancel(), { flush: "sync" });
-const attachmentActions = useAttachmentActions({
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getAddress: () => activeAddress.value,
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
-  flush: () => cellEditSession.finish(),
-  execute: executeCommand,
-  onError: () => {
-    void MessagePlugin.error(t("attachment.failed"));
-  },
-});
-const {
-  viewing: viewingAttachment,
-  busy: attachmentBusy,
-  inserting: insertingAttachment,
-} = attachmentActions;
-watch(() => activeSheet.value.id, attachmentActions.close);
-watch(workbookGeneration, attachmentActions.close);
-const diagramWorkspace: DiagramWorkspace = {
-  getSheets: () => session.workbook.sheets.values(),
-  getSheet: () => activeSheet.value,
-  getAddress: () => activeAddress.value,
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
-  flush: () => cellEditSession.finish(),
-  execute: executeCommand,
-};
-const flowcharts = useFlowchartActions(diagramWorkspace);
-const mindMaps = useMindMapActions(diagramWorkspace);
-const { editor: mindMapEditor, error: mindMapError } = mindMaps;
-watch(() => activeSheet.value.id, mindMaps.close);
-watch(workbookGeneration, mindMaps.close);
-const { editor: flowchartEditor, error: flowchartError } = flowcharts;
-watch(() => activeSheet.value.id, flowcharts.close);
-watch(workbookGeneration, flowcharts.close);
-const cameraActions = useCameraActions({
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getEvaluator: () => activeSheetEvaluator.value,
-  getGeneration: () => workbookGeneration.value,
-  getRevision: () => workbookRevision.value,
-  getRange: () => activeSelectionRange.value,
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
-  flush: () => cellEditSession.finish(),
-  execute: executeCommand,
-  name: () => t("camera.title"),
-});
-const { dialog: cameraDialog, editing: editingCamera, error: cameraError } = cameraActions;
-const cameraRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
-const { active: pickingCameraRange, reference: pickedCameraReference } = cameraRangePicker;
-watch(cameraDialog, () => cameraRangePicker.cancel(), { flush: "sync" });
-const sparklineActions = useSparklineActions({
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getRange: () => activeSelectionRange.value,
-  getGeneration: () => workbookGeneration.value,
-  flush: () => cellEditSession.finish(),
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
-  execute: executeCommand,
-  selectSheet,
-});
-const {
-  dialog: sparklineDialog,
-  draft: sparklineDraft,
-  error: sparklineError,
-  failed: sparklineFailed,
-} = sparklineActions;
-const sparklineToolContext = useSparklineTools({
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getRange: () => activeSelectionRange.value,
-  getAddress: () => activeAddress.value,
-  getGeneration: () => workbookGeneration.value,
-  getRevision: () => workbookRevision.value,
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
-  flush: () => cellEditSession.finish(),
-  execute: executeCommand,
-  edit: (address) => sparklineActions.open(undefined, address),
-});
-const sparklineRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
-const sparklineSettings = {
-  getContext: () => sparklineToolContext.value,
-  flush: () => cellEditSession.finish(),
-};
-const sparklineDataOptions = useSparklineDataOptions(sparklineSettings);
-const sparklineDates = useSparklineDateAxis({
-  ...sparklineSettings,
-  workbook: () => session.workbook,
-  sheet: () => activeSheet.value,
-  revision: () => workbookRevision.value,
-  selectSheet,
-});
-const sparklineAxisLimit = useSparklineAxisLimit(sparklineSettings);
-const { active: pickingSparklineRange, reference: pickedSparklineReference } = sparklineRangePicker;
-let sparklinePickerSequence = 0;
-const sparklinePicker = shallowRef<{ id: number; confirm: () => void; cancel: () => void }>();
-const selectSparklineReference = computed(() => {
-  const dialog = sparklineDialog.value;
-  const dates = sparklineDates.dialog.value;
-  const currentOwner = () => (dates ? sparklineDates.dialog.value === dates : dialog?.isCurrent());
-  return async (current: string): Promise<string | undefined> => {
-    if (!currentOwner()) return undefined;
-    const select = () => sparklineRangePicker.selectReference(current);
-    const selection = dates ? sparklineDates.pick(select) : sparklineActions.pickReference(select);
-    const picker = {
-      id: ++sparklinePickerSequence,
-      confirm: () => {
-        if (sparklinePicker.value === picker && currentOwner()) sparklineRangePicker.confirm();
-      },
-      cancel: () => {
-        if (sparklinePicker.value === picker && currentOwner()) sparklineRangePicker.cancel();
-      },
-    };
-    sparklinePicker.value = picker;
-    const result = await selection;
-    if (sparklinePicker.value === picker) sparklinePicker.value = undefined;
-    return currentOwner() ? result : undefined;
-  };
-});
-watch(
-  [sparklineDialog, sparklineDates.dialog],
-  () => {
-    sparklineRangePicker.cancel();
-    sparklinePicker.value = undefined;
-  },
-  { flush: "sync" },
-);
-const selectedChartId = ref<string | null>(null);
-const selectedSlicerId = ref<string | null>(null);
-const selectedSlicer = computed(() => {
-  void workbookRevision.value;
-  const id =
-    selectedSlicerId.value ??
-    (selectedShapeObjectPaths.value.length === 1 && selectedShapeObjectPaths.value[0]?.length === 1
-      ? selectedShapeObjectPaths.value[0][0]
-      : null);
-  if (!id) return undefined;
-  const drawing = activeSheet.value.drawings?.find((node) => node.id === id);
-  return drawing?.kind === "slicer" ? drawing : undefined;
-});
-const selectedSlicerState = computed(() => {
-  const drawing = selectedSlicer.value;
-  return drawing ? tableSlicers.state(activeSheet.value, drawing) : undefined;
-});
-const dashboards = useDashboardActions({
-  workbook: () => session.workbook,
-  sheet: () => activeSheet.value,
-  range: () => activeSelectionRange.value,
-  selectSheet,
-  busy: () => loading.value || fileBusy.value || xlsxBusy.value,
-  flush: () => cellEditSession.finish(),
-  execute: executeCommand,
-  title: () => t("dashboard.title"),
-  widgetTitle: (kind) => t(`dashboard.${kind}`),
-});
-const {
-  creating: creatingDashboard,
-  editing: editingDashboard,
-  error: dashboardError,
-} = dashboards;
-const { active: pickingDashboardRange, reference: dashboardReference } = dashboards.picker;
-watch(workbookGeneration, dashboards.close);
 const {
   chartFormatPaneVisible,
   chartFormatPaneRef,
@@ -2555,246 +2249,44 @@ watch(
     shapeObjectControls.paneVisible.value = false;
   },
 );
-const shapeDrawingTransfer = useShapeDrawingTransfer({
+const {
+  shapeClipboard,
+  shapeClipboardEpoch,
+  shapeClipboardTransferConfirmation,
+  canPasteShapeObjects,
+  shapeClipboardHandlers,
+  clearCompetingShapeClipboard,
+  captureCompetingShapeClipboardCopy,
+  wordArtInsertHandler,
+  shapeInsertHandler,
+  drawingTextBoxHandler,
+  drawingConfirmHandler,
+} = useWorkspaceShapeClipboard({
   getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getGeneration: () => workbookGeneration.value,
-  getRevision: () => workbookRevision.value,
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || !!shapeTextEdit.snapshot.value,
-  execute: executeCommand,
+  getActiveSheet: () => activeSheet.value,
+  getActiveAddress: () => activeAddress.value,
+  workbookGeneration,
+  workbookRevision,
+  getDocumentRevision: () => session.history.revision,
+  locale,
+  getShapeMetrics: (sheet) => sheetGridRef.value?.getShapeFrameContext(sheet)?.metrics,
+  getSelectedShapeObjects: () =>
+    sheetGridRef.value?.getSelectedShapeObjects() ?? selectedShapeObjectPaths.value,
+  getShapeObjectSelectionRevision: () => sheetGridRef.value?.getShapeObjectSelectionRevision(),
+  selectShapeObjects: (paths) => sheetGridRef.value?.selectShapeObjects(paths) ?? false,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  isWordArtBusy: () =>
+    loading.value || fileBusy.value || xlsxBusy.value || shapeInteractionBlocked.value,
+  isShapeTextEditing: () => Boolean(shapeTextEdit.snapshot.value),
+  flushPendingEdit: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
+  executeCommand,
   prepareDrawing: (sheet, metrics, next, owner, forest) =>
     prepareWorkspaceDrawing(sheet, metrics, next, owner, forest, "preserve-geometry"),
-  preflightConnectedCollection: (pass) => {
-    preflightShapeConnectorPaint(pass, {
-      theme: session.workbook.theme,
-      getAssetSize: getShapePaintAssetSize,
-    });
-    return true;
-  },
-});
-const shapeClipboardEpoch = ref(0);
-const shapeClipboard = useShapeClipboard({
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getGeneration: () => workbookGeneration.value,
-  getRevision: () => workbookRevision.value,
-  getDocumentRevision: () => session.history.revision,
-  getMetrics: () => sheetGridRef.value?.getShapeFrameContext(activeSheet.value)?.metrics,
-  getSelectedPaths: () =>
-    sheetGridRef.value?.getSelectedShapeObjects() ?? selectedShapeObjectPaths.value,
-  getTargetAddress: () => activeAddress.value,
-  replaceCollection: drawingActions.replaceCollectionPreservingGeometry,
-  replaceCollections: shapeDrawingTransfer.replaceCollections,
-  prepareRootsForTarget: (roots, sourceSheet, targetSheet) => {
-    if (!roots.some((drawing) => drawing.kind === "chart")) return roots;
-    const workbook = session.workbook;
-    try {
-      const evaluator = createWorkbookEvaluator(workbook, sourceSheet.id);
-      return roots.map((drawing) =>
-        drawing.kind === "chart"
-          ? planChartClipboardSourceForTarget({
-              drawing,
-              sourceSheet,
-              targetSheet,
-              evaluator,
-              resolveSheet: (id) => workbook.sheets.get(id),
-            })
-          : drawing,
-      );
-    } catch (error) {
-      throw new ShapeClipboardError(
-        error instanceof ChartClipboardSourceError &&
-          (error.reason === "unsupported-legacy-source" ||
-            error.reason === "unsupported-pivot-source" ||
-            error.reason === "dormant-series-id-collision" ||
-            error.reason === "non-equivalent-source")
-          ? "chart-source-unsupported"
-          : "chart-source-invalid",
-      );
-    }
-  },
-  flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || !!shapeTextEdit.snapshot.value,
-  onSelect: (paths) => {
-    const workbook = session.workbook,
-      sheet = activeSheet.value,
-      generation = workbookGeneration.value,
-      revision = workbookRevision.value,
-      address = { ...activeAddress.value },
-      selectionRevision = sheetGridRef.value?.getShapeObjectSelectionRevision(),
-      previous = sheetGridRef.value?.getSelectedShapeObjects() ?? [],
-      selection = paths.map((path) => [...path]),
-      roots = selection.map((path) => sheet.drawings?.find((root) => root.id === path[0]));
-    shapeClipboardEpoch.value++;
-    // Collection commits update the grid's drawings and metrics on the next Vue tick.
-    void nextTick(() => {
-      if (
-        session.workbook !== workbook ||
-        activeSheet.value !== sheet ||
-        workbookGeneration.value !== generation ||
-        workbookRevision.value !== revision ||
-        activeAddress.value.row !== address.row ||
-        activeAddress.value.column !== address.column ||
-        shapeTextEdit.snapshot.value ||
-        sheetGridRef.value?.getShapeObjectSelectionRevision() !== selectionRevision ||
-        roots.some((root) => !root || !sheet.drawings?.includes(root))
-      )
-        return;
-      const current = sheetGridRef.value?.getSelectedShapeObjects() ?? [];
-      if (JSON.stringify(current) !== JSON.stringify(previous)) {
-        // A cut can remove the old selection while the grid refreshes. Any surviving
-        // or explicitly selected replacement must retain the user's newer selection.
-        const surviving = new Set(
-          (sheet.drawings ?? []).flatMap((root) =>
-            isShapeGroupDrawing(root)
-              ? traverseShapeGroup(root).map(({ path }) => JSON.stringify(path))
-              : [JSON.stringify([root.id])],
-          ),
-        );
-        if (current.length || previous.some((path) => surviving.has(JSON.stringify(path)))) return;
-      }
-      sheetGridRef.value?.selectShapeObjects(selection);
-    });
-  },
-  onCopy: () => {
-    shapeClipboardEpoch.value++;
-  },
-  onFeedback: (reason: ShapeClipboardFailure) => {
-    const owningGroup =
-      reason === "unsupported-group-scene" || reason === "unsupported-owner-effects";
-    void MessagePlugin.warning(
-      locale.value === "zh-CN"
-        ? owningGroup
-          ? "此成员继承组的三维场景或组合效果。请复制所属组以保留完整外观。"
-          : reason === "chart-source-unsupported"
-            ? "此图表的旧范围或透视来源暂不能跨表移动而保持数据含义。请在当前工作表粘贴，或先在选择数据中设置明确的系列来源；原图和剪贴板已保留。"
-            : reason === "chart-source-invalid"
-              ? "图表来源或所在工作表已变化，未执行粘贴。请重新复制图表；原图和剪贴板已保留。"
-              : reason === "cross-sheet-cut"
-                ? "此对象暂不能跨工作表剪切。请使用复制；原对象已保留。"
-                : "无法复制、剪切或粘贴此形状。请检查对象权限及当前选区，原对象和剪贴板已保留。"
-        : owningGroup
-          ? "Copy the owning group to retain its shared 3D scene and composited effects."
-          : reason === "chart-source-unsupported"
-            ? "This legacy or Pivot chart cannot move across sheets while preserving its data meaning. Paste on its original sheet or configure explicit series in Select Data first; the original and clipboard are kept."
-            : reason === "chart-source-invalid"
-              ? "The chart source or owning sheet changed. Copy the chart again; the original and clipboard are kept."
-              : reason === "cross-sheet-cut"
-                ? "This object cannot be cut across sheets yet. Use Copy; the original is kept."
-                : "The shape clipboard action was not applied. Check permissions and selection; the original and clipboard are kept.",
-    );
-  },
-});
-const { confirmation: shapeClipboardTransferConfirmation } = shapeClipboard;
-const canPasteShapeObjects = computed(() => {
-  void shapeClipboardEpoch.value;
-  return shapeClipboard.hasPending();
-});
-const shapeClipboardHandlers = computed(() => {
-  const workbook = session.workbook,
-    sheet = activeSheet.value,
-    generation = workbookGeneration.value,
-    revision = workbookRevision.value,
-    metrics = sheetGridRef.value?.getShapeFrameContext(sheet)?.metrics,
-    address = { ...activeAddress.value };
-  const valid = () =>
-    session.workbook === workbook &&
-    activeSheet.value === sheet &&
-    generation === workbookGeneration.value &&
-    revision === workbookRevision.value &&
-    metrics === sheetGridRef.value?.getShapeFrameContext(sheet)?.metrics &&
-    address.row === activeAddress.value.row &&
-    address.column === activeAddress.value.column;
-  return {
-    copy: (paths: readonly ShapeGroupPath[]) => valid() && shapeClipboard.copy(paths),
-    cut: (paths: readonly ShapeGroupPath[]) => valid() && shapeClipboard.cut(paths),
-    paste: () => {
-      if (!valid()) return false;
-      const accepted = shapeClipboard.paste(address);
-      shapeClipboardEpoch.value++;
-      return accepted;
-    },
-  };
-});
-function clearCompetingShapeClipboard(): void {
-  if (shapeClipboard.clear()) shapeClipboardEpoch.value++;
-}
-function captureCompetingShapeClipboardCopy(): () => void {
-  const identity = shapeClipboard.getIdentity(),
-    workbook = session.workbook,
-    generation = workbookGeneration.value;
-  return () => {
-    if (
-      identity &&
-      session.workbook === workbook &&
-      workbookGeneration.value === generation &&
-      shapeClipboard.clear(identity)
-    )
-      shapeClipboardEpoch.value++;
-  };
-}
-watch(workbookGeneration, clearCompetingShapeClipboard);
-
-const wordArtActions = useWordArtActions({
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getGeneration: () => workbookGeneration.value,
-  getRevision: () => workbookRevision.value,
-  getMetrics: () => sheetGridRef.value?.getShapeFrameContext(activeSheet.value)?.metrics,
-  getAddress: () => activeAddress.value,
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || shapeInteractionBlocked.value,
-  flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
-  replaceCollection: drawingActions.replaceCollection,
-  name: () => t("drawing.wordArt"),
-  placeholder: () => (locale.value === "zh-CN" ? "请输入文字" : "Your text here"),
-  getFontFamily: () => session.workbook.theme.bodyFont,
-  prepareFont: (drawing) => ensureCellFontResource(drawing.shapeText!.fontFamily!),
-  onInserted: (root) => {
-    const workbook = session.workbook,
-      sheet = activeSheet.value,
-      generation = workbookGeneration.value,
-      revision = workbookRevision.value;
-    // The insertion command invalidates grid metric objects. Start the editor
-    // only after its stored root and current worksheet metrics reach the grid.
-    void nextTick(() => {
-      if (
-        session.workbook !== workbook ||
-        activeSheet.value !== sheet ||
-        workbookGeneration.value !== generation ||
-        workbookRevision.value !== revision ||
-        !sheet.drawings?.includes(root) ||
-        shapeTextEdit.snapshot.value ||
-        !sheetGridRef.value?.selectShapeObjects([[root.id]])
-      )
-        return;
-      startShapeTextEdit({ root, selection: "all" });
-    });
-  },
-});
-const wordArtInsertHandler = computed(() => {
-  void workbookGeneration.value;
-  void activeSheet.value;
-  void workbookRevision.value;
-  void activeAddress.value.row;
-  void activeAddress.value.column;
-  return wordArtActions.createInsertHandler();
-});
-onBeforeUnmount(wordArtActions.cancelPending);
-
-const shapeInsertHandler = computed(() => {
-  const owner = shapeCreation.captureOwner();
-  void workbookRevision.value;
-  return (choice: ShapeGalleryChoice, continuous: boolean) =>
-    shapeCreation.start(choice, continuous, owner);
-});
-
-const drawingTextBoxHandler = computed(() => {
-  const target = drawingDialog.value;
-  return (direction: "horizontal" | "vertical") => drawingActions.requestTextBox(direction, target);
-});
-const drawingConfirmHandler = computed(() => {
-  const target = drawingDialog.value;
-  return (drawing: SheetGraphicDrawing) => drawingActions.confirm(drawing, target);
+  getShapePaintAssetSize,
+  drawingActions,
+  shapeCreation,
+  startShapeTextEdit,
+  t,
 });
 const pictureAssetTools = usePictureAssetTools({
   getWorkbook: () => session.workbook,
@@ -3529,446 +3021,6 @@ function setShowFormulaBar(visible: boolean): void {
   if (transferDraft) void nextTick(focusCellEditor);
 }
 
-function onWorkspaceShapeTextOutsideAction(event: PointerEvent | MouseEvent): void {
-  cancelPendingEquationOpen();
-  const math = equationEdit.snapshot.value;
-  if (
-    math &&
-    !(
-      event.target instanceof Element &&
-      event.target.closest(`[data-equation-session="${math.sessionId}"]`)
-    )
-  ) {
-    if (sheetGridRef.value?.flushPendingEquationEdit() === false) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      return;
-    }
-  }
-  const current = shapeTextEdit.snapshot.value;
-  if (!current) {
-    const selected = shapeRibbonFormat.snapshot.value;
-    if (!selected || ownsSelectedShapeFieldTarget(event.target)) return;
-    if (!flushSelectedShapeFieldDrafts(selected)) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    }
-    return;
-  }
-  if (ownsShapeTextEditTarget(event.target, current.sessionId)) return;
-  if (sheetGridRef.value?.flushPendingShapeTextEdit() === false) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-  }
-}
-function onWorkspaceNativeTextCopy(event: ClipboardEvent): void {
-  const target = event.target;
-  if (
-    !(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) ||
-    target.closest("[data-shape-canvas-text-editor]")
-  )
-    return;
-  if (
-    target.selectionStart === null ||
-    target.selectionEnd === null ||
-    target.selectionStart === target.selectionEnd
-  )
-    return;
-  const identity = shapeClipboard.getIdentity(),
-    workbook = session.workbook,
-    generation = workbookGeneration.value;
-  void Promise.resolve().then(() => {
-    if (
-      identity &&
-      !event.defaultPrevented &&
-      session.workbook === workbook &&
-      workbookGeneration.value === generation &&
-      shapeClipboard.clear(identity)
-    )
-      shapeClipboardEpoch.value++;
-  });
-}
-function onWorkspaceKeydown(event: KeyboardEvent): void {
-  if (activeSheet.value.dashboard) {
-    const target = event.target;
-    if (
-      !editingDashboard.value &&
-      !(
-        target instanceof HTMLElement && target.closest("input,textarea,select,[contenteditable]")
-      ) &&
-      (event.ctrlKey || event.metaKey)
-    ) {
-      if (event.key.toLowerCase() === "z" || event.key.toLowerCase() === "y") {
-        event.preventDefault();
-        if (event.key.toLowerCase() === "y" || event.shiftKey) redo();
-        else undo();
-      }
-    }
-    return;
-  }
-  const effectsFocusReturn = pictureEffectsFocusReturn.value;
-  const effectsTrigger = effectsFocusReturn();
-  const fromEffectsTrigger = event.target instanceof Node && effectsTrigger?.contains(event.target);
-  const activeBeforeHistory = document.activeElement;
-  const historyContext = {
-    blocked: gridInert.value || imageBusy.value || !!activeRangePicker.value,
-    editing:
-      cellEditSession.state.active ||
-      cellEditSession.state.composing ||
-      !!shapeTextEdit.snapshot.value ||
-      !!equationEdit.snapshot.value,
-    cropping: sheetGridRef.value?.hasActivePictureCrop() ?? false,
-    undo,
-    redo,
-  };
-  if (
-    event.ctrlKey &&
-    event.altKey &&
-    !event.metaKey &&
-    !event.shiftKey &&
-    !event.defaultPrevented &&
-    !event.repeat &&
-    !event.isComposing &&
-    !historyContext.editing &&
-    !historyContext.blocked &&
-    !historyContext.cropping &&
-    !(
-      event.target instanceof HTMLElement &&
-      event.target.closest("input,textarea,select,[contenteditable=true],[role=dialog],[role=menu]")
-    ) &&
-    (event.code === "KeyX" || event.code === "KeyC")
-  ) {
-    event.preventDefault();
-    insertScreenCapture("rectangle", false, event.code === "KeyC");
-    return;
-  }
-  if (routeRibbonHistoryShortcut(event, historyContext)) {
-    if (fromEffectsTrigger && effectsTrigger)
-      restoreFocusAfterRemount(effectsTrigger, effectsFocusReturn, () => true, activeBeforeHistory);
-    return;
-  }
-  const chartHistory = chartFormatContext.value;
-  if (
-    routeFormatPaneHistoryShortcut(event, {
-      ...historyContext,
-      pane: chartFormatPaneRef.value?.getHistoryElement(),
-      current: () =>
-        !!chartHistory &&
-        chartHistory === chartFormatContext.value &&
-        chartHistory.isCurrent() &&
-        !chartHistory.disabled &&
-        !loading.value &&
-        !fileBusy.value &&
-        !xlsxBusy.value &&
-        !chartDialog.value &&
-        !chartSourceDialog.value &&
-        chartFormatPaneRef.value?.canChangeTarget() === true,
-    })
-  )
-    return;
-  const paneHistory = selectedShapePaneFieldLease();
-  const paneFocusOwner = paneHistory
-    ? {
-        workbook: session.workbook,
-        sheet: activeSheet.value,
-        generation: workbookGeneration.value,
-        paths: JSON.stringify(selectedShapeObjectPaths.value),
-        owner: shapeFormatOwnerKey(paneHistory.pane.owner),
-      }
-    : undefined;
-  const galleryPaintEditor =
-    event.target instanceof HTMLInputElement &&
-    event.target.getAttribute("data-panel-select-control") === "readonly-combobox"
-      ? event.target.closest<HTMLElement>(".picture-paint-editor")
-      : null;
-  const galleryModeId =
-    galleryPaintEditor && paneHistory?.element.contains(galleryPaintEditor)
-      ? galleryPaintEditor.querySelector<HTMLInputElement>(
-          'input[id^="picture-paint-mode-"][data-format-pane-history-control="readonly-combobox"]',
-        )?.id
-      : undefined;
-  if (
-    routeFormatPaneHistoryShortcut(event, {
-      ...historyContext,
-      pane: paneHistory?.element,
-      current: () => paneHistory?.current() ?? false,
-    })
-  ) {
-    const input = event.target;
-    if (paneHistory && isFormatPaneReadonlyHistoryControl(input)) {
-      const id = input.id;
-      // Undo can legitimately refresh the Ribbon's independent session. Resolve
-      // the same semantic pane owner again without reviving its retired lease.
-      const currentFocusPane = () => {
-        const next = selectedShapePaneFieldLease();
-        return paneFocusOwner &&
-          next &&
-          session.workbook === paneFocusOwner.workbook &&
-          activeSheet.value === paneFocusOwner.sheet &&
-          workbookGeneration.value === paneFocusOwner.generation &&
-          JSON.stringify(selectedShapeObjectPaths.value) === paneFocusOwner.paths &&
-          next.element === paneHistory.element &&
-          shapeFormatOwnerKey(next.pane.owner) === paneFocusOwner.owner &&
-          next.current()
-          ? next
-          : undefined;
-      };
-      restoreFocusAfterRemount(
-        input,
-        () => {
-          const currentPane = currentFocusPane()?.element;
-          if (!currentPane) return;
-          const controls = [
-            ...currentPane.querySelectorAll<HTMLInputElement>(
-              "input[data-format-pane-history-control], input[data-panel-select-control]",
-            ),
-          ];
-          const original = controls.find(
-            (control) => control.id === id && isFormatPaneReadonlyHistoryControl(control),
-          );
-          if (original) return original;
-          // A picture-only gallery can disappear or replace its keyed trigger.
-          // Return only to the captured editor's own mode, never another editor.
-          if (
-            !galleryModeId ||
-            !galleryPaintEditor?.isConnected ||
-            !currentPane.contains(galleryPaintEditor) ||
-            galleryPaintEditor.closest("[data-shape-format-pane]") !== currentPane
-          )
-            return;
-          return controls.find(
-            (control) =>
-              control.id === galleryModeId &&
-              galleryPaintEditor.contains(control) &&
-              isFormatPaneReadonlyHistoryControl(control),
-          );
-        },
-        () => !!currentFocusPane(),
-        activeBeforeHistory,
-      );
-    }
-    return;
-  }
-  const math = equationEdit.snapshot.value;
-  if (
-    math &&
-    event.target instanceof Element &&
-    event.target.closest(`[data-equation-session="${math.sessionId}"]`)
-  )
-    return;
-  if (
-    math &&
-    !event.defaultPrevented &&
-    !event.isComposing &&
-    !event.ctrlKey &&
-    !event.metaKey &&
-    !event.altKey &&
-    (event.key === "F2" || event.key === "Enter") &&
-    event.target instanceof Element &&
-    !event.target.closest("input, textarea, [contenteditable]")
-  ) {
-    const id = event.target.closest<HTMLElement>("[data-sheet-drawing-id]")?.dataset.sheetDrawingId;
-    if (id)
-      for (const root of activeSheet.value.drawings ?? []) {
-        if (isShapeGroupDrawing(root)) {
-          const visit = traverseShapeGroup(root).find(
-            ({ node }) => node.id === id && isSheetGroupedEquationDrawing(node),
-          );
-          if (!visit) continue;
-          // Commit may replace the outer root and invalidate the original Layer
-          // view before this captured keystroke reaches its target handler.
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          editOwnedDrawing(root, visit.path);
-          return;
-        }
-        if (root.id === id && root.kind === "equation") {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          beginEquationEdit(root);
-          return;
-        }
-      }
-  }
-  if (math && sheetGridRef.value?.flushPendingEquationEdit() === false) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    return;
-  }
-  const currentShapeTextEdit = shapeTextEdit.snapshot.value;
-  if (currentShapeTextEdit && ownsShapeTextEditTarget(event.target, currentShapeTextEdit.sessionId))
-    return;
-  if (shapeTextEdit.snapshot.value && sheetGridRef.value?.flushPendingShapeTextEdit() === false) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    return;
-  }
-  if (symbolVisible.value) return;
-  if (
-    themeDialogVisible.value ||
-    backgroundConflictVisible.value ||
-    printPreviewVisible.value ||
-    recordingModal.value ||
-    !!screenCapture.value ||
-    !!imageActions.batchInsertion.value ||
-    watermarkVisible.value ||
-    (pageSetupVisible.value && !pickingPageSetupRange.value) ||
-    formulaEditorVisible.value ||
-    formulaInsertVisible.value ||
-    hyperlinkDraft.value ||
-    noteDraft.value
-  )
-    return;
-  const picker = activeRangePicker.value;
-  if (picker) {
-    if (event.key === "Escape") picker.cancel();
-    else if (event.key === "Enter") picker.confirm();
-    else if (event.key === "Tab") return;
-    event.preventDefault();
-    event.stopPropagation();
-    return;
-  }
-  const target = event.target instanceof Element ? event.target : undefined;
-  const genericInput =
-    target?.closest("input, textarea, [contenteditable]") &&
-    !target?.closest("[data-cell-edit-surface]");
-  if (
-    !genericInput &&
-    !event.defaultPrevented &&
-    !event.repeat &&
-    !event.isComposing &&
-    !cellEditSession.state.active &&
-    !cellEditSession.state.composing &&
-    (event.ctrlKey || event.metaKey) &&
-    !event.altKey &&
-    !event.shiftKey &&
-    !target?.closest('[role="dialog"],[role="menu"],[role="listbox"]')
-  ) {
-    const key = event.key.toLowerCase();
-    const paths = sheetGridRef.value?.getSelectedShapeObjects() ?? [];
-    if (
-      ((key === "c" || key === "x") && paths.length) ||
-      (key === "v" && shapeClipboard.hasPending())
-    ) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      if (key === "c") shapeClipboard.copy(paths);
-      else if (key === "x") shapeClipboard.cut(paths);
-      else shapeClipboard.paste();
-      shapeClipboardEpoch.value++;
-      return;
-    }
-    if (key === "c" || key === "x") {
-      shapeClipboard.clear();
-      shapeClipboardEpoch.value++;
-    }
-  }
-  if (
-    !gridInert.value &&
-    !genericInput &&
-    !event.repeat &&
-    !event.isComposing &&
-    !cellEditSession.state.composing &&
-    !event.defaultPrevented
-  ) {
-    const symbol = resolveSymbolShortcut(symbolPreferences.preferences.value, event);
-    if (symbol) {
-      event.preventDefault();
-      event.stopPropagation();
-      const generation = workbookGeneration.value;
-      const sheet = activeSheet.value;
-      const address = { ...activeAddress.value };
-      const editGeneration = cellEditSession.state.generation;
-      const revision = cellEditSession.state.revision;
-      const documentRevision = workbookRevision.value;
-      const selection = { ...cellEditSession.state.selection };
-      void (symbol.fontFamily ? ensureCellFontResource(symbol.fontFamily) : Promise.resolve())
-        .then(() => {
-          if (
-            generation !== workbookGeneration.value ||
-            sheet !== activeSheet.value ||
-            address.row !== activeAddress.value.row ||
-            address.column !== activeAddress.value.column ||
-            editGeneration !== cellEditSession.state.generation ||
-            documentRevision !== workbookRevision.value ||
-            revision !== cellEditSession.state.revision ||
-            cellEditSession.state.selection.start !== selection.start ||
-            cellEditSession.state.selection.end !== selection.end ||
-            cellEditSession.state.selection.direction !== selection.direction ||
-            gridInert.value
-          )
-            return;
-          if (insertSymbol(symbol))
-            symbolPreferences.update(withRecentSymbol(symbolPreferences.preferences.value, symbol));
-        })
-        .catch(() => {
-          void MessagePlugin.warning(t("workspace.cellEditUnavailable"));
-        });
-      return;
-    }
-  }
-  if (
-    event.key.toLowerCase() === "k" &&
-    (event.ctrlKey || event.metaKey) &&
-    !event.altKey &&
-    !event.shiftKey &&
-    !event.isComposing &&
-    !cellEditSession.state.composing
-  ) {
-    event.preventDefault();
-    event.stopPropagation();
-    hyperlinkActions.edit();
-    return;
-  }
-  if (
-    event.key.toLowerCase() === "t" &&
-    (event.ctrlKey || event.metaKey) &&
-    !event.altKey &&
-    !event.shiftKey &&
-    !event.isComposing
-  ) {
-    event.preventDefault();
-    event.stopPropagation();
-    tableActions.requestCreate();
-    return;
-  }
-  if (
-    event.key === "1" &&
-    (event.ctrlKey || event.metaKey) &&
-    !event.altKey &&
-    !event.shiftKey &&
-    !event.isComposing &&
-    !cellEditSession.state.composing
-  ) {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!cellFormatSelection.value) openCellFormat();
-    return;
-  }
-  if (
-    event.key === "F2" &&
-    event.ctrlKey &&
-    !event.altKey &&
-    !event.metaKey &&
-    !event.isComposing &&
-    !cellEditSession.state.composing
-  ) {
-    event.preventDefault();
-    event.stopPropagation();
-    if (cellEditSession.state.surface === "formula-bar") focusCellEditor();
-    else {
-      showFormulaBar.value = true;
-      void nextTick(() => formulaBarRef.value?.focus({ preserveSelection: true }));
-    }
-    return;
-  }
-  if (event.key !== "Escape" || !formatPainterActive.value) {
-    return;
-  }
-  event.preventDefault();
-  event.stopPropagation();
-  cancelFormatPainter();
-}
 const gridInert = computed(
   () =>
     loading.value ||
@@ -4024,6 +3076,75 @@ watch(
   },
   { immediate: true, flush: "sync" },
 );
+
+const { onWorkspaceShapeTextOutsideAction, onWorkspaceNativeTextCopy, onWorkspaceKeydown } =
+  useWorkspaceKeyboardShortcuts({
+    getWorkbook: () => session.workbook,
+    getActiveSheet: () => activeSheet.value,
+    getActiveAddress: () => activeAddress.value,
+    workbookGeneration,
+    workbookRevision,
+    cellEditSession,
+    gridInert,
+    imageBusy,
+    showFormulaBar,
+    formatPainterActive,
+    selectedShapeObjectPaths,
+    isEditingDashboard: () => Boolean(editingDashboard.value),
+    isShortcutsSuppressedByDialog: () =>
+      Boolean(
+        symbolVisible.value ||
+        themeDialogVisible.value ||
+        backgroundConflictVisible.value ||
+        printPreviewVisible.value ||
+        recordingModal.value ||
+        screenCapture.value ||
+        imageActions.batchInsertion.value ||
+        watermarkVisible.value ||
+        (pageSetupVisible.value && !pickingPageSetupRange.value) ||
+        formulaEditorVisible.value ||
+        formulaInsertVisible.value ||
+        hyperlinkDraft.value ||
+        noteDraft.value,
+      ),
+    isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+    hasChartModalOpen: () => Boolean(chartDialog.value || chartSourceDialog.value),
+    hasCellFormatOpen: () => Boolean(cellFormatSelection.value),
+    getActiveRangePicker: () => activeRangePicker.value,
+    getEquationSnapshot: () => equationEdit.snapshot.value,
+    getShapeTextEditSnapshot: () => shapeTextEdit.snapshot.value,
+    getShapeRibbonFormatSnapshot: () => shapeRibbonFormat.snapshot.value,
+    ownsSelectedShapeFieldTarget,
+    flushSelectedShapeFieldDrafts: (selected) =>
+      flushSelectedShapeFieldDrafts(
+        selected as NonNullable<typeof shapeRibbonFormat.snapshot.value>,
+      ),
+    cancelPendingEquationOpen,
+    flushPendingEquationEdit: () => sheetGridRef.value?.flushPendingEquationEdit(),
+    flushPendingShapeTextEdit: () => sheetGridRef.value?.flushPendingShapeTextEdit(),
+    hasActivePictureCrop: () => sheetGridRef.value?.hasActivePictureCrop() ?? false,
+    getSelectedShapeObjects: () => sheetGridRef.value?.getSelectedShapeObjects() ?? [],
+    getPictureEffectsFocusReturn: () => pictureEffectsFocusReturn.value,
+    getChartFormatContext: () => chartFormatContext.value,
+    chartFormatPaneRef,
+    getSelectedShapePaneFieldLease: () => selectedShapePaneFieldLease(),
+    shapeClipboard,
+    shapeClipboardEpoch,
+    symbolPreferences,
+    insertSymbol,
+    editOwnedDrawing,
+    beginEquationEdit,
+    insertScreenCapture,
+    openHyperlinkEdit: () => hyperlinkActions.edit(),
+    requestCreateTable: () => tableActions.requestCreate(),
+    openCellFormat: () => openCellFormat(),
+    focusCellEditor,
+    focusFormulaBar: () => formulaBarRef.value?.focus({ preserveSelection: true }),
+    cancelFormatPainter,
+    undo,
+    redo,
+    t,
+  });
 </script>
 
 <template>
