@@ -5838,6 +5838,9 @@ watch(
             !canUseSheetPermission(activeSheet, 'insertHyperlinks') ||
             !canEditCell(activeSheet, activeAddress)
           "
+          :header-footer-disabled="
+            loading || fileBusy || xlsxBusy || activeSheet.properties.protected
+          "
           :slicer-disabled="
             loading ||
             fileBusy ||
@@ -5849,6 +5852,7 @@ watch(
           :edit-session-id="cellEditSession.id"
           @insert-image="imageActions.requestInsert"
           @insert-hyperlink="hyperlinkActions.edit"
+          @insert-header-footer="openHeaderFooter({ region: 'header', section: 'center' })"
           @insert-table="tableActions.requestCreate"
           @insert-slicer="tableSlicers.open"
           @manage-table="tableActions.openSettings"

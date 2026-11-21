@@ -36,6 +36,7 @@ import {
   Star,
   Sigma,
   Eraser,
+  PanelTop,
 } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
@@ -54,6 +55,7 @@ defineProps<{
   symbolDisabled: boolean;
   sparklineDisabled: boolean;
   hyperlinkDisabled: boolean;
+  headerFooterDisabled?: boolean;
   slicerDisabled?: boolean;
   hasTable: boolean;
   editSessionId?: string;
@@ -86,6 +88,7 @@ const emit = defineEmits<{
   insertDrawing: [kind: SheetGraphicDrawing["kind"]];
   insertImage: [mode: "cell" | "floating"];
   insertHyperlink: [];
+  insertHeaderFooter: [];
   insertTable: [];
   insertSlicer: [];
   manageTable: [];
@@ -218,6 +221,15 @@ const { t, locale } = useAppI18n();
         data-insert-tool="text-box"
         @activate="emit('insertDrawing', 'textBox')"
         ><Type
+      /></RibbonButton>
+      <RibbonButton
+        variant="tall"
+        :label="t('pageLayout.headerFooterTools')"
+        :text="t('pageLayout.headerFooterTools')"
+        :disabled="headerFooterDisabled ?? disabled"
+        data-insert-tool="header-footer"
+        @activate="emit('insertHeaderFooter')"
+        ><PanelTop
       /></RibbonButton>
       <div class="insert-toolbar__diagrams">
         <DiagramInsertMenu
