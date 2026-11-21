@@ -386,17 +386,6 @@ import { createShapePaintAssetSource } from "../modules/sheet-drawings/shape-pai
 const EquationTools = defineAsyncComponent(
   () => import("../modules/sheet-drawings/equation/EquationTools.vue"),
 );
-import {
-  useEquationEditSession,
-  type EquationRootEditSource,
-} from "../modules/sheet-drawings/equation/useEquationEditSession";
-import {
-  createEquationPreset,
-  createEquationTemplate,
-  type EquationPresetId,
-  type EquationSymbolInsertion,
-} from "../modules/sheet-drawings/equation/equation-catalog";
-import type { EquationDraftAction } from "../modules/sheet-drawings/equation/equation-draft";
 const InsertToolbar = defineAsyncComponent(
   () => import("../modules/insert-tools/components/InsertToolbar.vue"),
 );
@@ -477,6 +466,7 @@ import { useSheetContextActions } from "./composables/useSheetContextActions";
 import { useWorkspaceCellFormatting } from "./composables/useWorkspaceCellFormatting";
 import { useWorkspaceCharts } from "./composables/useWorkspaceCharts";
 import { useWorkspaceDataRangePickers } from "./composables/useWorkspaceDataRangePickers";
+import { useWorkspaceEquationEditing } from "./composables/useWorkspaceEquationEditing";
 import { useWorkspaceFindAndGoTo } from "./composables/useWorkspaceFindAndGoTo";
 import { useWorkspaceInsertCapture } from "./composables/useWorkspaceInsertCapture";
 import { useWorkspacePageLayout } from "./composables/useWorkspacePageLayout";
@@ -1689,7 +1679,7 @@ function insertPivot(chart: boolean): void {
   else if (!activePivot.value) pivotActions.open(chart);
 }
 function editSheetDrawing(drawing: SheetDrawing): void {
-  if (drawing.kind !== "equation") equationOpenRequest++;
+  if (drawing.kind !== "equation") cancelPendingEquationOpen();
   if (drawing.kind === "shapeGroup") {
     openShapeGroupFormat(drawing, [drawing.id]);
     return;
@@ -2029,185 +2019,40 @@ function startShapeTextEdit(request: ShapeCanvasTextEditRequest): boolean {
   drawingActions.close();
   return true;
 }
-const equationEdit = useEquationEditSession({
+const {
+  equationEdit,
+  equationPlaceholdersHidden,
+  cancelPendingEquationOpen,
+  beginEquationEdit,
+  editOwnedDrawing,
+  equationInsertHandler,
+  equationMatrixCell,
+  insertEquationTemplate,
+  insertEquationSymbol,
+  insertEquationNormalText,
+  editEquationMathOption,
+} = useWorkspaceEquationEditing({
   getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getGeneration: () => workbookGeneration.value,
-  getRevision: () => workbookRevision.value,
-  getAddress: () => activeAddress.value,
+  getActiveSheet: () => activeSheet.value,
+  getWorkbookGeneration: () => workbookGeneration.value,
+  getWorkbookRevision: () => workbookRevision.value,
+  getActiveAddress: () => activeAddress.value,
   getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
   flush: () =>
     sheetGridRef.value
       ? sheetGridRef.value.flushPendingShapeTextEdit() && sheetGridRef.value.flushPendingCellEdit()
       : cellEditSession.finish(),
-  execute: executeCommand,
-  name: () => t("equation.equation"),
-  openInserted: (source) => beginPreparedEquation(++equationOpenRequest, source, undefined, true),
+  executeCommand,
+  getEquationName: () => t("equation.equation"),
+  closeCompetingDrawingsAndPanes: () => {
+    drawingActions.close();
+    shapeFormatPane.close();
+    shapeGroupFormatPane.close();
+    shapeConnectorFormatPane.close();
+  },
+  editGroupLeafDrawing: drawingActions.editGroupLeaf,
 });
-const equationPlaceholdersHidden = ref(false);
-let equationOpenRequest = 0;
-/** A completed source edit replaces all roots. Let the grid consume that revision
- * before taking its exact geometry lease, and reject any intervening owner change. */
-function beginPreparedEquation(
-  request: number,
-  root: SheetDrawing,
-  path: ShapeGroupPath | undefined,
-  afterCommit: boolean,
-): boolean {
-  const sheet = activeSheet.value,
-    workbook = session.workbook,
-    generation = workbookGeneration.value,
-    revision = workbookRevision.value,
-    fingerprint = JSON.stringify(normalizeSheetDrawing(root));
-  const open = () => {
-    try {
-      if (
-        request !== equationOpenRequest ||
-        activeSheet.value !== sheet ||
-        session.workbook !== workbook ||
-        workbookGeneration.value !== generation ||
-        workbookRevision.value !== revision ||
-        !sheet.drawings?.includes(root) ||
-        JSON.stringify(normalizeSheetDrawing(root)) !== fingerprint
-      )
-        return false;
-      const opened = path
-        ? isShapeGroupDrawing(root) && equationEdit.beginOwned(root, path)
-        : root.kind === "equation" && equationEdit.begin(root);
-      if (!opened) return false;
-      drawingActions.close();
-      shapeFormatPane.close();
-      shapeGroupFormatPane.close();
-      shapeConnectorFormatPane.close();
-      return true;
-    } catch {
-      return false;
-    }
-  };
-  if (afterCommit) {
-    void nextTick(open);
-    return true;
-  }
-  return open();
-}
-function beginEquationEdit(drawing: EquationRootEditSource): boolean {
-  const request = ++equationOpenRequest,
-    sheet = activeSheet.value,
-    workbook = session.workbook,
-    generation = workbookGeneration.value,
-    revision = workbookRevision.value;
-  if (!sheet.drawings?.includes(drawing)) return false;
-  const fingerprint = JSON.stringify(normalizeSheetDrawing(drawing));
-  const current = equationEdit.snapshot.value;
-  if (current && current.source !== drawing && !equationEdit.callbacks.value?.commit())
-    return false;
-  // Finishing a sibling normalizes the full collection and replaces untouched root instances too.
-  const target = sheet.drawings?.find((root) => root.id === drawing.id);
-  if (
-    activeSheet.value !== sheet ||
-    session.workbook !== workbook ||
-    workbookGeneration.value !== generation ||
-    target?.kind !== "equation" ||
-    JSON.stringify(normalizeSheetDrawing(target)) !== fingerprint
-  )
-    return false;
-  return beginPreparedEquation(request, target, undefined, workbookRevision.value !== revision);
-}
-function editOwnedDrawing(root: ShapeGroupDrawing, path: ShapeGroupPath): boolean {
-  const request = ++equationOpenRequest;
-  const node = findShapeGroupNode(root, path)?.node;
-  if (!isSheetGroupedEquationDrawing(node)) return drawingActions.editGroupLeaf(root, path);
-  const sheet = activeSheet.value,
-    workbook = session.workbook,
-    generation = workbookGeneration.value,
-    revision = workbookRevision.value,
-    fingerprint = JSON.stringify(node);
-  if (!sheet.drawings?.includes(root)) return false;
-  const current = equationEdit.snapshot.value;
-  if (
-    current &&
-    (current.root !== root || current.source !== node) &&
-    !equationEdit.callbacks.value?.commit()
-  )
-    return false;
-  // Finishing another mathematical leaf may replace this same outer owner.
-  const owner = sheet.drawings?.find((drawing) => drawing.id === root.id);
-  if (
-    activeSheet.value !== sheet ||
-    session.workbook !== workbook ||
-    workbookGeneration.value !== generation ||
-    !isShapeGroupDrawing(owner) ||
-    JSON.stringify(findShapeGroupNode(owner, path)?.node) !== fingerprint
-  )
-    return false;
-  return beginPreparedEquation(request, owner, [...path], workbookRevision.value !== revision);
-}
-const equationInsertHandler = computed(() => {
-  const workbook = session.workbook,
-    sheet = activeSheet.value,
-    generation = workbookGeneration.value;
-  const revision = workbookRevision.value;
-  return (preset: EquationPresetId | null): boolean => {
-    if (
-      session.workbook !== workbook ||
-      activeSheet.value !== sheet ||
-      workbookGeneration.value !== generation ||
-      workbookRevision.value !== revision
-    )
-      return false;
-    if (equationEdit.snapshot.value && !equationEdit.callbacks.value?.commit()) return false;
-    const textDocument = preset
-      ? createEquationPreset(preset, equationEdit.createId)
-      : {
-          kind: "equation-document-v1" as const,
-          body: { kind: "sequence" as const, id: equationEdit.createId(), children: [] },
-        };
-    return equationEdit.insert(textDocument);
-  };
-});
-const equationMatrixCell = computed(() => {
-  const state = equationEdit.snapshot.value,
-    node = equationEdit.selectedStructure.value;
-  if (!state?.draft || node?.kind !== "matrix") return { row: 0, column: 0 };
-  for (let row = 0; row < node.rows.length; row++)
-    for (let column = 0; column < node.rows[row]!.length; column++) {
-      if (node.rows[row]![column]!.id === state.draft.selection.slotId) return { row, column };
-    }
-  return { row: 0, column: 0 };
-});
-function insertEquationTemplate(id: string): boolean {
-  const state = equationEdit.snapshot.value;
-  if (!state?.draft || state.mode !== "structured") return false;
-  try {
-    return (
-      equationEdit.callbacks.value?.action({
-        type: "insert-nodes",
-        selection: state.draft.selection,
-        nodes: [createEquationTemplate(id, equationEdit.createId)],
-      }) === true
-    );
-  } catch {
-    return false;
-  }
-}
-function insertEquationSymbol(payload: EquationSymbolInsertion): boolean {
-  const state = equationEdit.snapshot.value;
-  if (!state?.draft || state.mode !== "structured") return false;
-  return (
-    equationEdit.callbacks.value?.action({
-      type: "insert-nodes",
-      selection: state.draft.selection,
-      nodes: [{ kind: payload.kind, id: equationEdit.createId(), value: payload.value }],
-    }) === true
-  );
-}
-function insertEquationNormalText(): boolean {
-  return equationEdit.callbacks.value?.toggleNormalText() === true;
-}
-function editEquationMathOption(action: EquationDraftAction): boolean {
-  return equationEdit.callbacks.value?.action(action) === true;
-}
 const textBoxReferenceActions = useTextBoxReference({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -3679,7 +3524,7 @@ function setShowFormulaBar(visible: boolean): void {
 }
 
 function onWorkspaceShapeTextOutsideAction(event: PointerEvent | MouseEvent): void {
-  equationOpenRequest++;
+  cancelPendingEquationOpen();
   const math = equationEdit.snapshot.value;
   if (
     math &&
