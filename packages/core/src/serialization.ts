@@ -373,6 +373,7 @@ export type WorkbookSnapshotV107 = Omit<WorkbookSnapshotV106, "version"> & { ver
 export type WorkbookSnapshotV108 = Omit<WorkbookSnapshotV107, "version"> & { version: 108 };
 export type WorkbookSnapshotV109 = Omit<WorkbookSnapshotV108, "version"> & { version: 109 };
 export type WorkbookSnapshotV110 = Omit<WorkbookSnapshotV109, "version"> & { version: 110 };
+export type WorkbookSnapshotV112 = Omit<WorkbookSnapshotV111, "version"> & { version: 112 };
 export type WorkbookSnapshotV111 = Omit<WorkbookSnapshotV110, "version"> & { version: 111 };
 export type WorkbookSnapshot =
   | WorkbookSnapshotV43
@@ -443,7 +444,8 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV108
   | WorkbookSnapshotV109
   | WorkbookSnapshotV110
-  | WorkbookSnapshotV111;
+  | WorkbookSnapshotV111
+  | WorkbookSnapshotV112;
 type WorkbookWritePayload = Omit<WorkbookSnapshotV98, "version"> & {
   version: WorkbookSnapshot["version"];
 };
@@ -576,7 +578,8 @@ type SnapshotVersion =
   | 108
   | 109
   | 110
-  | 111;
+  | 111
+  | 112;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -617,6 +620,9 @@ function hasLocalControlValue(drawings: unknown): boolean {
         Object.hasOwn(drawing.control, "localValue"),
     )
   );
+}
+function hasSlicers(drawings: unknown): boolean {
+  return Array.isArray(drawings) && drawings.some((drawing) => drawing?.kind === "slicer");
 }
 function hasCrossSheetControls(drawings: unknown): boolean {
   return (
@@ -2969,7 +2975,10 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       record.cells.some((cell) => hasSparklineDataReference(asRecord(cell, path).sparkline))
     )
       version = 111;
+    if (hasSlicers(record.drawings)) version = 112;
   }
+  if (version < 112 && hasSlicers(record.drawings))
+    return fail(path + ".drawings", "Table slicers require snapshot version 112.");
   if (version < 110 && hasCrossSheetControls(record.drawings))
     return fail(path + ".drawings", "Cross-sheet form controls require snapshot version 110.");
   if (version < 109 && hasRadioOrdering(record.drawings))
@@ -3482,6 +3491,7 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   if (sheets.some((sheet) => hasCrossSheetControls(sheet.drawings))) snapshot.version = 110;
   if (sheets.some((sheet) => sheet.cells.some((cell) => hasSparklineDataReference(cell.sparkline))))
     snapshot.version = 111;
+  if (sheets.some((sheet) => hasSlicers(sheet.drawings))) snapshot.version = 112;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -3600,7 +3610,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 108 &&
     record.version !== 109 &&
     record.version !== 110 &&
-    record.version !== 111
+    record.version !== 111 &&
+    record.version !== 112
   ) {
     throw new WorkbookDomainError(
       {

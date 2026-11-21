@@ -240,6 +240,22 @@ export function createDuplicateSheetCommand(
     copiedTableIds.set(table.id, id);
     return { ...table, id, name };
   });
+  if (sheet.drawings)
+    sheet.drawings = sheet.drawings.map((drawing) => {
+      if (
+        drawing.kind !== "slicer" ||
+        (drawing.slicer.sourceSheetId && drawing.slicer.sourceSheetId !== sourceSheetId)
+      )
+        return drawing;
+      return {
+        ...drawing,
+        slicer: {
+          ...drawing.slicer,
+          tableId: copiedTableIds.get(drawing.slicer.tableId) ?? drawing.slicer.tableId,
+          ...(drawing.slicer.sourceSheetId ? { sourceSheetId: sheetId } : {}),
+        },
+      };
+    });
   for (const table of sheet.tables)
     for (const column of table.columns) {
       if (column.calculatedColumnFormula === undefined) continue;

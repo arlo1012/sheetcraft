@@ -996,6 +996,22 @@ export function applyRemoveTableCommand(
       },
     );
   });
+  for (const owner of workbook.sheets.values()) {
+    if (
+      owner.drawings?.some(
+        (drawing) =>
+          drawing.kind === "slicer" &&
+          drawing.slicer.tableId === command.tableId &&
+          (drawing.slicer.sourceSheetId ?? owner.id) === sheet.id,
+      )
+    )
+      owner.drawings = owner.drawings.filter(
+        (drawing) =>
+          drawing.kind !== "slicer" ||
+          drawing.slicer.tableId !== command.tableId ||
+          (drawing.slicer.sourceSheetId ?? owner.id) !== sheet.id,
+      );
+  }
   sheet.tables = (sheet.tables ?? []).filter((table) => table.id !== command.tableId);
   return previous;
 }

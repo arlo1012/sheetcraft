@@ -124,13 +124,16 @@ export type SheetAttachmentDrawing = DrawingBase & {
   kind: "attachment";
   attachment: SheetAttachment;
 };
+export type TableSlicerSource = { tableId: string; columnId: string; sourceSheetId?: string };
+export type SheetSlicerDrawing = DrawingBase & { kind: "slicer"; slicer: TableSlicerSource };
 export type SheetControlDrawing = DrawingBase & { kind: "control"; control: SheetFormControl };
 export type SheetLegacyDrawing =
   | SheetGraphicDrawing
   | SheetChartDrawing
   | SheetCameraDrawing
   | SheetAttachmentDrawing
-  | SheetControlDrawing;
+  | SheetControlDrawing
+  | SheetSlicerDrawing;
 /** Canonical source-free placement, never accompanied by legacy physical fields. */
 export type SheetFramedGraphicDrawing = Omit<
   SheetGraphicDrawing,
@@ -163,6 +166,7 @@ type DrawingAppearance =
   | Omit<SheetChartDrawing, "anchor" | "offsetX" | "offsetY" | "width" | "height">
   | Omit<SheetCameraDrawing, "anchor" | "offsetX" | "offsetY" | "width" | "height">
   | Omit<SheetAttachmentDrawing, "anchor" | "offsetX" | "offsetY" | "width" | "height">
+  | Omit<SheetSlicerDrawing, "anchor" | "offsetX" | "offsetY" | "width" | "height">
   | Omit<SheetControlDrawing, "anchor" | "offsetX" | "offsetY" | "width" | "height">;
 export function isFramedShapeDrawing(value: SheetDrawing): value is SheetFramedGraphicDrawing {
   const kind: unknown = Object.getOwnPropertyDescriptor(value, "kind")?.value;
@@ -269,6 +273,7 @@ const kinds = new Set([
   "camera",
   "attachment",
   "control",
+  "slicer",
 ]);
 const shapes = new Set([
   "rectangle",
@@ -281,6 +286,23 @@ const shapes = new Set([
   "star",
   "heart",
 ]);
+function normalizeTableSlicer(source: TableSlicerSource): TableSlicerSource {
+  if (
+    !source ||
+    typeof source.tableId !== "string" ||
+    !source.tableId ||
+    typeof source.columnId !== "string" ||
+    !source.columnId ||
+    (source.sourceSheetId !== undefined &&
+      (typeof source.sourceSheetId !== "string" || !source.sourceSheetId))
+  )
+    throw new TypeError("A table slicer requires table and column identities.");
+  return {
+    tableId: source.tableId,
+    columnId: source.columnId,
+    ...(source.sourceSheetId ? { sourceSheetId: source.sourceSheetId } : {}),
+  };
+}
 export function normalizeSheetShapeGeometry(
   value: SheetShapeGeometry | undefined,
 ): SheetShapeGeometry | undefined {
@@ -517,7 +539,9 @@ function normalizeDrawingAppearance(value: DrawingAppearance): DrawingAppearance
             } as const)
           : value.kind === "control"
             ? ({ kind: "control", control: normalizeFormControl(value.control) } as const)
-            : { kind: value.kind }),
+            : value.kind === "slicer"
+              ? ({ kind: "slicer", slicer: normalizeTableSlicer(value.slicer) } as const)
+              : { kind: value.kind }),
     ...(iconId ? { iconId } : {}),
     ...(shapeGeometry ? { shapeGeometry } : {}),
     ...(shapePath ? { shapePath } : {}),

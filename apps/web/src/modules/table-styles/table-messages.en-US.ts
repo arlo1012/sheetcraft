@@ -2,6 +2,11 @@ import type { TableMessageSchema } from "./table-messages";
 
 export const tablesEnUS: TableMessageSchema = {
   tables: {
+    insertSlicer: "Insert Slicer",
+    slicerMultiple: "Multi-select",
+    slicerClear: "Clear filter",
+    slicerBlank: "(blank)",
+    slicerMissing: "No filter items available",
     create: "Create table",
     applyStyle: "Apply table style",
     sourceRange: "Table data source",

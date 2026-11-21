@@ -17,6 +17,9 @@ import StandardShapeContent from "./StandardShapeContent.vue";
 import type { ShapeDetailedPresentation } from "../shape-detailed-presentation";
 import type { FormRadioGroup } from "@sheetcraft/core/form-radio-groups";
 import { standardShapeSvgTransform } from "../shape-geometry";
+const TableSlicerContent = defineAsyncComponent(
+  () => import("../../slicers/components/TableSlicerContent.vue"),
+);
 const FormControlContent = defineAsyncComponent(
   () => import("../../form-controls/components/FormControlContent.vue"),
 );
@@ -220,6 +223,12 @@ const legacyBodyTransform = computed(() =>
       :resolve-sheet="resolveSheet"
       :revision="revision ?? 0"
       @select-element="(target, openPane) => emit('chartElementSelect', target, openPane)"
+    />
+    <TableSlicerContent
+      v-else-if="drawing.kind === 'slicer' && sheet"
+      :drawing="drawing"
+      :sheet="sheet"
+      :revision="revision ?? 0"
     />
     <FormControlContent
       v-else-if="drawing.kind === 'control' && sheet && evaluator"

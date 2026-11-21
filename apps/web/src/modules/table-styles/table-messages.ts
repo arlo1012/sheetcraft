@@ -1,5 +1,10 @@
 export type TableMessageSchema = {
   tables: {
+    insertSlicer: string;
+    slicerMultiple: string;
+    slicerClear: string;
+    slicerBlank: string;
+    slicerMissing: string;
     create: string;
     applyStyle: string;
     sourceRange: string;

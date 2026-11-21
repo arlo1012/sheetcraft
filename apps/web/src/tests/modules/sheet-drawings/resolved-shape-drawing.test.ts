@@ -75,7 +75,8 @@ function graphicView(view: SheetLegacyDrawing): SheetGraphicDrawing {
     view.kind === "chart" ||
     view.kind === "camera" ||
     view.kind === "attachment" ||
-    view.kind === "control"
+    view.kind === "control" ||
+    view.kind === "slicer"
   )
     throw new Error("Expected a graphic view.");
   return view;

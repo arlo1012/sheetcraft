@@ -178,6 +178,7 @@ export function updateResolvedShapeDrawing(
           ...(source.kind === "chart" ? ["chart"] : []),
           ...(source.kind === "camera" ? ["camera"] : []),
           ...(source.kind === "attachment" ? ["attachment"] : []),
+          ...(source.kind === "slicer" ? ["slicer"] : []),
           ...(source.kind === "control" ? ["control"] : []),
         ],
   );

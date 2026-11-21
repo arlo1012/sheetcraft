@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import { Eraser, ListMinus, Table2, TableProperties, FunctionSquare } from "lucide-vue-next";
+import {
+  ListFilter,
+  Eraser,
+  ListMinus,
+  Table2,
+  TableProperties,
+  FunctionSquare,
+} from "lucide-vue-next";
 import { Input } from "tdesign-vue-next/es/input";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { createThemedTableStyles, type TableStyleDefinition } from "@sheetcraft/core/table-styles";
@@ -25,6 +32,7 @@ const emit = defineEmits<{
   changeOptions: [changes: TableOptionsPatch];
   resize: [];
   calculatedColumn: [];
+  insertSlicer: [];
   removeDuplicates: [];
   convert: [];
   applyStyle: [style: TableStyleDefinition];
@@ -100,6 +108,15 @@ function onNameKeydown(_value: string | number, context: { e: KeyboardEvent }): 
         data-table-action="resize"
         @activate="emit('resize')"
         ><TableProperties
+      /></RibbonButton>
+      <RibbonButton
+        variant="tall"
+        :disabled="disabled"
+        :label="t('tables.insertSlicer')"
+        :text="t('tables.insertSlicer')"
+        data-table-action="insert-slicer"
+        @activate="emit('insertSlicer')"
+        ><ListFilter
       /></RibbonButton>
       <div class="table-tools-toolbar__stack">
         <RibbonButton

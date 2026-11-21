@@ -155,6 +155,8 @@ import PivotDesignToolbar from "../modules/pivot-tables/components/PivotDesignTo
 import TableStyleGallery from "../modules/table-styles/components/TableStyleGallery.vue";
 import PivotTableDialog from "../modules/pivot-tables/components/PivotTableDialog.vue";
 import { useFormControlActions } from "../modules/form-controls/useFormControlActions";
+import { useTableSlicers } from "../modules/slicers/useTableSlicers";
+import InsertSlicerDialog from "../modules/slicers/components/InsertSlicerDialog.vue";
 import FormControlDialog from "../modules/form-controls/components/FormControlDialog.vue";
 import { useAttachmentActions } from "../modules/attachments/useAttachmentActions";
 import AttachmentDialog from "../modules/attachments/components/AttachmentDialog.vue";
@@ -1582,6 +1584,19 @@ watch(
   },
   { flush: "sync" },
 );
+const tableSlicers = useTableSlicers({
+  workbook: () => session.workbook,
+  sheet: () => activeSheet.value,
+  table: () => activeTable.value,
+  address: () => activeAddress.value,
+  revision: () => workbookRevision.value,
+  busy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  flush: () => cellEditSession.finish(),
+  execute: executeCommand,
+  selectDrawing: (id) => {
+    sheetGridRef.value?.selectShapeObjects([[id]]);
+  },
+});
 const controlActions = useFormControlActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -2020,6 +2035,7 @@ function editSheetDrawing(drawing: SheetDrawing): void {
     if (!flowcharts.open("gallery", drawing) && !mindMaps.open("workbook", drawing))
       attachmentActions.viewing.value = drawing;
   } else if (drawing.kind === "camera") cameraActions.open(drawing);
+  else if (drawing.kind === "slicer") sheetGridRef.value?.selectShapeObjects([[drawing.id]]);
   else if (drawing.kind === "equation") beginEquationEdit(drawing);
   else drawingActions.edit(drawing);
 }
@@ -5819,6 +5835,7 @@ watch(
           @rename="tableActions.renameTable"
           @change-options="tableActions.updateTable"
           @resize="tableActions.openResize"
+          @insert-slicer="tableSlicers.open"
           @calculated-column="tableActions.openCalculatedColumn"
           @remove-duplicates="dataTools.openTableRemoveDuplicates(activeTable.id)"
           @convert="tableActions.convertToRange"
@@ -7633,6 +7650,12 @@ watch(
     :edit-session-id="cellEditSession.id"
     @confirm="pivotRangePicker.confirm"
     @cancel="pivotRangePicker.cancel"
+  />
+  <InsertSlicerDialog
+    v-if="tableSlicers.fields.value"
+    :fields="tableSlicers.fields.value"
+    @confirm="tableSlicers.insert"
+    @close="tableSlicers.target.value = undefined"
   />
   <FormControlDialog
     v-if="controlDialog"

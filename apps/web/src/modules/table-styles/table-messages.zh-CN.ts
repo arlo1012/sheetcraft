@@ -2,6 +2,11 @@ import type { TableMessageSchema } from "./table-messages";
 
 export const tablesZhCN: TableMessageSchema = {
   tables: {
+    insertSlicer: "插入切片器",
+    slicerMultiple: "多选",
+    slicerClear: "清除筛选",
+    slicerBlank: "（空白）",
+    slicerMissing: "没有可用的筛选项",
     create: "创建表格",
     applyStyle: "套用表格样式",
     sourceRange: "表数据的来源",

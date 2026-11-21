@@ -161,6 +161,10 @@
       "types": "./dist/sheet-icons.d.ts",
       "import": "./dist/sheet-icons.js"
     },
+    "./table-slicers": {
+      "types": "./dist/table-slicers.d.ts",
+      "import": "./dist/table-slicers.js"
+    },
     "./sheet-drawings": {
       "types": "./dist/sheet-drawings.d.ts",
       "import": "./dist/sheet-drawings.js"
