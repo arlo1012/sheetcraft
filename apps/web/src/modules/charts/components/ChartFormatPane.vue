@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { chartPlotSeries } from "../chart-bubble";
-import { computed, onBeforeUnmount, reactive, ref, useId, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, reactive, ref, useId, watch } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Input as TInput } from "tdesign-vue-next/es/input";
@@ -33,6 +33,7 @@ import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import OptionList from "../../../shared/option-list/OptionList.vue";
 import NumericField from "../../../shared/numeric-field/NumericField.vue";
 import FormatSection from "../../../shared/format-pane/FormatSection.vue";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import type {
   NumericCandidate,
   NumericCommitResult,
@@ -153,6 +154,34 @@ function legendTabKeydown(event: KeyboardEvent): void {
 }
 let live = true;
 let activeHandler: ChartFormatIntentHandler | undefined;
+const openSelectField = ref<string | null>(null);
+function selectControlAttrs(field: string) {
+  return {
+    attributes: {
+      role: "combobox",
+      "aria-expanded": String(openSelectField.value === field),
+      "data-format-pane-history-control": "readonly-combobox",
+      "data-chart-format-select": field,
+    },
+  };
+}
+function onSelectPopupVisibleChange(field: string, visible: boolean): void {
+  if (visible) {
+    openSelectField.value = field;
+    return;
+  }
+  if (openSelectField.value === field) openSelectField.value = null;
+  void nextTick(() => {
+    if (!live) return;
+    const active = document.activeElement;
+    if (active && active !== document.body && root.value?.contains(active)) return;
+    if (active && active !== document.body) return;
+    const input = root.value?.querySelector<HTMLInputElement>(
+      `input[data-chart-format-select="${field}"]`,
+    );
+    if (input && !input.disabled) input.focus({ preventScroll: true });
+  });
+}
 onBeforeUnmount(() => {
   live = false;
 });
@@ -1496,12 +1525,14 @@ function escapeDraft(event: KeyboardEvent): void {
         <div class="chart-format-pane__field" data-chart-format-title-position>
           <span>{{ t("chart.titlePosition") }}</span
           ><TSelect
+            v-native-control="selectControlAttrs('titlePosition')"
             :popup-props="popupProps"
             :value="chart.elements?.titlePosition ?? 'above'"
             :options="titlePositionOptions"
             size="small"
             :disabled="disabled"
             :aria-label="t('chart.titlePosition')"
+            :onPopupVisibleChange="(v: boolean) => onSelectPopupVisibleChange('titlePosition', v)"
             :onChange="captureAction(setTitlePosition)"
           />
         </div>
@@ -1807,6 +1838,7 @@ function escapeDraft(event: KeyboardEvent): void {
         >
           <span>{{ t("chart.formatDisplayUnit") }}</span>
           <TSelect
+            v-native-control="selectControlAttrs('displayUnit')"
             :popup-props="popupProps"
             :value="valueAxis.displayUnit ?? 'none'"
             :options="displayUnitOptions"
@@ -1814,6 +1846,7 @@ function escapeDraft(event: KeyboardEvent): void {
             :disabled="disabled"
             :aria-label="t('chart.formatDisplayUnit')"
             data-chart-display-unit-select
+            :onPopupVisibleChange="(v: boolean) => onSelectPopupVisibleChange('displayUnit', v)"
             :onChange="captureAction(setAxisDisplayUnit)"
           />
         </div>
@@ -2073,12 +2106,14 @@ function escapeDraft(event: KeyboardEvent): void {
         <div class="chart-format-pane__field">
           <span>{{ t("cellFormat.category") }}</span
           ><TSelect
+            v-native-control="selectControlAttrs('numberCategory')"
             :popup-props="popupProps"
             :value="numberCategory"
             :options="numberCategoryOptions"
             size="small"
             :disabled="disabled"
             :aria-label="t('cellFormat.category')"
+            :onPopupVisibleChange="(v: boolean) => onSelectPopupVisibleChange('numberCategory', v)"
             :onChange="captureAction(selectNumberCategory)"
           />
         </div>
@@ -2112,12 +2147,14 @@ function escapeDraft(event: KeyboardEvent): void {
         <div v-if="showCurrency" class="chart-format-pane__field">
           <span>{{ t("cellFormat.currencyCode") }}</span
           ><TSelect
+            v-native-control="selectControlAttrs('currencyCode')"
             :popup-props="popupProps"
             :value="numberFormat && 'currency' in numberFormat ? numberFormat.currency : ''"
             :options="currencyOptions"
             size="small"
             :disabled="disabled"
             :aria-label="t('cellFormat.currencyCode')"
+            :onPopupVisibleChange="(v: boolean) => onSelectPopupVisibleChange('currencyCode', v)"
             :onChange="captureAction(setCurrency)"
           />
         </div>
@@ -2181,12 +2218,14 @@ function escapeDraft(event: KeyboardEvent): void {
         <div v-if="capabilities.seriesAxis" class="chart-format-pane__field">
           <span>{{ t("chart.formatSeriesAxis") }}</span
           ><TSelect
+            v-native-control="selectControlAttrs('seriesAxis')"
             :popup-props="popupProps"
             :value="series.axis ?? 'primary'"
             :options="seriesAxisOptions"
             size="small"
             :disabled="disabled"
             :aria-label="t('chart.formatSeriesAxis')"
+            :onPopupVisibleChange="(v: boolean) => onSelectPopupVisibleChange('seriesAxis', v)"
             :onChange="
               captureAction(
                 (value: unknown) =>
@@ -2274,6 +2313,7 @@ function escapeDraft(event: KeyboardEvent): void {
           <label :for="`${paneId}-marker-symbol`">{{ t("chart.formatMarkerSymbol") }}</label>
           <div class="chart-format-pane__number">
             <TSelect
+              v-native-control="selectControlAttrs('markerSymbol')"
               :id="`${paneId}-marker-symbol`"
               :popup-props="popupProps"
               :value="series.markerSymbol ?? ''"
@@ -2281,6 +2321,7 @@ function escapeDraft(event: KeyboardEvent): void {
               size="small"
               :disabled="disabled || !seriesMarkersVisible"
               :aria-label="t('chart.formatMarkerSymbol')"
+              :onPopupVisibleChange="(v: boolean) => onSelectPopupVisibleChange('markerSymbol', v)"
               :onChange="captureAction(setMarkerSymbol)"
             /><TButton
               variant="text"
