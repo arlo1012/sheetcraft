@@ -158,6 +158,18 @@ function setTrendline(value: unknown): void {
     return;
   patchElements({ trendline: value });
 }
+function setErrorBars(value: unknown): void {
+  if (
+    props.disabled ||
+    !capabilities.value.errorBars ||
+    (value !== "none" &&
+      value !== "standardError" &&
+      value !== "percentage" &&
+      value !== "standardDeviation")
+  )
+    return;
+  patchElements({ errorBars: value });
+}
 
 const titleOptions = computed(() => [
   { value: "none", label: t("chart.elementNone") },
@@ -184,6 +196,12 @@ const trendlineOptions = computed(() => [
   { value: "linear", label: t("chart.trendlineLinear") },
   { value: "exponential", label: t("chart.trendlineExponential") },
   { value: "movingAverage", label: t("chart.trendlineMovingAverage") },
+]);
+const errorBarOptions = computed(() => [
+  { value: "none", label: t("chart.elementNone") },
+  { value: "standardError", label: t("chart.errorBarsStandardError") },
+  { value: "percentage", label: t("chart.errorBarsPercentage") },
+  { value: "standardDeviation", label: t("chart.errorBarsStandardDeviation") },
 ]);
 
 defineExpose({
@@ -296,6 +314,19 @@ defineExpose({
         :aria-label="t('chart.trendline')"
         data-chart-trendline-select
         @change="setTrendline"
+      />
+    </div>
+    <div v-if="capabilities.errorBars" class="chart-elements-controls__field">
+      <span>{{ t("chart.errorBars") }}</span>
+      <Select
+        :value="settings.errorBars"
+        :options="errorBarOptions"
+        :popup-props="popupProps"
+        size="small"
+        :disabled="disabled"
+        :aria-label="t('chart.errorBars')"
+        data-chart-error-bars-select
+        @change="setErrorBars"
       />
     </div>
     <p v-if="chart.type === 'wordCloud'" class="chart-elements-controls__hint">

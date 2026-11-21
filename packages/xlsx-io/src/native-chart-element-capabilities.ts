@@ -9,6 +9,7 @@ const elementKeys = [
   "labelContent",
   "labelScope",
   "trendline",
+  "errorBars",
 ] as const;
 export const nativeLegendPositions = {
   top: "t",
@@ -96,6 +97,7 @@ export function unsupportedNativeChartElements(chart: SheetChart): readonly stri
       ["labelContent", "value"],
       ["labelScope", "all"],
       ["trendline", "none"],
+      ["errorBars", "none"],
     ] as const)
       if (Object.hasOwn(fields, key) && fields[key] !== defaultValue) reject(key);
     return [...issues];

@@ -47,6 +47,10 @@ export function getChartElementCapabilities(
       ["column", "bar", "line", "area", "scatter", "combo"].includes(type) &&
       !chart?.stacked &&
       !chart?.presentation?.percentStacked,
+    errorBars:
+      ["column", "bar", "line", "area", "scatter", "combo"].includes(type) &&
+      !chart?.stacked &&
+      !chart?.presentation?.percentStacked,
   };
 }
 
@@ -58,5 +62,6 @@ export function getChartElementSettings(chart: SheetChart) {
     legendOverlay: chart.elements?.legendOverlay ?? false,
     labelPosition: chart.elements?.labelPosition ?? "center",
     trendline: chart.elements?.trendline ?? "none",
+    errorBars: chart.elements?.errorBars ?? "none",
   } as const;
 }

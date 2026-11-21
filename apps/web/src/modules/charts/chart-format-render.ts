@@ -16,6 +16,7 @@ import type {
 } from "echarts";
 import {
   normalizeChartFormat,
+  type ChartAxisDisplayUnit,
   type ChartTextFormat,
   type ChartValueAxisFormat,
 } from "@sheetcraft/core/chart-format";
@@ -61,6 +62,22 @@ function uniformFormat(series: ChartSeries[]): CellNumberFormat | undefined {
     : undefined;
 }
 
+const DISPLAY_UNIT_DIVISORS: Record<Exclude<ChartAxisDisplayUnit, "none">, number> = {
+  hundreds: 100,
+  thousands: 1_000,
+  tenThousands: 10_000,
+  millions: 1_000_000,
+  hundredMillions: 100_000_000,
+};
+
+const DISPLAY_UNIT_SUFFIX: Record<Exclude<ChartAxisDisplayUnit, "none">, string> = {
+  hundreds: "×100",
+  thousands: "×1K",
+  tenThousands: "×1W",
+  millions: "×1M",
+  hundredMillions: "×100M",
+};
+
 function valueAxis(
   base: ValueAxisOption,
   settings: ChartValueAxisFormat | undefined,
@@ -72,9 +89,15 @@ function valueAxis(
   const state = resolveChartValueAxisState(settings, entries, stacked, percent);
   settings = state.settings;
   const { percentageDomain, intervals } = state;
+  const displayUnit =
+    !percent && settings?.displayUnit && settings.displayUnit !== "none"
+      ? settings.displayUnit
+      : undefined;
+  const unitDivisor = displayUnit ? DISPLAY_UNIT_DIVISORS[displayUnit] : 1;
   const overrideNumber =
     percent ||
     sourceGroupChanged ||
+    displayUnit !== undefined ||
     settings?.numberFormat !== undefined ||
     settings?.linkedToSource !== undefined;
   const numberFormat: CellNumberFormat | undefined = percent
@@ -86,6 +109,18 @@ function valueAxis(
       : (settings?.numberFormat ??
         (settings?.linkedToSource === false ? undefined : uniformFormat(entries)));
   const { minorDivisions, ...domain } = intervals;
+  const explicitAxisName =
+    settings?.titleVisible === false
+      ? ""
+      : settings?.title !== undefined
+        ? settings.title
+        : undefined;
+  const axisName =
+    explicitAxisName !== undefined
+      ? explicitAxisName
+      : displayUnit
+        ? DISPLAY_UNIT_SUFFIX[displayUnit]
+        : undefined;
   const result: ValueAxisOption = {
     ...base,
     type: "value",
@@ -95,9 +130,9 @@ function valueAxis(
     ...(settings?.min !== undefined ? { min: settings.min } : {}),
     ...(settings?.max !== undefined ? { max: settings.max } : {}),
     ...(settings?.reverse !== undefined ? { inverse: settings.reverse } : {}),
-    ...(settings?.titleVisible === false || settings?.title !== undefined
+    ...(axisName !== undefined
       ? {
-          name: settings.titleVisible === false ? "" : settings.title,
+          name: axisName,
           nameLocation: "middle",
           nameGap: 42,
         }
@@ -110,14 +145,17 @@ function valueAxis(
       ...base.axisLabel,
       ...textStyle(settings?.text),
       ...(overrideNumber
-        ? { formatter: (value: number) => formatCellNumberValue(value, numberFormat).text }
+        ? {
+            formatter: (value: number) =>
+              formatCellNumberValue(value / unitDivisor, numberFormat).text,
+          }
         : {}),
       ...(overrideNumber && numberFormat
         ? {
             color: (value?: string | number) => {
               const number = typeof value === "number" ? value : Number(value);
               return Number.isFinite(number)
-                ? (formatCellNumberValue(number, numberFormat).color ??
+                ? (formatCellNumberValue(number / unitDivisor, numberFormat).color ??
                     settings?.text?.color ??
                     "#6e7079")
                 : (settings?.text?.color ?? "#6e7079");

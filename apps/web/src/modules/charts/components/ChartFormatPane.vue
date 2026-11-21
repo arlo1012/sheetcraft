@@ -15,6 +15,7 @@ import { ChartNoAxesColumn, RotateCcw, X } from "lucide-vue-next";
 import type { SheetChartDrawing } from "@sheetcraft/core/sheet-drawings";
 import type { ChartData } from "@sheetcraft/core/sheet-charts";
 import type {
+  ChartAxisDisplayUnit,
   ChartAxisLineFormat,
   ChartLegendFormat,
   ChartSurfaceFormat,
@@ -917,6 +918,32 @@ function setFill(value: string | null): void {
       format: setChartFormatField(chart.value.format?.plot ?? {}, "fill", value ?? undefined),
     });
 }
+const displayUnitOptions = computed(() => [
+  { value: "none", label: t("chart.displayUnitNone") },
+  { value: "hundreds", label: t("chart.displayUnitHundreds") },
+  { value: "thousands", label: t("chart.displayUnitThousands") },
+  { value: "tenThousands", label: t("chart.displayUnitTenThousands") },
+  { value: "millions", label: t("chart.displayUnitMillions") },
+  { value: "hundredMillions", label: t("chart.displayUnitHundredMillions") },
+]);
+function setAxisDisplayUnit(value: unknown): void {
+  if (
+    !isValueAxis.value ||
+    percentageAxis.value ||
+    (value !== "none" &&
+      value !== "hundreds" &&
+      value !== "thousands" &&
+      value !== "tenThousands" &&
+      value !== "millions" &&
+      value !== "hundredMillions")
+  )
+    return;
+  const next = { ...valueAxis.value };
+  if (value === "none") delete next.displayUnit;
+  else next.displayUnit = value as ChartAxisDisplayUnit;
+  const intent = axisIntent(next);
+  if (intent) submit(intent);
+}
 function setAxisBoolean(
   field: "show" | "reverse" | "titleVisible" | "majorGridlines" | "minorGridlines",
   value: unknown,
@@ -1772,6 +1799,23 @@ function escapeDraft(event: KeyboardEvent): void {
               ><RotateCcw :size="14" aria-hidden="true"
             /></TButton>
           </div>
+        </div>
+        <div
+          v-if="!percentageAxis"
+          class="chart-format-pane__field"
+          data-chart-format-field="displayUnit"
+        >
+          <span>{{ t("chart.formatDisplayUnit") }}</span>
+          <TSelect
+            :popup-props="popupProps"
+            :value="valueAxis.displayUnit ?? 'none'"
+            :options="displayUnitOptions"
+            size="small"
+            :disabled="disabled"
+            :aria-label="t('chart.formatDisplayUnit')"
+            data-chart-display-unit-select
+            :onChange="captureAction(setAxisDisplayUnit)"
+          />
         </div>
       </FormatSection>
 

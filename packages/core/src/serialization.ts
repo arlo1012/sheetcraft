@@ -373,6 +373,7 @@ export type WorkbookSnapshotV107 = Omit<WorkbookSnapshotV106, "version"> & { ver
 export type WorkbookSnapshotV108 = Omit<WorkbookSnapshotV107, "version"> & { version: 108 };
 export type WorkbookSnapshotV109 = Omit<WorkbookSnapshotV108, "version"> & { version: 109 };
 export type WorkbookSnapshotV110 = Omit<WorkbookSnapshotV109, "version"> & { version: 110 };
+export type WorkbookSnapshotV116 = Omit<WorkbookSnapshotV115, "version"> & { version: 116 };
 export type WorkbookSnapshotV115 = Omit<WorkbookSnapshotV114, "version"> & { version: 115 };
 export type WorkbookSnapshotV114 = Omit<WorkbookSnapshotV113, "version"> & { version: 114 };
 export type WorkbookSnapshotV113 = Omit<WorkbookSnapshotV112, "version"> & { version: 113 };
@@ -451,7 +452,8 @@ export type WorkbookSnapshot =
   | WorkbookSnapshotV112
   | WorkbookSnapshotV113
   | WorkbookSnapshotV114
-  | WorkbookSnapshotV115;
+  | WorkbookSnapshotV115
+  | WorkbookSnapshotV116;
 type WorkbookWritePayload = Omit<WorkbookSnapshotV98, "version"> & {
   version: WorkbookSnapshot["version"];
 };
@@ -588,7 +590,8 @@ type SnapshotVersion =
   | 112
   | 113
   | 114
-  | 115;
+  | 115
+  | 116;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -676,6 +679,35 @@ function hasChartTrendline(drawings: unknown): boolean {
         Object.hasOwn(elements, "trendline") &&
         (elements as Record<string, unknown>).trendline !== "none"
       );
+    })
+  );
+}
+function hasChartErrorBarsOrDisplayUnit(drawings: unknown): boolean {
+  return (
+    Array.isArray(drawings) &&
+    drawings.some((drawing) => {
+      if (drawing?.kind !== "chart" || !drawing.chart || typeof drawing.chart !== "object")
+        return false;
+      const elements = chartLayoutContainer(drawing.chart, "elements");
+      if (
+        elements &&
+        typeof elements === "object" &&
+        Object.hasOwn(elements, "errorBars") &&
+        (elements as Record<string, unknown>).errorBars !== "none"
+      )
+        return true;
+      const format = chartLayoutContainer(drawing.chart, "format");
+      for (const axis of ["valueAxis", "secondaryValueAxis"]) {
+        const settings = chartLayoutContainer(format, axis);
+        if (
+          settings &&
+          typeof settings === "object" &&
+          Object.hasOwn(settings, "displayUnit") &&
+          (settings as Record<string, unknown>).displayUnit !== "none"
+        )
+          return true;
+      }
+      return false;
     })
   );
 }
@@ -3034,7 +3066,13 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     if (hasSlicerOptions(record.drawings)) version = 113;
     if (hasPivotSlicers(record.drawings)) version = 114;
     if (hasChartTrendline(record.drawings)) version = 115;
+    if (hasChartErrorBarsOrDisplayUnit(record.drawings)) version = 116;
   }
+  if (version < 116 && hasChartErrorBarsOrDisplayUnit(record.drawings))
+    return fail(
+      path + ".drawings",
+      "Chart error bars and axis display units require snapshot version 116.",
+    );
   if (version < 115 && hasChartTrendline(record.drawings))
     return fail(path + ".drawings", "Chart trendlines require snapshot version 115.");
   if (version < 114 && hasPivotSlicers(record.drawings))
@@ -3559,6 +3597,8 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   if (sheets.some((sheet) => hasSlicerOptions(sheet.drawings))) snapshot.version = 113;
   if (sheets.some((sheet) => hasPivotSlicers(sheet.drawings))) snapshot.version = 114;
   if (sheets.some((sheet) => hasChartTrendline(sheet.drawings))) snapshot.version = 115;
+  if (sheets.some((sheet) => hasChartErrorBarsOrDisplayUnit(sheet.drawings)))
+    snapshot.version = 116;
   // Current write envelopes have the same statically checked payload; this
   // preserves the public discriminated union past large-union contextual limits.
   return snapshot as WorkbookSnapshot;
@@ -3681,7 +3721,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 112 &&
     record.version !== 113 &&
     record.version !== 114 &&
-    record.version !== 115
+    record.version !== 115 &&
+    record.version !== 116
   ) {
     throw new WorkbookDomainError(
       {

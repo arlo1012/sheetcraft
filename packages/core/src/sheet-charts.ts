@@ -56,6 +56,7 @@ export const chartTypes = [
 export type ChartType = (typeof chartTypes)[number];
 
 export type ChartTrendlineType = "none" | "linear" | "exponential" | "movingAverage";
+export type ChartErrorBarType = "none" | "standardError" | "percentage" | "standardDeviation";
 /** Sparse element layout choices; omission retains the existing chart behavior. */
 export type ChartElementSettings = {
   titlePosition?: "none" | "above" | "overlay";
@@ -68,6 +69,7 @@ export type ChartElementSettings = {
   labelContent?: "value" | "seriesAndValue";
   labelScope?: "all" | "lastCategory" | "lastSeries";
   trendline?: ChartTrendlineType;
+  errorBars?: ChartErrorBarType;
 };
 export type SheetChart = {
   /** Source-owned hidden selections, including retired and inactive identities. */
@@ -109,6 +111,7 @@ function normalizeChartElementSettings(value: unknown): ChartElementSettings {
     "labelContent",
     "labelScope",
     "trendline",
+    "errorBars",
   ] as const;
   for (const key of keys)
     if (key in value && !Object.hasOwn(value, key))
@@ -164,6 +167,15 @@ function normalizeChartElementSettings(value: unknown): ChartElementSettings {
     if (!["none", "linear", "exponential", "movingAverage"].includes(source.trendline as string))
       throw new RangeError("Invalid chart trendline type.");
     result.trendline = source.trendline as ChartTrendlineType;
+  }
+  if (Object.hasOwn(source, "errorBars")) {
+    if (
+      !["none", "standardError", "percentage", "standardDeviation"].includes(
+        source.errorBars as string,
+      )
+    )
+      throw new RangeError("Invalid chart error bar type.");
+    result.errorBars = source.errorBars as ChartErrorBarType;
   }
   return result;
 }

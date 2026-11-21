@@ -2,6 +2,7 @@ import { stockChartOption } from "./chart-stock";
 import { pieChartOption } from "./chart-pie";
 import { chartPlotSeries, bubbleSeries, bubbleFormats, isXYChart } from "./chart-bubble";
 import { appendChartTrendlineSeries } from "./chart-trendline";
+import { appendChartErrorBarSeries } from "./chart-error-bars";
 import { specialtyOption } from "./chart-specialty-options";
 import { applyChartSeriesRenderOrder } from "./chart-series-render-order";
 import { reserveChartAxisTitles } from "./chart-axis-title-layout";
@@ -608,22 +609,26 @@ export function createChartOption(
           presentation.themeAccent,
         )
       : (presentation?.palette ?? [...colors]);
-  return appendChartTrendlineSeries(
-    applyChartSeriesRenderOrder(
-      applySeriesLegendIdentity(
-        applyChartScriptFontFormat(
-          reserveChartAxisTitles(formatted, chart, dimensions),
+  return appendChartErrorBarSeries(
+    appendChartTrendlineSeries(
+      applyChartSeriesRenderOrder(
+        applySeriesLegendIdentity(
+          applyChartScriptFontFormat(
+            reserveChartAxisTitles(formatted, chart, dimensions),
+            chart,
+            dimensions?.theme,
+            dimensions?.resolveFontFamily,
+          ),
           chart,
-          dimensions?.theme,
-          dimensions?.resolveFontFamily,
+          renderedData,
         ),
         chart,
-        renderedData,
       ),
       chart,
+      renderedData,
+      palette,
     ),
     chart,
     renderedData,
-    palette,
   );
 }

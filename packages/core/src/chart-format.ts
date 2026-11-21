@@ -42,12 +42,22 @@ export type ChartCategoryAxisFormat = {
   text?: ChartTextFormat;
   line?: ChartAxisLineFormat;
 };
+export const CHART_AXIS_DISPLAY_UNITS = [
+  "none",
+  "hundreds",
+  "thousands",
+  "tenThousands",
+  "millions",
+  "hundredMillions",
+] as const;
+export type ChartAxisDisplayUnit = (typeof CHART_AXIS_DISPLAY_UNITS)[number];
 export type ChartValueAxisFormat = {
   show?: boolean;
   min?: number;
   max?: number;
   majorUnit?: number;
   minorUnit?: number;
+  displayUnit?: ChartAxisDisplayUnit;
   majorGridlines?: boolean;
   minorGridlines?: boolean;
   reverse?: boolean;
@@ -325,6 +335,7 @@ function valueAxis(value: unknown): ChartValueAxisFormat {
     "max",
     "majorUnit",
     "minorUnit",
+    "displayUnit",
     "majorGridlines",
     "minorGridlines",
     "reverse",
@@ -390,6 +401,11 @@ function valueAxis(value: unknown): ChartValueAxisFormat {
     result.numberFormat = numberFormat(source.numberFormat);
   if (Object.hasOwn(source, "linkedToSource"))
     result.linkedToSource = boolean(source.linkedToSource);
+  if (Object.hasOwn(source, "displayUnit")) {
+    if (!CHART_AXIS_DISPLAY_UNITS.includes(source.displayUnit as ChartAxisDisplayUnit))
+      throw new RangeError("Invalid chart axis display unit.");
+    result.displayUnit = source.displayUnit as ChartAxisDisplayUnit;
+  }
   return result;
 }
 function series(value: unknown): ChartSeriesFormat[] {
