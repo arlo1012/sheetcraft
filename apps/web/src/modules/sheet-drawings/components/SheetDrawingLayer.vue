@@ -35,19 +35,11 @@ import {
   type ShapeGroupDrawing,
   type ShapeGroupPath,
 } from "@sheetcraft/core/shape-group";
-import {
-  groupShapeRoots,
-  ungroupShapeRoot,
-  isShapeGroupEligibleRoot,
-} from "@sheetcraft/core/shape-group-planning";
-import { planDeleteShapeGroupNodes } from "@sheetcraft/core/shape-group-delete";
-import { normalizeSheetDrawing } from "@sheetcraft/core/sheet-drawings";
+import { isShapeGroupEligibleRoot } from "@sheetcraft/core/shape-group-planning";
 import {
   planShapeConnectorBodyTranslation,
   planShapeConnectorEndpointChange,
   planShapeConnectorRouteAdjustment,
-  type ShapeConnectorEditSource,
-  type ShapeConnectorEndpointEdit,
 } from "@sheetcraft/core/shape-connector-editing";
 import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
 import { shapeFrameLocalToWorld } from "@sheetcraft/core/shape-frame";
@@ -56,10 +48,7 @@ import {
   type ResolvedShapeForestForRender,
   type ResolvedShapeRenderLeaf,
 } from "../resolved-shape-render-source";
-import {
-  getShapeConnectorSiteCandidates,
-  type ShapeConnectorSiteCandidate,
-} from "../shape-connector-site-picking";
+import type { ShapeConnectorSiteCandidate } from "../shape-connector-site-picking";
 import {
   resolveShapeGroupProjection,
   updateResolvedShapeGroupLeaf,
@@ -69,21 +58,12 @@ import {
   getShapeGroupFrameFragments,
   type ShapeGroupFrameFragment,
 } from "../shape-group-fragments";
-import {
-  moveSelectedShapeRoots,
-  resizeSelectedShapeRoots,
-  alignSelectedShapeRoots,
-  equalizeSelectedShapeRoots,
-  type EqualShapeDimensionsAction,
-} from "../shape-root-selection-planning";
-import {
-  updateOwnedShapeContainer,
-  ungroupOwnedShapeContainer,
-} from "../shape-group-container-editing";
+import { moveSelectedShapeRoots } from "../shape-root-selection-planning";
+import { updateOwnedShapeContainer } from "../shape-group-container-editing";
 import { resolveShapeGroupFormatContext } from "../shape-group-format-planning";
 import { readShapeObjectControlPaths } from "../shape-object-control-planning";
 import { getVisibleShapeNodeIds } from "../shape-visibility";
-import type { ShapeAlignment, ShapeAlignmentReference } from "../shape-selection-actions";
+import type { ShapeAlignmentReference } from "../shape-selection-actions";
 import { createBrowserIdFactory } from "../../../shared/runtime/browser-id-factory";
 import { useAppI18n } from "../../../shared/i18n";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
@@ -180,6 +160,8 @@ import {
   detailedShapeContainsWorldPoint,
   type ShapeDetailedPresentation,
 } from "../shape-detailed-presentation";
+import { useDrawingSelectionOperations } from "../composables/useDrawingSelectionOperations";
+import { useDrawingConnectorGestures } from "../composables/useDrawingConnectorGestures";
 import type { TextBoxReferenceResolver } from "../textbox-reference-display";
 const props = defineProps<{
   drawings: readonly SourceSheetDrawing[];
@@ -1379,489 +1361,58 @@ const toolbarAnchor = computed<FloatingReference | null>(() => {
     },
   };
 });
-function runSelectionPlan(
-  plan: () => readonly SourceSheetDrawing[],
-  key = selectionKey.value,
-): boolean {
-  const m = metrics.value;
-  if (key !== selectionKey.value || selectionDisabled.value || !m || !props.applyCollection)
-    return false;
-  const expected = [...props.drawings];
-  const pass = renderPass.value;
-  const current = () => {
-    try {
-      pass?.assertCurrent(props.drawings, m, props.revision ?? 0);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-  try {
-    if (!current()) return false;
-    const next = plan();
-    if (pass) resolveShapeForestForRender({ drawings: next, metrics: m, revision: pass.revision });
-    if (
-      key !== selectionKey.value ||
-      metrics.value !== m ||
-      props.drawings.length !== expected.length ||
-      props.drawings.some((d, i) => d !== expected[i]) ||
-      !current()
-    )
-      return false;
-    const accepted =
-      props.applyCollection(
-        next,
-        expected,
-        m,
-        () =>
-          key === selectionKey.value &&
-          metrics.value === m &&
-          !selectionDisabled.value &&
-          current() &&
-          props.drawings.length === expected.length &&
-          props.drawings.every((d, i) => d === expected[i]),
-      ) === true;
-    selectionFailure.value = !accepted;
-    return accepted;
-  } catch {
-    selectionFailure.value = true;
-    return false;
-  }
-}
-function alignSelected(
-  action: ShapeAlignment,
-  reference: ShapeAlignmentReference,
-  key: string,
-): void {
-  if (selectedRoots.value.some((id) => renderPass.value?.getLeaf(id)?.connector)) {
-    connectorFailure.value = true;
-    return;
-  }
-  if (metrics.value)
-    runSelectionPlan(
-      () =>
-        alignSelectedShapeRoots(
-          props.drawings,
-          selectedRoots.value,
-          action,
-          metrics.value!,
-          reference,
-        ),
-      key,
-    );
-}
-function equalizeSelected(action: EqualShapeDimensionsAction, key: string): void {
-  if (selectedRoots.value.some((id) => renderPass.value?.getLeaf(id)?.connector)) {
-    connectorFailure.value = true;
-    return;
-  }
-  if (metrics.value)
-    runSelectionPlan(
-      () =>
-        equalizeSelectedShapeRoots(
-          props.drawings,
-          selectedRoots.value,
-          action,
-          metrics.value!,
-          alignmentReference.value,
-        ),
-      key,
-    );
-}
-function selectedContainerPath(source: ShapeGroupDrawing): ShapeGroupPath {
-  const own =
-    selectedOwnedId.value &&
-    metrics.value &&
-    groupProjection(source, metrics.value).owners.find(
-      (o) => o.sourceNode.id === selectedOwnedId.value,
-    );
-  return own ? own.path : [source.id];
-}
-function formatGroup(source: ShapeGroupDrawing, path: ShapeGroupPath): void {
-  if (props.drawings.find((d) => d.id === source.id) !== source || selectionDisabled.value) return;
-  const selectedLeaf = renderPass.value?.getLeaf(path.at(-1)!);
-  if (
-    selectedLeaf?.connector &&
-    selectedLeaf.sourceRoot === source &&
-    JSON.stringify(selectedLeaf.path) === JSON.stringify(path)
-  ) {
-    const view = legacyDrawings.value.find((drawing) => drawing.id === selectedLeaf.sourceNode.id);
-    if (view) formatConnector(view);
-    return;
-  }
-  if (
-    renderPass.value?.leaves.some(
-      (leaf) =>
-        leaf.sourceRoot === source &&
-        leaf.connector &&
-        path.every((id, index) => leaf.path[index] === id),
-    )
-  ) {
-    connectorFailure.value = true;
-    return;
-  }
-  selectRoots([source.id], path.length > 1 ? path.at(-1)! : null);
-  emit("formatGroup", source, path);
-}
-function groupSelected(key: string): void {
-  if (key !== selectionKey.value || !metrics.value) return;
-  const id = createId("shape-group");
-  if (
-    runSelectionPlan(
-      () =>
-        groupShapeRoots(
-          props.drawings,
-          selectedRoots.value,
-          { id, name: t("drawing.groupName") },
-          metrics.value!,
-        ),
-      key,
-    )
-  )
-    selectRoots([id]);
-}
-function ungroupSelected(source: ShapeGroupDrawing, path: ShapeGroupPath = [source.id]): void {
-  const m = metrics.value;
-  if (
-    !m ||
-    props.drawings.find((d) => d.id === source.id) !== source ||
-    !selectedRoots.value.includes(source.id)
-  )
-    return;
-  if (path.length > 1) {
-    if (
-      runSelectionPlan(() =>
-        props.drawings.map((d) => (d === source ? ungroupOwnedShapeContainer(source, path, m) : d)),
-      )
-    )
-      selectRoots([source.id], path.length > 2 ? path.at(-2)! : null);
-  } else if (runSelectionPlan(() => ungroupShapeRoot(props.drawings, source.id, m)))
-    selectRoots(source.members.map((d) => d.id));
-}
-function deleteSelected(): void {
-  const m = metrics.value;
-  if (!m) return;
-  const own =
-    selectedOwnedId.value &&
-    resolvedDrawings.value.find((d) => d.view.id === selectedOwnedId.value)?.groupLeaf;
-  const selectedRoot = props.drawings.find((d) => d.id === selectedRoots.value[0]);
-  const container =
-    selectedRoot && isShapeGroupDrawing(selectedRoot)
-      ? selectedContainerPath(selectedRoot)
-      : undefined;
-  const paths: ShapeGroupPath[] = own
-    ? [own.path]
-    : container && container.length > 1
-      ? [container]
-      : selectedRoots.value.map((id) => [id]);
-  if (runSelectionPlan(() => planDeleteShapeGroupNodes(props.drawings, paths, m))) {
-    if (own && props.drawings.some((d) => d.id === own.sourceRoot.id))
-      selectRoots([own.sourceRoot.id]);
-    else selectRoots([]);
-  }
-}
-function rotateRootSelection(degrees: number): readonly SourceSheetDrawing[] {
-  const ids = new Set(selectedRoots.value);
-  if (
-    props.drawings.some((root) => ids.has(root.id) && root.kind === "shape" && root.shapeConnector)
-  ) {
-    connectorFailure.value = true;
-    throw new TypeError("Connector rotation requires an endpoint edit.");
-  }
-  return props.drawings.map((root) =>
-    ids.has(root.id)
-      ? normalizeSheetDrawing({
-          ...root,
-          rotation: ((((root.rotation + degrees + 180) % 360) + 360) % 360) - 180,
-        })
-      : root,
-  );
-}
-function startRootGesture(
-  id: string,
-  fragment: FloatingImageViewportFragment & { pageKey?: string },
-  event: PointerEvent,
-  direction?: FloatingImageResizeDirection,
-  mode: "move" | "rotate" = "move",
-  onClick?: () => void,
-  ownedPath?: ShapeGroupPath,
-): void {
-  if (!finishCanvasText()) {
-    event.preventDefault();
-    event.stopPropagation();
-    return;
-  }
-  const m = metrics.value;
-  const root = props.drawings.find((d) => d.id === id);
-  if (
-    !m ||
-    !root ||
-    !isShapeGroupEligibleRoot(root) ||
-    selectionDisabled.value ||
-    event.button !== 0
-  )
-    return;
-  if (
-    props.drawings.some(
-      (drawing) =>
-        selectedRoots.value.includes(drawing.id) &&
-        drawing.kind === "shape" &&
-        drawing.shapeConnector,
-    )
-  ) {
-    connectorFailure.value = true;
-    return;
-  }
-  event.preventDefault();
-  event.stopPropagation();
-  const expected = [...props.drawings],
-    expectedData = JSON.stringify(props.drawings),
-    key = selectionKey.value,
-    selected = [...selectedRoots.value];
-  const sheet = props.sheet,
-    revision = props.revision,
-    viewport = props.layout,
-    projection = props.pageProjection,
-    scale = props.scale;
-  const pass = renderPass.value;
-  const current = () => {
-    try {
-      pass?.assertCurrent(props.drawings, m, props.revision ?? 0);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-  const valid = () =>
-    key === selectionKey.value &&
-    !selectionDisabled.value &&
-    metrics.value === m &&
-    props.sheet === sheet &&
-    props.revision === revision &&
-    props.layout === viewport &&
-    props.pageProjection === projection &&
-    props.scale === scale &&
-    current() &&
-    props.drawings.length === expected.length &&
-    props.drawings.every((d, i) => d === expected[i]) &&
-    JSON.stringify(props.drawings) === expectedData;
-  const translation = getPicturePaneTranslation(fragment.paneId, viewport);
-  const sample = (point: MouseEvent) =>
-    projection
-      ? shapePagePointFromViewport(viewportPoint(point), viewport, projection, m)?.point
-      : { x: viewportPoint(point).x - translation.x, y: viewportPoint(point).y - translation.y };
-  const origin = sample(event);
-  if (!origin) return;
-  const worldRect = {
-    ...fragment.rect,
-    x: fragment.rect.x - translation.x,
-    y: fragment.rect.y - translation.y,
-  };
-  const groupLayout = isShapeGroupDrawing(root)
-    ? ownedPath
-      ? groupContainer(root, ownedPath, m).layout
-      : groupProjection(root, m).layout
-    : undefined;
-  const centerRect =
-    groupLayout?.rect ?? resolvedDrawings.value.find((d) => d.source === root)?.rect ?? worldRect;
-  const center = {
-    x: centerRect.x + centerRect.width / 2,
-    y: centerRect.y + centerRect.height / 2,
-  };
-  const initialAngle = Math.atan2(origin.y - center.y, origin.x - center.x);
-  let rejected = false;
-  let moved = false;
-  const updateRoots = (point: MouseEvent) => {
-    if (!valid()) {
-      session?.cancel();
-      return;
-    }
-    const nextPoint = sample(point);
-    if (!nextPoint) {
-      rootsPreview.value = undefined;
-      return;
-    }
-    const delta = { x: nextPoint.x - origin.x, y: nextPoint.y - origin.y };
-    moved = delta.x !== 0 || delta.y !== 0;
-    try {
-      if (ownedPath && isShapeGroupDrawing(root) && groupLayout) {
-        let angle = groupLayout.angleDeg;
-        let rect = { ...groupLayout.rect };
-        if (mode === "rotate") {
-          angle +=
-            ((Math.atan2(nextPoint.y - center.y, nextPoint.x - center.x) - initialAngle) * 180) /
-            Math.PI;
-          if (point.shiftKey) angle = Math.round(angle / 15) * 15;
-        } else if (direction) {
-          const node = groupContainer(root, ownedPath, m).sourceNode;
-          const resized = standardShapeResizeRect(
-            rect,
-            angle,
-            direction,
-            delta,
-            getShapeObjectProperties(node.shapeProperties).lockAspectRatio || point.shiftKey,
-            1,
-            true,
-          );
-          if (!resized) throw new RangeError("Nested group resize has no valid placement.");
-          rect = resized;
-        } else {
-          rect.x += delta.x;
-          rect.y += delta.y;
-        }
-        const next = updateOwnedShapeContainer(root, ownedPath, { rect, angleDeg: angle }, m);
-        setRootsPreview(expected.map((d) => (d === root ? next : d)));
-      } else if (mode === "rotate") {
-        let degrees =
-          ((Math.atan2(nextPoint.y - center.y, nextPoint.x - center.x) - initialAngle) * 180) /
-          Math.PI;
-        if (point.shiftKey)
-          degrees = Math.round((root.rotation + degrees) / 15) * 15 - root.rotation;
-        const ids = new Set(selected);
-        setRootsPreview(
-          expected.map((d) =>
-            ids.has(d.id)
-              ? normalizeSheetDrawing({
-                  ...d,
-                  rotation: ((((d.rotation + degrees + 180) % 360) + 360) % 360) - 180,
-                })
-              : d,
-          ),
-        );
-      } else
-        setRootsPreview(
-          direction
-            ? resizeSelectedShapeRoots(expected, selected, id, direction, delta, m, point.shiftKey)
-            : moveSelectedShapeRoots(expected, selected, delta, m),
-        );
-      rejected = false;
-    } catch {
-      rootsPreview.value = undefined;
-      rejected = true;
-    }
-  };
-  session = startPointerSession({
-    event,
-    captureTarget: layerElement.value,
-    onMove: updateRoots,
-    onEnd: (point) => {
-      updateRoots(point);
-      const next = rootsPreview.value;
-      rootsPreview.value = undefined;
-      if (valid() && next) {
-        const accepted = runSelectionPlan(() => next, key);
-        if (accepted && !moved && !direction && mode === "move") onClick?.();
-      } else if (valid() && rejected) selectionFailure.value = true;
-    },
-    onCancel: () => {
-      rootsPreview.value = undefined;
-    },
-  });
-}
-function startGroupFrame(
-  source: ShapeGroupDrawing,
-  fragment: ShapeGroupFrameFragment,
-  event: PointerEvent,
-  direction?: FloatingImageResizeDirection,
-  mode: "move" | "rotate" = "move",
-  path: ShapeGroupPath = [source.id],
-): void {
-  if (!finishCanvasText()) {
-    event.preventDefault();
-    event.stopPropagation();
-    return;
-  }
-  if (props.drawings.find((d) => d.id === source.id) !== source) return;
-  const nestedId = path.length > 1 ? path.at(-1)! : null;
-  if (nestedId !== null) {
-    if (
-      selectedRoots.value.length !== 1 ||
-      selectedRoots.value[0] !== source.id ||
-      selectedOwnedId.value !== nestedId
-    )
-      selectRoots([source.id], nestedId);
-  } else if (!selectedRoots.value.includes(source.id) || selectedOwnedId.value !== null)
-    selectRoots([source.id]);
-  pointEditingId.value = null;
-  emit("select");
-  startRootGesture(
-    source.id,
-    fragment,
-    event,
-    direction,
-    mode,
-    undefined,
-    path.length > 1 ? path : undefined,
-  );
-}
-function groupKeydown(
-  source: ShapeGroupDrawing,
-  event: KeyboardEvent,
-  path: ShapeGroupPath = [source.id],
-): void {
-  if (
-    event.defaultPrevented ||
-    event.isComposing ||
-    event.ctrlKey ||
-    event.metaKey ||
-    event.altKey ||
-    props.drawings.find((d) => d.id === source.id) !== source
-  )
-    return;
-  if (
-    !selectedRoots.value.includes(source.id) ||
-    selectedOwnedId.value !== (path.length > 1 ? path.at(-1)! : null)
-  )
-    selectRoots([source.id], path.length > 1 ? path.at(-1)! : null);
-  if (event.key === "F2" || event.key === "Enter") {
-    event.preventDefault();
-    event.stopPropagation();
-    formatGroup(source, path);
-    return;
-  }
-  if (event.key === "Escape") {
-    if (path.length > 1) selectRoots([source.id], path.length > 2 ? path.at(-2)! : null);
-    else selectRoots([]);
-    event.stopPropagation();
-    return;
-  }
-  if (event.key === "Delete" || event.key === "Backspace") {
-    event.preventDefault();
-    event.stopPropagation();
-    deleteSelected();
-    return;
-  }
-  const step = event.shiftKey ? 10 : 1;
-  const delta = {
-    ArrowLeft: { x: -step, y: 0 },
-    ArrowRight: { x: step, y: 0 },
-    ArrowUp: { x: 0, y: -step },
-    ArrowDown: { x: 0, y: step },
-  }[event.key];
-  if (delta && metrics.value) {
-    event.preventDefault();
-    event.stopPropagation();
-    if (path.length > 1)
-      runSelectionPlan(() => {
-        const layout = groupContainer(source, path, metrics.value!).layout;
-        if (!layout) throw new RangeError("Nested group is collapsed.");
-        const next = updateOwnedShapeContainer(
-          source,
-          path,
-          {
-            rect: { ...layout.rect, x: layout.rect.x + delta.x, y: layout.rect.y + delta.y },
-            angleDeg: layout.angleDeg,
-          },
-          metrics.value!,
-        );
-        return props.drawings.map((d) => (d === source ? next : d));
-      });
-    else
-      runSelectionPlan(() =>
-        moveSelectedShapeRoots(props.drawings, selectedRoots.value, delta, metrics.value!),
-      );
-  }
-}
+const {
+  runSelectionPlan,
+  alignSelected,
+  equalizeSelected,
+  formatGroup,
+  groupSelected,
+  ungroupSelected,
+  deleteSelected,
+  rotateRootSelection,
+  startRootGesture,
+  startGroupFrame,
+  groupKeydown,
+} = useDrawingSelectionOperations({
+  getDrawings: () => props.drawings,
+  getSheet: () => props.sheet,
+  getRevision: () => props.revision,
+  getLayout: () => props.layout,
+  getPageProjection: () => props.pageProjection,
+  getScale: () => props.scale,
+  getApplyCollection: () => props.applyCollection,
+  metrics,
+  renderPass,
+  resolvedDrawings,
+  legacyDrawings,
+  selectedRoots,
+  selectedOwnedId,
+  selectionKey,
+  selectionDisabled,
+  selectionFailure,
+  connectorFailure,
+  alignmentReference,
+  rootsPreview,
+  pointEditingId,
+  layerElement,
+  createId,
+  groupNameLabel: () => t("drawing.groupName"),
+  selectRoots,
+  setRootsPreview,
+  groupProjection,
+  groupContainer,
+  viewportPoint,
+  finishCanvasText: () => finishCanvasText(),
+  formatConnector,
+  setPointerSession: (next) => {
+    session = next;
+  },
+  cancelPointerSession: () => {
+    session?.cancel();
+  },
+  onFormatGroup: (source, path) => emit("formatGroup", source, path),
+  onSelect: () => emit("select"),
+});
 watch(
   () => [
     props.drawings,
@@ -2037,200 +1588,36 @@ const unavailableConnectors = computed(
         : [],
     ) ?? [],
 );
-function connectorEditSource(drawing: SheetDrawing): ShapeConnectorEditSource | undefined {
-  const leaf = renderPass.value?.getLeaf(drawing.id);
-  return leaf?.connector?.status === "ready"
-    ? { connectorId: leaf.sourceNode.id, path: leaf.path }
-    : undefined;
-}
-function commitConnectorPlan(
-  pass: ResolvedShapeForestForRender,
-  drawing: SheetDrawing,
-  next: readonly SourceSheetDrawing[],
-  key: string,
-  gestureValid: () => boolean = () => true,
-): boolean {
-  const root = pass.getLeaf(drawing.id)?.sourceRoot;
-  const valid = () => {
-    try {
-      pass.assertCurrent(props.drawings, metrics.value!, props.revision ?? 0);
-      return (
-        gestureValid() &&
-        key === selectionKey.value &&
-        renderPass.value === pass &&
-        canChange(drawing) &&
-        !selectionDisabled.value &&
-        !!root &&
-        props.drawings.find((item) => item.id === root.id) === root
-      );
-    } catch {
-      return false;
-    }
-  };
-  if (!valid() || !props.applyCollection) return false;
-  try {
-    resolveShapeForestForRender({ drawings: next, metrics: pass.metrics, revision: pass.revision });
-    const accepted =
-      props.applyCollection(next, [...pass.sourceForest], pass.metrics, valid) === true;
-    selectionFailure.value = !accepted;
-    return accepted;
-  } catch {
-    selectionFailure.value = true;
-    return false;
-  }
-}
-function startConnectorGesture(
-  fragment: DrawingFragment,
-  event: PointerEvent,
-  mode: "move" | "endpoint" | "adjust",
-  index?: number,
-): void {
-  const drawing = fragment.drawing;
-  const pass = renderPass.value;
-  const source = connectorEditSource(drawing);
-  const route = fragment.connectorRoute;
-  if (!props.applyCollection) {
-    connectorFailure.value = true;
-    return;
-  }
-  if (
-    !pass ||
-    !source ||
-    !route ||
-    !props.applyCollection ||
-    selectionDisabled.value ||
-    !canChange(drawing) ||
-    (mode === "endpoint" && index !== 0 && index !== 1) ||
-    (mode === "adjust" && (!Number.isSafeInteger(index) || !route.geometry.handles[index!]))
-  )
-    return;
-  const key = selectionKey.value;
-  const sheet = props.sheet,
-    revision = props.revision,
-    viewport = props.layout,
-    page = props.pageProjection,
-    scale = props.scale;
-  const valid = () => {
-    try {
-      pass.assertCurrent(props.drawings, metrics.value!, props.revision ?? 0);
-      return (
-        key === selectionKey.value &&
-        renderPass.value === pass &&
-        canChange(drawing) &&
-        !selectionDisabled.value &&
-        props.sheet === sheet &&
-        props.revision === revision &&
-        props.layout === viewport &&
-        props.pageProjection === page &&
-        props.scale === scale &&
-        legacyDrawings.value.includes(drawing)
-      );
-    } catch {
-      return false;
-    }
-  };
-  const translation = getPicturePaneTranslation(fragment.paneId, viewport);
-  const sample = (point: MouseEvent) =>
-    page
-      ? shapePagePointFromViewport(viewportPoint(point), viewport, page, pass.metrics)?.point
-      : { x: viewportPoint(point).x - translation.x, y: viewportPoint(point).y - translation.y };
-  const origin = sample(event);
-  if (!origin || !valid()) return;
-  const tip = index === 0 ? route.begin : route.end;
-  const adjustment =
-    mode === "adjust"
-      ? shapeFrameLocalToWorld(
-          route.paintLayout.rect,
-          route.paintLayout.angleDeg,
-          route.geometry.handles[index!]!.position,
-        )
-      : undefined;
-  let planned: readonly SourceSheetDrawing[] | undefined;
-  let changed = false;
-  const update = (point: MouseEvent) => {
-    if (!valid()) {
-      session?.cancel();
-      return;
-    }
-    const target = sample(point);
-    if (!target) {
-      planned = undefined;
-      rootsPreview.value = undefined;
-      connectorSites.value = [];
-      return;
-    }
-    const delta = { x: target.x - origin.x, y: target.y - origin.y };
-    changed = delta.x !== 0 || delta.y !== 0;
-    try {
-      if (mode === "endpoint") {
-        const position = { x: tip.x + delta.x, y: tip.y + delta.y };
-        const nearby = getShapeConnectorSiteCandidates(
-          pass.connections!,
-          position,
-          12 / scale,
-          visibleNodeIds.value,
-        );
-        connectorSites.value = nearby;
-        const site = nearby[0];
-        const endpoint: ShapeConnectorEndpointEdit = site
-          ? {
-              kind: "site",
-              targetId: site.targetId,
-              targetPath: site.path,
-              preset: site.preset,
-              siteIndex: site.siteIndex,
-            }
-          : { kind: "free", position };
-        planned = changed
-          ? planShapeConnectorEndpointChange(
-              pass.sourceForest,
-              source,
-              index === 0 ? "begin" : "end",
-              endpoint,
-              pass.metrics,
-            )
-          : undefined;
-      } else if (mode === "adjust") {
-        planned = changed
-          ? planShapeConnectorRouteAdjustment(
-              pass.sourceForest,
-              source,
-              index!,
-              { x: adjustment!.x + delta.x, y: adjustment!.y + delta.y },
-              pass.metrics,
-            )
-          : undefined;
-      } else {
-        planned = changed
-          ? planShapeConnectorBodyTranslation(pass.sourceForest, source, delta, pass.metrics)
-          : undefined;
-      }
-      setRootsPreview(planned);
-      selectionFailure.value = false;
-    } catch {
-      planned = undefined;
-      rootsPreview.value = undefined;
-      connectorSites.value = [];
-      selectionFailure.value = true;
-    }
-  };
-  session = startPointerSession({
-    event,
-    captureTarget: layerElement.value,
-    onMove: update,
-    onEnd: (point) => {
-      update(point);
-      const next = planned;
-      rootsPreview.value = undefined;
-      connectorSites.value = [];
-      if (next && changed && valid()) commitConnectorPlan(pass, drawing, next, key, valid);
+const { connectorEditSource, commitConnectorPlan, startConnectorGesture } =
+  useDrawingConnectorGestures({
+    getDrawings: () => props.drawings,
+    getSheet: () => props.sheet,
+    getRevision: () => props.revision,
+    getLayout: () => props.layout,
+    getPageProjection: () => props.pageProjection,
+    getScale: () => props.scale,
+    getApplyCollection: () => props.applyCollection,
+    metrics,
+    renderPass,
+    legacyDrawings,
+    visibleNodeIds,
+    selectionKey,
+    selectionDisabled,
+    selectionFailure,
+    connectorFailure,
+    rootsPreview,
+    connectorSites,
+    layerElement,
+    canChange,
+    setRootsPreview,
+    viewportPoint,
+    setPointerSession: (next) => {
+      session = next;
     },
-    onCancel: () => {
-      rootsPreview.value = undefined;
-      connectorSites.value = [];
+    cancelPointerSession: () => {
+      session?.cancel();
     },
   });
-}
 function start(
   fragment: DrawingFragment,
   event: PointerEvent,

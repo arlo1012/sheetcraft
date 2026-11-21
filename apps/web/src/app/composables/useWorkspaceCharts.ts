@@ -20,10 +20,12 @@ import { useChartActions } from "../../modules/charts/useChartActions";
 import { useChartFormatControls } from "../../modules/charts/useChartFormatControls";
 import { useChartObjectControls } from "../../modules/charts/useChartObjectControls";
 import { useChartSourceActions } from "../../modules/charts/useChartSourceActions";
-import type { MessageKey } from "../../shared/i18n";
+import type { MessageKey, MessageParams } from "../../shared/i18n";
 import { useRangeReferencePicker } from "../../shared/range-reference/useRangeReferencePicker";
+import type { WorkspaceRuntime } from "../../shared/runtime/workspace-runtime";
 
 type WorkspaceChartsOptions = {
+  runtime?: WorkspaceRuntime;
   getWorkbook: () => Workbook;
   getActiveSheet: () => Sheet;
   getSelectionRange: () => CellRange;
@@ -38,8 +40,8 @@ type WorkspaceChartsOptions = {
   selectSheet: (sheetId: string) => void;
   selectDrawing: (drawingId: string) => void;
   openPivotFields: (id?: string) => void;
-  closeCompetingFormatPanes: () => void;
-  t: (key: MessageKey, params?: Record<string, unknown>) => string;
+  closeCompetingFormatPanes?: () => void;
+  t: (key: MessageKey, params?: MessageParams) => string;
 };
 
 /** Owns chart insert/edit/source/object/format orchestration and chart range-reference pickers. */
@@ -47,6 +49,10 @@ export function useWorkspaceCharts(options: WorkspaceChartsOptions) {
   const chartFormatPaneVisible = ref(false);
   const chartFormatPaneRef = ref<InstanceType<typeof ChartFormatPaneType>>();
   const chartFormatTarget = shallowRef<ChartFormatTarget>({ kind: "chart" });
+
+  options.runtime?.coordinator.registerPane("chart", () => {
+    chartFormatPaneVisible.value = false;
+  });
 
   const chartActions = useChartActions({
     getWorkbook: options.getWorkbook,
@@ -193,7 +199,8 @@ export function useWorkspaceCharts(options: WorkspaceChartsOptions) {
       chartFormatPaneRef.value?.canChangeTarget() === false
     )
       return;
-    options.closeCompetingFormatPanes();
+    if (options.runtime) options.runtime.coordinator.notifyPaneOpened("chart");
+    else options.closeCompetingFormatPanes?.();
     chartFormatTarget.value = target;
     chartFormatPaneVisible.value = true;
   }

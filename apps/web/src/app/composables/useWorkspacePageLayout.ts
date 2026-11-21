@@ -6,6 +6,7 @@ import { isPictureGroup } from "@sheetcraft/core";
 import { isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import type { CellAddress, CellRange, Sheet, Workbook } from "@sheetcraft/core/workbook";
 import type { SheetViewMode } from "@sheetcraft/sheet-engine/page-layout";
+import type { SelectionMode } from "@sheetcraft/sheet-engine/selection";
 import type {
   usePageDecorationActions,
   WatermarkScope,
@@ -42,7 +43,7 @@ type WorkspacePageLayoutOptions = {
   getWorkbookGeneration: () => number;
   getSelectionRange: () => CellRange;
   getActiveAddress: () => CellAddress;
-  getSelectionMode: () => "cells" | "rows" | "columns" | "sheet";
+  getSelectionMode: () => SelectionMode;
   isBusy: () => boolean;
   flushPendingEdit: () => boolean;
   executeCommand: (command: WorkbookCommand) => boolean;

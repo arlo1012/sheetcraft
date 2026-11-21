@@ -10,7 +10,7 @@ import type { FillDirection } from "@sheetcraft/sheet-engine/fill-selection";
 import {
   getSelectionMode,
   getSelectionRange,
-  type SheetSelection,
+  type CellSelection,
 } from "@sheetcraft/sheet-engine/selection";
 import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import {
@@ -24,12 +24,12 @@ import type { SheetRenderFrame } from "./rendering/sheet-render-frame";
 export type SheetGridEditorKeydownOptions = {
   rowHeaderWidth: number;
   getSheet: () => Sheet;
-  getSelection: () => SheetSelection;
+  getSelection: () => CellSelection;
   getSelectedRange: () => CellRange;
   getActiveCell: () => CellAddress;
   getLayout: () => SheetViewportLayout;
   getRenderFrame: () => SheetRenderFrame;
-  getRootElement: () => HTMLElement | undefined;
+  getRootElement: () => HTMLElement | null | undefined;
   getScale: () => number;
   isEditing: () => boolean;
   isComposing: () => boolean;

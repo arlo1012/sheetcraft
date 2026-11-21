@@ -6,7 +6,7 @@ import {
   type ShapeGroupDrawing,
   type ShapeGroupPath,
 } from "@sheetcraft/core/shape-group";
-import type { SheetEquationDrawing } from "@sheetcraft/core/sheet-drawings";
+import type { EquationRootEditSource } from "../../modules/sheet-drawings/equation/useEquationEditSession";
 import type { CellAddress, Sheet, Workbook } from "@sheetcraft/core/workbook";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import type ChartFormatPaneType from "../../modules/charts/components/ChartFormatPane.vue";
@@ -53,8 +53,8 @@ type WorkspaceKeyboardShortcutsOptions = {
   hasChartModalOpen: () => boolean;
   hasCellFormatOpen: () => boolean;
   getActiveRangePicker: () => { confirm: () => void; cancel: () => void } | undefined;
-  getEquationSnapshot: () => { sessionId: string } | undefined;
-  getShapeTextEditSnapshot: () => { sessionId: string } | undefined;
+  getEquationSnapshot: () => { sessionId: number } | undefined;
+  getShapeTextEditSnapshot: () => { sessionId: number } | undefined;
   getShapeRibbonFormatSnapshot: () => unknown;
   ownsSelectedShapeFieldTarget: (target: EventTarget | null) => boolean;
   flushSelectedShapeFieldDrafts: (snapshot: NonNullable<unknown>) => boolean;
@@ -75,7 +75,7 @@ type WorkspaceKeyboardShortcutsOptions = {
   };
   insertSymbol: (symbol: SymbolInsertion) => boolean;
   editOwnedDrawing: (root: ShapeGroupDrawing, path: ShapeGroupPath) => void;
-  beginEquationEdit: (drawing: SheetEquationDrawing) => void;
+  beginEquationEdit: (drawing: EquationRootEditSource) => void;
   insertScreenCapture: (mode: "rectangle", hideWindow: boolean, copyOnly: boolean) => void;
   openHyperlinkEdit: () => void;
   requestCreateTable: () => void;

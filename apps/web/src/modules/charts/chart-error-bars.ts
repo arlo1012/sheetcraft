@@ -92,19 +92,20 @@ export function appendChartErrorBarSeries(
           const dy = band ? barOffsetRatio * band[1] : 0;
           const lowPt = api.coord([low, cat]);
           const highPt = api.coord([high, cat]);
-          const y = lowPt[1] + dy;
+          if (!lowPt || !highPt) return;
+          const y = lowPt[1]! + dy;
           return {
             type: "group",
             children: [
-              { type: "line", shape: { x1: lowPt[0], y1: y, x2: highPt[0], y2: y }, style },
+              { type: "line", shape: { x1: lowPt[0]!, y1: y, x2: highPt[0]!, y2: y }, style },
               {
                 type: "line",
-                shape: { x1: lowPt[0], y1: y - halfCap, x2: lowPt[0], y2: y + halfCap },
+                shape: { x1: lowPt[0]!, y1: y - halfCap, x2: lowPt[0]!, y2: y + halfCap },
                 style,
               },
               {
                 type: "line",
-                shape: { x1: highPt[0], y1: y - halfCap, x2: highPt[0], y2: y + halfCap },
+                shape: { x1: highPt[0]!, y1: y - halfCap, x2: highPt[0]!, y2: y + halfCap },
                 style,
               },
             ],
@@ -114,19 +115,20 @@ export function appendChartErrorBarSeries(
         const dx = band ? barOffsetRatio * band[0] : 0;
         const lowPt = api.coord([cat, low]);
         const highPt = api.coord([cat, high]);
-        const x = lowPt[0] + dx;
+        if (!lowPt || !highPt) return;
+        const x = lowPt[0]! + dx;
         return {
           type: "group",
           children: [
-            { type: "line", shape: { x1: x, y1: lowPt[1], x2: x, y2: highPt[1] }, style },
+            { type: "line", shape: { x1: x, y1: lowPt[1]!, x2: x, y2: highPt[1]! }, style },
             {
               type: "line",
-              shape: { x1: x - halfCap, y1: lowPt[1], x2: x + halfCap, y2: lowPt[1] },
+              shape: { x1: x - halfCap, y1: lowPt[1]!, x2: x + halfCap, y2: lowPt[1]! },
               style,
             },
             {
               type: "line",
-              shape: { x1: x - halfCap, y1: highPt[1], x2: x + halfCap, y2: highPt[1] },
+              shape: { x1: x - halfCap, y1: highPt[1]!, x2: x + halfCap, y2: highPt[1]! },
               style,
             },
           ],

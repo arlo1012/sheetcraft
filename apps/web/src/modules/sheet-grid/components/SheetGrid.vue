@@ -6,7 +6,6 @@ import type {
 import type { PictureContextSourceAction } from "../../sheet-images/picture-context-source-action";
 import { captureCellPictureSourcePresentation } from "../../sheet-images/cell-picture-presentation";
 import { isFramedCellImage } from "@sheetcraft/core/cell-picture-frame";
-import type { Point } from "@sheetcraft/sheet-engine/geometry";
 import { canEditPictureRoot, canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import { isPictureGroup, type PictureGroupPath } from "@sheetcraft/core/picture-group";
 import {
@@ -23,7 +22,6 @@ import {
   capturePictureSourcePresentation,
   type PictureSourcePresentation,
 } from "../../sheet-images/picture-source-presentation";
-import { getPivotActiveField } from "../../pivot-tables/pivot-active-field";
 const PivotReportFilters = defineAsyncComponent(
   () => import("../../pivot-tables/components/PivotReportFilters.vue"),
 );
@@ -104,8 +102,12 @@ import { getSelectionFitZoom } from "../selection-zoom";
 import { createSheetGridEditorKeydownHandler } from "../useSheetGridEditorKeydown";
 import { useSheetGridPictureClipboard } from "../useSheetGridPictureClipboard";
 import { useSheetGridPictureSelection } from "../useSheetGridPictureSelection";
-import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
-import { createContextMenuPoint } from "../../../shared/menu/useContextMenu";
+import { useSheetGridPictureEditing } from "../composables/useSheetGridPictureEditing";
+import {
+  useSheetGridContextMenus,
+  type AxisContextMenuState,
+  type CellContextMenuState,
+} from "../composables/useSheetGridContextMenus";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
 import type {
   CellEditFinishOptions,
@@ -150,7 +152,6 @@ import {
   extendCellSelection,
   getSelectionMode,
   getSelectionRange,
-  isCellSelected,
   isSingleCellSelection,
   moveActiveCellWithinSelection,
   moveCellSelection,
@@ -187,8 +188,6 @@ import SheetFloatingImageLayer from "../../sheet-images/components/SheetFloating
 const PictureColorPickLayer = defineAsyncComponent(
   () => import("../../sheet-images/components/PictureColorPickLayer.vue"),
 );
-import { usePictureTransparentColor } from "../../sheet-images/usePictureTransparentColor";
-import { createPicturePaintResources } from "../../../shared/images/picture-paint-resources";
 import SheetOwnedPictureGroupLayer from "../../sheet-images/components/SheetOwnedPictureGroupLayer.vue";
 import type { PictureAlignmentReference } from "../../sheet-images/usePictureTools";
 const SheetPictureAdjustmentHandles = defineAsyncComponent(
@@ -202,18 +201,6 @@ import type PictureCropToolbarType from "../../sheet-images/components/PictureCr
 const PictureCropToolbar = defineAsyncComponent(
   () => import("../../sheet-images/components/PictureCropToolbar.vue"),
 );
-import {
-  usePictureCropSession,
-  type PictureCropDirection,
-} from "../../sheet-images/usePictureCropSession";
-import {
-  getPictureCropViewportFragments,
-  preparePictureCropPreview,
-} from "../../sheet-images/picture-crop-preview";
-import {
-  startPointerSession,
-  type PointerSession,
-} from "../../../shared/sheet-input/pointer-session";
 import { resolveOwnedPictureNode } from "../../sheet-images/picture-group-interaction";
 const SheetImagePreview = defineAsyncComponent(
   () => import("../../sheet-images/components/SheetImagePreview.vue"),
@@ -273,20 +260,6 @@ import {
 } from "../../../shared/cell-text/font-resources";
 import { isCellTextWrapped } from "../../../shared/cell-text/text-presentation";
 import { browserCellTextMeasurer } from "../../../shared/cell-text/text-metrics";
-
-type AxisContextMenuState = {
-  axis: SheetDimensionAxis;
-  index: number;
-  count: number;
-  anchor: FloatingReference;
-  trigger: HTMLElement;
-};
-
-type CellContextMenuState = {
-  anchor: FloatingReference;
-  imageAddress?: CellAddress;
-  address: CellAddress;
-};
 
 const CLIPBOARD_MESSAGE_KEYS: Record<GridClipboardFeedback, MessageKey> = {
   unavailable: "clipboard.unavailable",
@@ -1556,292 +1529,48 @@ const pictureFrameContext = computed<PictureFrameLayoutContext | undefined>(() =
     metrics: pictureViewMetrics.value,
   };
 });
-const pictureCrop = usePictureCropSession({
-  getSheet: () => props.sheet,
-  getGeneration: () => props.pictureOwnerGeneration ?? 0,
-  getRevision: () => props.workbookRevision ?? 0,
-  getContext: () => pictureFrameContext.value,
-  getSelectedIds: () => selectedImageIds.value,
-  getSelectedPath: () => selectedOwnedPicturePath.value,
-  isReadOnly: () => pictureSelectionReadOnly.value,
-  execute: (roots) => props.applyPictureCollectionChange?.(roots) === true,
-  getThemeEffects: () => drawingThemeEffects.value,
-  onFailure: () => emit("imageFeedback", "picture.operationFailed"),
-});
 const cropOverlayRef = ref<InstanceType<typeof SheetPictureCropOverlayType>>();
 const cropToolbarRef = ref<InstanceType<typeof PictureCropToolbarType>>();
-let pendingCropOverlayFocus = false;
-let cropPointer: PointerSession | undefined;
-function stopCropPointer(): void {
-  const pointer = cropPointer;
-  cropPointer = undefined;
-  pointer?.cancel();
-}
-function finishPictureCrop(cancel = false, restoreFocus = true): boolean {
-  // Drop mode before releasing capture so pointer cancellation cannot restore an applied draft.
-  const accepted = cancel ? (pictureCrop.cancel(), true) : pictureCrop.apply();
-  if (accepted) {
-    pendingCropOverlayFocus = false;
-    stopCropPointer();
-    imageLayerRef.value?.closePictureContextMenu();
-    ownedImageLayerRef.value?.closePictureContextMenu();
-    if (restoreFocus) focusEditor();
-  }
-  return accepted;
-}
-function startPictureCrop(): boolean {
-  if (pictureCrop.active.value) return finishPictureCrop();
-  if (!flushPendingEdit() || !pictureCrop.start()) return false;
-  pendingCropOverlayFocus = true;
-  void nextTick(() => {
-    const overlay = cropOverlayRef.value?.$el as HTMLElement | undefined;
-    if (overlay && pendingCropOverlayFocus && pictureCrop.active.value) {
-      pendingCropOverlayFocus = false;
-      overlay.focus({ preventScroll: true });
-    }
-  });
-  return true;
-}
-watch(cropOverlayRef, (overlay) => {
-  if (overlay && pendingCropOverlayFocus && pictureCrop.active.value) {
-    pendingCropOverlayFocus = false;
-    void nextTick(() =>
-      (overlay.$el as HTMLElement | undefined)?.focus({
-        preventScroll: true,
-      }),
-    );
-  }
+const {
+  pictureCrop,
+  stopCropPointer,
+  finishPictureCrop,
+  startPictureCrop,
+  openCropContextMenu,
+  startPictureCropGesture,
+  startPictureShapeAdjustment,
+  nudgePictureShapeAdjustment,
+  pictureAdjustmentView,
+  onPictureCropKeydown,
+  cropControls,
+  cropToolbarAnchor,
+  pictureTransparentColor,
+} = useSheetGridPictureEditing({
+  getSheet: () => props.sheet,
+  getTheme: () => props.theme,
+  getGeneration: () => props.pictureOwnerGeneration ?? 0,
+  getRevision: () => props.workbookRevision ?? 0,
+  isPictureSourceBusy: () => Boolean(props.pictureSourceBusy),
+  pictureFrameContext,
+  selectedImageIds,
+  selectedOwnedPicturePath,
+  pictureSelectionReadOnly,
+  drawingThemeEffects,
+  layout,
+  scale,
+  headerSize,
+  rootRef,
+  cropOverlayRef,
+  cropToolbarRef,
+  resolvedImageUrls,
+  floatingImageCache,
+  getImageLayer: () => imageLayerRef.value,
+  getOwnedImageLayer: () => ownedImageLayerRef.value,
+  applyPictureCollectionChange: (roots) => props.applyPictureCollectionChange?.(roots) === true,
+  flushPendingEdit,
+  focusEditor,
+  onImageFeedback: (key) => emit("imageFeedback", key),
 });
-function openCropContextMenu(event: MouseEvent): void {
-  if (!pictureCrop.active.value) return;
-  if (selectedOwnedPicturePath.value?.length && selectedOwnedPicturePath.value.length > 1)
-    ownedImageLayerRef.value?.openSelectedContextMenu(event);
-  else imageLayerRef.value?.openSelectedContextMenu(event);
-}
-function startPictureCropGesture(direction: PictureCropDirection, event: PointerEvent): void {
-  if (event.button !== 0 || !pictureCrop.active.value) return;
-  stopCropPointer();
-  const snapshot = pictureCrop.captureGesture();
-  if (!snapshot) return;
-  const start = { x: event.clientX, y: event.clientY },
-    gestureScale = scale.value;
-  const move = (pointer: PointerEvent | MouseEvent) => {
-    if (
-      !pictureCrop.previewGesture(snapshot, direction, {
-        x: (pointer.clientX - start.x) / gestureScale,
-        y: (pointer.clientY - start.y) / gestureScale,
-      })
-    )
-      emit("imageFeedback", "picture.operationFailed");
-  };
-  cropPointer = startPointerSession({
-    event,
-    captureTarget: event.currentTarget instanceof HTMLElement ? event.currentTarget : null,
-    onMove: move,
-    onEnd: (pointer) => {
-      cropPointer = undefined;
-      move(pointer);
-      pictureCrop.finishGesture(snapshot);
-    },
-    onCancel: () => {
-      cropPointer = undefined;
-      pictureCrop.cancelGesture(snapshot);
-    },
-  });
-}
-function startPictureShapeAdjustment(index: number, event: PointerEvent): void {
-  if (event.button !== 0) return;
-  const immediate = !pictureCrop.active.value;
-  if (immediate && (!flushPendingEdit() || !pictureCrop.start())) return;
-  stopCropPointer();
-  const snapshot = pictureCrop.captureGesture();
-  if (!snapshot) return;
-  const start = { x: event.clientX, y: event.clientY },
-    zoom = scale.value;
-  const move = (pointer: PointerEvent | MouseEvent) =>
-    pictureCrop.previewShapeAdjustment(snapshot, index, {
-      x: (pointer.clientX - start.x) / zoom,
-      y: (pointer.clientY - start.y) / zoom,
-    });
-  cropPointer = startPointerSession({
-    event,
-    captureTarget: event.currentTarget instanceof HTMLElement ? event.currentTarget : null,
-    onMove: (pointer) => {
-      if (!move(pointer)) emit("imageFeedback", "picture.operationFailed");
-    },
-    onEnd: (pointer) => {
-      cropPointer = undefined;
-      move(pointer);
-      pictureCrop.finishGesture(snapshot);
-      if (immediate) finishPictureCrop();
-    },
-    onCancel: () => {
-      cropPointer = undefined;
-      pictureCrop.cancelGesture(snapshot);
-      if (immediate) pictureCrop.cancel();
-    },
-  });
-}
-function nudgePictureShapeAdjustment(index: number, delta: Point): void {
-  const immediate = !pictureCrop.active.value;
-  if (immediate && (!flushPendingEdit() || !pictureCrop.start())) return;
-  stopCropPointer();
-  const snapshot = pictureCrop.captureGesture();
-  if (!snapshot || !pictureCrop.previewShapeAdjustment(snapshot, index, delta)) {
-    if (immediate) pictureCrop.cancel();
-    emit("imageFeedback", "picture.operationFailed");
-    return;
-  }
-  pictureCrop.finishGesture(snapshot);
-  if (immediate) finishPictureCrop();
-}
-const pictureAdjustmentView = computed(() => {
-  if (pictureCrop.view.value) return pictureCrop.view.value;
-  if (selectedImageIds.value.length !== 1 || pictureSelectionReadOnly.value) return;
-  const context = pictureFrameContext.value;
-  const root = props.sheet.floatingImages.find((entry) => entry.id === selectedImageIds.value[0]);
-  if (!context || !root || root.hidden) return;
-  if (isFramedPictureObject(root) && root.frame.cropShape)
-    return {
-      picture: root,
-      geometry: resolvePictureFrame(root.frame, context.metrics),
-    };
-  const path = selectedOwnedPicturePath.value;
-  if (!isPictureGroup(root) || !path || path.length < 2) return;
-  const selected = resolveOwnedPictureNode(props.sheet.floatingImages, path, context);
-  if (
-    selected?.visible &&
-    selected.layout &&
-    selected.node.kind === "grouped-picture-v1" &&
-    selected.node.frame.cropShape
-  )
-    return {
-      picture: selected.node,
-      geometry: resolvePictureSourceLayout(
-        selected.layout.rect,
-        selected.layout.angleDeg,
-        selected.node.frame.source,
-      ),
-    };
-});
-function onPictureCropKeydown(event: KeyboardEvent): void {
-  if (!pictureCrop.active.value || event.isComposing || event.defaultPrevented) return;
-  const target = event.target;
-  if (
-    target instanceof Element &&
-    !rootRef.value?.contains(target) &&
-    !target.closest(
-      "[data-picture-crop-toolbar], [data-owned-picture-context-menu], [data-floating-image-context-menu]",
-    )
-  )
-    return;
-  if (event.key === "Escape") {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    finishPictureCrop();
-    return;
-  }
-  // Menus and toolbar buttons retain their own Arrow/Enter navigation. Only
-  // Escape is shared with the crop owner's exit contract.
-  if (
-    target instanceof Element &&
-    target.closest(
-      "[data-picture-crop-toolbar], [data-picture-shape-adjustment], [role=menu], input, textarea, [contenteditable=true]",
-    )
-  )
-    return;
-  const history = getWorkbookHistoryShortcut(event);
-  if (history) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    stopCropPointer();
-    if (history === "undo") pictureCrop.undoDraft();
-    else pictureCrop.redoDraft();
-    return;
-  }
-  if (event.key === "Enter") {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    cropToolbarRef.value?.openRatios();
-    return;
-  }
-  const distance = event.shiftKey ? 10 : 1;
-  const delta = {
-    ArrowLeft: { x: -distance, y: 0 },
-    ArrowRight: { x: distance, y: 0 },
-    ArrowUp: { x: 0, y: -distance },
-    ArrowDown: { x: 0, y: distance },
-  }[event.key];
-  if (!delta) return;
-  event.preventDefault();
-  event.stopImmediatePropagation();
-  stopCropPointer();
-  const snapshot = pictureCrop.captureGesture();
-  if (snapshot && pictureCrop.previewGesture(snapshot, "source", delta))
-    pictureCrop.finishGesture(snapshot);
-}
-const cropControls = computed(() => {
-  const view = pictureCrop.view.value;
-  if (!view) return null;
-  const id = view.id;
-  const current = () => pictureCrop.view.value?.id === id;
-  return {
-    id,
-    apply: () => current() && finishPictureCrop(),
-    cancel: () => {
-      if (current()) finishPictureCrop(true);
-    },
-    setShape: (shape: import("@sheetcraft/core/shape-presets").PictureCropShape | undefined) => {
-      if (!current()) return false;
-      stopCropPointer();
-      return pictureCrop.setShape(shape);
-    },
-    resetShapeAndCrop: () => {
-      if (!current()) return false;
-      stopCropPointer();
-      return pictureCrop.resetShapeAndCrop();
-    },
-    setRatio: (ratio: number) => {
-      if (!current()) return false;
-      stopCropPointer();
-      return pictureCrop.setRatio(ratio);
-    },
-  };
-});
-const cropToolbarAnchor = computed<FloatingReference | null>(() => {
-  const view = pictureCrop.view.value,
-    root = rootRef.value;
-  if (!view || !root) return null;
-  const fragments = getPictureCropViewportFragments(
-    preparePictureCropPreview(view.picture, view.geometry),
-    layout.value,
-  );
-  if (!fragments.length) return null;
-  const frame = fragments.find((fragment) => fragment.paneId === "body") ?? fragments[0]!;
-  const bounds = frame.clippedBounds,
-    zoom = scale.value,
-    header = headerSize.value;
-  return {
-    contextElement: root,
-    getBoundingClientRect: () => {
-      const host = root.getBoundingClientRect();
-      return new DOMRect(
-        host.left + (header.width + bounds.x) * zoom,
-        host.top + (header.height + bounds.y) * zoom,
-        bounds.width * zoom,
-        bounds.height * zoom,
-      );
-    },
-  };
-});
-watch([layout, scale], () => stopCropPointer(), { flush: "sync" });
-watch(
-  pictureCrop.active,
-  (active) => {
-    if (!active) stopCropPointer();
-  },
-  { flush: "sync" },
-);
 
 watch(
   [() => props.sheet, () => props.sheet.floatingImages, pictureFrameContext],
@@ -1916,30 +1645,6 @@ function imagePoint(event: MouseEvent) {
   const point = surfacePoint(event);
   return surfacePointToBody(point, renderFrame.value.headerSize);
 }
-const pictureTransparentColor = usePictureTransparentColor({
-  getSheet: () => props.sheet,
-  getGeneration: () => props.pictureOwnerGeneration ?? 0,
-  getRevision: () => props.workbookRevision ?? 0,
-  getPath: () =>
-    selectedImageIds.value.length === 1
-      ? (selectedOwnedPicturePath.value ?? [selectedImageIds.value[0]!])
-      : undefined,
-  isReadOnly: () =>
-    pictureSelectionReadOnly.value ||
-    !!props.pictureSourceBusy ||
-    pictureCrop.active.value ||
-    !pictureFrameContext.value,
-  getLayout: () => layout.value,
-  getFrameContext: () => pictureFrameContext.value,
-  getEffects: () => drawingThemeEffects.value,
-  getResources: () =>
-    createPicturePaintResources(props.theme, resolvedImageUrls.value, floatingImageCache),
-  getImage: (assetId) => {
-    const url = resolvedImageUrls.value.get(assetId);
-    return url ? floatingImageCache.get(url) : undefined;
-  },
-  onError: () => emit("imageFeedback", "picture.operationFailed"),
-});
 const headerState = shallowRef<HeaderInteractionState>({});
 const headerSelection = computed(() => ({
   startRow: selectedRange.value.start.row,
@@ -1976,7 +1681,8 @@ const headerInput = useHeaderInteraction({
     quickInsert: (axis, index) => onQuickInsert(axis, { index }),
     quickInsertHover: (axis, index) => onQuickInsertHover(axis, index === null ? null : { index }),
     axisDragStart: (axis, index, event) => onAxisDragStart(axis, { index, event }),
-    openContextMenu: openAxisContextMenu,
+    openContextMenu: (axis, index, clientX, clientY, trigger) =>
+      openAxisContextMenu(axis, index, clientX, clientY, trigger),
   },
 });
 const headerLabel = computed(() => {
@@ -3153,365 +2859,77 @@ function pickAxisReference(
   return true;
 }
 
-function isAxisIndexSelected(axis: SheetDimensionAxis, index: number): boolean {
-  const expectedMode = axis === "row" ? "rows" : "columns";
-  if (getSelectionMode(selection.value) !== expectedMode) {
-    return false;
-  }
-  const range = selectedRange.value;
-  return axis === "row"
-    ? index >= range.start.row && index <= range.end.row
-    : index >= range.start.column && index <= range.end.column;
-}
-
-function openAxisContextMenu(
-  axis: SheetDimensionAxis,
-  index: number,
-  clientX: number,
-  clientY: number,
-  trigger: HTMLElement,
-): void {
-  if (isComposing.value) {
-    return;
-  }
-  cellContextMenu.value = undefined;
-  if (!isAxisIndexSelected(axis, index)) {
-    const address = axis === "row" ? { row: index, column: 0 } : { row: 0, column: index };
-    selectAxis(axis === "row" ? "rows" : "columns", address, false, false);
-  }
-
-  const range = selectedRange.value;
-  const start = axis === "row" ? range.start.row : range.start.column;
-  const end = axis === "row" ? range.end.row : range.end.column;
-  axisContextMenu.value = {
-    axis,
-    index: start,
-    count: end - start + 1,
-    anchor: markRaw(createContextMenuPoint({ clientX, clientY }, rootRef.value ?? trigger)),
-    trigger,
-  };
-}
-
-function getAxisMaximum(axis: SheetDimensionAxis): number {
-  return axis === "row" ? MAX_SHEET_ROWS : MAX_SHEET_COLUMNS;
-}
-
-function requestAxisInsert(payload: { direction: "before" | "after"; count: number }): void {
-  if (!axisContextMenu.value || axisOperationReadOnly(axisContextMenu.value.axis, "insert")) return;
-  const menu = axisContextMenu.value;
-  if (!menu) {
-    return;
-  }
-  if (!requestAxisInsertion(menu.axis, menu.index, menu.count, payload.direction, payload.count))
-    return;
-  axisContextMenu.value = undefined;
-  focusEditor();
-}
-
-function requestAxisInsertion(
-  axis: SheetDimensionAxis,
-  index: number,
-  selectionCount: number,
-  direction: "before" | "after",
-  count = selectionCount,
-): boolean {
-  if (axisOperationReadOnly(axis, "insert")) return false;
-  const insertIndex = direction === "before" ? index : index + selectionCount;
-  if (count > getAxisMaximum(axis) - insertIndex) return false;
-  clearPendingClipboard();
-  emit("insertAxis", { axis, index: insertIndex, count });
-  return true;
-}
-
-function requestAxisDelete(): void {
-  if (!axisContextMenu.value || axisOperationReadOnly(axisContextMenu.value.axis, "delete")) return;
-  const menu = axisContextMenu.value;
-  if (!menu) {
-    return;
-  }
-  clearPendingClipboard();
-  emit("deleteAxis", { axis: menu.axis, index: menu.index, count: menu.count });
-  axisContextMenu.value = undefined;
-  focusEditor();
-}
-
-function requestAxisResize(size: number): void {
-  if (!axisContextMenu.value || dimensionReadOnly(axisContextMenu.value.axis)) return;
-  const menu = axisContextMenu.value;
-  if (!menu || menu.count !== 1) {
-    return;
-  }
-  emit("resizeDimension", { axis: menu.axis, index: menu.index, size });
-}
-
-function requestAxisClear(): void {
-  if (props.readOnly) return;
-  if (!axisContextMenu.value) {
-    return;
-  }
-  clearPendingClipboard();
-  emit("clearCells", getSelectionRange(selection.value));
-  axisContextMenu.value = undefined;
-  focusEditor();
-}
-
-function closeAxisContextMenu(restoreFocus: boolean): void {
-  const trigger = axisContextMenu.value?.trigger;
-  axisContextMenu.value = undefined;
-  if (restoreFocus) {
-    void nextTick(() => {
-      if (trigger?.isConnected) {
-        trigger.focus();
-      } else {
-        focusEditor();
-      }
-    });
-  }
-}
-
-function openCellContextMenu(address: CellAddress, event: MouseEvent): void {
-  if (isEditing.value || isComposing.value) {
-    return;
-  }
-  event.preventDefault();
-  event.stopPropagation();
-
-  const retainsSelection =
-    getSelectionMode(selection.value) === "cells" && isCellSelected(address, selection.value);
-  if (!retainsSelection) {
-    setActiveCell(address, false);
-  }
-
-  axisContextMenu.value = undefined;
-  const noteAddress = layout.value.getAnchorForAddress(address);
-  const contextElement = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
-  cellContextMenu.value = {
-    imageAddress:
-      getCellContent(props.sheet, layout.value.getAnchorForAddress(address))?.kind === "image"
-        ? layout.value.getAnchorForAddress(address)
-        : undefined,
-    address: noteAddress,
-    anchor: markRaw(createContextMenuPoint(event, rootRef.value ?? contextElement ?? undefined)),
-  };
-}
-
-function openActiveCellContextMenu(): void {
-  if (getSelectionMode(selection.value) !== "cells") {
-    return;
-  }
-  const scroller = scrollerRef.value;
-  if (!scroller) {
-    return;
-  }
-  const bounds = scroller.getBoundingClientRect();
-  const rect = activeCellRect.value;
-  if (!rect) return;
-  const x = bounds.left + (rect.x + Math.min(16, rect.width / 2)) * scale.value;
-  const y = bounds.top + (rect.y + rect.height) * scale.value;
-  axisContextMenu.value = undefined;
-  const noteAddress = layout.value.getAnchorForAddress(activeCell.value);
-  cellContextMenu.value = {
-    imageAddress:
-      getCellContent(props.sheet, activeCell.value)?.kind === "image"
-        ? { ...activeCell.value }
-        : undefined,
-    address: noteAddress,
-    anchor: markRaw(createContextMenuPoint({ clientX: x, clientY: y }, scroller)),
-  };
-}
-
-async function requestCellClipboard(
-  action: "cut" | "copy" | "paste" | "paste-values" | "paste-formats",
-): Promise<void> {
-  if (
-    props.readOnly &&
-    action !== "copy" &&
-    (selectionReadOnly.value || action === "cut" || action === "paste-formats")
-  )
-    return;
-  if (!cellContextMenu.value) {
-    return;
-  }
-  cellContextMenu.value = undefined;
-  if (action === "cut") {
-    floatingClipboard.clear();
-    await cutSelection();
-  } else if (action === "copy") {
-    floatingClipboard.clear();
-    await copySelection();
-  } else if (action === "paste-values") {
-    await pasteValuesSelection();
-  } else if (action === "paste-formats") {
-    await pasteFormatsSelection();
-  } else {
-    await pasteSelection();
-  }
-  focusEditor();
-}
-
-async function requestAxisClipboard(
-  action: "cut" | "copy" | "paste" | "paste-values" | "paste-formats",
-): Promise<void> {
-  if (!axisContextMenu.value || (props.readOnly && action !== "copy")) return;
-  axisContextMenu.value = undefined;
-  floatingClipboard.clear();
-  if (action === "cut") await cutSelection();
-  else if (action === "copy") await copySelection();
-  else if (action === "paste-values") await pasteValuesSelection();
-  else if (action === "paste-formats") await pasteFormatsSelection();
-  else await pasteSelection();
-  focusEditor();
-}
-
-function requestContextAction(action: SheetContextAction): void {
-  if (!axisContextMenu.value && !cellContextMenu.value) return;
-  const allowedAxisFormatting =
-    (action.type === "resize" || action.type === "autoFit" || action.type === "visibility") &&
-    !dimensionReadOnly(action.axis);
-  const allowedAxisOperation =
-    (action.type === "insert" || action.type === "delete") &&
-    !axisOperationReadOnly(action.axis, action.type);
-  if (
-    props.readOnly &&
-    action.type !== "columnStatistics" &&
-    !allowedAxisFormatting &&
-    !allowedAxisOperation
-  )
-    return;
-  const range = getSelectionRange(selection.value);
-  const keepOpen =
-    action.type === "applyStyle" ||
-    action.type === "applyBorders" ||
-    action.type === "updateBorderFormat" ||
-    action.type === "merge" ||
-    action.type === "unmerge";
-  if (!keepOpen) {
-    axisContextMenu.value = undefined;
-    cellContextMenu.value = undefined;
-  }
-  if (
-    action.type !== "columnStatistics" &&
-    action.type !== "chooseFromColumn" &&
-    action.type !== "filter" &&
-    action.type !== "formatCells" &&
-    action.type !== "formatPainter"
-  )
-    clearPendingClipboard();
-  emit("contextAction", {
-    action,
-    range: { start: { ...range.start }, end: { ...range.end } },
-  });
-}
-
-function requestCellImageAction(action: "preview" | "float"): void {
-  const address = cellContextMenu.value?.imageAddress;
-  cellContextMenu.value = undefined;
-  if (
-    !address ||
-    (action === "float" &&
-      (pictureLayerReadOnly.value ||
-        !canEditRange(
-          props.sheet,
-          expandSelectionToMergedCellRanges(
-            { start: address, end: address },
-            props.sheet.mergedCells,
-          ),
-        )))
-  )
-    return;
-  setActiveCell(address);
-  if (action === "float") emit("convertCellImageToFloating", address);
-  else {
-    const content = getCellContent(props.sheet, address);
-    if (content?.kind === "image")
-      openImagePreview({
-        ...content.image,
-        ...(isFramedCellImage(content.image)
-          ? { frameSource: captureCellPictureSourcePresentation(content.image) }
-          : {}),
-      });
-  }
-}
-
-const hyperlinkEditDisabled = computed(
-  () =>
-    (props.readOnly && !props.sheet.properties.protected) ||
-    !canUseSheetPermission(props.sheet, "insertHyperlinks"),
-);
-function requestCellHyperlink(action: "edit" | "open" | "remove"): void {
-  const address = cellContextMenu.value?.address;
-  cellContextMenu.value = undefined;
-  if (!address) return;
-  if (action === "open") {
-    emit("openHyperlink", address);
-    return;
-  }
-  if (hyperlinkEditDisabled.value) return;
-  setActiveCell(address);
-  if (action === "edit") emit("editHyperlink");
-  else {
-    emit("removeHyperlink", address);
-    focusEditor();
-  }
-}
-function requestCellNote(action: "edit" | "delete"): void {
-  if (objectsReadOnly.value) return;
-  const address = cellContextMenu.value?.address;
-  cellContextMenu.value = undefined;
-  if (!address) return;
-  if (action === "edit") emit("editNote", address);
-  else emit("deleteNote", address);
-  focusEditor();
-}
-
-function requestCellClear(): void {
-  if (selectionReadOnly.value) return;
-  if (!cellContextMenu.value) {
-    return;
-  }
-  clearPendingClipboard();
-  emit("clearCells", getSelectionRange(selection.value));
-  cellContextMenu.value = undefined;
-  focusEditor();
-}
-
-const contextPivotDetails = computed(() =>
-  props.sheet.pivotTables?.find((table) =>
-    isPivotValueCell(table, cellContextMenu.value?.address ?? activeCell.value),
-  ),
-);
-const contextPivotGroup = computed(() => {
-  const address = cellContextMenu.value?.address ?? activeCell.value;
-  for (const table of props.sheet.pivotTables ?? []) {
-    const active = getPivotActiveField(table, [], address);
-    if (active?.area === "rows" || active?.area === "columns") {
-      const field = (active.area === "rows" ? table.rowFields : table.columnFields)[active.index]!;
-      return { table, field };
-    }
-  }
-  return undefined;
+const {
+  isAxisIndexSelected,
+  openAxisContextMenu,
+  getAxisMaximum,
+  requestAxisInsert,
+  requestAxisInsertion,
+  requestAxisDelete,
+  requestAxisResize,
+  requestAxisClear,
+  closeAxisContextMenu,
+  openCellContextMenu,
+  openActiveCellContextMenu,
+  requestCellClipboard,
+  requestAxisClipboard,
+  requestContextAction,
+  requestCellImageAction,
+  hyperlinkEditDisabled,
+  requestCellHyperlink,
+  requestCellNote,
+  requestCellClear,
+  contextPivotDetails,
+  contextPivotGroup,
+  requestPivotGroup,
+  requestPivotDetails,
+  closeCellContextMenu,
+} = useSheetGridContextMenus({
+  axisContextMenu,
+  cellContextMenu,
+  getSheet: () => props.sheet,
+  isReadOnly: () => Boolean(props.readOnly),
+  selection,
+  selectedRange,
+  activeCell,
+  activeCellRect,
+  layout,
+  scale,
+  rootRef,
+  scrollerRef,
+  isEditing,
+  isComposing,
+  selectionReadOnly,
+  objectsReadOnly,
+  pictureLayerReadOnly,
+  dimensionReadOnly,
+  axisOperationReadOnly,
+  selectAxis,
+  setActiveCell,
+  focusEditor,
+  clearPendingClipboard,
+  clearFloatingClipboard: () => floatingClipboard.clear(),
+  cutSelection,
+  copySelection,
+  pasteSelection,
+  pasteValuesSelection,
+  pasteFormatsSelection,
+  openImagePreview,
+  onInsertAxis: (payload) => emit("insertAxis", payload),
+  onDeleteAxis: (payload) => emit("deleteAxis", payload),
+  onResizeDimension: (payload) => emit("resizeDimension", payload),
+  onClearCells: (range) => emit("clearCells", range),
+  onContextAction: (request) => emit("contextAction", request),
+  onConvertCellImageToFloating: (address) => emit("convertCellImageToFloating", address),
+  onOpenHyperlink: (address) => emit("openHyperlink", address),
+  onEditHyperlink: () => emit("editHyperlink"),
+  onRemoveHyperlink: (address) => emit("removeHyperlink", address),
+  onEditNote: (address) => emit("editNote", address),
+  onDeleteNote: (address) => emit("deleteNote", address),
+  onGroupPivotField: (tableId) => emit("groupPivotField", tableId),
+  onUngroupPivotField: (tableId) => emit("ungroupPivotField", tableId),
+  onShowPivotDetails: (tableId, address) => emit("showPivotDetails", tableId, address),
 });
-function requestPivotGroup(ungroup = false): void {
-  const table = contextPivotGroup.value?.table;
-  if (table) {
-    if (ungroup) emit("ungroupPivotField", table.id);
-    else emit("groupPivotField", table.id);
-  }
-  closeCellContextMenu(false);
-}
-function requestPivotDetails(): void {
-  const table = contextPivotDetails.value;
-  const address = cellContextMenu.value?.address;
-  if (table && address) emit("showPivotDetails", table.id, address);
-  closeCellContextMenu(false);
-}
-
-function closeCellContextMenu(restoreFocus: boolean): void {
-  cellContextMenu.value = undefined;
-  if (restoreFocus) {
-    focusEditor();
-  }
-}
 
 function onCornerClick(): void {
   selectAxis("all", { row: 0, column: 0 }, false);

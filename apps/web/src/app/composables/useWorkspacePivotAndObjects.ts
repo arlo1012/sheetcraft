@@ -3,16 +3,13 @@ import { canUseSheetPermission } from "@sheetcraft/core";
 import type { WorkbookCommand } from "@sheetcraft/core/commands";
 import { getPivotTableSource } from "@sheetcraft/core/pivot-tables";
 import type { ShapeGroupPath } from "@sheetcraft/core/shape-group";
-import {
-  createThemedTableStyles,
-  type PivotTableStyleDefinition,
-} from "@sheetcraft/core/table-styles";
-import type { SheetTable } from "@sheetcraft/core/tables";
+import { createThemedTableStyles, type TableStyleDefinition } from "@sheetcraft/core/table-styles";
 import type {
   CellAddress,
   CellRange,
   Sheet,
   SheetEvaluator,
+  SheetTable,
   Workbook,
 } from "@sheetcraft/core/workbook";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
@@ -34,7 +31,7 @@ import { useSparklineAxisLimit } from "../../modules/sparklines/useSparklineAxis
 import { useSparklineDataOptions } from "../../modules/sparklines/useSparklineDataOptions";
 import { useSparklineDateAxis } from "../../modules/sparklines/useSparklineDateAxis";
 import { useSparklineTools } from "../../modules/sparklines/useSparklineTools";
-import type { MessageKey } from "../../shared/i18n";
+import type { MessageKey, MessageParams } from "../../shared/i18n";
 import { useRangeReferencePicker } from "../../shared/range-reference/useRangeReferencePicker";
 
 type WorkspacePivotAndObjectsOptions = {
@@ -44,7 +41,7 @@ type WorkspacePivotAndObjectsOptions = {
   getSelectionRange: () => CellRange;
   getEvaluator: () => SheetEvaluator;
   getActiveTable: () => SheetTable | undefined;
-  customPivotTableStyles: ComputedRef<readonly PivotTableStyleDefinition[]>;
+  customPivotTableStyles: ComputedRef<readonly TableStyleDefinition[]>;
   getSelectedShapeObjectPaths: () => readonly ShapeGroupPath[];
   workbookGeneration: Ref<number>;
   workbookRevision: Ref<number>;
@@ -55,7 +52,7 @@ type WorkspacePivotAndObjectsOptions = {
   navigateToCell: (address: CellAddress) => void;
   selectDrawing: (id: string) => void;
   selectShapeObjects: (paths: readonly ShapeGroupPath[]) => void;
-  t: (key: MessageKey, params?: Record<string, unknown>) => string;
+  t: (key: MessageKey, params?: MessageParams) => string;
 };
 
 /** Owns pivot tables, table slicers, form controls, attachments, diagrams, camera, sparklines, and dashboards. */

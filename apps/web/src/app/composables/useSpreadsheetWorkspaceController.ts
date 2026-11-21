@@ -23,25 +23,9 @@ import {
   type ComponentPublicInstance,
 } from "vue";
 import {
-  createAddSheetCommand,
   createBatchSetCellContentsCommand,
-  createAdjustCellIndentCommand,
-  createAdjustCellNumberFormatDecimalsCommand,
-  createApplyCellBordersCommand,
-  createApplyCellFormatCommand,
-  createApplyCellStyleCommand,
   createClearCellRangeCommand,
-  createConvertCellValueTypeCommand,
   createClearSheetFilterCommand,
-  createDeleteSheetAxisCommand,
-  createDeleteSheetCommand,
-  createDuplicateSheetCommand,
-  createInsertSheetAxisCommand,
-  createMergeCellsCommand,
-  createMoveSheetCommand,
-  createMoveSheetAxisCommand,
-  createRenameSheetCommand,
-  createResizeSheetDimensionCommand,
   createSetCellContentCommand,
   createSetFloatingImageCommand,
   createDeleteFloatingImageCommand,
@@ -50,33 +34,16 @@ import {
   createConvertCellImageToFloatingCommand,
   createSetSheetFilterCriteriaCommand,
   createSetSheetFreezePanesCommand,
-  createSetSheetPropertiesCommand,
-  createSetSheetConditionalFormatsCommand,
-  createClearSheetConditionalFormatsCommand,
   createSortSheetRangeCommand,
-  createUnmergeCellsCommand,
   getCellMergeModeAvailability,
   getSheetFilterColumnDistinctValues,
   getSheetFilterValueKey,
   getSheetFilters,
   type SortDirection,
-  type CellFormatChange,
   type CellMergeMode,
-  type CellValueConversionMode,
-  type CellValueConversionOptions,
   type WorkbookCommand,
   type WorkbookOperation,
 } from "@sheetcraft/core/commands";
-import {
-  cloneConditionalFormatRule,
-  type SheetConditionalFormatRule,
-} from "@sheetcraft/core/conditional-formatting";
-import type { ConditionalFormatSheetChange } from "../../modules/conditional-formatting/conditional-format-manager-types";
-import {
-  getCellMatrixSize,
-  tileCellMatrix,
-  type CellValueMatrix,
-} from "@sheetcraft/core/clipboard";
 import { formatCellAddress, parseCellAddress } from "@sheetcraft/core/coordinates";
 import {
   createWorkbookSession,
@@ -96,7 +63,6 @@ import {
 import { isTextCellNumberFormat } from "@sheetcraft/core/number-format";
 import type { CellEditCommit } from "../../shared/cell-editing/useCellEditSession";
 import { applyInputFontRuns } from "../../shared/cell-editing/input-font-runs";
-import type { ExcelDateSystem } from "@sheetcraft/core/formula";
 import {
   createAutoSumFormula,
   createFormulaError,
@@ -115,18 +81,10 @@ import { getTableAtAddress } from "@sheetcraft/core/table-styles";
 import { useWorkbookFindController } from "../../modules/workbook/composables/useWorkbookFindController";
 import { useWorkbookGoToController } from "../../modules/workbook/composables/useWorkbookGoToController";
 import { getSelectionSummary } from "@sheetcraft/core/selection-summary";
-import {
-  mergeCellStyle,
-  type CellBorderAction,
-  type CellBorderFormatPatch,
-  type CellStylePatch,
-} from "@sheetcraft/core/style";
+import { mergeCellStyle, type CellStylePatch } from "@sheetcraft/core/style";
 import {
   getSelectionCellStyleState,
-  getSelectionBorderState,
   isCellStyleRangeSupported,
-  type SelectionCellStyleState,
-  type SelectionBorderState,
 } from "@sheetcraft/core/style-state";
 import {
   getActiveSheet,
@@ -135,14 +93,11 @@ import {
   getWorkbookSheets,
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
-  setActiveSheet,
   type FloatingImage,
   type CellAddress,
   type CellRange,
   type SheetFilter,
   type SheetFilterValue,
-  type SheetDimensionAxis,
-  type SheetProperties,
   type Sheet,
   type Workbook,
 } from "@sheetcraft/core/workbook";
@@ -155,26 +110,19 @@ import {
   createSheetGridViewState,
   type SheetGridViewState,
 } from "@sheetcraft/sheet-engine/view-state";
-import type { AxisMovePayload } from "../../modules/sheet-grid/composables/useAxisMoveDrag";
-import {
-  getCellRangeStyles,
-  type CellStyleMatrix,
-  type GridClipboardFeedback,
-  type GridPastePayload,
-  type GridPasteResult,
+import type {
+  GridClipboardFeedback,
+  GridPastePayload,
+  GridPasteResult,
 } from "../../modules/sheet-grid/useGridClipboard";
 import {
   createGridPasteCommand,
   GridPasteError,
 } from "../../modules/sheet-grid/createGridPasteCommand";
-import {
-  createGridClipboardRowVisibility,
-  createVisibleGridPastePlan,
-  getVisibleClipboardRows,
-  rangeIntersectsMergedCells,
-} from "../../modules/sheet-grid/gridClipboardRows";
 import { useAppI18n, type MessageKey, type MessageParams } from "../../shared/i18n";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
+import type { TypedEventBus } from "../../shared/runtime/typed-event-bus";
+import type { WorkspaceEvents } from "../../shared/runtime/workspace-runtime";
 import { useDeferredSelectionSnapshot } from "../../modules/workbook/composables/useDeferredSelectionSnapshot";
 import { useDataValidationInput } from "../../modules/data-tools/useDataValidationInput";
 import type {
@@ -183,18 +131,18 @@ import type {
   MergeCellsState,
 } from "../../modules/home-tools/components/data-tool-state";
 import {
-  getCellFormatBorderCapabilities,
-  type CellFormatBorderCapabilities,
-} from "../../modules/cell-format/border-capabilities";
+  useWorkspaceControllerFormatting,
+  type CellFormatSelection,
+  type ConditionalFormattingSelection,
+  type FormatPainterSource,
+} from "./useWorkspaceControllerFormatting";
+import { useWorkspaceControllerSheets } from "./useWorkspaceControllerSheets";
+
+export type { CellFormatSelection, ConditionalFormattingSelection };
 
 type FeedbackState = {
   key: MessageKey;
   params?: MessageParams;
-};
-
-type FormatPainterSource = {
-  values: CellValueMatrix;
-  styles: CellStyleMatrix;
 };
 
 export type SheetGridNavigator = {
@@ -214,30 +162,7 @@ export type SheetGridNavigator = {
 export type SpreadsheetWorkspaceControllerOptions = {
   idFactory?: IdFactory;
   statusDuration?: number;
-};
-
-export type CellFormatSelection = {
-  sheetId: string;
-  range: CellRange;
-  generation: number;
-  state: SelectionCellStyleState;
-  borderState: SelectionBorderState;
-  borderCapabilities: CellFormatBorderCapabilities;
-  mergeState: {
-    canMerge: boolean;
-    canUnmerge: boolean;
-    merged: "on" | "off" | "mixed";
-  };
-  sampleValue: string | number | boolean | null;
-  dateSystem: ExcelDateSystem;
-};
-
-export type ConditionalFormattingSelection = {
-  sheetId: string;
-  generation: number;
-  range: CellRange;
-  rules: SheetConditionalFormatRule[];
-  sampleValue?: string | number | boolean | null;
+  events?: TypedEventBus<WorkspaceEvents>;
 };
 
 export function useSpreadsheetWorkspaceController(
@@ -495,7 +420,7 @@ export function useSpreadsheetWorkspaceController(
   function execute(
     command: WorkbookCommand,
     operation?: WorkbookOperation,
-    options: { allowDuplicateEntry?: boolean } = {},
+    executeOptions: { allowDuplicateEntry?: boolean } = {},
   ): boolean {
     let changed: boolean;
     try {
@@ -505,7 +430,7 @@ export function useSpreadsheetWorkspaceController(
       assertPictureCommandSupport(command, session.workbook);
       if (
         !(
-          options.allowDuplicateEntry &&
+          executeOptions.allowDuplicateEntry &&
           command.type === "setCellContents" &&
           command.changes.length === 1
         )
@@ -546,6 +471,12 @@ export function useSpreadsheetWorkspaceController(
       calculation.invalidate();
       workbookVersion.value += 1;
       pruneViewStates();
+      options.events?.emit("command:executed", {
+        source: "execute",
+        operation,
+        sheetId: session.workbook.activeSheetId,
+        revision: workbookVersion.value,
+      });
     }
     return changed;
   }
@@ -578,6 +509,11 @@ export function useSpreadsheetWorkspaceController(
       calculation.invalidate();
       workbookVersion.value += 1;
       pruneViewStates();
+      options.events?.emit("command:executed", {
+        source: "replaceable",
+        sheetId: session.workbook.activeSheetId,
+        revision: workbookVersion.value,
+      });
     }
     return result;
   }
@@ -1030,488 +966,71 @@ export function useSpreadsheetWorkspaceController(
     );
   }
 
-  function mergeSelection(mode: CellMergeMode = "all"): void {
-    if (!(mergeState.value.availableModes?.[mode] ?? mergeState.value.canMerge)) {
-      showWorkspaceStatus({ key: "workspace.mergeUnavailable" });
-      return;
-    }
-    if (
-      executeFeature(
-        () =>
-          createMergeCellsCommand(
-            activeSheet.value.id,
-            activeSelectionRange.value,
-            mode,
-            mode === "content" ? locale.value : undefined,
-          ),
-        "cells.merge",
-        "workspace.mergeUnavailable",
-      )
-    ) {
-      gridRef.value?.clearClipboard?.();
-    }
-  }
+  const {
+    mergeSelection,
+    unmergeSelection,
+    applyCellStyle,
+    convertNumberType,
+    applyCellBorders,
+    captureCellFormatSelection,
+    captureConditionalFormattingSelection,
+    setConditionalFormats,
+    setConditionalFormatsForSheets,
+    clearConditionalFormats,
+    applyCellFormat,
+    updateBorderFormat,
+    adjustNumberFormatDecimals,
+    adjustIndent,
+    activateFormatPainter,
+    cancelFormatPainter,
+    applyFormatPainterTarget,
+  } = useWorkspaceControllerFormatting({
+    getWorkbook: () => session.workbook,
+    activeSheet,
+    activeAddress,
+    activeSelectionRange,
+    activeSheetEvaluator,
+    isFormattingSupported,
+    mergeState,
+    workbookGeneration,
+    formatPainterSource,
+    locale,
+    getCellFormatMergeState,
+    execute,
+    executeFeature,
+    pasteCells,
+    flushPendingGridEdit,
+    clearGridClipboard: () => gridRef.value?.clearClipboard?.(),
+    focusGrid: () => gridRef.value?.focusGrid(),
+    showWorkspaceStatus,
+    clearWorkspaceStatus,
+  });
 
-  function unmergeSelection(): void {
-    if (!mergeState.value.canUnmerge) {
-      showWorkspaceStatus({ key: "workspace.mergeUnavailable" });
-      return;
-    }
-    if (
-      executeFeature(
-        () => createUnmergeCellsCommand(activeSheet.value.id, activeSelectionRange.value),
-        "cells.unmerge",
-        "workspace.mergeUnavailable",
-      )
-    ) {
-      gridRef.value?.clearClipboard?.();
-    }
-  }
-
-  function applyCellStyle(patch: CellStylePatch): void {
-    if (!isFormattingSupported.value) {
-      showWorkspaceStatus({ key: "format.selectionTooLarge" });
-      return;
-    }
-    execute(
-      createApplyCellStyleCommand(activeSheet.value.id, activeSelectionRange.value, patch),
-      "format.cells",
-    );
-    clearWorkspaceStatus();
-  }
-
-  function convertNumberType(
-    mode: CellValueConversionMode,
-    scope: "cell" | "selection" | "sheet" = "selection",
-    conversionOptions?: CellValueConversionOptions,
-  ): void {
-    if (activeSheet.value.properties.protected || !flushPendingGridEdit()) return;
-    try {
-      const range =
-        scope === "cell"
-          ? { start: activeAddress.value, end: activeAddress.value }
-          : scope === "sheet"
-            ? {
-                start: { row: 0, column: 0 },
-                end: { row: MAX_SHEET_ROWS - 1, column: MAX_SHEET_COLUMNS - 1 },
-              }
-            : activeSelectionRange.value;
-      const command = createConvertCellValueTypeCommand(
-        activeSheet.value,
-        range,
-        mode,
-        conversionOptions,
-      );
-      if (command.changes.length === 0) {
-        showWorkspaceStatus({ key: "workspace.conversionNoMatch" });
-        return;
-      }
-      if (execute(command, "cells.edit")) {
-        showWorkspaceStatus({
-          key: "workspace.conversionCompleted",
-          params: { count: command.changes.length },
-        });
-      }
-    } catch {
-      showWorkspaceStatus({ key: "workspace.conversionUnavailable" });
-    }
-  }
-
-  function applyCellBorders(action: CellBorderAction): void {
-    if (!isFormattingSupported.value) {
-      showWorkspaceStatus({ key: "format.selectionTooLarge" });
-      return;
-    }
-    execute(
-      createApplyCellBordersCommand(activeSheet.value.id, activeSelectionRange.value, action),
-      "format.borders",
-    );
-    clearWorkspaceStatus();
-  }
-
-  function captureCellFormatSelection(): CellFormatSelection | undefined {
-    if (
-      !isFormattingSupported.value ||
-      (activeSheet.value.properties.protected && !activeSheet.value.protection?.formatCells)
-    )
-      return;
-    const sheet = activeSheet.value;
-    const range = activeSelectionRange.value;
-    const value = activeSheetEvaluator.value.getComputedValue(activeAddress.value);
-    return {
-      sheetId: sheet.id,
-      range: { start: { ...range.start }, end: { ...range.end } },
-      generation: workbookGeneration.value,
-      state: getSelectionCellStyleState(sheet, range),
-      borderState: getSelectionBorderState(sheet, range),
-      borderCapabilities: getCellFormatBorderCapabilities(range, sheet.mergedCells),
-      mergeState: {
-        ...getCellFormatMergeState(sheet, range),
-        ...(sheet.properties.protected ? { canMerge: false, canUnmerge: false } : {}),
-      },
-      sampleValue:
-        typeof value === "object" && value !== null ? formatComputedValueForDisplay(value) : value,
-      dateSystem: session.workbook.dateSystem,
-    };
-  }
-
-  function captureConditionalFormattingSelection(): ConditionalFormattingSelection | undefined {
-    if (activeSheet.value.properties.protected) return;
-    const range = activeSelectionRange.value;
-    const value = activeSheetEvaluator.value.getComputedValue(range.start);
-    return {
-      sheetId: activeSheet.value.id,
-      generation: workbookGeneration.value,
-      sampleValue:
-        typeof value === "object" && value !== null ? formatComputedValueForDisplay(value) : value,
-      range: { start: { ...range.start }, end: { ...range.end } },
-      rules: (activeSheet.value.conditionalFormats ?? []).map(cloneConditionalFormatRule),
-    };
-  }
-
-  function setConditionalFormats(
-    rules: readonly SheetConditionalFormatRule[],
-    target: ConditionalFormattingSelection,
-  ): boolean {
-    const sheet = session.workbook.sheets.get(target.sheetId);
-    if (target.generation !== workbookGeneration.value || !sheet || sheet.properties.protected) {
-      return false;
-    }
-    execute(createSetSheetConditionalFormatsCommand(target.sheetId, rules), "format.cells");
-    return true;
-  }
-
-  /**
-   * Applies the manager's changed sheets as individual Core commands.  Validate and
-   * construct every command before mutation so a later protected/missing sheet
-   * cannot leave an earlier sheet saved on its own.
-   */
-  function setConditionalFormatsForSheets(
-    changes: readonly ConditionalFormatSheetChange[],
-    generation: number,
-  ): boolean {
-    if (generation !== workbookGeneration.value) return false;
-
-    const commands: WorkbookCommand[] = [];
-    for (const change of changes) {
-      const sheet = session.workbook.sheets.get(change.sheetId);
-      if (!sheet || sheet.properties.protected) return false;
-      if (JSON.stringify(sheet.conditionalFormats ?? []) === JSON.stringify(change.rules)) continue;
-      commands.push(createSetSheetConditionalFormatsCommand(change.sheetId, change.rules));
-    }
-
-    for (const command of commands) execute(command, "format.cells");
-    return true;
-  }
-
-  function clearConditionalFormats(scope: "selection" | "sheet"): boolean {
-    const sheet = activeSheet.value;
-    if (sheet.properties.protected) return false;
-    return execute(
-      createClearSheetConditionalFormatsCommand(
-        sheet.id,
-        scope === "selection" ? activeSelectionRange.value : undefined,
-      ),
-      "format.cells",
-    );
-  }
-
-  function applyCellFormat(change: CellFormatChange, target: CellFormatSelection): boolean {
-    const sheet = session.workbook.sheets.get(target.sheetId);
-    if (
-      target.generation !== workbookGeneration.value ||
-      !sheet ||
-      (sheet.properties.protected && !sheet.protection?.formatCells)
-    ) {
-      return false;
-    }
-    if (!isCellStyleRangeSupported(target.range)) {
-      showWorkspaceStatus({ key: "format.selectionTooLarge" });
-      return false;
-    }
-    if (change.merge === true && !target.mergeState.canMerge) {
-      showWorkspaceStatus({ key: "workspace.mergeUnavailable" });
-      return false;
-    }
-    if (
-      Object.keys(change.style ?? {}).length === 0 &&
-      (change.borders?.length ?? 0) === 0 &&
-      Object.keys(change.borderFormat ?? {}).length === 0 &&
-      change.merge === undefined
-    )
-      return true;
-    const mergeWillChange =
-      change.merge !== undefined &&
-      (change.merge
-        ? !sheet.mergedCells.some((merged) => doMergedCellRangesIntersect(merged, target.range))
-        : sheet.mergedCells.some((merged) => doMergedCellRangesIntersect(merged, target.range)));
-    const changed = execute(
-      createApplyCellFormatCommand(target.sheetId, target.range, change),
-      "format.cells",
-    );
-    if (changed && mergeWillChange) gridRef.value?.clearClipboard?.();
-    clearWorkspaceStatus();
-    return true;
-  }
-
-  function updateBorderFormat(patch: CellBorderFormatPatch): void {
-    if (!isFormattingSupported.value) {
-      showWorkspaceStatus({ key: "format.selectionTooLarge" });
-      return;
-    }
-    execute(
-      createApplyCellFormatCommand(activeSheet.value.id, activeSelectionRange.value, {
-        borderFormat: patch,
-      }),
-      "format.borders",
-    );
-    clearWorkspaceStatus();
-  }
-
-  function adjustNumberFormatDecimals(delta: -1 | 1): void {
-    if (!isFormattingSupported.value) {
-      showWorkspaceStatus({ key: "format.selectionTooLarge" });
-      return;
-    }
-    execute(
-      createAdjustCellNumberFormatDecimalsCommand(
-        activeSheet.value.id,
-        activeSelectionRange.value,
-        delta,
-      ),
-      "format.cells",
-    );
-    clearWorkspaceStatus();
-  }
-
-  function adjustIndent(delta: -1 | 1): void {
-    if (!isFormattingSupported.value) {
-      showWorkspaceStatus({ key: "format.selectionTooLarge" });
-      return;
-    }
-    execute(
-      createAdjustCellIndentCommand(activeSheet.value.id, activeSelectionRange.value, delta),
-      "format.cells",
-    );
-    clearWorkspaceStatus();
-  }
-
-  function activateFormatPainter(): void {
-    if (formatPainterSource.value) {
-      cancelFormatPainter();
-      return;
-    }
-    if (!isFormattingSupported.value) {
-      showWorkspaceStatus({ key: "format.selectionTooLarge" });
-      return;
-    }
-    const sheet = activeSheet.value;
-    const range = activeSelectionRange.value;
-    const rows = getVisibleClipboardRows(
-      createGridClipboardRowVisibility(sheet, activeSheetEvaluator.value),
-      range,
-    );
-    if (!rows?.length || rangeIntersectsMergedCells(sheet, range)) {
-      showWorkspaceStatus({
-        key: rows?.length ? "clipboard.mergedRangeUnsupported" : "clipboard.noVisibleCells",
-      });
-      return;
-    }
-    const rowRanges = rows.map((row) => ({
-      start: { row, column: range.start.column },
-      end: { row, column: range.end.column },
-    }));
-    const styles = rowRanges.flatMap((rowRange) => getCellRangeStyles(sheet, rowRange));
-    formatPainterSource.value = {
-      values: styles.map((row) => row.map(() => null)),
-      styles,
-    };
-    clearWorkspaceStatus();
-    gridRef.value?.focusGrid();
-  }
-
-  function cancelFormatPainter(): void {
-    formatPainterSource.value = undefined;
-    clearWorkspaceStatus();
-  }
-
-  function applyFormatPainterTarget(range: CellRange): void {
-    const source = formatPainterSource.value;
-    if (!source) {
-      return;
-    }
-    if (!isCellStyleRangeSupported(range)) {
-      showWorkspaceStatus({ key: "format.selectionTooLarge" });
-      return;
-    }
-    const plan = createVisibleGridPastePlan(
-      source.values,
-      range,
-      range.start,
-      createGridClipboardRowVisibility(activeSheet.value, activeSheetEvaluator.value),
-    );
-    if (!plan) {
-      showWorkspaceStatus({ key: "workspace.formatPainterRangeMismatch" });
-      return;
-    }
-    const result = pasteCells({
-      kind: "formats",
-      plan,
-      styles: tileCellMatrix(source.styles, getCellMatrixSize(plan.values)),
-    });
-    if (!result.ok) {
-      showWorkspaceStatus({ key: `clipboard.${result.reason}` });
-      return;
-    }
-    formatPainterSource.value = undefined;
-    clearWorkspaceStatus();
-  }
-
-  function resizeDimension(payload: {
-    axis: SheetDimensionAxis;
-    index: number;
-    size: number;
-  }): void {
-    execute(
-      createResizeSheetDimensionCommand(
-        activeSheet.value.id,
-        payload.axis,
-        payload.index,
-        payload.size,
-      ),
-      "dimensions.resize",
-    );
-  }
-
-  function insertAxis(payload: { axis: SheetDimensionAxis; index: number; count: number }): void {
-    execute(
-      createInsertSheetAxisCommand(
-        activeSheet.value.id,
-        payload.axis,
-        payload.index,
-        payload.count,
-      ),
-      "structure.insert",
-    );
-  }
-
-  function deleteAxis(payload: { axis: SheetDimensionAxis; index: number; count: number }): void {
-    execute(
-      createDeleteSheetAxisCommand(
-        activeSheet.value.id,
-        payload.axis,
-        payload.index,
-        payload.count,
-      ),
-      "structure.delete",
-    );
-  }
-
-  function moveAxis(payload: AxisMovePayload): boolean {
-    return executeFeature(
-      () =>
-        createMoveSheetAxisCommand(
-          activeSheet.value.id,
-          payload.axis,
-          payload.index,
-          payload.count,
-          payload.toIndex,
-        ),
-      "structure.move",
-      "grid.axisMoveUnavailable",
-    );
-  }
-
-  function selectSheet(sheetId: string): void {
-    if (setActiveSheet(session.workbook, sheetId)) {
-      workbookVersion.value += 1;
-    }
-    clearWorkspaceStatus();
-  }
-
-  function updateSheetProperties(payload: {
-    sheetId: string;
-    patch: Partial<SheetProperties>;
-  }): void {
-    if (!session.workbook.sheets.has(payload.sheetId)) return;
-    execute(createSetSheetPropertiesCommand(session.workbook, payload.sheetId, payload.patch));
-    if (activeSheet.value.properties.protected) cancelFormatPainter();
-    clearWorkspaceStatus();
-  }
-
-  function restoreSheet(sheetId: string): void {
-    updateSheetProperties({ sheetId, patch: { hidden: false } });
-    selectSheet(sheetId);
-  }
-
-  function addSheet(): void {
-    execute(
-      createAddSheetCommand(session.workbook, { idFactory: session.idFactory }),
-      "sheets.add",
-    );
-    clearWorkspaceStatus();
-  }
-
-  function duplicateSheet(sheetId: string): void {
-    const command = createDuplicateSheetCommand(session.workbook, sheetId, {
-      idFactory: session.idFactory,
-    });
-    if (execute(command, "sheets.add")) {
-      showWorkspaceStatus({
-        key: "workspace.sheetDuplicated",
-        params: { name: command.sheet.name },
-      });
-      return;
-    }
-    clearWorkspaceStatus();
-  }
-
-  function renameSheet(payload: { sheetId: string; name: string }): void {
-    const normalizedName = payload.name.trim();
-    if (!normalizedName) {
-      showWorkspaceStatus({ key: "workspace.sheetNameEmpty" });
-      return;
-    }
-
-    const duplicate = sheets.value.some(
-      (sheet) =>
-        sheet.id !== payload.sheetId && sheet.name.toLowerCase() === normalizedName.toLowerCase(),
-    );
-    if (duplicate) {
-      showWorkspaceStatus({
-        key: "workspace.sheetNameDuplicate",
-        params: { name: normalizedName },
-      });
-      return;
-    }
-
-    try {
-      execute(createRenameSheetCommand(payload.sheetId, payload.name), "sheets.rename");
-      clearWorkspaceStatus();
-    } catch {
-      showWorkspaceStatus({ key: "workspace.renameFailed" });
-    }
-  }
-
-  function deleteSheet(sheetId: string): void {
-    execute(createDeleteSheetCommand(session.workbook, sheetId), "sheets.delete");
-    clearWorkspaceStatus();
-  }
-
-  function moveSheet(payload: { sheetId: string; toIndex: number }): void {
-    const sheet = session.workbook.sheets.get(payload.sheetId);
-    if (!sheet) {
-      return;
-    }
-    if (execute(createMoveSheetCommand(session.workbook, payload.sheetId, payload.toIndex))) {
-      showWorkspaceStatus({
-        key: "workspace.sheetMoved",
-        params: { name: sheet.name, position: payload.toIndex + 1 },
-      });
-      return;
-    }
-    clearWorkspaceStatus();
-  }
+  const {
+    resizeDimension,
+    insertAxis,
+    deleteAxis,
+    moveAxis,
+    selectSheet,
+    updateSheetProperties,
+    restoreSheet,
+    addSheet,
+    duplicateSheet,
+    renameSheet,
+    deleteSheet,
+    moveSheet,
+  } = useWorkspaceControllerSheets({
+    session,
+    activeSheet,
+    sheets,
+    workbookVersion,
+    events: options.events,
+    execute,
+    executeFeature,
+    cancelFormatPainter,
+    showWorkspaceStatus,
+    clearWorkspaceStatus,
+  });
 
   function areViewSelectionsEqual(
     left: SheetGridViewState["selection"],
@@ -1567,6 +1086,7 @@ export function useSpreadsheetWorkspaceController(
     clearWorkspaceStatus();
     workbookGeneration.value += 1;
     workbookVersion.value += 1;
+    options.events?.emit("workbook:replaced", { generation: workbookGeneration.value });
   }
 
   function flushPendingGridEdit(): boolean {
@@ -1714,6 +1234,11 @@ export function useSpreadsheetWorkspaceController(
       calculation.invalidate();
       workbookVersion.value += 1;
       pruneViewStates();
+      options.events?.emit("command:executed", {
+        source: "undo",
+        sheetId: session.workbook.activeSheetId,
+        revision: workbookVersion.value,
+      });
     }
     return changed;
   }
@@ -1729,6 +1254,11 @@ export function useSpreadsheetWorkspaceController(
       calculation.invalidate();
       workbookVersion.value += 1;
       pruneViewStates();
+      options.events?.emit("command:executed", {
+        source: "redo",
+        sheetId: session.workbook.activeSheetId,
+        revision: workbookVersion.value,
+      });
     }
     return changed;
   }

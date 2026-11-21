@@ -176,7 +176,7 @@ import type PictureToolbarType from "../modules/sheet-images/components/PictureT
 const PictureToolbar = defineAsyncComponent(
   () => import("../modules/sheet-images/components/PictureToolbar.vue"),
 );
-import type { Workbook, Sheet, FloatingImage } from "@sheetcraft/core/workbook";
+import type { Sheet, FloatingImage } from "@sheetcraft/core/workbook";
 const PictureGroupRibbon = defineAsyncComponent(
   () => import("../modules/sheet-images/components/PictureGroupRibbon.vue"),
 );
@@ -184,22 +184,12 @@ import type PictureOwnedLeafRibbonType from "../modules/sheet-images/components/
 const PictureOwnedLeafRibbon = defineAsyncComponent(
   () => import("../modules/sheet-images/components/PictureOwnedLeafRibbon.vue"),
 );
-import { resolveOwnedPictureNode } from "../modules/sheet-images/picture-group-interaction";
+import type PictureFormatPaneType from "../modules/sheet-images/components/format-pane/PictureFormatPane.vue";
 const PictureFormatPane = defineAsyncComponent(
   () => import("../modules/sheet-images/components/format-pane/PictureFormatPane.vue"),
 );
-import { onBeforeUnmount } from "vue";
-import { restoreFocusAfterRemount } from "../shared/floating/useDismissibleFloatingPanel";
-import { usePictureEffectsFocusReturn } from "../modules/sheet-images/usePictureEffectsFocusReturn";
-import {
-  normalizeSheetDrawing,
-  type SheetFramedGraphicDrawing,
-  type SheetChartDrawing,
-  type SheetDrawing,
-  type SheetGraphicDrawing,
-} from "@sheetcraft/core/sheet-drawings";
-import { getShapeTextAssetIds } from "@sheetcraft/core/shape-text";
-import { createCanvasImageCache } from "../modules/sheet-grid/canvas/image-painter";
+import type ShapeFormatPaneType from "../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
+import type { SheetDrawing } from "@sheetcraft/core/sheet-drawings";
 const SparklineDateAxisDialog = defineAsyncComponent(
   () => import("../modules/sparklines/components/SparklineDateAxisDialog.vue"),
 );
@@ -288,62 +278,27 @@ const ScreenCaptureSourceDialog = defineAsyncComponent(
 const ScreenCaptureDialog = defineAsyncComponent(
   () => import("../modules/insert-tools/components/ScreenCaptureDialog.vue"),
 );
-import { useShapeCreation } from "../modules/sheet-drawings/useShapeCreation";
-import { iconName } from "../modules/sheet-drawings/icon-catalog";
-import { useDrawingActions } from "../modules/sheet-drawings/useDrawingActions";
-import { prepareTextBoxReferenceUpdate } from "../modules/sheet-drawings/prepare-textbox-reference-update";
-import { createTextBoxReferenceResolver } from "../modules/sheet-drawings/textbox-reference-display";
-import { useTextBoxReference } from "../modules/sheet-drawings/useTextBoxReference";
 const TextBoxReferenceDialog = defineAsyncComponent(
   () => import("../modules/sheet-drawings/components/TextBoxReferenceDialog.vue"),
 );
 const DrawingEditorDialog = defineAsyncComponent(
   () => import("../modules/sheet-drawings/components/DrawingEditorDialog.vue"),
 );
-import {
-  shapeFormatOwnerKey,
-  type ShapeFormatTab,
-} from "../modules/sheet-drawings/shape-format-pane-model";
-import { useShapeFormatPresentation } from "../modules/sheet-drawings/useShapeFormatPresentation";
-import type ShapeFormatPaneType from "../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue";
 const ShapeFormatPane = defineAsyncComponent(
   () => import("../modules/sheet-drawings/components/shape-format/ShapeFormatPane.vue"),
 );
 const ShapeTextRibbonTools = defineAsyncComponent(
   () => import("../modules/sheet-drawings/components/ShapeTextRibbonTools.vue"),
 );
-import { useShapeRibbonFormat } from "../modules/sheet-drawings/useShapeRibbonFormat";
 const ShapeToolsToolbar = defineAsyncComponent(
   () => import("../modules/sheet-drawings/components/ShapeToolsToolbar.vue"),
 );
 const ShapeSelectionPane = defineAsyncComponent(
   () => import("../modules/sheet-drawings/components/ShapeSelectionPane.vue"),
 );
-import { useShapeObjectControls } from "../modules/sheet-drawings/useShapeObjectControls";
-import { useOwnedShapeGroupFormatPane } from "../modules/sheet-drawings/useOwnedShapeGroupFormatPane";
-import { useOwnedShapeConnectorFormatPane } from "../modules/sheet-drawings/useOwnedShapeConnectorFormatPane";
-import {
-  createShapeTextFieldDrafts,
-  shapeTextFieldDraftsKey,
-} from "../modules/sheet-drawings/shape-text-field-drafts";
-import { useShapeTextEditSession } from "../modules/sheet-drawings/useShapeTextEditSession";
-import type { ShapeCanvasTextEditRequest } from "../modules/sheet-drawings/shape-canvas-text-edit-contract";
-import { preflightShapeConnectorPaint } from "../modules/sheet-drawings/shape-connector-paint-preflight";
-import {
-  isShapeGroupDrawing,
-  findShapeGroupNode,
-  traverseShapeGroup,
-  type ShapeGroupDrawing,
-  type ShapeGroupPath,
-} from "@sheetcraft/core/shape-group";
 const ShapeClipboardTransferDialog = defineAsyncComponent(
   () => import("../modules/sheet-drawings/components/ShapeClipboardTransferDialog.vue"),
 );
-import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
-import type { ShapeTextPreparationMode } from "../modules/sheet-drawings/prepare-shape-text-update";
-import { useShapeTextCharacterFormatPane } from "../modules/sheet-drawings/useShapeTextCharacterFormatPane";
-import { useOwnedShapeFormatPane } from "../modules/sheet-drawings/useOwnedShapeFormatPane";
-import { createShapePaintAssetSource } from "../modules/sheet-drawings/shape-paint-asset-source";
 const EquationTools = defineAsyncComponent(
   () => import("../modules/sheet-drawings/equation/EquationTools.vue"),
 );
@@ -434,6 +389,13 @@ import { useWorkspaceFindAndGoTo } from "./composables/useWorkspaceFindAndGoTo";
 import { useWorkspaceInsertCapture } from "./composables/useWorkspaceInsertCapture";
 import { useWorkspacePageLayout } from "./composables/useWorkspacePageLayout";
 import { useWorkspacePictureFormat } from "./composables/useWorkspacePictureFormat";
+import { useWorkspaceShapeFormat } from "./composables/useWorkspaceShapeFormat";
+import { createTypedEventBus } from "../shared/runtime/typed-event-bus";
+import {
+  createWorkspaceRuntime,
+  provideWorkspaceRuntime,
+  type WorkspaceEvents,
+} from "../shared/runtime/workspace-runtime";
 import type { SheetContextMenuState } from "../modules/sheet-grid/context-menu-contracts";
 const SheetColumnStatisticsDialog = defineAsyncComponent(
   () => import("../modules/sheet-grid/components/SheetColumnStatisticsDialog.vue"),
@@ -518,6 +480,7 @@ function updateHorizontalScrollState(state: SheetHorizontalScrollState): void {
   Object.assign(horizontalScrollState, state);
 }
 
+const workspaceEvents = createTypedEventBus<WorkspaceEvents>();
 const {
   session,
   executeCommand,
@@ -609,9 +572,39 @@ const {
   flushPendingGridEdit,
   hasPendingGridEdit,
   scrollGridHorizontally,
-} = useSpreadsheetWorkspaceController();
+} = useSpreadsheetWorkspaceController({ events: workspaceEvents });
+
+const workspaceRuntime = createWorkspaceRuntime({
+  events: workspaceEvents,
+  getWorkbook: () => session.workbook,
+  getActiveSheet: () => activeSheet.value,
+  getActiveAddress: () => activeAddress.value,
+  getSelectionRange: () => activeSelectionRange.value,
+  getEvaluator: () => activeSheetEvaluator.value,
+  workbookGeneration,
+  workbookRevision,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  executeCommand,
+  executeReplaceableCommand,
+  undo,
+  redo,
+  selectSheet,
+  focusGrid: focusCellEditor,
+  notify: (level, message) => {
+    void MessagePlugin[level](message);
+  },
+});
+provideWorkspaceRuntime(workspaceRuntime);
 
 const cellEditSession = useCellEditSession({ onCommit: commitCell });
+workspaceRuntime.coordinator.registerEditParticipant({
+  id: "cell",
+  priority: 10,
+  isActive: () => cellEditSession.state.active,
+  flush: () => cellEditSession.finish(),
+  cancel: () => cellEditSession.cancel(),
+});
+workspaceRuntime.coordinator.registerClipboardOwner("cell", () => clearGridClipboard());
 const hyperlinkActions = useHyperlinksController({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -791,7 +784,6 @@ const {
   returnToPrintPreview,
   watermarkVisible,
   backgroundConflictVisible,
-  editingWatermarkPreset,
   watermarkDialogValue,
   showPageRulers,
   showPageMargins,
@@ -1195,15 +1187,15 @@ watch(
 );
 function showImageFeedback(key: MessageKey): void {
   if (key === "image.unchanged" || key === "clipboard.readyToMove") {
-    void MessagePlugin.info(t(key));
+    workspaceRuntime.notify("info", t(key));
   } else if (
     key === "image.inserted" ||
     key === "image.copied" ||
     key === "image.convertedToFloating"
   ) {
-    void MessagePlugin.success(t(key));
+    workspaceRuntime.notify("success", t(key));
   } else {
-    void MessagePlugin.error(t(key));
+    workspaceRuntime.notify("error", t(key));
   }
 }
 watch(
@@ -1318,25 +1310,21 @@ const {
   chartDialog,
   editingChart,
   chartError,
-  chartSourceActions,
   chartSourceDialog,
   chartSourceError,
-  openChartSource,
-  chartObjectControls,
   chartObjectContext,
   chartLayoutPreview,
   chartFormatControls,
   chartFormatContext,
   chartFormatChoices,
-  openChartFormat,
   selectChartFormatElement,
   chartRangePicker,
   pickingChartRange,
   pickedChartReference,
   chartPicker,
   selectChartReference,
-  selectChartSourceReference,
 } = useWorkspaceCharts({
+  runtime: workspaceRuntime,
   getWorkbook: () => session.workbook,
   getActiveSheet: () => activeSheet.value,
   getSelectionRange: () => activeSelectionRange.value,
@@ -1351,12 +1339,6 @@ const {
   selectSheet,
   selectDrawing: (drawingId) => sheetGridRef.value?.selectDrawing(drawingId),
   openPivotFields,
-  closeCompetingFormatPanes: () => {
-    shapeFormatPane.close();
-    shapeGroupFormatPane.close();
-    shapeConnectorFormatPane.close();
-    pictureTools.paneVisible.value = false;
-  },
   t,
 });
 watch(
@@ -1428,7 +1410,7 @@ const {
   focusCellEditor,
   focusFormulaBarOrGrid,
   pasteFloatingImage: (file, address) => imageActions.pasteImageFile(file, "floating", address),
-  insertRecordingAttachment: (file) => attachmentActions.requestInsert("icon", file),
+  insertRecordingAttachment: (file) => Boolean(attachmentActions.requestInsert("icon", file)),
   t,
 });
 const persistence = useWorkbookPersistence({
@@ -1471,18 +1453,6 @@ const {
   report: xlsxReport,
 } = xlsxActions;
 
-const shapeTextImages = createCanvasImageCache(() => {});
-onBeforeUnmount(shapeTextImages.dispose);
-function getShapePaintAssetSize(id: string) {
-  const size = imageAssetSizes.value.get(id);
-  if (size) return size;
-  const image =
-    shapePaintAssets.getAssetImage(id) ??
-    (imageAssetUrls.value.get(id)
-      ? shapeTextImages.peek?.(imageAssetUrls.value.get(id)!)
-      : undefined);
-  return image ? { width: image.naturalWidth, height: image.naturalHeight } : undefined;
-}
 const workbookPrintSheets = computed(() => {
   void workbookRevision.value;
   return [...session.workbook.sheets.values()].map((sheet) => ({
@@ -1499,225 +1469,89 @@ const chartPrintSheetResolver = computed(() => {
   const workbook = session.workbook;
   return (id: string) => workbook.sheets.get(id);
 });
-const textBoxReferenceResolver = computed(() => {
-  void workbookRevision.value;
-  return createTextBoxReferenceResolver({
-    workbook: session.workbook,
-    evaluator: activeSheetEvaluator.value,
-    locale: locale.value,
-  });
-});
-function prepareWorkspaceDrawing(
-  sheet: Sheet,
-  metrics: PictureSheetMetrics | undefined,
-  next: SheetDrawing,
-  owner: SheetDrawing | undefined,
-  forest?: readonly SheetDrawing[],
-  preparationMode?: ShapeTextPreparationMode,
-): SheetDrawing {
-  return prepareTextBoxReferenceUpdate(
-    textBoxReferenceResolver.value,
-    next,
-    owner,
-    sheetGridRef.value?.getDrawingLayout(sheet),
-    undefined,
-    {
-      resources: {
-        theme: session.workbook.theme,
-        getAssetImage: (id) =>
-          shapePaintAssets.getAssetImage(id) ??
-          (imageAssetUrls.value.get(id)
-            ? shapeTextImages.get(imageAssetUrls.value.get(id)!)
-            : undefined),
-        getAssetSize: getShapePaintAssetSize,
-      },
-    },
-    metrics,
-    forest
-      ? {
-          candidateForest: forest,
-          sourceForest: sheet.drawings ?? [],
-          revision: workbookRevision.value,
-        }
-      : undefined,
-    preparationMode,
-  );
-}
-const drawingActions = useDrawingActions({
-  preflightConnectedCollection: (pass) => {
-    preflightShapeConnectorPaint(pass, {
-      theme: session.workbook.theme,
-      getAssetSize: getShapePaintAssetSize,
-    });
-    return true;
-  },
-  getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getGeneration: () => workbookGeneration.value,
-  getRevision: () => workbookRevision.value,
-  getAddress: () => activeAddress.value,
-  flush: () => cellEditSession.finish(),
-  execute: executeCommand,
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
-  name: (kind) => t(`drawing.${kind}`),
-  iconName: (id) => iconName(id, locale.value),
-  onIconInserted: (id) => {
-    sheetGridRef.value?.selectDrawing(id);
-    void nextTick(() => sheetGridRef.value?.focusGrid());
-  },
-  prepareDrawing: (next, owner, forest, preparationMode) =>
-    prepareWorkspaceDrawing(
-      activeSheet.value,
-      sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
-      next,
-      owner,
-      forest,
-      preparationMode,
-    ),
-});
-const { dialog: drawingDialog, editing: editingDrawing } = drawingActions;
 const shapeObjectFormatPaneRef = ref<InstanceType<typeof ShapeFormatPaneType>>();
-const shapeFormatPane = useOwnedShapeFormatPane({
-  getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getGeneration: () => workbookGeneration.value,
-  getRevision: () => workbookRevision.value,
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
-  flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
-  update: drawingActions.update,
-  isAssetAvailable: (id) => imageAssetUrls.value.has(id) || shapePaintAssets.has(id),
-  getUnsupportedReason: () => t("pictureFormat.capabilityReasons.unsupportedFeature"),
-});
-const shapeGroupFormatPane = useOwnedShapeGroupFormatPane({
-  getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getGeneration: () => workbookGeneration.value,
-  getRevision: () => workbookRevision.value,
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
-  flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
-  replaceCollection: drawingActions.replaceCollection,
-  replaceCollectionPreservingGeometry: drawingActions.replaceCollectionPreservingGeometry,
-  isAssetAvailable: (id) => imageAssetUrls.value.has(id) || shapePaintAssets.has(id),
-  getUnsupportedReason: () => t("pictureFormat.capabilityReasons.unsupportedFeature"),
-  getCameraUnsupportedReason: () => t("drawing.groupCameraConnectorUnavailable"),
-  getScopeDescription: (scope) => {
-    const description = t("drawing.groupFormatScope", {
-      count: scope.descendantCount,
-      body: scope.bodyEligibleCount,
-      text: scope.textEligibleCount,
-    });
-    return scope.rotation3dShared
-      ? `${description} ${t("drawing.groupCameraScope", { count: scope.rotation3dAffectedCount })}`
-      : description;
+const {
+  getShapePaintAssetSize,
+  textBoxReferenceResolver,
+  prepareWorkspaceDrawing,
+  drawingActions,
+  drawingDialog,
+  editingDrawing,
+  shapeFormatPane,
+  shapeGroupFormatPane,
+  shapeConnectorFormatPane,
+  shapeTextEditSelection,
+  shapeTextEdit,
+  shapeTextEditCallbacks,
+  shapeFormatPresentation,
+  closeAllShapeFormatPanes,
+  startShapeTextEdit,
+  textBoxReferenceActions,
+  textBoxReferenceDialog,
+  textBoxReferencePicker,
+  pickingTextBoxReference,
+  pickedTextBoxReference,
+  selectTextBoxReference,
+  textBoxReferencePickerCallbacks,
+  openShapeGroupFormat,
+  selectedShapeGroupChanged,
+  shapePaintAssets,
+  beforeShapeFormatTabChange,
+  openShapeFormat,
+  selectedShapeChanged,
+  shapeInteractionBlocked,
+  shapeCreation,
+  selectedShapeObjectPaths,
+  selectedShapeObjectsChanged,
+  shapeRibbonFormat,
+  shapeRibbonSnapshot,
+  shapeRibbonCapabilities,
+  shapeRibbonIntent,
+  ownsSelectedShapeFieldTarget,
+  selectedShapePaneFieldLease,
+  flushSelectedShapeFieldDrafts,
+  beforeShapeContextChange,
+  shapeObjectControls,
+  shapeRibbonObjectTools,
+  activeShapeFormatPaneSnapshot,
+  activeShapeFormatPaneCapabilities,
+  activeShapeFormatPaneIntent,
+  activeShapeFormatInitialTab,
+} = useWorkspaceShapeFormat({
+  runtime: workspaceRuntime,
+  shapeObjectFormatPaneRef,
+  assetStore,
+  locale,
+  imageAssetUrls,
+  imageAssetSizes,
+  getShapeMetrics: (sheet) => sheetGridRef.value?.getShapeFrameContext?.(sheet)?.metrics,
+  getDrawingLayout: (sheet) => sheetGridRef.value?.getDrawingLayout(sheet),
+  flushPendingEdit: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
+  flushPendingCellEdit: () =>
+    sheetGridRef.value?.flushPendingCellEdit() ?? cellEditSession.finish(),
+  flushPendingShapeTextEdit: () => sheetGridRef.value?.flushPendingShapeTextEdit(),
+  selectDrawing: (id) => {
+    sheetGridRef.value?.selectDrawing(id);
   },
+  selectShapeObjects: (paths) => sheetGridRef.value?.selectShapeObjects(paths) ?? false,
+  onRootDrawingSelectionChanged: (id) => {
+    if (selectedChartId.value !== id) {
+      chartFormatPaneVisible.value = false;
+      chartFormatTarget.value = { kind: "chart" };
+    }
+    selectedChartId.value = activeSheet.value.drawings?.some(
+      (node) => node.id === id && node.kind === "chart",
+    )
+      ? id
+      : null;
+    selectedSlicerId.value = activeSheet.value.drawings?.some(
+      (node) => node.id === id && node.kind === "slicer",
+    )
+      ? id
+      : null;
+  },
+  t,
 });
-const shapeConnectorFormatPane = useOwnedShapeConnectorFormatPane({
-  getLocale: () => (locale.value === "zh-CN" ? "zh-CN" : "en-US"),
-  getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getGeneration: () => workbookGeneration.value,
-  getRevision: () => workbookRevision.value,
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
-  flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
-  replaceCollection: drawingActions.replaceCollection,
-  isAssetAvailable: (id) => imageAssetUrls.value.has(id) || shapePaintAssets.has(id),
-  getUnsupportedReason: () => t("pictureFormat.capabilityReasons.unsupportedFeature"),
-  getPaintResources: () => ({
-    theme: session.workbook.theme,
-    getAssetSize: getShapePaintAssetSize,
-  }),
-});
-const shapeTextEditSelection = shallowRef<{ start: number; end: number }>();
-const shapeTextFieldDrafts = createShapeTextFieldDrafts();
-provide(shapeTextFieldDraftsKey, shapeTextFieldDrafts);
-const shapeTextEdit = useShapeTextEditSession({
-  getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getGeneration: () => workbookGeneration.value,
-  getRevision: () => workbookRevision.value,
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
-  flush: () => sheetGridRef.value?.flushPendingCellEdit() ?? cellEditSession.finish(),
-  replaceCollection: drawingActions.replaceCollection,
-  flushFieldDrafts: (id) => shapeTextFieldDrafts.flush(`shape-text-${id}`).accepted,
-  focusFieldDraft: (id) => shapeTextFieldDrafts.focusRejected(`shape-text-${id}`),
-});
-const shapeTextEditCallbacks = computed(() => {
-  const current = shapeTextEdit.snapshot.value;
-  return current ? shapeTextEdit.callbacks(current.sessionId) : undefined;
-});
-const shapeTextCharacterPane = useShapeTextCharacterFormatPane({
-  getSnapshot: () => shapeTextEdit.snapshot.value,
-  getTheme: () => session.workbook.theme,
-  getCallbacks: () => shapeTextEditCallbacks.value,
-  getWorkbookId: () => session.workbook.id,
-  getSheetId: () => activeSheet.value.id,
-  getLocale: () => (locale.value === "zh-CN" ? "zh-CN" : "en-US"),
-});
-const shapeFormatPresentation = useShapeFormatPresentation(() => {
-  const edit = shapeTextCharacterPane.snapshot.value ? shapeTextEdit.snapshot.value : undefined;
-  const connector = shapeConnectorFormatPane.snapshot.value;
-  const group = shapeGroupFormatPane.snapshot.value;
-  const object = shapeFormatPane.snapshot.value;
-  const rootId =
-    edit?.sourceRootId ??
-    (connector
-      ? shapeConnectorFormatPane.root.value?.id
-      : group
-        ? shapeGroupFormatPane.root.value?.id
-        : object?.drawing.id);
-  const path =
-    edit?.path ??
-    (connector
-      ? shapeConnectorFormatPane.path.value
-      : group
-        ? shapeGroupFormatPane.path.value
-        : object
-          ? [object.drawing.id]
-          : undefined);
-  if (!rootId || !path) return undefined;
-  return {
-    workbook: session.workbook,
-    generation: workbookGeneration.value,
-    sheet: activeSheet.value,
-    rootId,
-    path,
-  };
-});
-function startShapeTextEdit(request: ShapeCanvasTextEditRequest): boolean {
-  const keepPropertiesOpen = !!(
-    shapeTextCharacterPane.snapshot.value ||
-    shapeFormatPane.snapshot.value ||
-    shapeGroupFormatPane.snapshot.value ||
-    shapeConnectorFormatPane.snapshot.value
-  );
-  const previous = shapeTextEdit.snapshot.value;
-  if (previous && !shapeTextEdit.commit(previous.sessionId)) return false;
-  if (!shapeTextEdit.begin(request.root, request.path)) return false;
-  const opened = shapeTextEdit.snapshot.value!;
-  if (
-    request.text !== undefined &&
-    !shapeTextEdit.update(opened.sessionId, opened.text + request.text)
-  )
-    return false;
-  const length = shapeTextEdit.snapshot.value!.draftText.length;
-  shapeTextEditSelection.value = { start: request.selection === "all" ? 0 : length, end: length };
-  shapeTextEdit.setSelection(opened.sessionId, {
-    ...shapeTextEditSelection.value,
-    direction: request.selection === "all" ? "forward" : "none",
-  });
-  if (keepPropertiesOpen) shapeTextCharacterPane.open();
-  else shapeTextCharacterPane.close();
-  shapeFormatPane.close();
-  shapeGroupFormatPane.close();
-  shapeConnectorFormatPane.close();
-  drawingActions.close();
-  return true;
-}
 const {
   equationEdit,
   equationPlaceholdersHidden,
@@ -1752,503 +1586,24 @@ const {
   },
   editGroupLeafDrawing: drawingActions.editGroupLeaf,
 });
-const textBoxReferenceActions = useTextBoxReference({
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getGeneration: () => workbookGeneration.value,
-  getRevision: () => workbookRevision.value,
-  getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
-  getResolver: () => textBoxReferenceResolver.value,
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
-  flush: () =>
-    (sheetGridRef.value?.flushPendingShapeTextEdit() ?? true) && cellEditSession.finish(),
-  replaceCollection: drawingActions.replaceCollectionPreservingGeometry,
+workspaceRuntime.coordinator.registerEditParticipant({
+  id: "shape-text",
+  priority: 30,
+  isActive: () => Boolean(shapeTextEdit.snapshot.value),
+  flush: () => sheetGridRef.value?.flushPendingShapeTextEdit() ?? true,
 });
-const { dialog: textBoxReferenceDialog } = textBoxReferenceActions;
-const textBoxReferencePicker = useRangeReferencePicker(() => activeSheet.value.name, {
-  singleCell: true,
+workspaceRuntime.coordinator.registerEditParticipant({
+  id: "equation",
+  priority: 25,
+  isActive: () => Boolean(equationEdit.snapshot.value),
+  flush: () => sheetGridRef.value?.flushPendingEquationEdit() ?? true,
 });
-const { active: pickingTextBoxReference, reference: pickedTextBoxReference } =
-  textBoxReferencePicker;
-watch(textBoxReferenceDialog, () => textBoxReferencePicker.cancel(), { flush: "sync" });
-const selectTextBoxReference = computed(() => {
-  const request = textBoxReferenceDialog.value;
-  return async (current: string): Promise<string | undefined> => {
-    if (!request?.isCurrent()) return undefined;
-    const selected = await textBoxReferencePicker.selectReference(current, { singleCell: true });
-    return request.isCurrent() ? selected : undefined;
-  };
+workspaceRuntime.coordinator.registerEditParticipant({
+  id: "picture-crop",
+  priority: 20,
+  isActive: () => sheetGridRef.value?.hasActivePictureCrop() ?? false,
+  flush: () => sheetGridRef.value?.applyPendingPictureCrop() ?? true,
 });
-const textBoxReferencePickerCallbacks = computed(() => {
-  const request = textBoxReferenceDialog.value;
-  return {
-    confirm: () => {
-      if (textBoxReferenceDialog.value !== request) return;
-      if (request?.isCurrent()) textBoxReferencePicker.confirm();
-      else textBoxReferencePicker.cancel();
-    },
-    cancel: () => {
-      if (textBoxReferenceDialog.value === request) textBoxReferencePicker.cancel();
-    },
-  };
-});
-function openShapeGroupFormat(root: ShapeGroupDrawing, path: ShapeGroupPath) {
-  const selected = traverseShapeGroup(root).find(
-    ({ path: current }) => JSON.stringify(current) === JSON.stringify(path),
-  )?.node;
-  if (selected?.kind === "shape" && selected.shapeConnector) {
-    if (shapeConnectorFormatPane.open(root, path)) {
-      shapeGroupFormatPane.close();
-      shapeFormatPane.close();
-      drawingActions.close();
-      sheetGridRef.value?.selectShapeObjects([path]);
-    }
-    return;
-  }
-  if (shapeGroupFormatPane.open(root, path)) {
-    shapeConnectorFormatPane.close();
-    shapeFormatPane.close();
-    drawingActions.close();
-    sheetGridRef.value?.selectShapeObjects([path]);
-  }
-}
-function selectedShapeGroupChanged(rootId: string | null, path: ShapeGroupPath | null) {
-  const connectorRoot = shapeConnectorFormatPane.root.value;
-  if (
-    connectorRoot?.kind === "shapeGroup" &&
-    (connectorRoot.id !== rootId ||
-      JSON.stringify(shapeConnectorFormatPane.path.value) !== JSON.stringify(path))
-  ) {
-    shapeConnectorFormatPane.close();
-    shapePaintAssets.cancel();
-  }
-  if (
-    shapeGroupFormatPane.root.value &&
-    (shapeGroupFormatPane.root.value.id !== rootId ||
-      JSON.stringify(shapeGroupFormatPane.path.value) !== JSON.stringify(path))
-  ) {
-    shapeGroupFormatPane.close();
-    shapePaintAssets.cancel();
-  }
-}
-const shapePaintAssets = createShapePaintAssetSource({
-  getSnapshot: () =>
-    shapeTextCharacterPane.ribbonSnapshot.value ??
-    shapeRibbonFormat.snapshot.value ??
-    shapeConnectorFormatPane.snapshot.value ??
-    shapeGroupFormatPane.snapshot.value ??
-    shapeFormatPane.snapshot.value,
-  store: assetStore,
-  preparePixels: async (asset) => {
-    if (asset.width * asset.height * 4 > 64 * 1024 * 1024) return;
-    const url = URL.createObjectURL(asset.blob),
-      image = new Image();
-    try {
-      image.src = url;
-      await image.decode();
-      return image;
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  },
-});
-onBeforeUnmount(shapePaintAssets.dispose);
-watch(
-  () =>
-    [
-      shapeFormatPane.drawing.value,
-      drawingDialog.value?.initial,
-      shapeGroupFormatPane.root.value,
-      shapeTextEdit.snapshot.value?.draftView,
-      imageAssetUrls.value,
-    ] as const,
-  ([selected, edited, group, draft, urls]) => {
-    const retained = new Set<string>();
-    const groupText = group
-      ? traverseShapeGroup(group).flatMap((visit) =>
-          visit.node.kind === "shape" || visit.node.kind === "textBox" ? [visit.node] : [],
-        )
-      : [];
-    for (const textOwner of [selected, edited, draft, ...groupText])
-      for (const id of getShapeTextAssetIds(textOwner?.shapeText, textOwner?.text)) {
-        const url = urls.get(id);
-        if (url) {
-          retained.add(url);
-          shapeTextImages.get(url);
-        }
-      }
-    shapeTextImages.retain(retained);
-  },
-  { immediate: true },
-);
-const shapePaneRequestedTab = ref<ShapeFormatTab>("fill-line");
-function beforeShapeFormatTabChange(tab: ShapeFormatTab): boolean {
-  const edit = shapeTextEdit.snapshot.value;
-  if (!edit || (tab !== "size-properties" && tab !== "effects")) return true;
-  const rootId = edit.sourceRootId,
-    path = edit.path,
-    sheet = activeSheet.value;
-  if (sheetGridRef.value?.flushPendingShapeTextEdit() === false || activeSheet.value !== sheet)
-    return false;
-  const root = sheet.drawings?.find((value) => value.id === rootId);
-  if (!root) return false;
-  const opened =
-    root.kind === "shapeGroup" ? shapeGroupFormatPane.open(root, path) : shapeFormatPane.open(root);
-  if (!opened) return false;
-  shapePaneRequestedTab.value = tab;
-  return true;
-}
-function openShapeFormat(drawing: SheetGraphicDrawing | SheetFramedGraphicDrawing) {
-  if (drawing.kind === "shape" && drawing.shapeConnector) {
-    if (shapeConnectorFormatPane.open(drawing)) {
-      shapeFormatPane.close();
-      shapeGroupFormatPane.close();
-      drawingActions.close();
-      sheetGridRef.value?.selectDrawing(drawing.id);
-    }
-    return;
-  }
-  if (shapeFormatPane.open(drawing)) {
-    shapeConnectorFormatPane.close();
-    shapeGroupFormatPane.close();
-    drawingActions.close();
-    sheetGridRef.value?.selectDrawing(drawing.id);
-  }
-}
-function selectedShapeChanged(id: string | null) {
-  if (selectedChartId.value !== id) {
-    chartFormatPaneVisible.value = false;
-    chartFormatTarget.value = { kind: "chart" };
-  }
-  selectedChartId.value = activeSheet.value.drawings?.some(
-    (node) => node.id === id && node.kind === "chart",
-  )
-    ? id
-    : null;
-  selectedSlicerId.value = activeSheet.value.drawings?.some(
-    (node) => node.id === id && node.kind === "slicer",
-  )
-    ? id
-    : null;
-  if (shapeConnectorFormatPane.root.value && shapeConnectorFormatPane.root.value.id !== id) {
-    shapeConnectorFormatPane.close();
-    shapePaintAssets.cancel();
-  }
-  if (shapeGroupFormatPane.root.value && shapeGroupFormatPane.root.value.id !== id) {
-    shapeGroupFormatPane.close();
-    shapePaintAssets.cancel();
-  }
-  if (shapeFormatPane.drawing.value && shapeFormatPane.drawing.value.id !== id) {
-    shapeFormatPane.close();
-    shapePaintAssets.cancel();
-  }
-}
-const shapeInteractionBlocked = ref(false);
-let shapeCreationEditorIntent = 0;
-const shapeCreation = useShapeCreation({
-  getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getGeneration: () => workbookGeneration.value,
-  getRevision: () => workbookRevision.value,
-  getAddress: () => activeAddress.value,
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || shapeInteractionBlocked.value,
-  flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
-  name: (choice) => choice.label[locale.value === "zh-CN" ? "zh-CN" : "en-US"],
-  getTextBoxFontFamily: () => session.workbook.theme.bodyFont,
-  onStart: () => {
-    shapeCreationEditorIntent++;
-    drawingActions.close();
-    sheetGridRef.value?.selectDrawing(null);
-  },
-  execute: executeCommand,
-  onCreated: (drawing, request) => {
-    const token = ++shapeCreationEditorIntent;
-    if (request.continuous) return;
-    if (drawing.kind !== "textBox") {
-      sheetGridRef.value?.selectDrawing(drawing.id);
-      return;
-    }
-    // Core normalizes the creation payload again: edit only the durable root,
-    // after the updated worksheet metrics have reached the grid.
-    const root = request.sheet.drawings?.find((node) => node.id === drawing.id);
-    const revision = workbookRevision.value;
-    if (!root || root.kind !== "textBox") return;
-    void nextTick(() => {
-      if (
-        token !== shapeCreationEditorIntent ||
-        session.workbook !== request.workbook ||
-        activeSheet.value !== request.sheet ||
-        workbookGeneration.value !== request.generation ||
-        workbookRevision.value !== revision ||
-        loading.value ||
-        fileBusy.value ||
-        xlsxBusy.value ||
-        shapeInteractionBlocked.value ||
-        shapeCreation.request.value ||
-        shapeTextEdit.snapshot.value ||
-        !request.sheet.drawings?.includes(root) ||
-        !sheetGridRef.value?.selectShapeObjects([[root.id]])
-      )
-        return;
-      startShapeTextEdit({ root, selection: "end" });
-    });
-  },
-});
-const selectedShapeObjectPaths = shallowRef<readonly ShapeGroupPath[]>([]);
-function selectedShapeObjectsChanged(paths: readonly ShapeGroupPath[], owner: Sheet) {
-  if (owner !== activeSheet.value) return;
-  if (JSON.stringify(paths) === JSON.stringify(selectedShapeObjectPaths.value)) return;
-  selectedShapeObjectPaths.value = paths.map((path) => [...path]);
-}
-function formatShapeObjectPath(path: ShapeGroupPath): boolean {
-  const root = activeSheet.value.drawings?.find((node) => node.id === path[0]);
-  if (!root) return false;
-  if (root.kind === "shapeGroup") {
-    openShapeGroupFormat(root, path);
-    return (
-      JSON.stringify(shapeGroupFormatPane.path.value ?? shapeConnectorFormatPane.path.value) ===
-      JSON.stringify(path)
-    );
-  }
-  if (path.length !== 1 || (root.kind !== "shape" && root.kind !== "textBox")) return false;
-  openShapeFormat(root);
-  return (
-    shapeFormatPane.drawing.value?.id === root.id ||
-    shapeConnectorFormatPane.root.value?.id === root.id
-  );
-}
-const shapeRibbonFormat = useShapeRibbonFormat({
-  getPaths: () => selectedShapeObjectPaths.value,
-  isTextEditing: () => !!shapeTextEdit.snapshot.value,
-  root: {
-    getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
-    getWorkbook: () => session.workbook,
-    getSheet: () => activeSheet.value,
-    getGeneration: () => workbookGeneration.value,
-    getRevision: () => workbookRevision.value,
-    isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
-    flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
-    update: drawingActions.update,
-    isAssetAvailable: (id) => imageAssetUrls.value.has(id) || shapePaintAssets.has(id),
-    getUnsupportedReason: () => t("pictureFormat.capabilityReasons.unsupportedFeature"),
-  },
-  group: {
-    getMetrics: () => sheetGridRef.value?.getShapeFrameContext?.(activeSheet.value)?.metrics,
-    getWorkbook: () => session.workbook,
-    getSheet: () => activeSheet.value,
-    getGeneration: () => workbookGeneration.value,
-    getRevision: () => workbookRevision.value,
-    isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
-    flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
-    replaceCollection: drawingActions.replaceCollection,
-    replaceCollectionPreservingGeometry: drawingActions.replaceCollectionPreservingGeometry,
-    isAssetAvailable: (id) => imageAssetUrls.value.has(id) || shapePaintAssets.has(id),
-    getUnsupportedReason: () => t("pictureFormat.capabilityReasons.unsupportedFeature"),
-    getCameraUnsupportedReason: () => t("drawing.groupCameraConnectorUnavailable"),
-  },
-});
-const shapeRibbonSnapshot = computed(() =>
-  shapeTextEdit.snapshot.value
-    ? shapeTextCharacterPane.ribbonSnapshot.value
-    : shapeRibbonFormat.snapshot.value,
-);
-const shapeRibbonCapabilities = computed(() =>
-  shapeTextEdit.snapshot.value
-    ? shapeTextCharacterPane.capabilities.value
-    : shapeRibbonFormat.capabilities.value,
-);
-function shapeRibbonIntent(intent: Parameters<typeof shapeRibbonFormat.onIntent>[0]): boolean {
-  return shapeTextEdit.snapshot.value
-    ? shapeTextCharacterPane.onIntent(intent)
-    : shapeRibbonFormat.onIntent(intent);
-}
-function selectedShapeFieldLease(snapshot: NonNullable<typeof shapeRibbonFormat.snapshot.value>) {
-  const owner = shapeFormatOwnerKey(snapshot.owner),
-    fieldOwner = snapshot.owner.sessionId,
-    workbook = session.workbook,
-    sheet = activeSheet.value,
-    generation = workbookGeneration.value,
-    paths = JSON.stringify(selectedShapeObjectPaths.value);
-  const current = () => {
-    const selected = shapeRibbonFormat.snapshot.value;
-    return (
-      !shapeTextEdit.snapshot.value &&
-      session.workbook === workbook &&
-      activeSheet.value === sheet &&
-      workbookGeneration.value === generation &&
-      JSON.stringify(selectedShapeObjectPaths.value) === paths &&
-      !!selected &&
-      shapeFormatOwnerKey(selected.owner) === owner
-    );
-  };
-  return { fieldOwner, current };
-}
-function ownsSelectedShapeFieldTarget(target: EventTarget | null): boolean {
-  const snapshot = shapeRibbonFormat.snapshot.value;
-  if (!(target instanceof Node) || !target.isConnected) return false;
-  if (snapshot) {
-    const lease = selectedShapeFieldLease(snapshot);
-    if (
-      lease.current() &&
-      shapeTextFieldDrafts.ownsTarget(lease.fieldOwner, target) &&
-      lease.current()
-    )
-      return true;
-  }
-  const paneLease = selectedShapePaneFieldLease(snapshot);
-  return (
-    !!paneLease &&
-    paneLease.current() &&
-    shapeTextFieldDrafts.ownsTarget(`shape-pane:${paneLease.pane.owner.sessionId}`, target) &&
-    paneLease.current()
-  );
-}
-/** Connector selections intentionally have no ordinary Shape Ribbon session. */
-function selectedConnectorPaneFieldLease(
-  pane: NonNullable<typeof shapeConnectorFormatPane.snapshot.value>,
-) {
-  if (shapeConnectorFormatPane.snapshot.value !== pane) return;
-  const workbook = session.workbook,
-    sheet = activeSheet.value,
-    generation = workbookGeneration.value,
-    owner = shapeFormatOwnerKey(pane.owner),
-    paths = JSON.stringify(selectedShapeObjectPaths.value);
-  return {
-    current: () => {
-      const selected = shapeConnectorFormatPane.snapshot.value,
-        selectedPaths = selectedShapeObjectPaths.value;
-      return (
-        !shapeTextEdit.snapshot.value &&
-        session.workbook === workbook &&
-        activeSheet.value === sheet &&
-        workbookGeneration.value === generation &&
-        workbook.sheets.get(sheet.id) === sheet &&
-        selectedPaths.length === 1 &&
-        JSON.stringify(selectedPaths) === paths &&
-        JSON.stringify(shapeConnectorFormatPane.path.value) === JSON.stringify(selectedPaths[0]) &&
-        !!selected &&
-        selected.owner.workbookId === workbook.id &&
-        selected.owner.sheetId === sheet.id &&
-        shapeFormatOwnerKey(selected.owner) === owner
-      );
-    },
-  };
-}
-function selectedShapePaneFieldLease(snapshot = shapeRibbonFormat.snapshot.value) {
-  // The properties pane and Ribbon hold independent command sessions. A pane
-  // popup may retain only the same uniquely selected, complete object path.
-  const getPaneSnapshot = () =>
-    shapeConnectorFormatPane.snapshot.value ??
-    shapeGroupFormatPane.snapshot.value ??
-    shapeFormatPane.snapshot.value;
-  const getPanePath = () =>
-    shapeConnectorFormatPane.snapshot.value
-      ? shapeConnectorFormatPane.path.value
-      : shapeGroupFormatPane.snapshot.value
-        ? shapeGroupFormatPane.path.value
-        : shapeFormatPane.drawing.value
-          ? [shapeFormatPane.drawing.value.id]
-          : undefined;
-  const pane = getPaneSnapshot(),
-    element = shapeObjectFormatPaneRef.value?.$el;
-  if (!pane || !(element instanceof HTMLElement)) return;
-  const lease = snapshot
-    ? selectedShapeFieldLease(snapshot)
-    : selectedConnectorPaneFieldLease(pane);
-  if (!lease) return;
-  const comparison = snapshot ?? pane;
-  const owner = shapeFormatOwnerKey(pane.owner);
-  const current = () => {
-    const selectedPane = getPaneSnapshot(),
-      paths = selectedShapeObjectPaths.value,
-      style = getComputedStyle(element);
-    return (
-      lease.current() &&
-      shapeObjectFormatPaneRef.value?.$el === element &&
-      element.isConnected &&
-      !element.hidden &&
-      style.display !== "none" &&
-      style.visibility !== "hidden" &&
-      !!selectedPane &&
-      shapeFormatOwnerKey(selectedPane.owner) === owner &&
-      selectedPane.owner.workbookId === comparison.owner.workbookId &&
-      selectedPane.owner.sheetId === comparison.owner.sheetId &&
-      selectedPane.owner.drawingId === comparison.owner.drawingId &&
-      paths.length === 1 &&
-      JSON.stringify(getPanePath()) === JSON.stringify(paths[0])
-    );
-  };
-  return { pane, element, current };
-}
-function flushSelectedShapeFieldDrafts(snapshot = shapeRibbonFormat.snapshot.value): boolean {
-  if (!snapshot) return true;
-  const lease = selectedShapeFieldLease(snapshot);
-  // A successful field command may advance revision. Its exact selection owner must survive.
-  return (
-    lease.current() && shapeTextFieldDrafts.flush(lease.fieldOwner).accepted && lease.current()
-  );
-}
-function beforeShapeContextChange(): boolean {
-  const edit = shapeTextEdit.snapshot.value;
-  return edit
-    ? shapeTextFieldDrafts.flush(`shape-text-${edit.sessionId}`).accepted
-    : flushSelectedShapeFieldDrafts();
-}
-const shapeObjectControls = useShapeObjectControls({
-  getWorkbook: () => session.workbook,
-  getSheet: () => activeSheet.value,
-  getGeneration: () => workbookGeneration.value,
-  getRevision: () => workbookRevision.value,
-  getMetrics: () => sheetGridRef.value?.getShapeFrameContext(activeSheet.value)?.metrics,
-  getSelection: () => selectedShapeObjectPaths.value,
-  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || shapeInteractionBlocked.value,
-  flush: () => sheetGridRef.value?.flushPendingEdit() ?? cellEditSession.finish(),
-  select: (paths) => sheetGridRef.value?.selectShapeObjects(paths) ?? false,
-  format: formatShapeObjectPath,
-  replaceCollection: drawingActions.replaceCollection,
-  replaceVisibilityCollection: drawingActions.replaceVisibilityCollection,
-});
-const shapeRibbonObjectTools = computed(() => {
-  const tools = shapeObjectControls.snapshot.value;
-  if (!tools) return undefined;
-  const lease = shapeTextEdit.snapshot.value;
-  const request = (action: "format" | "selection" | Parameters<typeof tools.actionHandler>[0]) => {
-    if (lease && action === "format") {
-      if (shapeTextEdit.snapshot.value?.sessionId !== lease.sessionId) return false;
-      shapeTextCharacterPane.open();
-      return true;
-    }
-    if (lease) {
-      if (
-        shapeTextEdit.snapshot.value?.sessionId !== lease.sessionId ||
-        sheetGridRef.value?.flushPendingShapeTextEdit() === false
-      )
-        return false;
-    }
-    const current = shapeObjectControls.snapshot.value;
-    if (!current) return false;
-    return action === "format"
-      ? current.formatHandler()
-      : action === "selection"
-        ? current.selectionPaneHandler()
-        : current.actionHandler(action);
-  };
-  return {
-    ...tools,
-    locale: locale.value === "zh-CN" ? ("zh-CN" as const) : ("en-US" as const),
-    actionHandler: (action: Parameters<typeof tools.actionHandler>[0]) => request(action),
-    formatHandler: () => request("format"),
-    selectionPaneHandler: () => request("selection"),
-  };
-});
-watch(
-  () => [activeSheet.value, workbookGeneration.value],
-  () => {
-    selectedShapeObjectPaths.value = [];
-    shapeObjectControls.paneVisible.value = false;
-  },
-);
 const {
   shapeClipboard,
   shapeClipboardEpoch,
@@ -2311,196 +1666,27 @@ const pictureTools = usePictureTools({
   execute: executeCommand,
   getFrameContext: () => sheetGridRef.value?.getPictureFrameContext?.(activeSheet.value),
 });
-function performPictureGroup(
-  ungroup = false,
-  ids: readonly string[] = selectedPictureIds.value,
-  owner = activeSheet.value,
-): boolean {
-  if (owner !== activeSheet.value || activeViewMode.value === "page-layout") return false;
-  const focusBeforeGrouping = document.activeElement;
-  const accepted = pictureTools.group(ungroup, [...ids]);
-  if (accepted) {
-    const selectedIds = [...selectedPictureIds.value];
-    // Keep the contextual Ribbon owned while Grid receives the replacement
-    // roots; its selection-change notification arrives on the following tick.
-    selectedPictureId.value =
-      selectedIds.find((id) => owner.floatingImages.some((root) => root.id === id)) ?? null;
-    const workbook = session.workbook,
-      generation = pictureOwnerGeneration.value,
-      revision = workbookRevision.value,
-      grid = sheetGridRef.value;
-    grid?.selectFloatingImages(selectedIds);
-    // Ungroup removes its menu/toolbar trigger. Keep the replacement roots'
-    // keyboard ownership without changing their multi-selection or taking focus
-    // back from a control the user reached while the view was updating.
-    if (
-      ungroup &&
-      (focusBeforeGrouping instanceof HTMLElement || focusBeforeGrouping instanceof SVGElement)
-    )
-      restoreFocusAfterRemount(
-        focusBeforeGrouping,
-        () => grid?.getPictureSelectionFocusTarget(selectedIds, owner),
-        () =>
-          session.workbook === workbook &&
-          activeSheet.value === owner &&
-          pictureOwnerGeneration.value === generation &&
-          workbookRevision.value === revision &&
-          sheetGridRef.value === grid &&
-          activeViewMode.value !== "page-layout" &&
-          !gridInert.value &&
-          !imageBusy.value &&
-          !cellEditSession.state.active &&
-          !cellEditSession.state.composing &&
-          !shapeTextEdit.snapshot.value &&
-          !equationEdit.snapshot.value &&
-          selectedIds.length === selectedPictureIds.value.length &&
-          selectedIds.every((id, index) => selectedPictureIds.value[index] === id),
-        focusBeforeGrouping,
-      );
-    // The floating Group button disappears with the old multi-selection. Return
-    // keyboard ownership to its new group, after Grid has received the new roots.
-    if (!ungroup)
-      void nextTick(() => {
-        if (
-          session.workbook !== workbook ||
-          activeSheet.value !== owner ||
-          pictureOwnerGeneration.value !== generation ||
-          workbookRevision.value !== revision ||
-          sheetGridRef.value !== grid ||
-          selectedIds.length !== selectedPictureIds.value.length ||
-          selectedIds.some((id, index) => selectedPictureIds.value[index] !== id) ||
-          !selectedIds.every((id) =>
-            owner.floatingImages.some((root) => root.id === id && isPictureGroup(root)),
-          ) ||
-          (document.activeElement !== focusBeforeGrouping &&
-            !(
-              focusBeforeGrouping &&
-              !focusBeforeGrouping.isConnected &&
-              document.activeElement === document.body
-            ))
-        )
-          return;
-        grid?.focusOwnedPictureSelection(selectedIds, owner);
-      });
-  } else showImageFeedback("picture.operationFailed");
-  return accepted;
-}
-function deleteOwnedPictures(paths: readonly PictureGroupPath[], owner: Sheet): boolean {
-  if (owner !== activeSheet.value) return false;
-  const accepted = pictureTools.deletePaths(paths);
-  if (accepted) sheetGridRef.value?.selectFloatingImages([...selectedPictureIds.value]);
-  return accepted;
-}
-let picturePaneEpoch = 0;
-watch(
-  [() => session.workbook, activeSheet, pictureOwnerGeneration, pictureTools.paneVisible],
-  () => {
-    picturePaneEpoch += 1;
-  },
-  { flush: "sync" },
-);
-function picturePaneImageAvailable(image: FloatingImage): boolean {
-  void workbookRevision.value;
-  return canEditPictureSelection(activeSheet.value, [image.id]);
-}
-const picturePaneHandlers = computed(() => {
-  const workbook = session.workbook;
-  const sheet = activeSheet.value;
-  const generation = pictureOwnerGeneration.value;
-  const visible = pictureTools.paneVisible.value;
-  const epoch = picturePaneEpoch;
-  const current = () =>
-    visible &&
-    epoch === picturePaneEpoch &&
-    workbook === session.workbook &&
-    sheet === activeSheet.value &&
-    generation === pictureOwnerGeneration.value;
-  return {
-    rename: (image: FloatingImage, name: string) => current() && pictureTools.rename(image, name),
-    visibility: (image: FloatingImage) => current() && pictureTools.toggleVisibility(image),
-    select: (ids: string[]) => {
-      if (!current() || (ids.length && !canEditPictureSelection(sheet, ids))) return false;
-      sheetGridRef.value?.selectFloatingImages(ids);
-      return true;
-    },
-    close: () => {
-      if (!current()) return false;
-      pictureTools.paneVisible.value = false;
-      return true;
-    },
-  };
+workspaceRuntime.events.on("pane:opened", ({ pane }) => {
+  if (pane === "chart") pictureTools.paneVisible.value = false;
 });
-const selectedOwnedPictureLeaf = computed(() => {
-  void workbookRevision.value;
-  const path = selectedOwnedPicturePath.value;
-  const context = sheetGridRef.value?.getPictureFrameContext(activeSheet.value);
-  if (
-    !path ||
-    path.length < 2 ||
-    selectedPictureIds.value.length !== 1 ||
-    path[0] !== selectedPictureIds.value[0] ||
-    !context
-  )
-    return;
-  try {
-    const resolved = resolveOwnedPictureNode(activeSheet.value.floatingImages, path, context);
-    return resolved?.visible &&
-      resolved.layout &&
-      !resolved.layout.collapsed &&
-      resolved.node.kind === "grouped-picture-v1"
-      ? { node: resolved.node, path: [...path] }
-      : undefined;
-  } catch {
-    return;
-  }
-});
+workspaceRuntime.coordinator.registerClipboardOwner("shape", clearCompetingShapeClipboard);
 const pictureToolbarRef = ref<InstanceType<typeof PictureToolbarType> | null>(null);
 const pictureOwnedLeafRibbonRef = ref<InstanceType<typeof PictureOwnedLeafRibbonType> | null>(null);
-const pictureEffectsFocusReturn = usePictureEffectsFocusReturn({
-  getOwner: () => {
-    void workbookRevision.value;
-    const sheet = activeSheet.value;
-    const leaf = selectedOwnedPictureLeaf.value;
-    const targets = leaf
-      ? [{ id: selectedPictureIds.value[0]!, assetId: leaf.node.assetId }]
-      : selectedPictureIds.value.map((id) => {
-          const image = sheet.floatingImages.find((entry) => entry.id === id);
-          return image && !isPictureGroup(image) ? { id, assetId: image.assetId } : undefined;
-        });
-    if (!targets.length || targets.some((target) => !target)) return undefined;
-    return {
-      workbook: session.workbook,
-      sheet,
-      generation: pictureOwnerGeneration.value,
-      mode: leaf ? "owned" : "standalone",
-      targets: targets as { id: string; assetId: string }[],
-      path: leaf ? leaf.path : null,
-    };
-  },
-  isBlocked: () =>
-    gridInert.value ||
-    imageBusy.value ||
-    Boolean(activeRangePicker.value) ||
-    cellEditSession.state.active ||
-    cellEditSession.state.composing ||
-    Boolean(shapeTextEdit.snapshot.value) ||
-    Boolean(equationEdit.snapshot.value) ||
-    (sheetGridRef.value?.hasActivePictureCrop() ?? false),
-  getTarget: (mode) =>
-    mode === "owned"
-      ? (pictureOwnedLeafRibbonRef.value?.getEffectsTrigger() ?? null)
-      : (pictureToolbarRef.value?.getEffectsTrigger() ?? null),
-});
+const pictureFormatComponentRef = ref<InstanceType<typeof PictureFormatPaneType> | null>(null);
 const {
+  performPictureGroup,
+  deleteOwnedPictures,
+  picturePaneImageAvailable,
+  picturePaneHandlers,
+  selectedOwnedPictureLeaf,
+  pictureEffectsFocusReturn,
   pictureFormatVisible,
-  pictureFormatComponentRef,
   pictureFormatInitialTab,
   pictureFormatInitialPaint,
   pictureIntrinsic,
   pictureIntrinsicRetry,
   pictureOriginalResetOwner,
   beforePictureFormatPaneInteraction,
-  beforePictureFormatInteraction,
   pictureFormatPane,
   picturePaintAssets,
   pictureFormatLabel,
@@ -2514,6 +1700,8 @@ const {
   pictureCompression,
   pictureBatchSize,
 } = useWorkspacePictureFormat({
+  runtime: workspaceRuntime,
+  pictureFormatComponentRef,
   getWorkbook: () => session.workbook,
   getActiveSheet: () => activeSheet.value,
   getWorkbookRevision: () => workbookRevision.value,
@@ -2522,10 +1710,37 @@ const {
   selectedPictureIds,
   selectedOwnedPicturePath,
   selectedPicture,
-  selectedOwnedPictureLeaf,
   imageAssetUrls,
   assetStore,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
+  isPageLayoutMode: () => activeViewMode.value === "page-layout",
+  isPictureInteractionBlocked: () =>
+    gridInert.value ||
+    imageBusy.value ||
+    cellEditSession.state.active ||
+    cellEditSession.state.composing ||
+    Boolean(shapeTextEdit.snapshot.value) ||
+    Boolean(equationEdit.snapshot.value),
+  isEffectsFocusReturnBlocked: () =>
+    gridInert.value ||
+    imageBusy.value ||
+    Boolean(activeRangePicker.value) ||
+    cellEditSession.state.active ||
+    cellEditSession.state.composing ||
+    Boolean(shapeTextEdit.snapshot.value) ||
+    Boolean(equationEdit.snapshot.value) ||
+    (sheetGridRef.value?.hasActivePictureCrop() ?? false),
+  getGridToken: () => sheetGridRef.value,
+  selectFloatingImages: (ids) => sheetGridRef.value?.selectFloatingImages(ids),
+  getPictureSelectionFocusTarget: (ids, owner) =>
+    sheetGridRef.value?.getPictureSelectionFocusTarget(ids, owner),
+  focusOwnedPictureSelection: (ids, owner) =>
+    sheetGridRef.value?.focusOwnedPictureSelection(ids, owner),
+  getEffectsTrigger: (mode) =>
+    mode === "owned"
+      ? (pictureOwnedLeafRibbonRef.value?.getEffectsTrigger() ?? null)
+      : (pictureToolbarRef.value?.getEffectsTrigger() ?? null),
+  showImageFeedback,
   getPictureFrameContext: (sheet) => sheetGridRef.value?.getPictureFrameContext?.(sheet),
   applyPendingPictureCrop: () => sheetGridRef.value?.applyPendingPictureCrop(),
   canCropPicture: () => sheetGridRef.value?.canCropPicture() ?? false,
@@ -3729,7 +2944,9 @@ const { onWorkspaceShapeTextOutsideAction, onWorkspaceNativeTextCopy, onWorkspac
           :edit-session-id="cellEditSession.id"
           @insert-image="imageActions.requestInsert"
           @insert-hyperlink="hyperlinkActions.edit"
-          @insert-header-footer="openHeaderFooter({ region: 'header', section: 'center' })"
+          @insert-header-footer="
+            openHeaderFooter({ section: 'header', part: 'center', variant: 'odd' })
+          "
           @insert-table="tableActions.requestCreate"
           @insert-slicer="tableSlicers.open"
           @manage-table="tableActions.openSettings"
@@ -5032,57 +4249,18 @@ const { onWorkspaceShapeTextOutsideAction, onWorkspaceNativeTextCopy, onWorkspac
             ? `character-${shapeTextEdit.snapshot.value.sessionId}`
             : 'object-format'
         "
-        v-if="
-          shapeTextCharacterPane.snapshot.value ||
-          shapeConnectorFormatPane.snapshot.value ||
-          shapeGroupFormatPane.snapshot.value ||
-          shapeFormatPane.snapshot.value
-        "
-        :snapshot="
-          shapeTextCharacterPane.snapshot.value ??
-          shapeConnectorFormatPane.snapshot.value ??
-          shapeGroupFormatPane.snapshot.value ??
-          shapeFormatPane.snapshot.value
-        "
-        :capabilities="
-          shapeTextCharacterPane.snapshot.value
-            ? shapeTextCharacterPane.capabilities.value
-            : shapeConnectorFormatPane.snapshot.value
-              ? shapeConnectorFormatPane.capabilities.value
-              : shapeGroupFormatPane.snapshot.value
-                ? shapeGroupFormatPane.capabilities.value
-                : shapeFormatPane.capabilities.value
-        "
-        :on-intent="
-          shapeTextCharacterPane.snapshot.value
-            ? shapeTextCharacterPane.onIntent
-            : shapeConnectorFormatPane.snapshot.value
-              ? shapeConnectorFormatPane.onIntent
-              : shapeGroupFormatPane.snapshot.value
-                ? shapeGroupFormatPane.onIntent
-                : shapeFormatPane.onIntent
-        "
+        v-if="activeShapeFormatPaneSnapshot"
+        :snapshot="activeShapeFormatPaneSnapshot"
+        :capabilities="activeShapeFormatPaneCapabilities"
+        :on-intent="activeShapeFormatPaneIntent"
         :load-paint-asset="shapePaintAssets.load"
         :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
         :t="pictureFormatLabel"
-        :initial-tab="
-          shapeTextCharacterPane.snapshot.value
-            ? shapeTextCharacterPane.snapshot.value.drawing.kind === 'shape' &&
-              shapeTextCharacterPane.snapshot.value.drawing.wordArt
-              ? 'text-fill-line'
-              : 'text-box'
-            : shapePaneRequestedTab
-        "
+        :initial-tab="activeShapeFormatInitialTab"
         :presentation-state="shapeFormatPresentation"
         :before-tab-change="beforeShapeFormatTabChange"
         :data-shape-text-edit-session="shapeTextEdit.snapshot.value?.sessionId"
-        @close="
-          shapeTextCharacterPane.close();
-          shapeFormatPane.close();
-          shapeGroupFormatPane.close();
-          shapeConnectorFormatPane.close();
-          shapePaintAssets.cancel();
-        "
+        @close="closeAllShapeFormatPanes(true)"
       />
       <ShapeSelectionPane
         v-if="shapeObjectControls.paneVisible.value && shapeObjectControls.snapshot.value"

@@ -5,6 +5,7 @@ import { getPictureObjectOriginCell } from "@sheetcraft/core/picture-object-shee
 import { canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import type { CellAddress, Sheet } from "@sheetcraft/core/workbook";
 import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
+import type { CellSelection } from "@sheetcraft/sheet-engine/selection";
 import type { MessageKey } from "../../shared/i18n";
 import type { PictureContextSourceAction } from "../sheet-images/picture-context-source-action";
 import { resolveOwnedPictureNode } from "../sheet-images/picture-group-interaction";
@@ -30,7 +31,7 @@ export type SheetGridPictureSelectionOptions = {
   isPictureLayerReadOnly: () => boolean;
   isPictureCropActive: () => boolean;
   finishPictureCrop: () => boolean;
-  finishEdit: (value?: string, focus?: boolean) => boolean;
+  finishEdit: (destination?: CellSelection, restoreFocus?: boolean) => boolean;
   stopDragSelection: () => void;
   clearContextMenus: () => void;
   focusEditor: () => void;

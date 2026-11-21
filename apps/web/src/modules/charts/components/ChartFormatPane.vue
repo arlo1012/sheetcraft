@@ -24,11 +24,8 @@ import type {
   ChartSeriesFormat,
   ChartValueAxisFormat,
 } from "@sheetcraft/core/chart-format";
-import {
-  formatCellNumberValue,
-  validateCellNumberFormatCode,
-} from "@sheetcraft/core/number-format";
-import type { CellNumberFormat, CellNumberFormatNegativeStyle } from "@sheetcraft/core/style";
+import { validateCellNumberFormatCode } from "@sheetcraft/core/number-format";
+import type { CellNumberFormat } from "@sheetcraft/core/style";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import OptionList from "../../../shared/option-list/OptionList.vue";
 import NumericField from "../../../shared/numeric-field/NumericField.vue";
@@ -38,7 +35,6 @@ import type {
   NumericCandidate,
   NumericCommitResult,
   NumericDraftChange,
-  NumericFieldSpec,
   NumericValue,
 } from "../../../shared/numeric-field/types";
 import FontFormatField from "../../../shared/cell-text/FontFormatField.vue";
@@ -49,6 +45,21 @@ import type { MessageKey } from "../../../shared/i18n";
 import { getChartElementSettings } from "../chart-elements";
 import { chartMinorGridlinesForAxis } from "../chart-axis-state";
 import type { ChartElementPatch } from "../chart-element-controls";
+import {
+  chartAxisBoundSpec as axisBoundSpec,
+  chartAxisDraftErrorKeys as axisDraftErrorKeys,
+  chartAxisUnitSpec as axisUnitSpec,
+  chartDecimalsSpec as decimalsSpec,
+  chartFontSizeSpec as fontSizeSpec,
+  chartGapWidthSpec as gapWidthSpec,
+  chartLabelAngleSpec as labelAngleSpec,
+  chartLegendFontSizeSpec as legendFontSizeSpec,
+  chartLegendStrokeWidthSpec as legendStrokeWidthSpec,
+  chartMarkerSizePtSpec as markerSizePtSpec,
+  chartOverlapSpec as overlapSpec,
+  chartStrokeWidthSpec as strokeWidthSpec,
+} from "../chart-format-specs";
+import { useChartFormatNumberSection } from "../composables/useChartFormatNumberSection";
 import {
   chartFormatTargetKey,
   chartFormatTargetLabelKeys,
@@ -63,7 +74,6 @@ import {
   getChartSeriesFormat,
   resolveChartFormatSeriesId,
   getChartValueAxisDraftError,
-  type ChartValueAxisDraftError,
   setChartFormatField,
   setChartTextFontFamily,
   syncChartFormatDraft,
@@ -365,88 +375,18 @@ const draftFields = [
   "axisTitle",
   "formatCode",
 ];
-const axisBoundSpec: NumericFieldSpec = {
-  displayStep: 1,
-  allowAuto: true,
-  parsePolicy: { scientific: true },
-};
-const axisUnitSpec: NumericFieldSpec = {
-  ...axisBoundSpec,
-  canonicalBounds: { min: 0, minExclusive: true },
-};
-const fontSizeSpec: NumericFieldSpec = {
-  displayUnit: "px",
-  displayStep: 1,
-  canonicalBounds: { min: 1, max: 256 },
-  allowAuto: true,
-  parsePolicy: { scientific: true },
-};
-const legendFontSizeSpec: NumericFieldSpec = {
-  ...fontSizeSpec,
-  displayUnit: "pt",
-  toDisplay: (value) => value * 0.75,
-  fromDisplay: (value) => (value * 4) / 3,
-  displayStep: 1,
-};
 const fontSizeFieldSpec = computed(() =>
   kind.value === "legend" ? legendFontSizeSpec : fontSizeSpec,
 );
 const fontSizeLabel = computed(() =>
   t(kind.value === "legend" ? "chart.legendFontSize" : "chart.formatFontSize"),
 );
-const strokeWidthSpec: NumericFieldSpec = {
-  displayUnit: "px",
-  displayStep: 0.25,
-  canonicalBounds: { min: 0, max: 32 },
-  allowAuto: true,
-  parsePolicy: { scientific: true },
-};
-const markerSizePtSpec: NumericFieldSpec = {
-  displayUnit: "pt",
-  displayStep: 1,
-  canonicalBounds: { min: 2, max: 72 },
-  integer: true,
-  allowAuto: true,
-};
-const legendStrokeWidthSpec: NumericFieldSpec = {
-  ...strokeWidthSpec,
-  displayUnit: "pt",
-  toDisplay: (value) => value * 0.75,
-  fromDisplay: (value) => (value * 4) / 3,
-  displayPrecision: 2,
-};
 const surfaceStrokeWidthSpec = computed(() =>
   kind.value === "legend" ? legendStrokeWidthSpec : strokeWidthSpec,
 );
 const surfaceStrokeWidthLabel = computed(() =>
   t(kind.value === "legend" ? "chart.legendLineWidth" : "chart.formatLineWidth"),
 );
-const labelAngleSpec: NumericFieldSpec = {
-  displayUnit: "°",
-  displayStep: 1,
-  canonicalBounds: { min: -90, max: 90 },
-  allowAuto: true,
-  parsePolicy: { scientific: true },
-};
-const gapWidthSpec: NumericFieldSpec = {
-  displayUnit: "%",
-  displayStep: 1,
-  canonicalBounds: { min: 0, max: 500 },
-  allowAuto: true,
-  parsePolicy: { scientific: true },
-};
-const overlapSpec: NumericFieldSpec = {
-  displayUnit: "%",
-  displayStep: 1,
-  canonicalBounds: { min: -100, max: 100 },
-  allowAuto: true,
-  parsePolicy: { scientific: true },
-};
-const decimalsSpec: NumericFieldSpec = {
-  displayStep: 1,
-  canonicalBounds: { min: 0, max: 20 },
-  integer: true,
-};
 function sharedNumericValue(field: SharedNumericField, previous?: NumericValue): NumericValue {
   const value = sharedNumericResets[field] === ownerKey.value ? undefined : numericValue(field);
   if (value === undefined) return previous?.kind === "auto" ? previous : { kind: "auto" };
@@ -498,14 +438,6 @@ const decimalsCommit = computed(() => sharedNumericCommit("decimals"));
 const fontSizeCommit = computed(() => sharedNumericCommit("fontSize"));
 const strokeWidthCommit = computed(() => sharedNumericCommit("strokeWidth"));
 const markerSizePtCommit = computed(() => sharedNumericCommit("markerSizePt"));
-const axisDraftErrorKeys: Record<ChartValueAxisDraftError, MessageKey> = {
-  number: "chart.formatInvalidNumber",
-  bounds: "chart.formatAxisBoundsOrder",
-  positiveUnit: "chart.formatAxisPositiveUnit",
-  minorTooLarge: "chart.formatAxisMinorTooLarge",
-  divisionLimit: "chart.formatAxisDivisionLimit",
-  unevenDivision: "chart.formatAxisUnevenDivision",
-};
 function sharedNumericCommit(field: SharedNumericField) {
   const owner = ownerKey.value,
     handler = props.apply,
@@ -1107,158 +1039,46 @@ function setMarkerSymbol(value: unknown): void {
     return;
   setSeries("markerSymbol", value === "" ? undefined : value);
 }
-function numberIntent(format: CellNumberFormat | undefined): ChartFormatIntent | undefined {
-  if (!isValueAxis.value) return undefined;
-  const next = { ...valueAxis.value };
-  if (format) {
-    next.numberFormat = format;
-    next.linkedToSource = false;
-  } else if (percentageAxis.value) {
-    next.numberFormat = { kind: "custom", code: "General" };
-    next.linkedToSource = false;
-  } else {
-    delete next.numberFormat;
-    delete next.linkedToSource;
-  }
-  return axisIntent(next);
-}
-function applyNumberFormat(format: CellNumberFormat | undefined): boolean {
-  const intent = numberIntent(format);
-  return !!intent && submit(intent);
-}
-function toggleSourceLink(value: unknown): void {
-  if (percentageAxis.value) return;
-  const next = { ...valueAxis.value, linkedToSource: !!value };
-  // Relinking is an explicit edit, never a normalization of dormant input state.
-  if (ordinaryPrimaryValueAxis.value && value) delete next.numberFormat;
-  const intent = axisIntent(next);
-  if (intent) submit(intent);
-}
-type NumberCategory = CellNumberFormat["kind"] | "general";
-const categoryKeys: Record<NumberCategory, MessageKey> = {
-  general: "cellFormat.general",
-  number: "cellFormat.numeric",
-  currency: "cellFormat.currency",
-  accounting: "cellFormat.accounting",
-  date: "cellFormat.date",
-  time: "cellFormat.time",
-  percent: "cellFormat.percent",
-  fraction: "cellFormat.fraction",
-  scientific: "cellFormat.scientific",
-  text: "cellFormat.text",
-  special: "cellFormat.special",
-  custom: "cellFormat.custom",
-};
-const numberCategoryOptions = computed(() =>
-  Object.entries(categoryKeys).map(([value, key]) => ({ value, label: t(key) })),
-);
-function selectNumberCategory(value: unknown): void {
-  if (typeof value !== "string" || !Object.hasOwn(categoryKeys, value)) return;
-  const category = value as NumberCategory;
-  const defaults: Record<NumberCategory, CellNumberFormat | undefined> = {
-    general: ordinaryPrimaryValueAxis.value ? { kind: "custom", code: "General" } : undefined,
-    number: { kind: "number", fractionDigits: 2 },
-    percent: { kind: "percent", fractionDigits: 2 },
-    scientific: { kind: "scientific", fractionDigits: 2 },
-    currency: {
-      kind: "currency",
-      currency: locale.value === "zh-CN" ? "CNY" : "USD",
-      fractionDigits: 2,
-    },
-    accounting: {
-      kind: "accounting",
-      currency: locale.value === "zh-CN" ? "CNY" : "USD",
-      fractionDigits: 2,
-    },
-    date: { kind: "date", code: "yyyy-mm-dd" },
-    time: { kind: "time", code: "hh:mm:ss" },
-    fraction: { kind: "fraction", code: "# ?/?" },
-    text: { kind: "text" },
-    special: { kind: "special", code: "00000" },
-    custom: { kind: "custom", code: "0.00" },
-  };
-  const next = defaults[category];
-  if (!applyNumberFormat(next)) return;
-  // An accepted category replaces both number-format editors, even before the
-  // next owner snapshot arrives. Unrelated axis drafts remain untouched.
-  acceptedCategoryDecimals.value = {
-    owner: ownerKey.value,
-    value: next && "fractionDigits" in next ? (next.fractionDigits ?? 2) : 2,
-  };
-  decimalsControl.value?.cancel();
-  delete sharedNumericDrafts.decimals;
-  delete sharedNumericResetErrors.decimals;
-  drafts.formatCode = createChartFormatDraft(next && "code" in next ? next.code : "");
-  draftHandlers.delete("formatCode");
-}
-const showDecimals = computed(() =>
-  ["number", "percent", "currency", "accounting", "scientific"].includes(numberCategory.value),
-);
-const showCurrency = computed(
-  () => numberCategory.value === "currency" || numberCategory.value === "accounting",
-);
-const showCode = computed(() =>
-  ["date", "time", "fraction", "special", "custom"].includes(numberCategory.value),
-);
-const showNegative = computed(
-  () => numberCategory.value === "number" || numberCategory.value === "currency",
-);
-function setGrouping(value: unknown): void {
-  const format = numberFormat.value;
-  if (format?.kind === "number") applyNumberFormat({ ...format, useGrouping: !!value });
-}
-function setCurrency(value: unknown): void {
-  const format = numberFormat.value;
-  if (typeof value === "string" && (format?.kind === "currency" || format?.kind === "accounting")) {
-    const next = { ...format, currency: value };
-    delete next.currencySymbol;
-    applyNumberFormat(next);
-  }
-}
-function setNegative(value: string): void {
-  if (!["minus", "red", "parentheses", "red-parentheses"].includes(value)) return;
-  const format = numberFormat.value;
-  if (format?.kind === "number" || format?.kind === "currency")
-    applyNumberFormat({ ...format, negativeStyle: value as CellNumberFormatNegativeStyle });
-}
-const negativeOptions = computed(() =>
-  (["minus", "red", "parentheses", "red-parentheses"] as const).map((value) => {
-    const format = numberFormat.value;
-    const presentation = formatCellNumberValue(
-      -1234.56,
-      format?.kind === "number" || format?.kind === "currency"
-        ? { ...format, negativeStyle: value }
-        : undefined,
-      { locale: locale.value },
-    );
-    return { value, label: presentation.text, color: presentation.color };
-  }),
-);
-const currencyOptions = computed(() =>
-  [
-    ...new Set([
-      "CNY",
-      "USD",
-      "EUR",
-      "GBP",
-      "JPY",
-      ...(showCurrency.value && numberFormat.value && "currency" in numberFormat.value
-        ? [numberFormat.value.currency]
-        : []),
-    ]),
-  ].map((value) => ({ value, label: value || t("cellFormat.noCurrency") })),
-);
-const numberPreview = computed(() => {
-  const sample = percentageAxis.value
-    ? 0.375
-    : (sourceSeries.value
-        .flatMap((entry) => entry.values)
-        .find((value): value is number => value !== null) ?? 1234.56);
-  try {
-    return formatCellNumberValue(sample, numberFormat.value, { locale: locale.value });
-  } catch {
-    return { text: "####" };
-  }
+const {
+  numberIntent,
+  toggleSourceLink,
+  numberCategoryOptions,
+  selectNumberCategory,
+  showDecimals,
+  showCurrency,
+  showCode,
+  showNegative,
+  setGrouping,
+  setCurrency,
+  setNegative,
+  negativeOptions,
+  currencyOptions,
+  numberPreview,
+} = useChartFormatNumberSection({
+  isValueAxis,
+  percentageAxis,
+  ordinaryPrimaryValueAxis,
+  valueAxis,
+  sourceSeries,
+  numberFormat,
+  numberCategory,
+  locale,
+  t,
+  axisIntent,
+  submit,
+  onCategoryApplied: (next) => {
+    // An accepted category replaces both number-format editors, even before the
+    // next owner snapshot arrives. Unrelated axis drafts remain untouched.
+    acceptedCategoryDecimals.value = {
+      owner: ownerKey.value,
+      value: next && "fractionDigits" in next ? (next.fractionDigits ?? 2) : 2,
+    };
+    decimalsControl.value?.cancel();
+    delete sharedNumericDrafts.decimals;
+    delete sharedNumericResetErrors.decimals;
+    drafts.formatCode = createChartFormatDraft(next && "code" in next ? next.code : "");
+    draftHandlers.delete("formatCode");
+  },
 });
 const { fontOptions } = useFontCatalog(() => [
   ...(textFormat.value.fontFamily ? [textFormat.value.fontFamily] : []),

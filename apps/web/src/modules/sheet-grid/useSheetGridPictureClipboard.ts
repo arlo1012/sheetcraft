@@ -8,7 +8,7 @@ import {
   type Sheet,
 } from "@sheetcraft/core/workbook";
 import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
-import { areCellAddressesEqual } from "@sheetcraft/sheet-engine/selection";
+import { areCellAddressesEqual, type CellSelection } from "@sheetcraft/sheet-engine/selection";
 import { insertTextAtSelection } from "../../shared/forms/text-selection";
 import type { MessageKey } from "../../shared/i18n";
 import type { ImageInsertMode } from "../sheet-images/useSheetImageActions";
@@ -48,7 +48,7 @@ export type SheetGridPictureClipboardOptions = {
   setActiveCell: (address: CellAddress) => void;
   pasteSelection: () => Promise<unknown>;
   pasteCapturedText: (text: string) => void;
-  finishEdit: (value?: string, focus?: boolean) => boolean;
+  finishEdit: (destination?: CellSelection, restoreFocus?: boolean) => boolean;
   onEditorInput: (value: string) => void;
   focusEditor: () => void;
   onPasteImageFile: (file: File, mode: ImageInsertMode, address?: CellAddress) => void;

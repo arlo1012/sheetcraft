@@ -1,5 +1,6 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from "vue";
 import { isPictureGroup, type PictureGroupPath } from "@sheetcraft/core";
+import type { GroupedPicture } from "@sheetcraft/core/picture-group";
 import { canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import type { FloatingImage, ImageAppearance, Sheet, Workbook } from "@sheetcraft/core/workbook";
 import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
@@ -8,23 +9,29 @@ import type PictureFormatPaneType from "../../modules/sheet-images/components/fo
 import type { PictureContextSourceAction } from "../../modules/sheet-images/picture-context-source-action";
 import type { PictureEffectEdit } from "../../modules/sheet-images/picture-effect-edit";
 import type { PictureFormatLabelKey } from "../../modules/sheet-images/picture-format-pane-model";
+import { resolveOwnedPictureNode } from "../../modules/sheet-images/picture-group-interaction";
 import { createPicturePaintAssetSource } from "../../modules/sheet-images/picture-paint-asset-source";
 import { useOwnedPictureFormatPane } from "../../modules/sheet-images/useOwnedPictureFormatPane";
 import type { usePictureAssetTools } from "../../modules/sheet-images/usePictureAssetTools";
 import type { usePictureCellConversion } from "../../modules/sheet-images/usePictureCellConversion";
 import { usePictureDialogSessions } from "../../modules/sheet-images/usePictureDialogSessions";
+import { usePictureEffectsFocusReturn } from "../../modules/sheet-images/usePictureEffectsFocusReturn";
 import { usePictureIntrinsicSize } from "../../modules/sheet-images/usePictureIntrinsicSize";
 import { usePictureToolbarOwner } from "../../modules/sheet-images/usePictureToolbarOwner";
 import type { usePictureTools } from "../../modules/sheet-images/usePictureTools";
 import type { useSheetImageActions } from "../../modules/sheet-images/useSheetImageActions";
+import { restoreFocusAfterRemount } from "../../shared/floating/useDismissibleFloatingPanel";
 import type { MessageKey } from "../../shared/i18n";
+import type { WorkspaceRuntime } from "../../shared/runtime/workspace-runtime";
 
 type OwnedPictureLeaf = {
-  node: Exclude<FloatingImage, { kind: "group" }>;
+  node: GroupedPicture;
   path: PictureGroupPath;
 };
 
 type WorkspacePictureFormatOptions = {
+  runtime?: WorkspaceRuntime;
+  pictureFormatComponentRef?: Ref<InstanceType<typeof PictureFormatPaneType> | null>;
   getWorkbook: () => Workbook;
   getActiveSheet: () => Sheet;
   getWorkbookRevision: () => number;
@@ -33,10 +40,21 @@ type WorkspacePictureFormatOptions = {
   selectedPictureIds: Ref<string[]>;
   selectedOwnedPicturePath: Ref<PictureGroupPath | null>;
   selectedPicture: ComputedRef<FloatingImage | undefined>;
-  selectedOwnedPictureLeaf: ComputedRef<OwnedPictureLeaf | undefined>;
-  imageAssetUrls: ComputedRef<ReadonlyMap<string, string>>;
+  imageAssetUrls: Readonly<Ref<ReadonlyMap<string, string>>>;
   assetStore: ImageAssetStore;
   isBusy: () => boolean;
+  isPageLayoutMode: () => boolean;
+  isPictureInteractionBlocked: () => boolean;
+  isEffectsFocusReturnBlocked: () => boolean;
+  getGridToken: () => unknown;
+  selectFloatingImages: (ids: string[]) => void;
+  getPictureSelectionFocusTarget: (
+    ids: readonly string[],
+    owner: Sheet,
+  ) => HTMLElement | null | undefined;
+  focusOwnedPictureSelection: (ids: readonly string[], owner: Sheet) => void;
+  getEffectsTrigger: (mode: "owned" | "standalone") => HTMLElement | null;
+  showImageFeedback: (key: MessageKey) => void;
   getPictureFrameContext: (sheet: Sheet) => PictureFrameLayoutContext | undefined;
   applyPendingPictureCrop: () => boolean | undefined;
   canCropPicture: () => boolean;
@@ -52,14 +70,13 @@ type WorkspacePictureFormatOptions = {
   t: (key: MessageKey) => string;
 };
 
-/** Owns the picture format side-pane, intrinsic size/reset, paint assets, source ribbon lease, and picture dialog sessions. */
+/** Owns the picture format side-pane, group/selection-pane handlers, intrinsic size/reset, paint assets, source ribbon lease, and picture dialog sessions. */
 export function useWorkspacePictureFormat(options: WorkspacePictureFormatOptions) {
   const {
     selectedPictureId,
     selectedPictureIds,
     selectedOwnedPicturePath,
     selectedPicture,
-    selectedOwnedPictureLeaf,
     imageAssetUrls,
     pictureTools,
     pictureAssetTools,
@@ -67,8 +84,185 @@ export function useWorkspacePictureFormat(options: WorkspacePictureFormatOptions
     imageActions,
   } = options;
 
+  function performPictureGroup(
+    ungroup = false,
+    ids: readonly string[] = selectedPictureIds.value,
+    owner = options.getActiveSheet(),
+  ): boolean {
+    if (owner !== options.getActiveSheet() || options.isPageLayoutMode()) return false;
+    const focusBeforeGrouping = document.activeElement;
+    const accepted = pictureTools.group(ungroup, [...ids]);
+    if (accepted) {
+      const selectedIds = [...selectedPictureIds.value];
+      // Keep the contextual Ribbon owned while Grid receives the replacement
+      // roots; its selection-change notification arrives on the following tick.
+      selectedPictureId.value =
+        selectedIds.find((id) => owner.floatingImages.some((root) => root.id === id)) ?? null;
+      const workbook = options.getWorkbook(),
+        generation = options.getPictureOwnerGeneration(),
+        revision = options.getWorkbookRevision(),
+        gridToken = options.getGridToken();
+      options.selectFloatingImages(selectedIds);
+      // Ungroup removes its menu/toolbar trigger. Keep the replacement roots'
+      // keyboard ownership without changing their multi-selection or taking focus
+      // back from a control the user reached while the view was updating.
+      if (
+        ungroup &&
+        (focusBeforeGrouping instanceof HTMLElement || focusBeforeGrouping instanceof SVGElement)
+      )
+        restoreFocusAfterRemount(
+          focusBeforeGrouping,
+          () => options.getPictureSelectionFocusTarget(selectedIds, owner),
+          () =>
+            options.getWorkbook() === workbook &&
+            options.getActiveSheet() === owner &&
+            options.getPictureOwnerGeneration() === generation &&
+            options.getWorkbookRevision() === revision &&
+            options.getGridToken() === gridToken &&
+            !options.isPageLayoutMode() &&
+            !options.isPictureInteractionBlocked() &&
+            selectedIds.length === selectedPictureIds.value.length &&
+            selectedIds.every((id, index) => selectedPictureIds.value[index] === id),
+          focusBeforeGrouping,
+        );
+      // The floating Group button disappears with the old multi-selection. Return
+      // keyboard ownership to its new group, after Grid has received the new roots.
+      if (!ungroup)
+        void nextTick(() => {
+          if (
+            options.getWorkbook() !== workbook ||
+            options.getActiveSheet() !== owner ||
+            options.getPictureOwnerGeneration() !== generation ||
+            options.getWorkbookRevision() !== revision ||
+            options.getGridToken() !== gridToken ||
+            selectedIds.length !== selectedPictureIds.value.length ||
+            selectedIds.some((id, index) => selectedPictureIds.value[index] !== id) ||
+            !selectedIds.every((id) =>
+              owner.floatingImages.some((root) => root.id === id && isPictureGroup(root)),
+            ) ||
+            (document.activeElement !== focusBeforeGrouping &&
+              !(
+                focusBeforeGrouping &&
+                !focusBeforeGrouping.isConnected &&
+                document.activeElement === document.body
+              ))
+          )
+            return;
+          options.focusOwnedPictureSelection(selectedIds, owner);
+        });
+    } else options.showImageFeedback("picture.operationFailed");
+    return accepted;
+  }
+
+  function deleteOwnedPictures(paths: readonly PictureGroupPath[], owner: Sheet): boolean {
+    if (owner !== options.getActiveSheet()) return false;
+    const accepted = pictureTools.deletePaths(paths);
+    if (accepted) options.selectFloatingImages([...selectedPictureIds.value]);
+    return accepted;
+  }
+
+  let picturePaneEpoch = 0;
+  watch(
+    [
+      options.getWorkbook,
+      options.getActiveSheet,
+      options.getPictureOwnerGeneration,
+      pictureTools.paneVisible,
+    ],
+    () => {
+      picturePaneEpoch += 1;
+    },
+    { flush: "sync" },
+  );
+
+  function picturePaneImageAvailable(image: FloatingImage): boolean {
+    void options.getWorkbookRevision();
+    return canEditPictureSelection(options.getActiveSheet(), [image.id]);
+  }
+
+  const picturePaneHandlers = computed(() => {
+    const workbook = options.getWorkbook();
+    const sheet = options.getActiveSheet();
+    const generation = options.getPictureOwnerGeneration();
+    const visible = pictureTools.paneVisible.value;
+    const epoch = picturePaneEpoch;
+    const current = () =>
+      visible &&
+      epoch === picturePaneEpoch &&
+      workbook === options.getWorkbook() &&
+      sheet === options.getActiveSheet() &&
+      generation === options.getPictureOwnerGeneration();
+    return {
+      rename: (image: FloatingImage, name: string) => current() && pictureTools.rename(image, name),
+      visibility: (image: FloatingImage) => current() && pictureTools.toggleVisibility(image),
+      select: (ids: string[]) => {
+        if (!current() || (ids.length && !canEditPictureSelection(sheet, ids))) return false;
+        options.selectFloatingImages(ids);
+        return true;
+      },
+      close: () => {
+        if (!current()) return false;
+        pictureTools.paneVisible.value = false;
+        return true;
+      },
+    };
+  });
+
+  const selectedOwnedPictureLeaf = computed<OwnedPictureLeaf | undefined>(() => {
+    void options.getWorkbookRevision();
+    const path = selectedOwnedPicturePath.value;
+    const sheet = options.getActiveSheet();
+    const context = options.getPictureFrameContext(sheet);
+    if (
+      !path ||
+      path.length < 2 ||
+      selectedPictureIds.value.length !== 1 ||
+      path[0] !== selectedPictureIds.value[0] ||
+      !context
+    )
+      return;
+    try {
+      const resolved = resolveOwnedPictureNode(sheet.floatingImages, path, context);
+      return resolved?.visible &&
+        resolved.layout &&
+        !resolved.layout.collapsed &&
+        resolved.node.kind === "grouped-picture-v1"
+        ? { node: resolved.node, path: [...path] }
+        : undefined;
+    } catch {
+      return;
+    }
+  });
+
+  const pictureEffectsFocusReturn = usePictureEffectsFocusReturn({
+    getOwner: () => {
+      void options.getWorkbookRevision();
+      const sheet = options.getActiveSheet();
+      const leaf = selectedOwnedPictureLeaf.value;
+      const targets = leaf
+        ? [{ id: selectedPictureIds.value[0]!, assetId: leaf.node.assetId }]
+        : selectedPictureIds.value.map((id) => {
+            const image = sheet.floatingImages.find((entry) => entry.id === id);
+            return image && !isPictureGroup(image) ? { id, assetId: image.assetId } : undefined;
+          });
+      if (!targets.length || targets.some((target) => !target)) return undefined;
+      return {
+        workbook: options.getWorkbook(),
+        sheet,
+        generation: options.getPictureOwnerGeneration(),
+        mode: leaf ? "owned" : "standalone",
+        targets: targets as { id: string; assetId: string }[],
+        path: leaf ? leaf.path : null,
+      };
+    },
+    isBlocked: options.isEffectsFocusReturnBlocked,
+    getTarget: options.getEffectsTrigger,
+  });
+
   const pictureFormatVisible = ref(false);
-  const pictureFormatComponentRef = ref<InstanceType<typeof PictureFormatPaneType> | null>(null);
+  const pictureFormatComponentRef =
+    options.pictureFormatComponentRef ??
+    ref<InstanceType<typeof PictureFormatPaneType> | null>(null);
   const pictureFormatInitialTab = ref<"effects" | "size-properties">("size-properties");
   const pictureFormatInitialPaint = ref<"fill" | "line" | undefined>();
 
@@ -262,6 +456,7 @@ export function useWorkspacePictureFormat(options: WorkspacePictureFormatOptions
       pictureFormatInitialPaint.value = paint;
       pictureFormatInitialTab.value = target ?? "size-properties";
     }
+    options.runtime?.coordinator.notifyPaneOpened("picture");
     pictureFormatVisible.value = true;
     if (paint) pictureFormatComponentRef.value?.showPaint(paint);
     else if (target === "effects") pictureFormatComponentRef.value?.showEffects();
@@ -271,6 +466,8 @@ export function useWorkspacePictureFormat(options: WorkspacePictureFormatOptions
     pictureFormatVisible.value = false;
     pictureFormatPane.close();
   }
+
+  options.runtime?.coordinator.registerPane("picture", closeOwnedPictureFormat);
 
   const pictureDialogs = usePictureDialogSessions({
     getWorkbook: options.getWorkbook,
@@ -425,6 +622,12 @@ export function useWorkspacePictureFormat(options: WorkspacePictureFormatOptions
   });
 
   return {
+    performPictureGroup,
+    deleteOwnedPictures,
+    picturePaneImageAvailable,
+    picturePaneHandlers,
+    selectedOwnedPictureLeaf,
+    pictureEffectsFocusReturn,
     pictureFormatVisible,
     pictureFormatComponentRef,
     pictureFormatInitialTab,
