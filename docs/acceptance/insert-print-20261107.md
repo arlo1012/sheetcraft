@@ -29,6 +29,14 @@ Sheetcraft 的「表格工具 → 插入切片器」列出当前表字段，支�
 - 图表「添加图表元素」新增「误差线」（无 / 标准误差 / 百分比 5% / 标准偏差），适用于非堆积的柱形、条形、折线、面积、散点与组合图，以带端帽的 ECharts custom 覆盖层绘制；右侧「设置图表格式 → 数值轴 → 边界与单位」新增「显示单位」（无 / 百 / 千 / 万 / 百万 / 亿），实时缩放刻度标签并显示单位标示。两者按需持久化为 **V116** 快照，原生 XLSX 导出门禁明确拦截非默认误差线。Chrome 实测柱形图误差线（±5% 与标准偏差切换）、显示单位 `千`（刻度 `0–25` + `×1K`）、刷新重载 V116 持久化与 `Ctrl+Z` 撤销全部通过，控制台 0 报错。[误差线与千单位实图](evidence/charts/error-bars-display-unit.png)
 - 补验此前因输入超时阻塞的「图片工具 → 设置透明色」点击取色路径：上传四色 `color-pick-reference.svg` 浮动图片，点击主按钮进入取色模式并点击中心绿色方块（`#16a34a`），绿色区域透明透出工作表网格线；`Ctrl+Z` 恢复原绿像素、`Ctrl+Y` 恢复透明，控制台 0 报错。[图片点击透明色实图](evidence/pictures/transparent-color-eyedropper.png)
 
+### 打印阶段端到端实机验收与工程优化（2026-11-21）
+
+- **打印阶段实机验收**：在 Chrome 实机新建含公式汇总的格式化报表（加粗、浅色填充、所有框线、`=SUM(...)`）、簇状柱形图、自定义页眉（`Q1 Summary`）及斜向平铺水印（`保密`），依次验证「分页预览」、「页面布局视图」（标尺、纸张边距、页眉、水印、表格与图表）与「打印预览」（缩略图、页码、缩放及完整分页渲染），全程 **0 控制台错误、0 `[Vue warn]`、0 `[intlify]` 告警**。[页面布局视图实图](evidence/print/page-layout-view.png) · [打印预览实图](evidence/print/print-preview.png)
+- **项目级体积、拆分、渲染与交互优化**：
+  - 按需异步拆分 70+ 非首屏弹窗/面板/次级工具栏与 `planning-solver`，主入口 `dist/assets/index-*.js` 从 `4,529.23 kB`（gzip `1,315.29 kB`）降至 `2,306.18 kB`（gzip `674.37 kB`），缩减约 **49.1%**。
+  - 从 `SpreadsheetWorkspace.vue` 与 `SheetGrid.vue` 拆出 10 个高内聚领域 Composable，主文件分别瘦身约 1,450+ 行与 610+ 行。
+  - 优化单 Canvas 边框合批绘制、网格线无填充快路径、文本绘制状态复用与 `useSheetDisplaySnapshot` 版本号快路径；修复 `ChartFormatPane` 下拉选择后焦点回落 `BODY` 导致无法直接 `Ctrl+Z` 撤销问题；清除 `chart.pie.*`/`chart.stock.*` 的 24 条 `[intlify]` 扁平键告警。以上均已完成 `oxfmt`、`oxlint --deny-warnings`、`check:web-ui`、`vite build` 与 Chrome 实机验证（按低内存约定未执行单元测试）。
+
 ### 窗体控件的独立状态
 
 在 WPS 和 Excel 分别创建九种窗体控件，默认都没有关联单元格。两款桌面应用的复选框、组合框、列表框、数值调节和滚动条均可在没有链接时保存取值。WPS 数值调节器默认范围为 0 至 100，Excel 为 0 至 30000，Sheetcraft 沿用 WPS 范围。
