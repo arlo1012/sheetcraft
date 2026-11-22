@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef, watch, type ComputedRef, type Ref } from "vue";
+import { computed, nextTick, ref, shallowRef, watch, type ComputedRef, type Ref } from "vue";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import type { ShapeGroupDrawing, ShapeGroupPath } from "@sheetcraft/core/shape-group";
 import { canEditShapeObject } from "@sheetcraft/core/shape-protection";
@@ -81,14 +81,25 @@ export function useDrawingContextMenus<TFragment extends DrawingContextMenuFragm
 ) {
   const shapeTextMenu = shallowRef<ShapeTextContextMenuState>();
   const shapeTextMenuAnchor = shallowRef<FloatingReference | null>(null);
+  const shapeTextMenuTrigger = shallowRef<HTMLElement | null>(null);
   const shapeTextMenuSurface = ref<InstanceType<typeof MenuSurface> | null>(null);
   const { floatingStyles: shapeTextMenuStyles, dismiss: dismissShapeTextMenu } = useContextMenu({
     anchor: shapeTextMenuAnchor,
     panelRef: computed(() => shapeTextMenuSurface.value?.rootElement ?? null),
     surfaceRef: shapeTextMenuSurface,
     open: computed(() => !!shapeTextMenu.value),
-    onDismiss: () => {
+    restoreFocusTarget: () => shapeTextMenuTrigger.value,
+    onDismiss: ({ restoreFocus }) => {
+      const trigger = shapeTextMenuTrigger.value;
       shapeTextMenu.value = undefined;
+      shapeTextMenuTrigger.value = null;
+      if (restoreFocus && trigger?.isConnected) {
+        void nextTick(() => {
+          if (!shapeTextMenu.value && trigger.isConnected) {
+            trigger.focus({ preventScroll: true });
+          }
+        });
+      }
     },
   });
 
@@ -167,6 +178,8 @@ export function useDrawingContextMenus<TFragment extends DrawingContextMenuFragm
         canEditShapeObject(currentSheet, root)
       );
     }
+    shapeTextMenuTrigger.value =
+      event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
     shapeTextMenuAnchor.value = createContextMenuPoint(
       event,
       event.currentTarget as Element | null,
@@ -226,6 +239,8 @@ export function useDrawingContextMenus<TFragment extends DrawingContextMenuFragm
         options.canChange(drawing)
       );
     }
+    shapeTextMenuTrigger.value =
+      event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
     shapeTextMenuAnchor.value =
       event instanceof MouseEvent
         ? createContextMenuPoint(event, event.currentTarget as Element | null)
@@ -337,6 +352,8 @@ export function useDrawingContextMenus<TFragment extends DrawingContextMenuFragm
         options.sourceOwner(drawing) === source
       );
     }
+    shapeTextMenuTrigger.value =
+      event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
     shapeTextMenuAnchor.value =
       event instanceof MouseEvent
         ? createContextMenuPoint(event, event.currentTarget as Element | null)

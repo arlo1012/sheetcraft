@@ -2,6 +2,7 @@
 import { computed, ref, useId, watch } from "vue";
 import { Input } from "tdesign-vue-next/es/input";
 import GallerySection from "../../../shared/gallery/GallerySection.vue";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import {
   SHAPE_GALLERY,
   SHAPE_GALLERY_COUNT,
@@ -28,6 +29,7 @@ const query = ref("");
 const activeId = ref<string | null>(null);
 const instanceId = useId();
 const toolHintId = `shape-gallery-tools-${instanceId}`;
+const searchInputId = `shape-gallery-search-${instanceId}`;
 const labels = computed(() => SHAPE_GALLERY_LABELS[props.locale]);
 const groups = computed(() => filterShapeGallery(query.value));
 const visibleChoices = computed(() => groups.value.flatMap((group) => group.items));
@@ -177,6 +179,13 @@ defineExpose({
     <div class="shape-gallery__search">
       <Input
         v-model="query"
+        v-native-control="{
+          attributes: {
+            id: searchInputId,
+            name: 'shape-gallery-search',
+            'aria-label': labels.search,
+          },
+        }"
         type="search"
         clearable
         :disabled="disabled"

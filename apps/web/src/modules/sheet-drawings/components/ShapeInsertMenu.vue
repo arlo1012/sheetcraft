@@ -6,6 +6,7 @@ import { useAppI18n } from "../../../shared/i18n";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import ShapeGallery from "./ShapeGallery.vue";
 import type { ShapeGalleryChoice, ShapeGalleryLocale } from "../shape-gallery";
 
@@ -159,9 +160,18 @@ onBeforeUnmount(() => generation++);
         </template>
         <template #footer>
           <li class="shape-insert-menu__options" role="none">
-            <Checkbox v-model="continuous" :disabled="disabled" data-shape-insert-continuous>{{
-              labels.continuous
-            }}</Checkbox>
+            <Checkbox
+              v-model="continuous"
+              v-native-control="{
+                attributes: {
+                  id: `${menuId}-continuous`,
+                  name: 'shape-insert-continuous',
+                },
+              }"
+              :disabled="disabled"
+              data-shape-insert-continuous
+              >{{ labels.continuous }}</Checkbox
+            >
             <p class="shape-insert-menu__hint">{{ labels.drawingHint }}</p>
             <p
               v-if="rejected"
