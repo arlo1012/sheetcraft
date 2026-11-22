@@ -30,7 +30,7 @@ const props = withDefaults(
   { sheets: () => [], names: () => [], recentEmails: () => [], currentSheetName: "" },
 );
 const emit = defineEmits<{ confirm: [value: HyperlinkInput]; remove: []; cancel: [] }>();
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 const initial = readHyperlinkTarget(props.draft.target, props.currentSheetName);
 const kind = ref<Page>(
   props.draft.initialPage ?? (isCloudShareUrl(props.draft.target) ? "cloud" : initial.kind),
@@ -122,6 +122,12 @@ function confirm() {
       tooltip: tooltip.value,
     });
 }
+function onDialogKeydown(event: KeyboardEvent): void {
+  if ((event.ctrlKey || event.metaKey) && event.key === "Enter" && confirmEnabled.value) {
+    event.preventDefault();
+    confirm();
+  }
+}
 </script>
 
 <template>
@@ -131,18 +137,18 @@ function confirm() {
     aria-modal="true"
     :aria-label="t(draft.hasLink ? 'hyperlinks.edit' : 'hyperlinks.insert')"
     :header="t(draft.hasLink ? 'hyperlinks.edit' : 'hyperlinks.insert')"
-    :confirm-btn="{ content: t('hyperlinks.confirm'), disabled: !confirmEnabled }"
-    :cancel-btn="t('hyperlinks.cancel')"
     :close-on-overlay-click="false"
     :close-on-esc-keydown="tipDraft === undefined"
     :confirm-on-enter="false"
-    width="min(900px, calc(100vw - 32px))"
+    width="min(620px, calc(100vw - 32px))"
     placement="center"
+    @keydown="onDialogKeydown"
     @confirm="confirm"
     @close="tipDraft === undefined && emit('cancel')"
   >
     <div class="hyperlink-layout">
       <OptionList
+        class="hyperlink-layout__nav"
         variant="navigation"
         :model-value="kind"
         :options="pages"
@@ -162,8 +168,7 @@ function confirm() {
       </OptionList>
       <Form
         class="hyperlink-form sheetcraft-form-grid"
-        label-align="right"
-        :label-width="locale === 'zh-CN' ? 96 : 136"
+        label-align="top"
         :prevent-submit-default="true"
       >
         <FormItem :label="t('hyperlinks.displayText')">
@@ -207,26 +212,28 @@ function confirm() {
               v-native-control="{ attributes: { 'aria-label': t('hyperlinks.cellReference') } }"
               data-hyperlink-reference
           /></FormItem>
-          <FormItem :label="t('hyperlinks.sheet')">
-            <OptionList
-              class="hyperlink-form__list"
-              :model-value="selectedName ? undefined : sheetName"
-              :options="sheets.map((s) => ({ value: s.name, label: s.name }))"
-              :label="t('hyperlinks.sheet')"
-              item-data-attribute="data-hyperlink-sheet"
-              @select="chooseSheet"
-            />
-          </FormItem>
-          <FormItem :label="t('hyperlinks.definedNames')">
-            <OptionList
-              class="hyperlink-form__list"
-              :model-value="selectedName"
-              :options="names.map((value) => ({ value, label: value }))"
-              :label="t('hyperlinks.definedNames')"
-              item-data-attribute="data-hyperlink-name"
-              @select="selectedName = $event"
-            />
-          </FormItem>
+          <div class="hyperlink-form__location-lists">
+            <FormItem :label="t('hyperlinks.sheet')">
+              <OptionList
+                class="hyperlink-form__list"
+                :model-value="selectedName ? undefined : sheetName"
+                :options="sheets.map((s) => ({ value: s.name, label: s.name }))"
+                :label="t('hyperlinks.sheet')"
+                item-data-attribute="data-hyperlink-sheet"
+                @select="chooseSheet"
+              />
+            </FormItem>
+            <FormItem :label="t('hyperlinks.definedNames')">
+              <OptionList
+                class="hyperlink-form__list"
+                :model-value="selectedName"
+                :options="names.map((value) => ({ value, label: value }))"
+                :label="t('hyperlinks.definedNames')"
+                item-data-attribute="data-hyperlink-name"
+                @select="selectedName = $event"
+              />
+            </FormItem>
+          </div>
         </template>
         <template v-else-if="kind === 'email'">
           <FormItem :label="t('hyperlinks.emailAddress')"
@@ -243,7 +250,7 @@ function confirm() {
           /></FormItem>
           <FormItem :label="t('hyperlinks.recentEmails')"
             ><OptionList
-              class="hyperlink-form__list"
+              class="hyperlink-form__list hyperlink-form__list--recent"
               :model-value="emailAddress"
               :options="recentEmails.map((value) => ({ value, label: value }))"
               :label="t('hyperlinks.recentEmails')"
@@ -259,16 +266,31 @@ function confirm() {
             data-hyperlink-cloud
         /></FormItem>
         <p v-if="error" class="hyperlink-form__error" role="alert">{{ error }}</p>
+      </Form>
+    </div>
+    <template #footer>
+      <div class="hyperlink-footer">
         <TButton
           v-if="draft.hasLink"
-          class="hyperlink-form__remove"
-          theme="default"
-          variant="base"
+          class="hyperlink-footer__remove"
+          theme="danger"
+          variant="text"
           @click="emit('remove')"
           >{{ t("hyperlinks.remove") }}</TButton
         >
-      </Form>
-    </div>
+        <div class="hyperlink-footer__actions">
+          <TButton
+            theme="default"
+            variant="base"
+            @click="tipDraft === undefined && emit('cancel')"
+            >{{ t("hyperlinks.cancel") }}</TButton
+          >
+          <TButton theme="primary" variant="base" :disabled="!confirmEnabled" @click="confirm">{{
+            t("hyperlinks.confirm")
+          }}</TButton>
+        </div>
+      </div>
+    </template>
   </Dialog>
   <Dialog
     v-if="tipDraft !== undefined"
@@ -280,16 +302,12 @@ function confirm() {
     :close-on-overlay-click="false"
     :confirm-btn="t('hyperlinks.confirm')"
     :cancel-btn="t('hyperlinks.cancel')"
-    width="min(410px, calc(100vw - 32px))"
+    width="min(400px, calc(100vw - 32px))"
     placement="center"
     @confirm="closeTip(true)"
     @close="closeTip(false)"
   >
-    <Form
-      label-align="right"
-      :label-width="locale === 'zh-CN' ? 100 : 130"
-      :prevent-submit-default="true"
-    >
+    <Form class="sheetcraft-form-grid" label-align="top" :prevent-submit-default="true">
       <FormItem :label="t('hyperlinks.tipText')"
         ><TInput
           v-model="tipDraft"
@@ -304,44 +322,84 @@ function confirm() {
 <style scoped lang="scss">
 .hyperlink-layout {
   display: grid;
-  grid-template-columns: minmax(140px, 22%) minmax(0, 1fr);
+  grid-template-columns: 144px minmax(0, 1fr);
   gap: 16px;
-  min-height: min(320px, 44vh);
-  max-height: 62vh;
-  overflow: auto;
+  height: min(312px, calc(100dvh - 200px));
+  min-height: 0;
+
+  &__nav {
+    height: 100%;
+  }
 }
 .hyperlink-form {
-  display: grid;
-  align-content: start;
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   &__display {
     display: flex;
     width: 100%;
     align-items: center;
     gap: 8px;
+
+    > :first-child {
+      flex: 1;
+      min-width: 0;
+    }
+
+    > :last-child {
+      flex: none;
+    }
+  }
+  &__location-lists {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    min-width: 0;
   }
   &__list {
     width: 100%;
-    min-height: 44px;
-    max-height: 145px;
+    height: 132px;
+
+    &--recent {
+      height: 88px;
+    }
   }
   &__hint,
   &__error {
     margin: 0;
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
   }
   &__hint {
-    color: var(--sheetcraft-text-secondary);
+    color: var(--sheetcraft-text-muted);
   }
   &__error {
     color: var(--sheetcraft-status-error);
   }
-  &__remove {
-    justify-self: start;
+}
+.hyperlink-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sheetcraft-space-4);
+
+  &__actions {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sheetcraft-space-3);
+    margin-left: auto;
   }
 }
-@media (max-width: 640px) {
+@media (max-width: 560px) {
   .hyperlink-layout {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+  .hyperlink-form__location-lists {
     grid-template-columns: minmax(0, 1fr);
   }
 }

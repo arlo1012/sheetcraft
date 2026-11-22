@@ -248,7 +248,8 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
         />
       </TFormItem>
     </div>
-    <TFormItem :label="t('pageLayout.centerOnPage')">
+    <div class="page-setup-margins__centering-card">
+      <span class="page-setup-margins__centering-label">{{ t("pageLayout.centerOnPage") }}</span>
       <div class="page-setup-margins__centering">
         <TCheckbox
           :checked="options.verticalCentered"
@@ -262,7 +263,7 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           >{{ t("pageLayout.centerHorizontally") }}</TCheckbox
         >
       </div>
-    </TFormItem>
+    </div>
   </TForm>
 </template>
 
@@ -272,15 +273,16 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
   @include panel.panel;
   display: flex;
   flex-direction: column;
-  gap: var(--sheetcraft-space-4);
+  gap: 12px;
   &__diagram {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     grid-template-areas: ". top header" "left preview right" "unit bottom footer";
-    gap: var(--sheetcraft-space-3) var(--sheetcraft-space-4);
+    gap: 8px 14px;
     align-items: center;
-    max-width: 420px;
-    margin: 0 auto;
+    padding: 10px 14px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
     width: 100%;
     > div:not(.page-setup-margins__preview) {
       min-width: 0;
@@ -316,11 +318,11 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 150px;
+    height: 124px;
     color: var(--sheetcraft-text-muted);
     svg {
       width: 100%;
-      height: 140px;
+      height: 118px;
     }
   }
   &__paper {
@@ -350,9 +352,23 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
     stroke-width: 0.6;
     stroke-dasharray: 1 2;
   }
+  &__centering-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
+  }
+  &__centering-label {
+    color: var(--sheetcraft-text-secondary);
+    white-space: nowrap;
+  }
   &__centering {
     display: flex;
-    gap: var(--sheetcraft-space-4);
+    flex-wrap: wrap;
+    gap: 8px 18px;
   }
 }
 </style>

@@ -118,6 +118,12 @@ watch(
   },
   { deep: true },
 );
+function onDialogKeydown(event: KeyboardEvent): void {
+  if ((event.ctrlKey || event.metaKey) && event.key === "Enter" && !customVisible.value) {
+    event.preventDefault();
+    confirm();
+  }
+}
 </script>
 
 <template>
@@ -126,10 +132,12 @@ watch(
     :visible="visible && !suspended"
     :header="t('pageLayout.pageSetup')"
     width="min(560px, calc(100vw - 32px))"
+    placement="center"
     :confirm-btn="t('pageLayout.confirm')"
     :cancel-btn="t('pageLayout.cancel')"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
+    @keydown="onDialogKeydown"
     @confirm="confirm"
     @close="close"
   >
@@ -177,7 +185,7 @@ watch(
   min-width: 0;
   &__tabs {
     min-width: 0;
-    height: min(392px, calc(100dvh - 210px));
+    height: min(376px, calc(100dvh - 196px));
   }
   &__error {
     margin: var(--sheetcraft-space-2) 0 0;

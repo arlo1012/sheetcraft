@@ -282,7 +282,7 @@ function setGradient(gradient: CellFillGradient): void {
 
     > span {
       color: var(--sheetcraft-text-secondary);
-      text-align: right;
+      text-align: left;
     }
   }
   &__preview-stage {

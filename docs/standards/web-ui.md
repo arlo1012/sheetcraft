@@ -108,11 +108,25 @@ Use CSS pixels at 100% scale; size and line height are a pair.
 
 ## Dialog and popover actions
 
-- Dialog form fields place labels on the left and controls on the right, with
-  right-aligned labels and one consistent label width within each form. Prefer
-  TDesign `Form` / `FormItem` with `label-align="right"`; allow localized label
-  widths and keep controls usable in narrow dialogs. Checkbox/radio captions
-  remain attached to their controls. Do not use top-aligned form labels.
+- Dialog form fields follow a two-track label rule rather than right-aligned
+  labels:
+  - **Default (`label-align="top"`)**: short forms (4 or fewer fields),
+    multi-column field grids, wide inputs (formulas, range references, URLs,
+    multiline textareas), and forms whose localized labels vary widely in length.
+    Top labels keep a clean left edge and eliminate locale-specific `label-width`
+    hacks.
+  - **Dense single-column settings (5+ compact rows)**: horizontal rows with
+    **left-aligned** secondary-colored labels (`label-align="left"`) and a
+    compact, consistent label width (roughly `76–104px` in `zh-CN`), grouped
+    into borderless soft cards (`--sheetcraft-surface-dialog-card`) so the left
+    axis stays straight without wasting vertical height.
+  - Checkbox/radio captions remain attached to their controls. Omit redundant
+    visible `"Preview"` or `"Category"` headings when the control is already
+    self-explanatory, while retaining `aria-label` for accessibility.
+- Multi-tab settings dialogs opt into fixed height (such as
+  `.sheetcraft-tabs--fixed-height` or a definite tab height anchored to the
+  primary tab's natural content height) so switching tabs never causes vertical
+  jitter or shifting footer actions.
 
 - Use `NewCellStyleDialog` (the Style dialog) as the reference for footer actions.
   Prefer TDesign Dialog's built-in `confirmBtn` and `cancelBtn` APIs. Custom

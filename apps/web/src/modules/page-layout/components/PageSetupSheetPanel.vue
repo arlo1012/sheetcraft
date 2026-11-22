@@ -67,32 +67,31 @@ function resetManualBreaks(): void {
 </script>
 <template>
   <TForm
-    class="page-setup-sheet"
+    class="page-setup-sheet sheetcraft-form-grid"
     :data="references"
-    label-align="right"
-    :label-width="locale === 'zh-CN' ? 96 : 144"
+    label-align="left"
+    :label-width="locale === 'zh-CN' ? 88 : 132"
   >
-    <TFormItem
-      name="printArea"
-      :label="t('pageLayout.printArea')"
-      :status="errors.printArea ? 'error' : undefined"
-      ><RangeReferenceInput
-        class="page-setup-sheet__reference"
-        :model-value="references.printArea"
+    <section class="page-setup-sheet__card" :aria-label="t('pageLayout.printTitles')">
+      <TFormItem
+        name="printArea"
         :label="t('pageLayout.printArea')"
-        :show-picker="true"
-        :select-reference="picker('printArea')"
-        data-page-setup="print-area"
-        @update:model-value="setReference('printArea', $event)"
-      />
-      <template #tips
-        ><p v-if="errors.printArea" role="alert" class="page-setup-sheet__error">
-          {{ errors.printArea }}
-        </p>
-      </template>
-    </TFormItem>
-    <section class="page-setup-sheet__section" :aria-label="t('pageLayout.printTitles')">
-      <h3>{{ t("pageLayout.printTitles") }}</h3>
+        :status="errors.printArea ? 'error' : undefined"
+        ><RangeReferenceInput
+          class="page-setup-sheet__reference"
+          :model-value="references.printArea"
+          :label="t('pageLayout.printArea')"
+          :show-picker="true"
+          :select-reference="picker('printArea')"
+          data-page-setup="print-area"
+          @update:model-value="setReference('printArea', $event)"
+        />
+        <template #tips
+          ><p v-if="errors.printArea" role="alert" class="page-setup-sheet__error">
+            {{ errors.printArea }}
+          </p>
+        </template>
+      </TFormItem>
       <TFormItem
         name="titleRows"
         :label="t('pageLayout.titleRows')"
@@ -151,97 +150,121 @@ function resetManualBreaks(): void {
         </template>
       </TFormItem>
     </section>
-    <section class="page-setup-sheet__section" :aria-label="t('pageLayout.printSettings')">
-      <h3>{{ t("pageLayout.printSettings") }}</h3>
-      <TFormItem :label-width="0">
-        <div class="page-setup-sheet__flags">
-          <TCheckbox
-            :checked="options.gridLines"
-            data-page-setup="print-gridlines"
-            @change="patchOptions({ gridLines: Boolean($event) })"
-            >{{ t("pageLayout.printGridLines") }}</TCheckbox
-          >
-          <TCheckbox
-            :checked="options.blackAndWhite"
-            data-page-setup="black-and-white"
-            @change="patchOptions({ blackAndWhite: Boolean($event) })"
-            >{{ t("pageLayout.blackAndWhite") }}</TCheckbox
-          >
-          <TCheckbox
-            :checked="options.headings"
-            data-page-setup="print-headings"
-            @change="patchOptions({ headings: Boolean($event) })"
-            >{{ t("pageLayout.printHeadings") }}</TCheckbox
+    <section class="page-setup-sheet__card" :aria-label="t('pageLayout.printSettings')">
+      <div class="page-setup-sheet__flags">
+        <TCheckbox
+          :checked="options.gridLines"
+          data-page-setup="print-gridlines"
+          @change="patchOptions({ gridLines: Boolean($event) })"
+          >{{ t("pageLayout.printGridLines") }}</TCheckbox
+        >
+        <TCheckbox
+          :checked="options.blackAndWhite"
+          data-page-setup="black-and-white"
+          @change="patchOptions({ blackAndWhite: Boolean($event) })"
+          >{{ t("pageLayout.blackAndWhite") }}</TCheckbox
+        >
+        <TCheckbox
+          :checked="options.headings"
+          data-page-setup="print-headings"
+          @change="patchOptions({ headings: Boolean($event) })"
+          >{{ t("pageLayout.printHeadings") }}</TCheckbox
+        >
+      </div>
+      <div class="page-setup-sheet__select-row">
+        <TFormItem label-align="top" :label="t('pageLayout.cellComments')"
+          ><TSelect
+            :model-value="options.cellComments"
+            :options="commentOptions"
+            :aria-label="t('pageLayout.cellComments')"
+            data-page-setup="cell-comments"
+            @change="setComments"
+          />
+        </TFormItem>
+        <TFormItem label-align="top" :label="t('pageLayout.cellErrors')"
+          ><TSelect
+            :model-value="options.errors"
+            :options="errorOptions"
+            :aria-label="t('pageLayout.cellErrors')"
+            data-page-setup="cell-errors"
+            @change="setErrors"
+          />
+        </TFormItem>
+      </div>
+    </section>
+    <section class="page-setup-sheet__card page-setup-sheet__card--footer-row">
+      <TFormItem class="page-setup-sheet__order-item" :label="t('pageLayout.pageOrder')">
+        <div class="page-setup-sheet__order" data-page-setup="page-order">
+          <TRadio
+            :checked="setup.pageOrder === 'downThenOver'"
+            @change="setup = { ...setup, pageOrder: 'downThenOver' }"
+            ><span class="page-setup-sheet__order-option"
+              ><ArrowDown aria-hidden="true" />{{ t("pageLayout.downThenOver") }}</span
+            ></TRadio
+          ><TRadio
+            :checked="setup.pageOrder === 'overThenDown'"
+            @change="setup = { ...setup, pageOrder: 'overThenDown' }"
+            ><span class="page-setup-sheet__order-option"
+              ><ArrowRight aria-hidden="true" />{{ t("pageLayout.overThenDown") }}</span
+            ></TRadio
           >
         </div>
       </TFormItem>
-      <TFormItem :label="t('pageLayout.cellComments')"
-        ><TSelect
-          :model-value="options.cellComments"
-          :options="commentOptions"
-          :aria-label="t('pageLayout.cellComments')"
-          data-page-setup="cell-comments"
-          @change="setComments"
-        />
-      </TFormItem>
-      <TFormItem :label="t('pageLayout.cellErrors')"
-        ><TSelect
-          :model-value="options.errors"
-          :options="errorOptions"
-          :aria-label="t('pageLayout.cellErrors')"
-          data-page-setup="cell-errors"
-          @change="setErrors"
-        />
-      </TFormItem>
+      <TButton
+        class="page-setup-sheet__reset-breaks"
+        theme="default"
+        variant="base"
+        data-page-setup="reset-manual-breaks"
+        @click="resetManualBreaks"
+        >{{ t("pageLayout.resetManualBreaks") }}</TButton
+      >
     </section>
-    <TFormItem class="page-setup-sheet__section" :label="t('pageLayout.pageOrder')">
-      <div class="page-setup-sheet__order" data-page-setup="page-order">
-        <TRadio
-          :checked="setup.pageOrder === 'downThenOver'"
-          @change="setup = { ...setup, pageOrder: 'downThenOver' }"
-          ><span class="page-setup-sheet__order-option"
-            ><ArrowDown aria-hidden="true" />{{ t("pageLayout.downThenOver") }}</span
-          ></TRadio
-        ><TRadio
-          :checked="setup.pageOrder === 'overThenDown'"
-          @change="setup = { ...setup, pageOrder: 'overThenDown' }"
-          ><span class="page-setup-sheet__order-option"
-            ><ArrowRight aria-hidden="true" />{{ t("pageLayout.overThenDown") }}</span
-          ></TRadio
-        >
-      </div>
-    </TFormItem>
-    <TFormItem>
-      <TButton variant="outline" data-page-setup="reset-manual-breaks" @click="resetManualBreaks">{{
-        t("pageLayout.resetManualBreaks")
-      }}</TButton>
-    </TFormItem>
   </TForm>
 </template>
 <style scoped lang="scss">
 @use "./page-setup-panel" as panel;
 .page-setup-sheet {
   @include panel.panel;
+  display: grid;
+  gap: 8px;
+  &__card {
+    @include panel.card;
+    gap: 8px;
+    padding: 8px 12px;
+
+    &--footer-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px 12px;
+    }
+  }
   &__reference {
     width: 100%;
     min-width: 0;
   }
-  &__section {
-    min-width: 0;
-    border-top: 1px solid var(--sheetcraft-border-subtle);
-    padding-top: var(--sheetcraft-space-3);
-  }
   &__flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    width: 100%;
+  }
+  &__select-row {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--sheetcraft-space-2) var(--sheetcraft-space-4);
-    width: 100%;
+    gap: 12px;
+    min-width: 0;
+  }
+  &__order-item {
+    flex: 1 1 auto;
+    min-width: 0;
   }
   &__order {
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--sheetcraft-space-2);
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 14px;
   }
   &__order-option {
     display: inline-flex;
@@ -253,6 +276,9 @@ function resetManualBreaks(): void {
       height: var(--sheetcraft-action-icon-size);
       color: var(--sheetcraft-text-secondary);
     }
+  }
+  &__reset-breaks {
+    flex: none;
   }
   &__error {
     margin: 0;

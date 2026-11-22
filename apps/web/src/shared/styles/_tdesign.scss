@@ -1,4 +1,5 @@
 @use "./tdesign-table";
+@use "../option-list/option-list";
 
 // TDesign is a Web dependency. Keep its theme values mapped from product tokens
 // here so feature styles never depend on its internal token names or DOM structure.
@@ -631,8 +632,16 @@
   row-gap: var(--td-comp-margin-xs);
 }
 
-.t-form__label {
+.t-form .t-form__label {
   padding-right: var(--td-comp-paddingLR-s);
+  color: var(--sheetcraft-text-secondary);
+}
+
+.t-form .t-form__label.t-form__label--top {
+  min-height: 0;
+  padding-right: 0;
+  padding-bottom: var(--sheetcraft-space-2);
+  line-height: var(--sheetcraft-line-height-body-medium);
 }
 
 .t-form__item {
@@ -672,8 +681,11 @@
   .t-form__controls-content {
     min-height: var(--td-comp-size-m);
   }
-  .t-form__label {
+  .t-form__label:not(.t-form__label--top) {
     line-height: var(--td-comp-size-m);
+  }
+  .t-form__label.t-form__label--top {
+    line-height: var(--sheetcraft-line-height-body-medium);
   }
   .t-form__controls-content > * {
     min-width: 0;
@@ -760,6 +772,7 @@
     }
 
     > .t-tabs__content {
+      @include option-list.scrollbar;
       padding: var(--sheetcraft-dialog-content-padding-block) 0 10px;
       flex: 1;
       min-height: 0;
@@ -783,6 +796,7 @@
   }
 
   > .t-tabs__content {
+    @include option-list.scrollbar;
     flex: 1;
     min-height: 0;
     overflow-x: hidden;

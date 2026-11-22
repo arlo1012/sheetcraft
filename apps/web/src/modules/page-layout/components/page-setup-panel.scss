@@ -1,11 +1,21 @@
 @mixin panel {
   min-width: 0;
-  padding: var(--sheetcraft-tool-panel-padding);
+  padding: var(--sheetcraft-dialog-content-padding-block) 0 4px;
 
   h3 {
     margin: 0 0 var(--sheetcraft-space-2);
     color: var(--sheetcraft-text-primary);
     font-size: var(--sheetcraft-font-size-body-medium);
-    font-weight: var(--sheetcraft-font-weight-medium);
+    font-weight: var(--sheetcraft-font-weight-semibold);
   }
+}
+
+@mixin card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: var(--sheetcraft-radius-dialog-card);
+  background: var(--sheetcraft-surface-dialog-card);
 }
