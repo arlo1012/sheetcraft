@@ -8,20 +8,11 @@ import { captureCellPictureSourcePresentation } from "../../sheet-images/cell-pi
 import { isFramedCellImage } from "@sheetcraft/core/cell-picture-frame";
 import { canEditPictureRoot, canEditPictureSelection } from "@sheetcraft/core/picture-protection";
 import { isPictureGroup, type PictureGroupPath } from "@sheetcraft/core/picture-group";
-import {
-  arePictureObjectsEqual,
-  isFramedPictureObject,
-  type StandalonePictureObject,
-} from "@sheetcraft/core/picture-object";
+import { arePictureObjectsEqual, isFramedPictureObject } from "@sheetcraft/core/picture-object";
 import {
   createPictureViewMetrics,
   type PictureFrameLayoutContext,
 } from "@sheetcraft/sheet-engine/picture-frame-layout";
-import { resolvePictureFrame, resolvePictureSourceLayout } from "@sheetcraft/core/picture-frame";
-import {
-  capturePictureSourcePresentation,
-  type PictureSourcePresentation,
-} from "../../sheet-images/picture-source-presentation";
 const PivotReportFilters = defineAsyncComponent(
   () => import("../../pivot-tables/components/PivotReportFilters.vue"),
 );
@@ -103,6 +94,8 @@ import { createSheetGridEditorKeydownHandler } from "../useSheetGridEditorKeydow
 import { useSheetGridPictureClipboard } from "../useSheetGridPictureClipboard";
 import { useSheetGridPictureSelection } from "../useSheetGridPictureSelection";
 import { useSheetGridPictureEditing } from "../composables/useSheetGridPictureEditing";
+import { useSheetGridImagePreview } from "../composables/useSheetGridImagePreview";
+import { useSheetGridSurfaceInteraction } from "../composables/useSheetGridSurfaceInteraction";
 import {
   useSheetGridContextMenus,
   type AxisContextMenuState,
@@ -132,7 +125,6 @@ import {
   type FloatingImage,
   type CellAddress,
   type CellNoteBox,
-  type ImageTransform,
   type CellRange,
   type Sheet,
   type Workbook,
@@ -234,12 +226,8 @@ import {
 } from "../../sheet-images/floating-image-painter";
 import { getDrawingThemeEffects } from "../../sheet-images/drawing-theme-effects";
 import { useSheetDisplaySnapshot } from "../canvas/sheet-display-snapshot";
-import { createSheetRenderFrame, getSurfaceCell } from "../rendering/sheet-render-frame";
+import { createSheetRenderFrame } from "../rendering/sheet-render-frame";
 import { useSheetRenderEnvironment } from "../rendering/useSheetRenderEnvironment";
-import {
-  clientPointToElementSurface,
-  surfacePointToBody,
-} from "../../../shared/sheet-input/surface-coordinates";
 import { useHeaderInteraction } from "../input/useHeaderInteraction";
 import type { HeaderInteractionState } from "../input/useHeaderInteraction";
 import { getOutlineGutterSize } from "../outline-layout";
@@ -691,158 +679,26 @@ watch([selectedImageId, selectedImageIds], ([id, ids]) =>
   emit("selectedFloatingImageChange", id, [...ids]),
 );
 const selection = shallowRef<CellSelection>(createCellSelection({ row: 0, column: 0 }));
-let imagePreviewSequence = 0;
-const imagePreview = shallowRef<{
-  ownerId: number;
-  sheet: Sheet;
-  assetId: string;
-  altText: string;
-  transform?: ImageTransform;
-  frameSource?: PictureSourcePresentation;
-  trigger?: HTMLElement;
-}>();
-const previewUrl = computed(
-  () => imagePreview.value && props.imageAssetUrls?.get(imagePreview.value.assetId),
-);
-
-function openImagePreview(
-  image: {
-    assetId: string;
-    altText: string;
-    transform?: ImageTransform;
-    frameSource?: PictureSourcePresentation;
-  },
-  trigger?: HTMLElement,
-): void {
-  if (pictureCrop.active.value || !props.imageAssetUrls?.has(image.assetId)) return;
-  imagePreview.value = {
-    ...image,
-    trigger,
-    ownerId: ++imagePreviewSequence,
-    sheet: props.sheet,
-  };
-}
-
-function openFloatingImagePreview(image: StandalonePictureObject, trigger?: HTMLElement): void {
-  try {
-    if (!isFramedPictureObject(image)) {
-      openImagePreview(image, trigger);
-      return;
-    }
-    const context = pictureFrameContext.value;
-    if (!context) throw new Error("Picture projection unavailable.");
-    openImagePreview(
-      {
-        assetId: image.assetId,
-        altText: image.altText,
-        transform: image.transform,
-        frameSource: capturePictureSourcePresentation(
-          image,
-          resolvePictureFrame(image.frame, context.metrics),
-        ),
-      },
-      trigger,
-    );
-  } catch {
-    emit("imageFeedback", "picture.operationFailed");
-  }
-}
-
-function selectedPicturePreview():
-  | {
-      assetId: string;
-      altText: string;
-      transform?: ImageTransform;
-      frameSource?: PictureSourcePresentation;
-    }
-  | undefined {
-  if (pictureCrop.active.value || selectedImageIds.value.length !== 1) return;
-  const root = props.sheet.floatingImages.find((entry) => entry.id === selectedImageId.value);
-  if (!root) return;
-  if (root.hidden) return;
-  if (isFramedPictureObject(root)) {
-    const context = pictureFrameContext.value;
-    if (!context) return;
-    return {
-      assetId: root.assetId,
-      altText: root.altText,
-      transform: root.transform,
-      frameSource: capturePictureSourcePresentation(
-        root,
-        resolvePictureFrame(root.frame, context.metrics),
-      ),
-    };
-  }
-  if (!isPictureGroup(root)) return root;
-  const context = pictureFrameContext.value,
-    path = selectedOwnedPicturePath.value;
-  if (!context || !path || path.length <= 1) return;
-  const selected = resolveOwnedPictureNode(props.sheet.floatingImages, path, context);
-  if (
-    !selected ||
-    !selected.visible ||
-    !selected.layout ||
-    selected.node.kind !== "grouped-picture-v1"
-  )
-    return;
-  return {
-    assetId: selected.node.assetId,
-    altText: selected.node.altText,
-    transform: selected.node.transform,
-    frameSource: capturePictureSourcePresentation(
-      selected.node,
-      resolvePictureSourceLayout(
-        { ...selected.layout.rect },
-        selected.layout.angleDeg,
-        selected.node.frame.source,
-      ),
-    ),
-  };
-}
-function canPreviewPicture(): boolean {
-  try {
-    const source = selectedPicturePreview();
-    return !!source && !!props.imageAssetUrls?.has(source.assetId);
-  } catch {
-    return false;
-  }
-}
-function previewSelectedPicture(): boolean {
-  try {
-    const source = selectedPicturePreview();
-    if (!source || !props.imageAssetUrls?.has(source.assetId)) return false;
-    openImagePreview(source);
-    return !!imagePreview.value;
-  } catch {
-    emit("imageFeedback", "picture.operationFailed");
-    return false;
-  }
-}
-
-const imagePreviewClose = computed(() => {
-  const owner = imagePreview.value;
-  return (): void => {
-    if (imagePreview.value === owner) closeImagePreview();
-  };
-});
-function closeImagePreview(): void {
-  if (!imagePreview.value) return;
-  const owner = imagePreview.value,
-    trigger = owner.trigger;
-  imagePreview.value = undefined;
-  void nextTick(() => {
-    if (imagePreview.value || owner.sheet !== props.sheet) return;
-    if (trigger?.isConnected) {
-      trigger.focus({ preventScroll: true });
-      if (document.activeElement === trigger) return;
-    }
-    focusEditor();
-  });
-}
-
-watch(() => [props.sheet, props.pictureOwnerGeneration, props.workbookRevision], closeImagePreview);
-watch(previewUrl, (url) => {
-  if (!url && imagePreview.value) closeImagePreview();
+const {
+  imagePreview,
+  previewUrl,
+  openImagePreview,
+  openFloatingImagePreview,
+  canPreviewPicture,
+  previewSelectedPicture,
+  imagePreviewClose,
+} = useSheetGridImagePreview({
+  getSheet: () => props.sheet,
+  getPictureOwnerGeneration: () => props.pictureOwnerGeneration,
+  getWorkbookRevision: () => props.workbookRevision,
+  getImageAssetUrls: () => props.imageAssetUrls,
+  selectedImageId,
+  selectedImageIds,
+  selectedOwnedPicturePath,
+  isPictureCropActive: () => pictureCrop.active.value,
+  getPictureFrameContext: () => pictureFrameContext.value,
+  focusEditor: () => focusEditor(),
+  onImageFeedback: (key) => emit("imageFeedback", key),
 });
 const axisContextMenu = ref<AxisContextMenuState>();
 const cellContextMenu = ref<CellContextMenuState>();
@@ -1420,7 +1276,7 @@ const pageBreakDrag = usePageBreakDrag({
   getMergedCells: () => props.sheet.mergedCells,
   getGeometry: () => baseGeometry.value,
   getRows: () => baseRows.value,
-  getSurfacePoint: surfacePoint,
+  getSurfacePoint: (event) => surfacePoint(event),
   isDisabled: () => props.readOnly || isEditing.value || Boolean(getReferenceEditor()),
   onBeforeStart: () => {
     stopDragSelection();
@@ -1439,7 +1295,7 @@ const pageMarginDrag = usePageMarginDrag({
   getState: () => pageView.value,
   getFrame: () => renderFrame.value,
   getSetup: () => pageSetup.value,
-  getSurfacePoint: surfacePoint,
+  getSurfacePoint: (event) => surfacePoint(event),
   isDisabled: () =>
     props.readOnly ||
     (!props.showPageMargins && !props.showPageRulers) ||
@@ -1641,10 +1497,6 @@ const paintSurfaceImages = computed(() => {
     });
 });
 onBeforeUnmount(() => floatingImageCache.dispose());
-function imagePoint(event: MouseEvent) {
-  const point = surfacePoint(event);
-  return surfacePointToBody(point, renderFrame.value.headerSize);
-}
 const headerState = shallowRef<HeaderInteractionState>({});
 const headerSelection = computed(() => ({
   startRow: selectedRange.value.start.row,
@@ -1743,182 +1595,69 @@ const overlayState = computed<SheetOverlayState>(() => {
     },
   };
 });
-const imageHoverCursor = ref<string>();
-const hoveredHyperlink = shallowRef<{ address: CellAddress; title: string }>();
-const hoveredNoteAddress = shallowRef<CellAddress>();
-let notePreviewLeaveTimer: number | undefined;
-
-function cancelNotePreviewLeave(): void {
-  if (notePreviewLeaveTimer === undefined) return;
-  window.clearTimeout(notePreviewLeaveTimer);
-  notePreviewLeaveTimer = undefined;
-}
-
-function scheduleNotePreviewLeave(): void {
-  cancelNotePreviewLeave();
-  notePreviewLeaveTimer = window.setTimeout(() => {
-    hoveredNoteAddress.value = undefined;
-    notePreviewLeaveTimer = undefined;
-  }, 120);
-}
-
-const hyperlinkPointerGesture = shallowRef<{
-  address: CellAddress;
-  pointerId: number;
-  startX: number;
-  startY: number;
-  moved: boolean;
-}>();
-const surfaceCursor = computed(() => {
-  if (pageMarginDrag.cursor.value) return pageMarginDrag.cursor.value;
-  if (pageBreakDrag.cursor.value) return pageBreakDrag.cursor.value;
-  const hit = headerState.value.hovered;
-  if (dimensionResize.value)
-    return dimensionResize.value.axis === "row" ? "row-resize" : "col-resize";
-  if (axisMoveDrag.value?.active) return "grabbing";
-  if (hit?.action === "resize") return hit.axis === "row" ? "row-resize" : "col-resize";
-  if (hit?.action === "grip") return "grab";
-  return hit
-    ? "pointer"
-    : (imageHoverCursor.value ?? (hoveredHyperlink.value ? "pointer" : "cell"));
+const {
+  hoveredHyperlink,
+  surfaceCursor,
+  surfacePoint,
+  imagePoint,
+  cancelNotePreviewLeave,
+  scheduleNotePreviewLeave,
+  clearHyperlinkPointerGesture,
+  onSurfacePointerDown,
+  onSurfacePointerMove,
+  onSurfacePointerLeave,
+  onSurfaceContextMenu,
+  onSurfaceDoubleClick,
+  onSurfaceKeydown,
+  visibleNotes,
+  notePreviewRefs,
+  onDocumentPointerDown,
+} = useSheetGridSurfaceInteraction({
+  getSheet: () => props.sheet,
+  getWorkbookRevision: () => props.workbookRevision,
+  rootRef,
+  scale,
+  rulerInset,
+  renderFrame,
+  layout,
+  effectiveFreeze,
+  activeCell,
+  headerState,
+  headerInput,
+  getPageMarginDragCursor: () => pageMarginDrag.cursor.value,
+  getPageBreakDragCursor: () => pageBreakDrag.cursor.value,
+  startPageBreakDrag: (event) => pageBreakDrag.start(event),
+  hoverPageBreakDrag: (event) => pageBreakDrag.hover(event),
+  clearPageBreakDragHover: () => pageBreakDrag.clearHover(),
+  getDimensionResizeAxis: () => dimensionResize.value?.axis,
+  isAxisMoveDragActive: () => Boolean(axisMoveDrag.value?.active),
+  getOwnedImageLayer: () => ownedImageLayerRef.value,
+  getImageLayer: () => imageLayerRef.value,
+  isFormatPainterActive: () => Boolean(props.formatPainterActive),
+  getReferenceEditor,
+  hasActiveShapeTextEdit: () =>
+    Boolean(props.shapeTextEditSnapshot && props.shapeTextEditCallbacks?.isActive()),
+  commitShapeTextEdit: () => props.shapeTextEditCallbacks?.commit() ?? true,
+  flushPendingEquationEdit,
+  onCellMouseDown,
+  onCellDoubleClick,
+  openCellContextMenu: (address, event) => openCellContextMenu(address, event),
+  onEditorKeydown: (event) => onEditorKeydown(event),
+  onOpenHyperlink: (address) => emit("openHyperlink", address),
+  isNotePreviewDisabled: () => Boolean(props.notePreviewDisabled),
+  getShowActiveNote: () => Boolean(props.showActiveNote),
+  getShowAllNotes: () => Boolean(props.showAllNotes),
+  getHiddenNoteKeys: () => props.hiddenNoteKeys,
+  getNoteDraft: () => props.noteDraft,
+  isEditing: () => isEditing.value,
+  isSelectionDragging: () => selectionDragging.value,
+  isFreezeDragging: () => freezeDragging.value,
+  hasContextMenuOpen: () => Boolean(cellContextMenu.value || axisContextMenu.value),
+  isTransparentColorActive: () => Boolean(pictureTransparentColor.session.value),
+  cancelTransparentColor: () => pictureTransparentColor.cancel(),
+  isPictureCropActive: () => pictureCrop.active.value,
+  finishPictureCrop: () => finishPictureCrop(),
 });
-function surfacePoint(event: MouseEvent) {
-  return clientPointToElementSurface(
-    { x: event.clientX, y: event.clientY },
-    rootRef.value!,
-    scale.value,
-  );
-}
-function isRulerPoint(point: { x: number; y: number }): boolean {
-  const inset = rulerInset.value;
-  return inset > 0 && (point.x < inset || point.y < inset);
-}
-function onSurfacePointerDown(event: PointerEvent): void {
-  if (!flushPendingEquationEdit()) {
-    event.preventDefault();
-    event.stopPropagation();
-    return;
-  }
-  if (
-    props.shapeTextEditSnapshot &&
-    props.shapeTextEditCallbacks?.isActive() &&
-    !props.shapeTextEditCallbacks.commit()
-  ) {
-    event.preventDefault();
-    event.stopPropagation();
-    return;
-  }
-  if (pageBreakDrag.start(event)) return;
-  const point = surfacePoint(event);
-  if (isRulerPoint(point)) return;
-  if (headerInput.onPointerDown(point, event, event.currentTarget as HTMLElement)) return;
-  if (ownedImageLayerRef.value?.handleSurfacePointerDown(event, imagePoint(event))) return;
-  if (imageLayerRef.value?.handleSurfacePointerDown(event, imagePoint(event))) return;
-  if (event.button !== 0) return;
-  const address = getSurfaceCell(renderFrame.value, point);
-  if (address) {
-    headerInput.focus(undefined);
-    event.preventDefault();
-    const hyperlink = getCellHyperlink(props.sheet, address);
-    if (hyperlink && !event.shiftKey && !props.formatPainterActive && !getReferenceEditor()) {
-      hyperlinkPointerGesture.value = {
-        address,
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-        moved: false,
-      };
-      window.addEventListener("pointermove", onHyperlinkPointerMove);
-      window.addEventListener("pointerup", onHyperlinkPointerUp);
-      window.addEventListener("pointercancel", cancelHyperlinkPointerGesture);
-    }
-    onCellMouseDown(address, event);
-  }
-}
-function onSurfacePointerMove(event: PointerEvent): void {
-  cancelNotePreviewLeave();
-  pageBreakDrag.hover(event);
-  if (isRulerPoint(surfacePoint(event))) {
-    headerInput.onPointerLeave();
-    return;
-  }
-  headerInput.onPointerMove(surfacePoint(event));
-  imageHoverCursor.value =
-    ownedImageLayerRef.value?.getSurfaceCursor(imagePoint(event)) ??
-    imageLayerRef.value?.getSurfaceCursor(imagePoint(event));
-  const address = getSurfaceCell(renderFrame.value, surfacePoint(event));
-  const hyperlink = address && getCellHyperlink(props.sheet, address);
-  hoveredHyperlink.value = hyperlink
-    ? { address, title: hyperlink.tooltip || hyperlink.target }
-    : undefined;
-  const noteAddress = address && layout.value.getAnchorForAddress(address);
-  hoveredNoteAddress.value =
-    noteAddress && props.sheet.cells.get(`${noteAddress.row}:${noteAddress.column}`)?.note
-      ? noteAddress
-      : undefined;
-}
-function onSurfacePointerLeave(): void {
-  pageBreakDrag.clearHover();
-  headerInput.onPointerLeave();
-  imageHoverCursor.value = undefined;
-  hoveredHyperlink.value = undefined;
-  scheduleNotePreviewLeave();
-}
-function clearHyperlinkPointerGesture(): void {
-  hyperlinkPointerGesture.value = undefined;
-  window.removeEventListener("pointermove", onHyperlinkPointerMove);
-  window.removeEventListener("pointerup", onHyperlinkPointerUp);
-  window.removeEventListener("pointercancel", cancelHyperlinkPointerGesture);
-}
-function cancelHyperlinkPointerGesture(event?: PointerEvent): void {
-  if (
-    event &&
-    hyperlinkPointerGesture.value &&
-    event.pointerId !== hyperlinkPointerGesture.value.pointerId
-  )
-    return;
-  clearHyperlinkPointerGesture();
-}
-function onHyperlinkPointerMove(event: PointerEvent): void {
-  const gesture = hyperlinkPointerGesture.value;
-  if (!gesture || event.pointerId !== gesture.pointerId) return;
-  if (Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) >= 3)
-    gesture.moved = true;
-}
-function onHyperlinkPointerUp(event: PointerEvent): void {
-  const gesture = hyperlinkPointerGesture.value;
-  if (!gesture || event.pointerId !== gesture.pointerId) return;
-  clearHyperlinkPointerGesture();
-  const completedAddress = getSurfaceCell(renderFrame.value, surfacePoint(event));
-  if (
-    !gesture.moved &&
-    completedAddress &&
-    areCellAddressesEqual(gesture.address, completedAddress)
-  ) {
-    emit("openHyperlink", gesture.address);
-  }
-}
-function onSurfaceContextMenu(event: MouseEvent): void {
-  const point = surfacePoint(event);
-  if (isRulerPoint(point)) return;
-  if (headerInput.onContextMenu(point, event, event.currentTarget as HTMLElement)) return;
-  if (ownedImageLayerRef.value?.handleSurfaceContextMenu(event, imagePoint(event))) return;
-  if (imageLayerRef.value?.handleSurfaceContextMenu(event, imagePoint(event))) return;
-  const address = getSurfaceCell(renderFrame.value, point);
-  if (address) openCellContextMenu(address, event);
-}
-function onSurfaceDoubleClick(event: MouseEvent): void {
-  if (ownedImageLayerRef.value?.handleSurfaceDoubleClick(event, imagePoint(event))) return;
-  if (imageLayerRef.value?.handleSurfaceDoubleClick(event, imagePoint(event))) return;
-  const address = getSurfaceCell(renderFrame.value, surfacePoint(event));
-  if (address) {
-    event.preventDefault();
-    onCellDoubleClick(address, event);
-  }
-}
-function onSurfaceKeydown(event: KeyboardEvent): void {
-  if (!headerInput.onKeyDown(event, event.currentTarget as HTMLElement)) onEditorKeydown(event);
-}
 
 const activeCellRect = computed(
   () =>
@@ -1928,107 +1667,6 @@ const activeCellRect = computed(
       width: 0,
       height: 0,
     },
-);
-const notePreviewsSuppressed = computed(
-  () =>
-    props.notePreviewDisabled ||
-    isEditing.value ||
-    selectionDragging.value ||
-    freezeDragging.value ||
-    dimensionResize.value ||
-    axisMoveDrag.value?.active ||
-    cellContextMenu.value ||
-    axisContextMenu.value,
-);
-function noteOrigin(address: CellAddress): { x: number; y: number } | undefined {
-  const rect = layout.value.getCellViewportRect(address);
-  const root = rootRef.value;
-  if (!root || !rect || rect.width === 0 || rect.height === 0) return;
-  const { row, column } = address;
-  const pane =
-    row < effectiveFreeze.value.rows
-      ? column < effectiveFreeze.value.columns
-        ? renderFrame.value.panes.topLeft
-        : renderFrame.value.panes.top
-      : column < effectiveFreeze.value.columns
-        ? renderFrame.value.panes.left
-        : renderFrame.value.panes.body;
-  const left = Math.max(rect.x, pane.clip.x);
-  const top = Math.max(rect.y, pane.clip.y);
-  const right = Math.min(rect.x + rect.width, pane.clip.x + pane.clip.width);
-  const bottom = Math.min(rect.y + rect.height, pane.clip.y + pane.clip.height);
-  if (right <= left || bottom <= top) return;
-  const bounds = root.getBoundingClientRect();
-  return {
-    x: bounds.left + (renderFrame.value.body.x + right) * scale.value,
-    y: bounds.top + (renderFrame.value.body.y + top) * scale.value,
-  };
-}
-const allNoteAddresses = computed(() => {
-  void props.workbookRevision;
-  if (!props.showAllNotes) return [];
-  const addresses: CellAddress[] = [];
-  for (const [key, cell] of props.sheet.cells) {
-    if (!cell.note || props.hiddenNoteKeys.includes(key)) continue;
-    const [row, column] = key.split(":").map(Number) as [number, number];
-    addresses.push({ row, column });
-  }
-  return addresses;
-});
-const visibleNotes = computed(() => {
-  void props.workbookRevision;
-  if (notePreviewsSuppressed.value) return [];
-  const addresses = new Map<string, CellAddress>();
-  for (const address of allNoteAddresses.value)
-    addresses.set(`${address.row}:${address.column}`, address);
-  const current =
-    props.noteDraft?.address ??
-    hoveredNoteAddress.value ??
-    (props.showActiveNote ? layout.value.getAnchorForAddress(activeCell.value) : undefined);
-  if (current) addresses.set(`${current.row}:${current.column}`, current);
-  return [...addresses].flatMap(([key, address]) => {
-    const note = props.sheet.cells.get(key)?.note;
-    const draft =
-      props.noteDraft?.address.row === address.row &&
-      props.noteDraft.address.column === address.column
-        ? props.noteDraft
-        : undefined;
-    if (!note && !draft) return [];
-    const origin = noteOrigin(address);
-    return origin ? [{ key: `${props.sheet.id}:${key}`, address, origin, note, draft }] : [];
-  });
-});
-const notePreviewRefs = ref<(InstanceType<typeof SheetNotePreviewType> | null)[]>([]);
-function onDocumentPointerDown(event: PointerEvent): void {
-  if (
-    pictureTransparentColor.session.value &&
-    event.target instanceof Element &&
-    !event.target.closest("[data-picture-color-picker]")
-  )
-    pictureTransparentColor.cancel();
-  if (
-    pictureCrop.active.value &&
-    event.button === 0 &&
-    event.target instanceof Element &&
-    !event.target.closest(
-      '[data-picture-crop-owner], [data-picture-crop-toolbar], [data-picture-tool="crop"], [data-owned-picture-context-menu], [data-floating-image-context-menu]',
-    )
-  ) {
-    if (!finishPictureCrop()) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      return;
-    }
-  }
-  if (!(event.target instanceof Node)) return;
-  for (const preview of notePreviewRefs.value) preview?.outsidePointerDown(event.target);
-}
-watch(
-  () => `${props.sheet.id}:${activeCell.value.row}:${activeCell.value.column}`,
-  () => {
-    hoveredNoteAddress.value = undefined;
-    for (const preview of notePreviewRefs.value) preview?.deselect();
-  },
 );
 const selectedRangeRects = computed(() => layout.value.getRangeFragments(selectedRange.value));
 

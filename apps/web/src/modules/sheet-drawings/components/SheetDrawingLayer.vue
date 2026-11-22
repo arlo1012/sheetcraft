@@ -36,13 +36,7 @@ import {
   type ShapeGroupPath,
 } from "@sheetcraft/core/shape-group";
 import { isShapeGroupEligibleRoot } from "@sheetcraft/core/shape-group-planning";
-import {
-  planShapeConnectorBodyTranslation,
-  planShapeConnectorEndpointChange,
-  planShapeConnectorRouteAdjustment,
-} from "@sheetcraft/core/shape-connector-editing";
 import type { ReadyShapeConnectorRoute } from "@sheetcraft/core/shape-connector-route";
-import { shapeFrameLocalToWorld } from "@sheetcraft/core/shape-frame";
 import {
   resolveShapeForestForRender,
   type ResolvedShapeForestForRender,
@@ -58,7 +52,6 @@ import {
   getShapeGroupFrameFragments,
   type ShapeGroupFrameFragment,
 } from "../shape-group-fragments";
-import { moveSelectedShapeRoots } from "../shape-root-selection-planning";
 import { updateOwnedShapeContainer } from "../shape-group-container-editing";
 import { resolveShapeGroupFormatContext } from "../shape-group-format-planning";
 import { readShapeObjectControlPaths } from "../shape-object-control-planning";
@@ -71,15 +64,10 @@ import type { ShapeTextEditSnapshot, ShapeTextEditCallbacks } from "../useShapeT
 import { ownsShapeTextEditTarget } from "../shape-text-edit-ownership";
 import type { ShapeCanvasTextEditRequest } from "../shape-canvas-text-edit-contract";
 import { shapeTextEditorPlacement } from "../shape-text-editor-placement";
-import { getDrawingShapeTextRect } from "../shape-text-runtime";
-import {
-  moveDrawingShapeTextWarpAdjustment,
-  nudgeDrawingShapeTextWarpAdjustment,
-} from "../shape-text-warp-adjustment";
+import { moveDrawingShapeTextWarpAdjustment } from "../shape-text-warp-adjustment";
 import ShapeCanvasTextEditor from "./ShapeCanvasTextEditor.vue";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
-import { createContextMenuPoint, useContextMenu } from "../../../shared/menu/useContextMenu";
 import SheetShapeSelectionToolbar from "./SheetShapeSelectionToolbar.vue";
 import ShapeGroupSelection from "./ShapeGroupSelection.vue";
 import { canEditShapeObject } from "@sheetcraft/core/shape-protection";
@@ -136,18 +124,9 @@ import { getShapeLineLocalEndpoints, moveStandardShapeEndpoint } from "../shape-
 import {
   listFreeShapePoints,
   moveFreeShapePoint,
-  setFreeShapePointType,
-  toggleClosedFreeShape,
   type FreeShapePointDescriptor,
   type ShapePointEditOptions,
 } from "../free-shape-point-layout";
-import {
-  addFreeShapePoint,
-  deleteFreeShapePoint,
-  deleteClosedFreeShapeSegment,
-  setFreeShapeSegmentType,
-} from "../free-shape-point-operations";
-import type { FreeShapePointAction as PointAction } from "../free-shape-edit-actions";
 import DrawingContent from "./DrawingContent.vue";
 import ShapeGroupDetailedContent from "./ShapeGroupDetailedContent.vue";
 import {
@@ -162,6 +141,8 @@ import {
 } from "../shape-detailed-presentation";
 import { useDrawingSelectionOperations } from "../composables/useDrawingSelectionOperations";
 import { useDrawingConnectorGestures } from "../composables/useDrawingConnectorGestures";
+import { useDrawingContextMenus } from "../composables/useDrawingContextMenus";
+import { useDrawingKeyboardAndPoints } from "../composables/useDrawingKeyboardAndPoints";
 import type { TextBoxReferenceResolver } from "../textbox-reference-display";
 const props = defineProps<{
   drawings: readonly SourceSheetDrawing[];
@@ -1918,749 +1899,93 @@ function pointContext(fragment: DrawingFragment, event: MouseEvent): void {
   activeVertex.value = 0;
   emit("select");
 }
-const shapeTextMenu = shallowRef<{
-  key: string;
-  canText: boolean;
-  kind: "shape" | "textBox" | "shapeGroup" | "chart" | "control";
-  canObject: boolean;
-  actions: {
-    object: () => boolean;
-    text: () => boolean;
-    format: () => boolean;
-    points?: () => boolean;
-    copy?: () => boolean;
-    cut?: () => boolean;
-    paste?: () => boolean;
-    reference?: () => boolean;
-  };
-}>();
-const shapeTextMenuAnchor = shallowRef<FloatingReference | null>(null);
-const shapeTextMenuSurface = ref<InstanceType<typeof MenuSurface> | null>(null);
-const { floatingStyles: shapeTextMenuStyles, dismiss: dismissShapeTextMenu } = useContextMenu({
-  anchor: shapeTextMenuAnchor,
-  panelRef: computed(() => shapeTextMenuSurface.value?.rootElement ?? null),
-  surfaceRef: shapeTextMenuSurface,
-  open: computed(() => !!shapeTextMenu.value),
-  onDismiss: () => {
-    shapeTextMenu.value = undefined;
-  },
+const {
+  shapeTextMenu,
+  shapeTextMenuSurface,
+  shapeTextMenuStyles,
+  dismissShapeTextMenu,
+  groupClipboardContext,
+  shapeContext,
+} = useDrawingContextMenus({
+  getDrawings: () => props.drawings,
+  getSheet: () => props.sheet,
+  getRevision: () => props.revision,
+  isReadOnly: () => Boolean(props.readOnly),
+  metrics,
+  selectionKey,
+  selectedRoots,
+  selectedOwnedId,
+  selectionFailure,
+  pointEditingId,
+  activeVertex,
+  legacyDrawings,
+  getCopyObjects: () => props.copyObjects,
+  getCutObjects: () => props.cutObjects,
+  getPasteObjects: () => props.pasteObjects,
+  canPasteObjects: () => props.canPasteObjects === true,
+  hasStartTextEdit: () => Boolean(props.startTextEdit),
+  getOpenTextBoxReference: () => props.openTextBoxReference,
+  selectRoots,
+  objectSelectionPaths,
+  sourceOwner,
+  resolvedOwner,
+  projectionById,
+  canChange,
+  hits,
+  finishCanvasText,
+  beginCanvasText,
+  formatConnector,
+  formatGroup,
+  pointContext,
+  onEdit: (drawing) => emit("edit", drawing),
+  onEditOwned: (root, path) => emit("editOwned", root, path),
+  onFormat: (drawing) => emit("format", drawing),
+  onFormatGroup: (root, path) => emit("formatGroup", root, path),
+  onSelect: () => emit("select"),
 });
-function clipboardMenuActions(paths: readonly ShapeGroupPath[], valid: () => boolean) {
-  const copy = props.copyObjects,
-    cut = props.cutObjects,
-    paste = props.pasteObjects;
-  const captured = paths.map((path) => [...path]);
-  const run = (callback: (() => boolean) | undefined): boolean => {
-    if (!valid() || !callback || !finishCanvasText() || !valid()) return false;
-    const accepted = callback();
-    if (accepted) dismissShapeTextMenu("programmatic", false);
-    else selectionFailure.value = true;
-    return accepted;
-  };
-  return {
-    ...(copy ? { copy: () => copy === props.copyObjects && run(() => copy(captured)) } : {}),
-    ...(cut ? { cut: () => cut === props.cutObjects && run(() => cut(captured)) } : {}),
-    ...(paste
-      ? {
-          paste: () => paste === props.pasteObjects && props.canPasteObjects === true && run(paste),
-        }
-      : {}),
-  };
-}
-function groupClipboardContext(
-  root: ShapeGroupDrawing,
-  path: ShapeGroupPath,
-  event: MouseEvent,
-): void {
-  if (
-    !props.drawings.includes(root) ||
-    !props.sheet ||
-    !canEditShapeObject(props.sheet, root) ||
-    props.readOnly
-  )
-    return;
-  event.preventDefault();
-  event.stopPropagation();
-  selectRoots([root.id], path.length > 1 ? path.at(-1)! : null);
-  const key = selectionKey.value,
-    m = metrics.value,
-    rev = props.revision;
-  const menu: NonNullable<typeof shapeTextMenu.value> = {
-    key,
-    kind: "shapeGroup",
-    canObject: false,
-    canText: false,
-    actions: {
-      object: () => false,
-      text: () => false,
-      format: () => {
-        if (!valid()) return false;
-        formatGroup(root, path);
-        dismissShapeTextMenu("programmatic", false);
-        return true;
-      },
-      ...clipboardMenuActions([path], valid),
-    },
-  };
-  function valid(): boolean {
-    return (
-      shapeTextMenu.value === menu &&
-      key === selectionKey.value &&
-      metrics.value === m &&
-      props.revision === rev &&
-      props.drawings.includes(root) &&
-      !props.readOnly &&
-      !!props.sheet &&
-      canEditShapeObject(props.sheet, root)
-    );
-  }
-  shapeTextMenuAnchor.value = createContextMenuPoint(event, event.currentTarget as Element | null);
-  shapeTextMenu.value = menu;
-}
-function widgetClipboardContext(
-  fragment: DrawingFragment,
-  event: MouseEvent | KeyboardEvent,
-): void {
-  const drawing = fragment.drawing;
-  const sheet = props.sheet;
-  const source = sourceOwner(drawing);
-  if (
-    (drawing.kind !== "chart" && drawing.kind !== "control") ||
-    source?.kind !== drawing.kind ||
-    !sheet ||
-    !canChange(drawing) ||
-    !props.drawings.includes(source) ||
-    (event instanceof MouseEvent && !hits(fragment, event))
-  )
-    return;
-  const capturedSource = source;
-  event.preventDefault();
-  event.stopPropagation();
-  if (!selectedRoots.value.includes(source.id) || selectedOwnedId.value) selectRoots([source.id]);
-  const paths = objectSelectionPaths();
-  const key = selectionKey.value,
-    m = metrics.value,
-    rev = props.revision;
-  const menu: NonNullable<typeof shapeTextMenu.value> = {
-    key,
-    kind: drawing.kind,
-    canObject: false,
-    canText: false,
-    actions: {
-      object: () => false,
-      text: () => false,
-      format: () => {
-        if (capturedSource.kind !== "control" || !valid()) return false;
-        dismissShapeTextMenu("programmatic", false);
-        emit("edit", capturedSource);
-        return true;
-      },
-      ...clipboardMenuActions(paths, valid),
-    },
-  };
-  function valid(): boolean {
-    return (
-      shapeTextMenu.value === menu &&
-      key === selectionKey.value &&
-      metrics.value === m &&
-      props.revision === rev &&
-      props.sheet === sheet &&
-      props.drawings.includes(capturedSource) &&
-      sourceOwner(drawing) === capturedSource &&
-      legacyDrawings.value.includes(drawing) &&
-      canChange(drawing)
-    );
-  }
-  shapeTextMenuAnchor.value =
-    event instanceof MouseEvent
-      ? createContextMenuPoint(event, event.currentTarget as Element | null)
-      : event.currentTarget instanceof HTMLElement
-        ? event.currentTarget
-        : null;
-  shapeTextMenu.value = menu;
-}
-function shapeContext(fragment: DrawingFragment, event: MouseEvent | KeyboardEvent): void {
-  const drawing = fragment.drawing;
-  if (drawing.kind === "chart" || drawing.kind === "control") {
-    widgetClipboardContext(fragment, event);
-    return;
-  }
-  if (!props.startTextEdit) {
-    if (event instanceof MouseEvent) pointContext(fragment, event);
-    return;
-  }
-  if (
-    (drawing.kind !== "shape" && drawing.kind !== "textBox") ||
-    !canChange(drawing) ||
-    legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing ||
-    (event instanceof MouseEvent && !hits(fragment, event))
-  )
-    return;
-  const source = sourceOwner(drawing),
-    owned = resolvedOwner(drawing)?.groupLeaf;
-  if (!source) return;
-  event.preventDefault();
-  event.stopPropagation();
-  if (
-    !selectedRoots.value.includes(source.id) ||
-    (selectedOwnedId.value && selectedOwnedId.value !== drawing.id)
-  )
-    selectRoots([source.id], owned ? drawing.id : null);
-  const capturedPaths = objectSelectionPaths();
-  const key = selectionKey.value,
-    m = metrics.value,
-    rev = props.revision;
-  const textRect = getDrawingShapeTextRect(drawing);
-  const menu: NonNullable<typeof shapeTextMenu.value> = {
-    key,
-    kind: drawing.kind,
-    canObject: !projectionById(drawing)?.renderLeaf?.connector,
-    canText:
-      !projectionById(drawing)?.renderLeaf?.connector &&
-      !(drawing.kind === "textBox" && drawing.textReference) &&
-      !!textRect &&
-      textRect.width > 0 &&
-      textRect.height > 0,
-    actions: {
-      ...clipboardMenuActions(capturedPaths, valid),
-      object: () => {
-        if (!valid() || !menu.canObject || !finishCanvasText() || !valid()) return false;
-        if (owned) emit("editOwned", owned.sourceRoot, owned.path);
-        else emit("edit", source);
-        dismissShapeTextMenu("programmatic", false);
-        return true;
-      },
-      text: () => {
-        if (!valid() || !beginCanvasText(drawing, "all")) return false;
-        dismissShapeTextMenu("programmatic", false);
-        return true;
-      },
-      format: () => {
-        if (!valid()) return false;
-        if (projectionById(drawing)?.renderLeaf?.connector) {
-          if (!formatConnector(drawing)) return false;
-        } else if (owned) emit("formatGroup", owned.sourceRoot, owned.path);
-        else if (source.kind === "shape" || source.kind === "textBox") emit("format", source);
-        else return false;
-        dismissShapeTextMenu("programmatic", false);
-        return true;
-      },
-      ...(drawing.kind === "textBox" && props.openTextBoxReference
-        ? {
-            reference: () => {
-              if (!valid() || !finishCanvasText() || !valid()) return false;
-              const opened = props.openTextBoxReference?.(source, owned?.path) === true;
-              if (opened) dismissShapeTextMenu("programmatic", false);
-              return opened;
-            },
-          }
-        : {}),
-      ...(drawing.kind === "shape" && drawing.shapePath
-        ? {
-            points: () => {
-              if (!valid()) return false;
-              pointEditingId.value = drawing.id;
-              activeVertex.value = 0;
-              dismissShapeTextMenu("programmatic", false);
-              emit("select");
-              return true;
-            },
-          }
-        : {}),
-    },
-  };
-  function valid() {
-    return (
-      shapeTextMenu.value === menu &&
-      key === selectionKey.value &&
-      metrics.value === m &&
-      props.revision === rev &&
-      canChange(drawing) &&
-      legacyDrawings.value.includes(drawing) &&
-      sourceOwner(drawing) === source
-    );
-  }
-  shapeTextMenuAnchor.value =
-    event instanceof MouseEvent
-      ? createContextMenuPoint(event, event.currentTarget as Element | null)
-      : event.currentTarget instanceof HTMLElement
-        ? event.currentTarget
-        : null;
-  shapeTextMenu.value = menu;
-}
-watch(
-  () => [props.drawings, props.sheet, props.revision, metrics.value, props.readOnly],
-  () => {
-    shapeTextMenu.value = undefined;
-  },
-);
-watch(selectionKey, (key) => {
-  if (shapeTextMenu.value?.key !== key) shapeTextMenu.value = undefined;
-});
-function nudgeFreePoint(
-  drawing: SheetGraphicDrawing,
-  point: FreeShapePointDescriptor,
-  delta: { x: number; y: number },
-): void {
-  if (
-    pointEditingId.value !== drawing.id ||
-    !canChange(drawing) ||
-    legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing
-  )
-    return;
-  const position = listFreeShapePoints(drawing).find(
-      (p) => p.commandIndex === point.commandIndex && p.role === point.role,
-    )?.position,
-    rect = getFloatingImageSheetRect(drawing, viewLayout(drawing));
-  if (!position || !rect) return;
-  const origin = pictureFrameLocalToWorld(
-    rect,
-    drawing.rotation,
-    standardShapeFlipPoint(drawing, position),
-  );
-  const next = moveFreeShapePoint(
-    drawing,
-    point,
-    { x: origin.x + delta.x, y: origin.y + delta.y },
-    viewLayout(drawing),
-    pointEditOptions(drawing),
-  );
-  if (next) commitUpdate(next, drawing);
-}
-const pointHandlers = new WeakMap<
-  SheetGraphicDrawing,
-  { key: string; handler: (action: PointAction, index: number) => boolean }
->();
-function pointHandler(drawing: SheetGraphicDrawing) {
-  const key = selectionKey.value;
-  let entry = pointHandlers.get(drawing);
-  if (!entry || entry.key !== key) {
-    entry = {
-      key,
-      handler: (action, index) =>
-        key === selectionKey.value &&
-        isSelectedView(drawing) &&
-        pointAction(drawing, action, index),
-    };
-    pointHandlers.set(drawing, entry);
-  }
-  return entry.handler;
-}
-function selectFreeVertex(drawing: SheetGraphicDrawing, index: number): void {
-  if (
-    !canChange(drawing) ||
-    pointEditingId.value !== drawing.id ||
-    legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing ||
-    !listFreeShapePoints(drawing).some((p) => p.role === "vertex" && p.commandIndex === index)
-  )
-    return;
-  activeVertex.value = index;
-}
-function pointAction(drawing: SheetGraphicDrawing, action: PointAction, index: number): boolean {
-  if (
-    !canChange(drawing) ||
-    legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing ||
-    pointEditingId.value !== drawing.id
-  )
-    return false;
-  if (action === "exit") {
-    pointEditingId.value = null;
-    pointRejected.value = false;
-    return true;
-  }
-  const vertices = listFreeShapePoints(drawing).filter((p) => p.role === "vertex");
-  const at = vertices.findIndex((p) => p.commandIndex === index);
-  const segmentAction =
-    action === "delete-segment" ||
-    action === "add-segment" ||
-    action === "straight-segment" ||
-    action === "curved-segment";
-  if (at < 0 && !segmentAction) return false;
-  let next: SheetGraphicDrawing | undefined;
-  if (action === "straight-segment" || action === "curved-segment")
-    next = setFreeShapeSegmentType(
-      drawing,
-      index,
-      action === "straight-segment" ? "straight" : "curved",
-      viewLayout(drawing),
-      pointEditOptions(drawing),
-    );
-  else if (action === "delete-segment") next = deleteClosedFreeShapeSegment(drawing, index);
-  else if (action === "add-segment")
-    next = addFreeShapePoint(drawing, index, viewLayout(drawing), 0.5, pointEditOptions(drawing));
-  else if (action === "add") {
-    const segment = drawing.shapePath!.commands[index + 1] ? index + 1 : undefined;
-    if (segment !== undefined)
-      next = addFreeShapePoint(
-        drawing,
-        segment,
-        viewLayout(drawing),
-        0.5,
-        pointEditOptions(drawing),
-      );
-  } else if (action === "delete")
-    next = deleteFreeShapePoint(drawing, index, viewLayout(drawing), pointEditOptions(drawing));
-  else if (action === "close" || action === "open")
-    next = toggleClosedFreeShape(
-      drawing,
-      action === "close",
-      viewLayout(drawing),
-      index,
-      pointEditOptions(drawing),
-    );
-  else
-    next = setFreeShapePointType(
-      drawing,
-      index,
-      action,
-      viewLayout(drawing),
-      pointEditOptions(drawing),
-    );
-  if (!next || !drawingGeometry(next)) return false;
-  const nextVertices = listFreeShapePoints(next).filter((p) => p.role === "vertex");
-  const nextIndex =
-    action === "delete-segment"
-      ? 0
-      : segmentAction
-        ? Math.max(
-            0,
-            nextVertices.findIndex((point) => point.commandIndex === index),
-          )
-        : action === "open"
-          ? 0
-          : action === "add"
-            ? at + 1
-            : action === "delete"
-              ? Math.min(at, nextVertices.length - 1)
-              : at;
-  if (!commitUpdate(next, drawing)) return false;
-  activeVertex.value = nextVertices[nextIndex]?.commandIndex ?? 0;
-  return true;
-}
-function nudgeAdjustment(
-  drawing: SheetGraphicDrawing,
-  index: number,
-  delta: { x: number; y: number },
-): void {
-  if (
-    !canChange(drawing) ||
-    legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing
-  )
-    return;
-  const shape = drawingGeometry(drawing);
-  const position = shape?.handles[index]?.position;
-  const source = connectorEditSource(drawing),
-    pass = renderPass.value,
-    route = connectorRoute(drawing);
-  if (source && pass && route && position) {
-    try {
-      const target = shapeFrameLocalToWorld(route.paintLayout.rect, route.paintLayout.angleDeg, {
-        x: position.x + delta.x,
-        y: position.y + delta.y,
-      });
-      const next = planShapeConnectorRouteAdjustment(
-        pass.sourceForest,
-        source,
-        index,
-        target,
-        pass.metrics,
-      );
-      commitConnectorPlan(pass, drawing, next, selectionKey.value);
-    } catch {
-      selectionFailure.value = true;
-    }
-    return;
-  }
-  if (!position || !drawing.shapeGeometry) return;
-  const geometry = moveStandardShapeAdjustment(
-    drawing.shapeGeometry,
-    drawing.width,
-    drawing.height,
-    index,
-    {
-      x: position.x + (drawing.shapeFlipX ? -delta.x : delta.x),
-      y: position.y + (drawing.shapeFlipY ? -delta.y : delta.y),
-    },
-  );
-  if (geometry) commitUpdate({ ...drawing, shapeGeometry: geometry }, drawing);
-}
-function nudgeWarpAdjustment(
-  drawing: SheetGraphicDrawing,
-  index: number,
-  delta: { x: number; y: number },
-): void {
-  if (
-    !canChange(drawing) ||
-    legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing
-  )
-    return;
-  const angle = (drawing.rotation * Math.PI) / 180;
-  const localDelta = {
-    x: Math.cos(angle) * delta.x + Math.sin(angle) * delta.y,
-    y: -Math.sin(angle) * delta.x + Math.cos(angle) * delta.y,
-  };
-  const next = nudgeDrawingShapeTextWarpAdjustment(drawing, index, localDelta);
-  if (next) commitUpdate(next, drawing);
-}
-function nudgeEndpoint(
-  drawing: SheetGraphicDrawing,
-  index: 0 | 1,
-  delta: { x: number; y: number },
-): void {
-  if (
-    !canChange(drawing) ||
-    legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing
-  )
-    return;
-  const source = connectorEditSource(drawing);
-  const pass = renderPass.value;
-  if (source && pass) {
-    if (!props.applyCollection) {
-      connectorFailure.value = true;
-      return;
-    }
-    const connector = pass.getLeaf(drawing.id)!.connector!;
-    if (connector.status !== "ready") return;
-    const tip = index === 0 ? connector.route.begin : connector.route.end;
-    try {
-      const next = planShapeConnectorEndpointChange(
-        pass.sourceForest,
-        source,
-        index === 0 ? "begin" : "end",
-        { kind: "free", position: { x: tip.x + delta.x, y: tip.y + delta.y } },
-        pass.metrics,
-      );
-      commitConnectorPlan(pass, drawing, next, selectionKey.value);
-    } catch {
-      selectionFailure.value = true;
-    }
-    return;
-  }
-  const position = getShapeLineLocalEndpoints(drawing)?.[index];
-  const rect = getFloatingImageSheetRect(drawing, viewLayout(drawing));
-  if (!position || !rect) return;
-  const origin = pictureFrameLocalToWorld(
-    rect,
-    drawing.rotation,
-    standardShapeFlipPoint(drawing, position),
-  );
-  const next = moveStandardShapeEndpoint(
-    drawing,
-    index,
-    { x: origin.x + delta.x, y: origin.y + delta.y },
-    viewLayout(drawing),
-    false,
-    pointEditOptions(drawing),
-  );
-  if (next) commitUpdate(next, drawing);
-}
-function nudgeRotation(drawing: SheetGraphicDrawing, degrees: number): void {
-  if (
-    !canChange(drawing) ||
-    legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing
-  )
-    return;
-  const rotation = ((((drawing.rotation + degrees + 180) % 360) + 360) % 360) - 180;
-  if (
-    selectedRoots.value.length > 1 ||
-    (resolvedOwner(drawing)?.groupLeaf && !selectedOwnedId.value)
-  )
-    runSelectionPlan(() => rotateRootSelection(degrees));
-  else commitUpdate({ ...drawing, rotation }, drawing);
-}
-function keydown(drawing: SheetDrawing, event: KeyboardEvent) {
-  if (legacyDrawings.value.find((item) => item.id === drawing.id) !== drawing) return;
-  if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.metaKey || event.altKey)
-    return;
-  const keyboardOwner = sourceOwner(drawing);
-  if (keyboardOwner && !selectedRoots.value.includes(keyboardOwner.id))
-    selectRoots([keyboardOwner.id], resolvedOwner(drawing)?.groupLeaf ? drawing.id : null);
-  else if (
-    resolvedOwner(drawing)?.groupLeaf &&
-    selectedRoots.value.length === 1 &&
-    selectedOwnedId.value &&
-    selectedOwnedId.value !== drawing.id
-  )
-    selectedOwnedId.value = drawing.id;
-  if (event.key === "Escape") {
-    if (pointEditingId.value === drawing.id) {
-      pointEditingId.value = null;
-      event.preventDefault();
-      event.stopPropagation();
-      return;
-    }
-    if (selectedOwnedId.value) selectedOwnedId.value = null;
-    else selectRoots([]);
-    event.stopPropagation();
-    return;
-  }
-  if (drawing.kind === "attachment" && (event.key === "Enter" || event.key === "F2")) {
-    event.preventDefault();
-    event.stopPropagation();
-    const source = sourceOwner(drawing);
-    if (source) emit("edit", source);
-    return;
-  }
-  if (!canChange(drawing)) return;
-  if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) {
-    const fragment = fragments.value.find((f) => f.drawing === drawing);
-    if (fragment) shapeContext(fragment, event);
-    return;
-  }
-  if (event.key === "Process" || event.keyCode === 229 || Array.from(event.key).length === 1) {
-    if (
-      beginCanvasText(
-        drawing,
-        "end",
-        event.key === "Process" || event.keyCode === 229 ? undefined : event.key,
-      )
-    ) {
-      if (event.key !== "Process" && event.keyCode !== 229) event.preventDefault();
-      event.stopPropagation();
-      return;
-    }
-  }
-  if (event.key === "Delete" || event.key === "Backspace") {
-    event.preventDefault();
-    event.stopPropagation();
-    if (
-      metrics.value &&
-      props.applyCollection &&
-      (selectedRoots.value.length > 1 || resolvedOwner(drawing)?.groupLeaf)
-    )
-      deleteSelected();
-    else emit("delete", drawing.id);
-    return;
-  }
-  if (event.key === "Enter" || event.key === "F2") {
-    event.preventDefault();
-    event.stopPropagation();
-    if (projectionById(drawing)?.renderLeaf?.connector) {
-      formatConnector(drawing);
-      return;
-    }
-    if (beginCanvasText(drawing, "all")) return;
-    const source = sourceOwner(drawing),
-      owned = resolvedOwner(drawing)?.groupLeaf;
-    if (owned && selectedOwnedId.value === drawing.id)
-      emit("editOwned", owned.sourceRoot, owned.path);
-    else if (source && source.kind !== "shapeGroup") emit("edit", source);
-    return;
-  }
-  if (event.key.startsWith("Arrow")) {
-    event.preventDefault();
-    event.stopPropagation();
-    const step = event.shiftKey ? 10 : 1;
-    const delta = {
-      x: event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0,
-      y: event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0,
-    };
-    const source = connectorEditSource(drawing);
-    const pass = renderPass.value;
-    if (
-      source &&
-      pass &&
-      selectedRoots.value.length === 1 &&
-      (!projectionById(drawing)?.groupLeaf || selectedOwnedId.value === drawing.id)
-    ) {
-      if (!props.applyCollection) {
-        connectorFailure.value = true;
-        return;
-      }
-      try {
-        const next = planShapeConnectorBodyTranslation(
-          pass.sourceForest,
-          source,
-          delta,
-          pass.metrics,
-        );
-        commitConnectorPlan(pass, drawing, next, selectionKey.value);
-      } catch {
-        selectionFailure.value = true;
-      }
-      return;
-    }
-    if (
-      metrics.value &&
-      props.applyCollection &&
-      (selectedRoots.value.length > 1 ||
-        (resolvedOwner(drawing)?.groupLeaf && !selectedOwnedId.value))
-    ) {
-      if (selectedRoots.value.some((id) => renderPass.value?.getLeaf(id)?.connector)) {
-        connectorFailure.value = true;
-        return;
-      }
-      runSelectionPlan(() =>
-        moveSelectedShapeRoots(props.drawings, selectedRoots.value, delta, metrics.value!),
-      );
-      return;
-    }
-    const moved = moveView(drawing, {
-      x: event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0,
-      y: event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0,
-    });
-    if (moved) commitUpdate(moved, drawing);
-  }
-}
-function freeSelectionHandlers(fragment: DrawingFragment) {
-  const key = selectionKey.value,
-    drawing = fragment.drawing;
-  const valid = () =>
-    key === selectionKey.value &&
-    isSelectedView(drawing) &&
-    pointEditingId.value === drawing.id &&
-    legacyDrawings.value.includes(drawing) &&
-    isStandard(drawing);
-  return {
-    selectVertex: (index: number) => {
-      if (valid() && isStandard(drawing)) selectFreeVertex(drawing, index);
-    },
-    move: (point: FreeShapePointDescriptor, event: PointerEvent) => {
-      if (valid()) start(fragment, event, undefined, "point", undefined, point);
-    },
-    nudge: (point: FreeShapePointDescriptor, delta: { x: number; y: number }) => {
-      if (valid() && isStandard(drawing)) nudgeFreePoint(drawing, point, delta);
-    },
-  };
-}
-function standardSelectionHandlers(fragment: DrawingFragment) {
-  const key = selectionKey.value,
-    drawing = fragment.drawing;
-  const valid = () =>
-    key === selectionKey.value &&
-    isSelectedView(drawing) &&
-    legacyDrawings.value.includes(drawing) &&
-    isStandard(drawing);
-  return {
-    resize: (direction: FloatingImageResizeDirection, event: PointerEvent) => {
-      if (valid()) start(fragment, event, direction);
-    },
-    rotate: (event: PointerEvent) => {
-      if (valid()) start(fragment, event, undefined, "rotate");
-    },
-    endpoint: (index: 0 | 1, event: PointerEvent) => {
-      if (valid()) start(fragment, event, undefined, "endpoint", index);
-    },
-    nudgeEndpoint: (index: 0 | 1, delta: { x: number; y: number }) => {
-      if (valid() && isStandard(drawing)) nudgeEndpoint(drawing, index, delta);
-    },
-    adjust: (index: number, event: PointerEvent) => {
-      if (valid()) start(fragment, event, undefined, "adjust", index);
-    },
-    nudgeAdjustment: (index: number, delta: { x: number; y: number }) => {
-      if (valid() && isStandard(drawing)) nudgeAdjustment(drawing, index, delta);
-    },
-    warpAdjust: (index: number, event: PointerEvent) => {
-      if (valid()) start(fragment, event, undefined, "text-warp-adjust", index);
-    },
-    nudgeWarpAdjustment: (index: number, delta: { x: number; y: number }) => {
-      if (valid() && isStandard(drawing)) nudgeWarpAdjustment(drawing, index, delta);
-    },
-    nudgeRotation: (degrees: number) => {
-      if (valid() && isStandard(drawing)) nudgeRotation(drawing, degrees);
-    },
-  };
-}
+
+const { pointHandler, keydown, freeSelectionHandlers, standardSelectionHandlers } =
+  useDrawingKeyboardAndPoints({
+    getDrawings: () => props.drawings,
+    hasApplyCollection: () => Boolean(props.applyCollection),
+    metrics,
+    renderPass,
+    legacyDrawings,
+    fragments,
+    selectionKey,
+    selectedRoots,
+    selectedOwnedId,
+    pointEditingId,
+    activeVertex,
+    pointRejected,
+    selectionFailure,
+    connectorFailure,
+    isStandard,
+    isSelectedView,
+    canChange,
+    selectRoots,
+    sourceOwner,
+    resolvedOwner,
+    projectionById,
+    viewLayout,
+    pointEditOptions,
+    drawingGeometry,
+    connectorEditSource,
+    connectorRoute,
+    commitConnectorPlan,
+    commitUpdate,
+    moveView,
+    rotateRootSelection,
+    runSelectionPlan,
+    deleteSelected,
+    formatConnector,
+    beginCanvasText,
+    shapeContext,
+    startGesture: start,
+    onEdit: (drawing) => emit("edit", drawing),
+    onEditOwned: (root, path) => emit("editOwned", root, path),
+    onDelete: (id) => emit("delete", id),
+  });
 function clearOutside(event: PointerEvent) {
   if (selectedRoots.value.length > 0 && props.ownsSelectedShapeFieldTarget?.(event.target)) return;
   const target = event.target instanceof Element ? event.target : undefined;
