@@ -71,7 +71,8 @@ const popupProps = computed<PopupProps>(() => ({
       overscrollBehavior: "contain",
     };
   },
-  overlayInnerStyle: { padding: "0" },
+  overlayInnerStyle:
+    props.panelWidth === "content" ? { padding: "0", width: "max-content" } : { padding: "0" },
 }));
 
 // TDesign forwards extra inputProps attributes to the wrapper, not the input.

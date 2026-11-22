@@ -109,6 +109,14 @@ function confirm(): void {
   emit("confirm", cloneCellFillGradient(draft.value)!);
 }
 
+function onDialogKeydown(event: KeyboardEvent): void {
+  if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+    event.preventDefault();
+    event.stopPropagation();
+    confirm();
+  }
+}
+
 watch(() => props.gradient, resetDraft, { immediate: true });
 </script>
 
@@ -124,10 +132,11 @@ watch(() => props.gradient, resetDraft, { immediate: true });
     :close-on-overlay-click="false"
     :destroy-on-close="true"
     :confirm-on-enter="false"
-    width="min(400px, calc(100vw - 32px))"
+    width="min(440px, calc(100vw - 32px))"
     placement="center"
     class="cell-format-fill-effects"
     data-cell-format-fill-effects
+    @keydown="onDialogKeydown"
     @confirm="confirm"
     @close="emit('cancel')"
   >
@@ -137,23 +146,25 @@ watch(() => props.gradient, resetDraft, { immediate: true });
         :aria-label="t('cellFormat.fillEffectsColors')"
       >
         <h3>{{ t("cellFormat.fillEffectsColors") }}</h3>
-        <div class="cell-format-fill-effects__color" data-fill-effects-color="1">
-          <span>{{ t("cellFormat.fillColor1") }}</span>
-          <CellFormatColorControl
-            :model-value="color1"
-            :default-color="defaultColor"
-            :label="t('cellFormat.fillColor1')"
-            @select="selectColor1"
-          />
-        </div>
-        <div class="cell-format-fill-effects__color" data-fill-effects-color="2">
-          <span>{{ t("cellFormat.fillColor2") }}</span>
-          <CellFormatColorControl
-            :model-value="color2"
-            :default-color="DEFAULT_SECOND_COLOR"
-            :label="t('cellFormat.fillColor2')"
-            @select="selectColor2"
-          />
+        <div class="cell-format-fill-effects__color-row">
+          <div class="cell-format-fill-effects__color" data-fill-effects-color="1">
+            <span>{{ t("cellFormat.fillColor1") }}</span>
+            <CellFormatColorControl
+              :model-value="color1"
+              :default-color="defaultColor"
+              :label="t('cellFormat.fillColor1')"
+              @select="selectColor1"
+            />
+          </div>
+          <div class="cell-format-fill-effects__color" data-fill-effects-color="2">
+            <span>{{ t("cellFormat.fillColor2") }}</span>
+            <CellFormatColorControl
+              :model-value="color2"
+              :default-color="DEFAULT_SECOND_COLOR"
+              :label="t('cellFormat.fillColor2')"
+              @select="selectColor2"
+            />
+          </div>
         </div>
       </section>
 
@@ -177,40 +188,44 @@ watch(() => props.gradient, resetDraft, { immediate: true });
         </TRadioGroup>
       </section>
 
-      <section
-        class="cell-format-fill-effects__variants"
-        :aria-label="t('cellFormat.fillVariants')"
-      >
-        <h3>{{ t("cellFormat.fillVariants") }}</h3>
-        <div class="cell-format-fill-effects__variant-list">
-          <button
-            v-for="item in variants"
-            :key="item.variant"
-            type="button"
-            class="cell-format-fill-effects__variant"
-            :class="{
-              'cell-format-fill-effects__variant--selected': item.variant === selectedVariant,
-            }"
-            :style="item.style"
-            :aria-label="t('cellFormat.fillVariantLabel', { value: item.variant + 1 })"
-            :aria-pressed="item.variant === selectedVariant"
-            :data-fill-effects-variant="item.variant"
-            @click="selectVariant(item.variant)"
-          />
-        </div>
-      </section>
+      <div class="cell-format-fill-effects__right">
+        <section
+          class="cell-format-fill-effects__variants"
+          :aria-label="t('cellFormat.fillVariants')"
+        >
+          <h3>{{ t("cellFormat.fillVariants") }}</h3>
+          <div class="cell-format-fill-effects__variant-list">
+            <button
+              v-for="item in variants"
+              :key="item.variant"
+              type="button"
+              class="cell-format-fill-effects__variant"
+              :class="{
+                'cell-format-fill-effects__variant--selected': item.variant === selectedVariant,
+              }"
+              :style="item.style"
+              :aria-label="t('cellFormat.fillVariantLabel', { value: item.variant + 1 })"
+              :aria-pressed="item.variant === selectedVariant"
+              :data-fill-effects-variant="item.variant"
+              @click="selectVariant(item.variant)"
+            />
+          </div>
+        </section>
 
-      <section
-        class="cell-format-fill-effects__preview-group"
-        :aria-label="t('cellFormat.preview')"
-      >
-        <h3>{{ t("cellFormat.preview") }}</h3>
-        <div
-          class="cell-format-fill-effects__preview"
-          :style="previewStyle"
-          data-fill-effects-preview
-        />
-      </section>
+        <section
+          class="cell-format-fill-effects__preview-group"
+          :aria-label="t('cellFormat.preview')"
+        >
+          <h3>{{ t("cellFormat.preview") }}</h3>
+          <div class="cell-format-fill-effects__preview-stage">
+            <div
+              class="cell-format-fill-effects__preview"
+              :style="previewStyle"
+              data-fill-effects-preview
+            />
+          </div>
+        </section>
+      </div>
     </div>
   </Dialog>
 </template>
@@ -219,8 +234,8 @@ watch(() => props.gradient, resetDraft, { immediate: true });
 .cell-format-fill-effects {
   &__body {
     display: grid;
-    grid-template-columns: max-content minmax(0, 1fr);
-    gap: 16px 20px;
+    grid-template-columns: 128px minmax(0, 1fr);
+    gap: 12px;
     color: var(--sheetcraft-text-primary);
     font-size: var(--sheetcraft-font-size-body-medium);
     line-height: var(--sheetcraft-line-height-body-medium);
@@ -236,70 +251,96 @@ watch(() => props.gradient, resetDraft, { immediate: true });
   &__preview-group {
     display: grid;
     align-content: start;
-    gap: 4px;
+    gap: 8px;
     min-width: 0;
   }
   &__colors {
     grid-column: 1 / -1;
+    padding: 10px 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
   }
-  &__style {
-    grid-column: 1;
-    grid-row: 2 / span 2;
-  }
-  &__variants {
-    grid-column: 2;
-    grid-row: 2;
-  }
-  &__preview-group {
-    grid-column: 2;
-    grid-row: 3;
+  &__color-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
   }
   &__color {
     display: grid;
-    grid-template-columns: 56px minmax(0, 1fr);
+    grid-template-columns: max-content minmax(0, 1fr);
     align-items: center;
     gap: 8px;
+    min-width: 0;
+
+    > span {
+      color: var(--sheetcraft-text-secondary);
+    }
+  }
+  &__style {
+    padding: 10px 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
+  }
+  &__right {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
   }
   &__variant-list {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    grid-auto-rows: 38px;
+    grid-auto-rows: 40px;
     align-content: start;
     gap: 8px;
-    min-height: 38px;
+    min-height: 40px;
   }
   &__variant {
     width: 100%;
-    height: 38px;
-    border: 1px solid var(--sheetcraft-border-control);
-    border-radius: var(--sheetcraft-radius-default);
+    height: 40px;
+    border: 1px solid rgb(0 0 0 / 12%);
+    border-radius: var(--sheetcraft-radius-floating-item);
     background-color: var(--sheetcraft-surface-panel);
     cursor: pointer;
+    transition:
+      border-color 0.12s ease,
+      box-shadow 0.12s ease;
+
     &:hover {
       border-color: var(--sheetcraft-action-primary-hover);
     }
 
     &--selected {
-      border: 2px solid var(--sheetcraft-action-primary);
+      border-color: var(--sheetcraft-action-primary);
+      box-shadow: 0 0 0 1px var(--sheetcraft-action-primary);
     }
+  }
+  &__preview-group {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 6px;
+  }
+  &__preview-stage {
+    flex: 1;
+    min-height: 88px;
+    padding: 8px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
   }
   &__preview {
-    height: 68px;
-    border: 1px solid var(--sheetcraft-border-control);
-    border-radius: var(--sheetcraft-radius-default);
+    width: 100%;
+    height: 100%;
+    min-height: 72px;
+    border: 1px solid rgb(0 0 0 / 10%);
+    border-radius: var(--sheetcraft-radius-floating-item);
   }
 }
-@media (max-width: 420px) {
+@media (max-width: 440px) {
   .cell-format-fill-effects {
-    &__body {
+    &__body,
+    &__color-row {
       grid-template-columns: minmax(0, 1fr);
-    }
-    &__colors,
-    &__style,
-    &__variants,
-    &__preview-group {
-      grid-column: auto;
-      grid-row: auto;
     }
   }
 }

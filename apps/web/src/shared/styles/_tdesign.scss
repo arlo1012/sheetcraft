@@ -745,7 +745,9 @@
 
 .cell-format-dialog {
   // Dialog always renders a body node; let Tabs own the content layout.
-  .t-dialog__body {
+  // Scope strictly to the host body wrapping the tabs so nested dialogs
+  // (such as Fill Effects) preserve standard dialog body padding.
+  .t-dialog__body:has(> .cell-format-dialog__tabs) {
     display: contents;
   }
 

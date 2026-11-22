@@ -153,7 +153,9 @@ test.each(["trigger", "content"] as const)(
     });
     vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue(new DOMRect(1038, 700, 132, 28));
     expect(popup.overlayStyle(trigger).maxHeight).toBe("684px");
-    expect(popup.overlayInnerStyle).toEqual({ padding: "0" });
+    expect(popup.overlayInnerStyle).toEqual(
+      panelWidth === "content" ? { padding: "0", width: "max-content" } : { padding: "0" },
+    );
   },
 );
 
