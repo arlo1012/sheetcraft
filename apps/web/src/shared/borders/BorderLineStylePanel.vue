@@ -168,16 +168,16 @@ const { t } = useAppI18n();
 .border-line-style-panel {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(7, 29px);
+  grid-template-rows: repeat(7, 26px);
   grid-auto-flow: column;
-  gap: 4px;
+  gap: 3px;
 
   > [role="menuitemradio"] {
     display: grid;
     place-items: center;
     width: 100%;
-    height: 29px;
-    padding: 0 12px;
+    height: 26px;
+    padding: 0 10px;
     background: transparent;
     color: var(--sheetcraft-text-primary);
     border: 0;

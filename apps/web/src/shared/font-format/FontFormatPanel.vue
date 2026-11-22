@@ -249,8 +249,11 @@ const previewText = computed(() =>
 
 <style scoped lang="scss">
 .font-format {
-  display: grid;
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
   color: var(--sheetcraft-text-primary);
   font-size: var(--sheetcraft-font-size-body-medium);
   line-height: var(--sheetcraft-line-height-body-medium);
@@ -260,10 +263,14 @@ const previewText = computed(() =>
     font-size: inherit;
     font-weight: var(--sheetcraft-font-weight-semibold);
   }
-  &__lists,
+  &__lists {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 0.95fr) minmax(0, 0.8fr);
+    gap: 12px;
+  }
   &__appearance {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
   }
   &__field {
@@ -277,7 +284,7 @@ const previewText = computed(() =>
     }
   }
   &__list {
-    height: 160px;
+    height: 132px;
   }
   &__family-search {
     display: flex;
@@ -291,27 +298,35 @@ const previewText = computed(() =>
   }
   &__bottom {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    flex: 1;
+    grid-template-columns: 148px minmax(0, 1fr);
     gap: 12px;
-    align-items: start;
+    min-height: 92px;
   }
-  &__effects,
-  &__preview-group {
-    display: grid;
-    gap: 4px;
+  &__effects {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
     min-width: 0;
+    padding: 8px 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
   }
   &__preview-group {
-    grid-column: span 2;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
   }
   &__preview {
     display: flex;
+    flex: 1;
     align-items: center;
     justify-content: center;
     min-width: 0;
-    height: 72px;
+    min-height: 72px;
     overflow: hidden;
-    padding: 12px 10px;
+    padding: 10px;
     border: 0;
     border-radius: var(--sheetcraft-radius-dialog-card);
     background: var(--sheetcraft-surface-dialog-card);

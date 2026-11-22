@@ -1,5 +1,13 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import {
+  AlignCenter,
+  AlignCenterHorizontal,
+  AlignEndHorizontal,
+  AlignLeft,
+  AlignRight,
+  AlignStartHorizontal,
+} from "lucide-vue-next";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -173,6 +181,54 @@ function checkboxPressed(
 ): boolean | "mixed" {
   return hasPatch(key) ? toggleValue(key) : state === "mixed" ? "mixed" : state === "on";
 }
+
+const previewSampleText = computed(() => {
+  if (props.sampleValue !== undefined && props.sampleValue !== null && props.sampleValue !== "") {
+    return String(props.sampleValue);
+  }
+  return t("cellFormat.previewText");
+});
+
+const previewCellStyle = computed(() => {
+  const h = horizontal.value ?? "general";
+  const v = vertical.value ?? "bottom";
+  const justifyContent =
+    h === "center" || h === "centerContinuous"
+      ? "center"
+      : h === "right"
+        ? "flex-end"
+        : "flex-start";
+  const alignItems = v === "top" ? "flex-start" : v === "middle" ? "center" : "flex-end";
+  const indentPx = canIndent.value && indent.value ? Math.min(indent.value, 6) * 8 : 0;
+  return {
+    justifyContent,
+    alignItems,
+    paddingLeft: h === "right" ? "10px" : `${10 + indentPx}px`,
+    paddingRight: h === "right" ? `${10 + indentPx}px` : "10px",
+    direction: direction.value === "rtl" ? ("rtl" as const) : ("ltr" as const),
+  };
+});
+
+const previewTextStyle = computed(() => {
+  const rot = rotation.value;
+  const base: Record<string, string> = {
+    whiteSpace: wrapped.value ? "normal" : "nowrap",
+    textAlign:
+      horizontal.value === "center" || horizontal.value === "centerContinuous"
+        ? "center"
+        : horizontal.value === "right"
+          ? "right"
+          : "left",
+  };
+  if (rot === "vertical") {
+    base.writingMode = "vertical-rl";
+    base.textOrientation = "upright";
+  } else if (typeof rot === "number" && rot !== 0) {
+    base.transform = `rotate(${-rot}deg)`;
+    base.transformOrigin = "center";
+  }
+  return base;
+});
 </script>
 
 <template>
@@ -180,7 +236,82 @@ function checkboxPressed(
     <div class="cell-format-alignment__layout">
       <div class="cell-format-alignment__content">
         <section class="cell-format-alignment__group">
-          <h3>{{ t("cellFormat.textAlignment") }}</h3>
+          <div class="cell-format-alignment__group-head">
+            <h3>{{ t("cellFormat.textAlignment") }}</h3>
+            <div
+              class="cell-format-alignment__quick-bar"
+              role="group"
+              :aria-label="t('cellFormat.quickAlignment')"
+            >
+              <button
+                type="button"
+                class="cell-format-alignment__quick-btn"
+                :class="{ 'is-active': horizontal === 'left' }"
+                :title="t('cellFormat.horizontalLeft')"
+                :aria-label="t('cellFormat.horizontalLeft')"
+                :aria-pressed="horizontal === 'left'"
+                @click="setHorizontal('left')"
+              >
+                <AlignLeft :size="14" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                class="cell-format-alignment__quick-btn"
+                :class="{ 'is-active': horizontal === 'center' }"
+                :title="t('cellFormat.horizontalCenter')"
+                :aria-label="t('cellFormat.horizontalCenter')"
+                :aria-pressed="horizontal === 'center'"
+                @click="setHorizontal('center')"
+              >
+                <AlignCenter :size="14" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                class="cell-format-alignment__quick-btn"
+                :class="{ 'is-active': horizontal === 'right' }"
+                :title="t('cellFormat.horizontalRight')"
+                :aria-label="t('cellFormat.horizontalRight')"
+                :aria-pressed="horizontal === 'right'"
+                @click="setHorizontal('right')"
+              >
+                <AlignRight :size="14" aria-hidden="true" />
+              </button>
+              <span class="cell-format-alignment__quick-sep" aria-hidden="true" />
+              <button
+                type="button"
+                class="cell-format-alignment__quick-btn"
+                :class="{ 'is-active': vertical === 'top' }"
+                :title="t('cellFormat.verticalTop')"
+                :aria-label="t('cellFormat.verticalTop')"
+                :aria-pressed="vertical === 'top'"
+                @click="setVertical('top')"
+              >
+                <AlignStartHorizontal :size="14" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                class="cell-format-alignment__quick-btn"
+                :class="{ 'is-active': vertical === 'middle' }"
+                :title="t('cellFormat.verticalMiddle')"
+                :aria-label="t('cellFormat.verticalMiddle')"
+                :aria-pressed="vertical === 'middle'"
+                @click="setVertical('middle')"
+              >
+                <AlignCenterHorizontal :size="14" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                class="cell-format-alignment__quick-btn"
+                :class="{ 'is-active': vertical === 'bottom' }"
+                :title="t('cellFormat.verticalBottom')"
+                :aria-label="t('cellFormat.verticalBottom')"
+                :aria-pressed="vertical === 'bottom'"
+                @click="setVertical('bottom')"
+              >
+                <AlignEndHorizontal :size="14" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
           <div class="cell-format-alignment__fields">
             <label class="cell-format-alignment__field"
               ><span>{{ t("cellFormat.horizontal") }}</span
@@ -221,7 +352,8 @@ function checkboxPressed(
             </div>
           </div>
         </section>
-        <section class="cell-format-alignment__group">
+
+        <section class="cell-format-alignment__card">
           <h3>{{ t("cellFormat.textControl") }}</h3>
           <div
             class="cell-format-alignment__checks"
@@ -256,18 +388,25 @@ function checkboxPressed(
               >{{ t("cellFormat.mergeCells") }}</TCheckbox
             >
           </div>
-        </section>
-        <section class="cell-format-alignment__group">
-          <h3>{{ t("cellFormat.rightToLeft") }}</h3>
-          <label class="cell-format-alignment__field"
-            ><span>{{ t("cellFormat.textDirection") }}</span
-            ><TSelect
+          <label class="cell-format-alignment__direction-row">
+            <span>{{ t("cellFormat.textDirection") }}</span>
+            <TSelect
               :model-value="direction"
               :options="directionOptions"
               :placeholder="state.textDirection.mixed ? t('format.mixed') : undefined"
               data-cell-format-text-direction
               @change="setDirection"
-          /></label>
+            />
+          </label>
+        </section>
+
+        <section class="cell-format-alignment__preview-card" :aria-label="t('cellFormat.preview')">
+          <span class="cell-format-alignment__preview-label">{{ t("cellFormat.preview") }}</span>
+          <div class="cell-format-alignment__preview-cell" :style="previewCellStyle">
+            <span class="cell-format-alignment__preview-text" :style="previewTextStyle">{{
+              previewSampleText
+            }}</span>
+          </div>
         </section>
       </div>
       <CellFormatTextOrientationControl
@@ -281,23 +420,78 @@ function checkboxPressed(
 
 <style scoped lang="scss">
 .cell-format-alignment {
-  padding-inline: 2px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
   color: var(--sheetcraft-text-primary);
   font-size: var(--sheetcraft-font-size-body-medium);
+
   &__layout {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 156px;
-    gap: 18px;
+    flex: 1;
+    grid-template-columns: minmax(0, 1fr) 196px;
+    gap: 16px;
+    min-height: 0;
   }
   &__content {
-    display: grid;
-    gap: 14px;
-    align-content: start;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    min-height: 0;
   }
   &__group {
     display: grid;
-    gap: 6px;
+    gap: 8px;
     min-width: 0;
+  }
+  &__group-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  &__quick-bar {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 8px;
+    background: var(--sheetcraft-surface-dialog-card);
+  }
+  &__quick-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--sheetcraft-text-secondary);
+    cursor: pointer;
+    transition:
+      background-color 0.12s ease,
+      color 0.12s ease;
+
+    &:hover {
+      background: var(--sheetcraft-surface-menu-hover);
+      color: var(--sheetcraft-text-primary);
+    }
+
+    &.is-active {
+      background: var(--sheetcraft-surface-panel);
+      color: var(--sheetcraft-action-primary);
+      box-shadow: var(--sheetcraft-shadow-segmented-active);
+    }
+  }
+  &__quick-sep {
+    width: 1px;
+    height: 14px;
+    margin-inline: 2px;
+    background: var(--sheetcraft-border-divider);
   }
   h3 {
     margin: 0;
@@ -306,7 +500,7 @@ function checkboxPressed(
   }
   &__fields {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr)) 96px;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) 88px;
     gap: 10px;
   }
   &__field {
@@ -320,16 +514,69 @@ function checkboxPressed(
       color: var(--sheetcraft-text-secondary);
     }
   }
+  &__card {
+    display: grid;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
+  }
   &__checks {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px 12px;
+    gap: 8px 14px;
+  }
+  &__direction-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+
+    > span {
+      color: var(--sheetcraft-text-secondary);
+      white-space: nowrap;
+    }
+  }
+  &__preview-card {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 92px;
+    padding: 10px 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
+  }
+  &__preview-label {
+    color: var(--sheetcraft-text-muted);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
+  }
+  &__preview-cell {
+    display: flex;
+    flex: 1;
+    min-height: 54px;
+    padding-block: 6px;
+    overflow: hidden;
+    border: 1px solid var(--sheetcraft-border-divider);
+    border-radius: var(--sheetcraft-radius-floating-item);
+    background: var(--sheetcraft-surface-panel);
+  }
+  &__preview-text {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--sheetcraft-text-primary);
+    line-height: 1.35;
   }
 }
-@media (max-width: 520px) {
-  .cell-format-alignment__layout {
-    grid-template-columns: minmax(0, 1fr);
+@media (max-width: 560px) {
+  .cell-format-alignment {
+    height: auto;
+    &__layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 }
 </style>

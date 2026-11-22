@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, toRaw } from "vue";
+import { RotateCcw } from "lucide-vue-next";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { TabPanel, Tabs } from "tdesign-vue-next/es/tabs";
 import type {
@@ -19,6 +21,34 @@ import { rememberCustomNumberFormat } from "../number-format/custom-formats";
 import type { CellFormatBorderCapabilities } from "../border-capabilities";
 
 export type CellFormatTab = "number" | "alignment" | "font" | "border" | "fill";
+
+const ALIGNMENT_KEYS: readonly (keyof CellStylePatch)[] = [
+  "horizontalAlign",
+  "verticalAlign",
+  "indent",
+  "wrapText",
+  "shrinkToFit",
+  "textDirection",
+  "textRotation",
+];
+const FONT_KEYS: readonly (keyof CellStylePatch)[] = [
+  "fontFamily",
+  "fontSize",
+  "bold",
+  "italic",
+  "underline",
+  "strikethrough",
+  "textColor",
+  "textColorTheme",
+  "script",
+];
+const FILL_KEYS: readonly (keyof CellStylePatch)[] = [
+  "fillColor",
+  "fillColorTheme",
+  "fillPattern",
+  "fillPatternColor",
+  "fillGradient",
+];
 
 const props = withDefaults(
   defineProps<{
@@ -75,6 +105,11 @@ function onTabKeydown(event: KeyboardEvent): void {
     ?.focus();
 }
 function onDialogKeydown(event: KeyboardEvent): void {
+  if ((event.ctrlKey || event.metaKey) && event.key === "Enter" && numberFormatValid.value) {
+    event.preventDefault();
+    confirm();
+    return;
+  }
   if (event.key !== "Tab") return;
   const root = tabsRef.value?.$el.closest('[role="dialog"]');
   const controls = Array.from(
@@ -93,9 +128,12 @@ function onDialogKeydown(event: KeyboardEvent): void {
   }
 }
 
-const stylePatch = ref<CellStylePatch>(
-  JSON.parse(JSON.stringify(toRaw(props.initialStylePatch))) as CellStylePatch,
-);
+function cloneInitialStylePatch(): CellStylePatch {
+  return JSON.parse(JSON.stringify(toRaw(props.initialStylePatch))) as CellStylePatch;
+}
+
+const draftResetKey = ref(0);
+const stylePatch = ref<CellStylePatch>(cloneInitialStylePatch());
 const numberFormatValid = ref(true);
 const borderActions = ref<CellBorderAction[]>([]);
 const borderFormat = ref<CellBorderFormatPatch | undefined>();
@@ -103,6 +141,33 @@ const merge = ref<boolean | undefined>();
 const displayedMergeState = computed(() =>
   merge.value === undefined ? props.mergeState?.merged : merge.value ? "on" : "off",
 );
+
+function hasModifiedKey(keys: readonly (keyof CellStylePatch)[]): boolean {
+  return keys.some((key) => {
+    const current = stylePatch.value[key];
+    const initial = props.initialStylePatch[key];
+    return JSON.stringify(current) !== JSON.stringify(initial);
+  });
+}
+
+const modifiedTabs = computed<Record<CellFormatTab, boolean>>(() => ({
+  number: hasModifiedKey(["numberFormat"]),
+  alignment: hasModifiedKey(ALIGNMENT_KEYS) || merge.value !== undefined,
+  font: hasModifiedKey(FONT_KEYS),
+  border: borderActions.value.length > 0 || Boolean(borderFormat.value),
+  fill: hasModifiedKey(FILL_KEYS),
+}));
+
+const hasDraftChanges = computed(() => Object.values(modifiedTabs.value).some(Boolean));
+
+function resetDraft(): void {
+  stylePatch.value = cloneInitialStylePatch();
+  borderActions.value = [];
+  borderFormat.value = undefined;
+  merge.value = undefined;
+  numberFormatValid.value = true;
+  draftResetKey.value += 1;
+}
 
 function updateStyle(patch: CellStylePatch): void {
   stylePatch.value = { ...stylePatch.value, ...patch };
@@ -139,15 +204,10 @@ function confirm(): void {
     :visible="true"
     @keydown="onDialogKeydown"
     :header="t('cellFormat.title')"
-    :confirm-btn="{
-      content: t('cellFormat.confirm'),
-      disabled: !numberFormatValid,
-    }"
-    :cancel-btn="t('cellFormat.cancel')"
     :close-on-overlay-click="false"
     :destroy-on-close="true"
     :confirm-on-enter="false"
-    width="min(640px, calc(100vw - 32px))"
+    width="min(660px, calc(100vw - 32px))"
     placement="center"
     class="cell-format-dialog"
     @confirm="confirm"
@@ -175,9 +235,14 @@ function confirm(): void {
             :tabindex="activeTab === 'number' ? 0 : -1"
             @keydown="onTabKeydown"
           >
-            {{ t("cellFormat.number") }}
-          </button></template
+            <span>{{ t("cellFormat.number") }}</span>
+            <span
+              v-if="modifiedTabs.number"
+              class="cell-format-dialog__dot"
+              aria-hidden="true"
+            /></button></template
         ><CellFormatNumberPanel
+          :key="`number-${draftResetKey}`"
           :state="state"
           :patch="stylePatch"
           :sample-value="sampleValue"
@@ -195,9 +260,14 @@ function confirm(): void {
             :tabindex="activeTab === 'alignment' ? 0 : -1"
             @keydown="onTabKeydown"
           >
-            {{ t("cellFormat.alignment") }}
-          </button></template
+            <span>{{ t("cellFormat.alignment") }}</span>
+            <span
+              v-if="modifiedTabs.alignment"
+              class="cell-format-dialog__dot"
+              aria-hidden="true"
+            /></button></template
         ><CellFormatAlignmentPanel
+          :key="`alignment-${draftResetKey}`"
           :state="state"
           :patch="stylePatch"
           :sample-value="sampleValue"
@@ -216,9 +286,14 @@ function confirm(): void {
             :tabindex="activeTab === 'font' ? 0 : -1"
             @keydown="onTabKeydown"
           >
-            {{ t("cellFormat.font") }}
-          </button></template
+            <span>{{ t("cellFormat.font") }}</span>
+            <span
+              v-if="modifiedTabs.font"
+              class="cell-format-dialog__dot"
+              aria-hidden="true"
+            /></button></template
         ><FontFormatPanel
+          :key="`font-${draftResetKey}`"
           :state="state"
           :patch="stylePatch"
           :sample-value="sampleValue"
@@ -234,9 +309,14 @@ function confirm(): void {
             :tabindex="activeTab === 'border' ? 0 : -1"
             @keydown="onTabKeydown"
           >
-            {{ t("cellFormat.border") }}
-          </button></template
+            <span>{{ t("cellFormat.border") }}</span>
+            <span
+              v-if="modifiedTabs.border"
+              class="cell-format-dialog__dot"
+              aria-hidden="true"
+            /></button></template
         ><CellFormatBorderPanel
+          :key="`border-${draftResetKey}`"
           :state="borderState"
           :capabilities="borderCapabilities"
           :actions="borderActions"
@@ -254,15 +334,47 @@ function confirm(): void {
             :tabindex="activeTab === 'fill' ? 0 : -1"
             @keydown="onTabKeydown"
           >
-            {{ t("cellFormat.fill") }}
-          </button></template
+            <span>{{ t("cellFormat.fill") }}</span>
+            <span
+              v-if="modifiedTabs.fill"
+              class="cell-format-dialog__dot"
+              aria-hidden="true"
+            /></button></template
         ><CellFormatFillPanel
+          :key="`fill-${draftResetKey}`"
           :state="state"
           :patch="stylePatch"
           :sample-value="sampleValue"
           @update:patch="updateStyle"
       /></TabPanel>
     </Tabs>
+    <template #footer>
+      <div class="cell-format-dialog__footer">
+        <TButton
+          variant="text"
+          class="cell-format-dialog__reset"
+          :disabled="!hasDraftChanges"
+          data-cell-format-reset
+          @click="resetDraft"
+        >
+          <template #icon><RotateCcw :size="14" aria-hidden="true" /></template>
+          {{ t("cellFormat.resetChanges") }}
+        </TButton>
+        <div class="cell-format-dialog__footer-actions">
+          <TButton class="t-dialog__cancel" theme="default" @click="emit('cancel')">
+            {{ t("cellFormat.cancel") }}
+          </TButton>
+          <TButton
+            class="t-dialog__confirm"
+            theme="primary"
+            :disabled="!numberFormatValid"
+            @click="confirm"
+          >
+            {{ t("cellFormat.confirm") }}
+          </TButton>
+        </div>
+      </div>
+    </template>
   </Dialog>
 </template>
 
@@ -271,22 +383,38 @@ function confirm(): void {
 
 .cell-format-dialog__tab {
   @include tab-label.label;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
+
+.cell-format-dialog__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--sheetcraft-action-primary);
+}
+
 .cell-format-dialog__tabs {
   display: flex;
   flex-direction: column;
-  height: min(380px, calc(100dvh - 240px));
+  height: min(464px, calc(100dvh - 176px));
+}
 
-  &--number {
-    height: min(508px, calc(100dvh - 192px));
-  }
+.cell-format-dialog__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sheetcraft-space-4);
+}
 
-  &--alignment,
-  &--font,
-  &--border,
-  &--fill {
-    height: auto;
-    max-height: calc(100dvh - 192px);
-  }
+.cell-format-dialog__reset {
+  color: var(--sheetcraft-text-secondary);
+}
+
+.cell-format-dialog__footer-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sheetcraft-space-3);
 }
 </style>

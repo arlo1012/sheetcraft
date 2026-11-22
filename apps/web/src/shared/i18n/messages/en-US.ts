@@ -1733,6 +1733,9 @@ export const enUS = {
     borderPreview: "Border preview",
     borderLines: "Line",
     borderHint: "Use the presets, preview, or surrounding buttons to add or remove borders.",
+    resetChanges: "Reset changes",
+    quickAlignment: "Quick align",
+    quickAngle: "Quick angles",
   },
   colorPalette: {
     label: "Color picker",

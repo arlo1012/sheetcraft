@@ -87,7 +87,9 @@ function selectNegative(code: string): void {
       />
       <div class="cell-format-number__details">
         <div class="cell-format-number__preview">
-          <h3 class="cell-format-number__heading">{{ t("cellFormat.preview") }}</h3>
+          <div class="cell-format-number__preview-head">
+            <h3 class="cell-format-number__heading">{{ t("cellFormat.preview") }}</h3>
+          </div>
           <output
             class="cell-format-number__sample"
             :style="{ color: preview.color }"
@@ -102,50 +104,59 @@ function selectNegative(code: string): void {
             </template>
             <template v-else>{{ preview.text }}</template>
           </output>
+          <p class="cell-format-number__description">{{ description }}</p>
         </div>
         <div v-if="!mixed" class="cell-format-number__settings">
           <div
-            v-if="showDecimals"
-            class="cell-format-number__field"
-            role="group"
-            :aria-label="t('cellFormat.decimalPlaces')"
+            v-if="showDecimals || showCurrency || category === 'number'"
+            class="cell-format-number__inline-row"
           >
-            <span>{{ t("cellFormat.decimalPlaces") }}</span>
-            <TInputNumber
-              :model-value="fractionDigits"
-              :min="0"
-              :max="20"
-              :decimal-places="0"
-              :placeholder="t('cellFormat.decimalPlaces')"
-              theme="column"
-              class="cell-format-number__digits sheetcraft-input-number--persistent-controls"
-              data-cell-format-decimals
-              @change="updateDigits"
-            />
+            <div
+              v-if="showDecimals"
+              class="cell-format-number__field cell-format-number__field--digits"
+              role="group"
+              :aria-label="t('cellFormat.decimalPlaces')"
+            >
+              <span>{{ t("cellFormat.decimalPlaces") }}</span>
+              <TInputNumber
+                :model-value="fractionDigits"
+                :min="0"
+                :max="20"
+                :decimal-places="0"
+                :placeholder="t('cellFormat.decimalPlaces')"
+                theme="column"
+                class="cell-format-number__digits sheetcraft-input-number--persistent-controls"
+                data-cell-format-decimals
+                @change="updateDigits"
+              />
+            </div>
+            <label
+              v-if="showCurrency"
+              class="cell-format-number__field cell-format-number__field--currency"
+            >
+              <span>{{ t("cellFormat.currencyCode") }}</span>
+              <TSelect
+                :model-value="currency"
+                :options="currencyOptions"
+                filterable
+                :value-display="currencyDisplay"
+                :popup-props="{
+                  overlayClassName: 'sheetcraft-number-format-options',
+                  overlayInnerStyle: { maxHeight: '240px' },
+                }"
+                data-cell-format-currency
+                @change="updateCurrency"
+              />
+            </label>
+            <TCheckbox
+              v-if="category === 'number'"
+              :model-value="grouping"
+              class="cell-format-number__grouping"
+              data-cell-format-grouping
+              @change="updateGrouping"
+              >{{ t("cellFormat.grouping") }}</TCheckbox
+            >
           </div>
-          <label v-if="showCurrency" class="cell-format-number__field">
-            <span>{{ t("cellFormat.currencyCode") }}</span>
-            <TSelect
-              :model-value="currency"
-              :options="currencyOptions"
-              filterable
-              :value-display="currencyDisplay"
-              :popup-props="{
-                overlayClassName: 'sheetcraft-number-format-options',
-                overlayInnerStyle: { maxHeight: '240px' },
-              }"
-              data-cell-format-currency
-              @change="updateCurrency"
-            />
-          </label>
-          <TCheckbox
-            v-if="category === 'number'"
-            :model-value="grouping"
-            class="cell-format-number__grouping"
-            data-cell-format-grouping
-            @change="updateGrouping"
-            >{{ t("cellFormat.grouping") }}</TCheckbox
-          >
           <div v-if="showNegative" class="cell-format-number__negative">
             <span class="cell-format-number__label">{{ t("cellFormat.negativeNumbers") }}</span>
             <OptionList
@@ -160,14 +171,23 @@ function selectNegative(code: string): void {
           <div v-if="showTypes" class="cell-format-number__types">
             <span class="cell-format-number__label">{{ t("cellFormat.type") }}</span>
             <template v-if="category === 'custom'">
-              <TInput
-                :model-value="customCode"
-                :aria-label="t('cellFormat.customCode')"
-                :status="customValid ? 'default' : 'error'"
-                :maxlength="255"
-                data-cell-format-custom-code
-                @change="updateCustomCode"
-              />
+              <div class="cell-format-number__custom-row">
+                <TInput
+                  :model-value="customCode"
+                  :aria-label="t('cellFormat.customCode')"
+                  :status="customValid ? 'default' : 'error'"
+                  :maxlength="255"
+                  data-cell-format-custom-code
+                  @change="updateCustomCode"
+                />
+                <TButton
+                  variant="outline"
+                  :disabled="!canDeleteCustom"
+                  data-cell-format-delete-custom
+                  @click="deleteCustom"
+                  >{{ t("cellFormat.deleteFormat") }}</TButton
+                >
+              </div>
               <p v-if="!customValid" class="cell-format-number__error" role="alert">
                 {{ t("cellFormat.invalidFormat") }}
               </p>
@@ -196,27 +216,16 @@ function selectNegative(code: string): void {
               @change="updateRegion"
             />
           </label>
-          <div v-if="category === 'custom'" class="cell-format-number__custom-actions">
-            <TButton
-              variant="outline"
-              :disabled="!canDeleteCustom"
-              data-cell-format-delete-custom
-              @click="deleteCustom"
-              >{{ t("cellFormat.deleteFormat") }}</TButton
-            >
-          </div>
         </div>
       </div>
     </div>
-    <p class="cell-format-number__description">{{ description }}</p>
   </section>
 </template>
 
 <style scoped lang="scss">
 .cell-format-number {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
   box-sizing: border-box;
   height: 100%;
   min-height: 0;
@@ -226,7 +235,8 @@ function selectNegative(code: string): void {
 
   &__body {
     display: grid;
-    grid-template-columns: 144px minmax(0, 1fr);
+    flex: 1;
+    grid-template-columns: 136px minmax(0, 1fr);
     gap: 16px;
     min-height: 0;
   }
@@ -244,28 +254,34 @@ function selectNegative(code: string): void {
   }
   &__heading {
     margin: 0;
-    font-size: inherit;
-    font-weight: var(--sheetcraft-font-weight-semibold);
+    color: var(--sheetcraft-text-muted);
+    font-size: var(--sheetcraft-font-size-body-small);
+    font-weight: var(--sheetcraft-font-weight-medium);
+    line-height: var(--sheetcraft-line-height-body-small);
   }
   &__preview {
     display: grid;
-    grid-template-rows: auto 40px;
-    gap: 6px;
+    gap: 4px;
     flex: none;
+    padding: 10px 14px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
+  }
+  &__preview-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
   }
   &__sample {
     display: flex;
     align-items: center;
     min-width: 0;
+    min-height: 28px;
     overflow: auto;
-    padding: 8px 12px;
-    border: 0;
-    border-radius: var(--sheetcraft-radius-dialog-card);
     color: var(--sheetcraft-text-primary);
-    background: var(--sheetcraft-surface-dialog-card);
-    font-size: var(--sheetcraft-font-size-body-large);
-    font-weight: var(--sheetcraft-font-weight-regular);
-    line-height: var(--sheetcraft-line-height-body-large);
+    font-size: 16px;
+    font-weight: var(--sheetcraft-font-weight-medium);
+    line-height: 24px;
     font-variant-numeric: tabular-nums;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -277,6 +293,13 @@ function selectNegative(code: string): void {
     flex: 1;
     min-height: 0;
   }
+  &__inline-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px 14px;
+    flex: none;
+  }
   &__sample-fill {
     flex: 1 1 auto;
     min-width: 0;
@@ -285,52 +308,68 @@ function selectNegative(code: string): void {
   }
   &__field {
     display: grid;
-    grid-template-columns: max-content minmax(0, 1fr);
-    align-items: center;
-    gap: 8px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+    min-width: 0;
     flex: none;
 
     > span {
       color: var(--sheetcraft-text-secondary);
     }
+
+    &--digits {
+      width: 112px;
+    }
+
+    &--currency {
+      flex: 1 1 180px;
+    }
   }
   &__digits {
-    max-width: 144px;
+    width: 100%;
   }
   &__grouping {
-    align-self: start;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
     flex: none;
   }
   &__negative {
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
-    gap: 8px;
-    min-height: 0;
-    max-height: 154px;
-  }
-  &__types {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     flex: 1;
     min-height: 0;
+
     > .number-format-types {
       flex: 1;
     }
   }
+  &__types {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    min-height: 0;
+
+    > .number-format-types {
+      flex: 1;
+    }
+  }
+  &__custom-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+  }
   &__region {
     display: grid;
-    gap: 8px;
+    gap: 4px;
     flex: none;
 
     > .cell-format-number__label {
       font-weight: var(--sheetcraft-font-weight-regular);
     }
-  }
-  &__custom-actions {
-    display: flex;
-    justify-content: flex-end;
-    flex: none;
   }
   &__error {
     margin: 0;
@@ -339,8 +378,8 @@ function selectNegative(code: string): void {
     line-height: var(--sheetcraft-line-height-body-small);
   }
   &__description {
-    margin: 0;
-    color: var(--sheetcraft-text-secondary);
+    margin: 2px 0 0;
+    color: var(--sheetcraft-text-muted);
     font-size: var(--sheetcraft-font-size-body-small);
     line-height: var(--sheetcraft-line-height-body-small);
   }
@@ -348,7 +387,6 @@ function selectNegative(code: string): void {
 @media (max-width: 480px) {
   .cell-format-number {
     height: auto;
-    grid-template-rows: auto auto;
     &__body {
       grid-template-columns: minmax(0, 1fr);
     }
@@ -357,10 +395,6 @@ function selectNegative(code: string): void {
     }
     &__types {
       min-height: 180px;
-    }
-    &__field {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 8px;
     }
   }
 }

@@ -125,7 +125,7 @@ async function selectDraftReference(
     :confirm-on-enter="false"
     @close="emit('close')"
   >
-    <TTabs v-model="activeTab" class="validation-dialog">
+    <TTabs v-model="activeTab" class="validation-dialog sheetcraft-tabs--fixed-height">
       <TTabPanel value="settings" :label="t('dataTools.validation.settings')">
         <div class="validation-dialog__form">
           <div class="validation-dialog__field">
@@ -272,12 +272,11 @@ async function selectDraftReference(
 <style scoped lang="scss">
 .validation-dialog {
   min-width: 0;
+  height: min(268px, calc(100dvh - 220px));
 
   &__form {
     display: grid;
     padding-top: var(--sheetcraft-dialog-content-padding-block);
-    max-height: calc(100dvh - 240px);
-    overflow: auto;
     align-content: start;
     gap: var(--sheetcraft-space-4);
   }

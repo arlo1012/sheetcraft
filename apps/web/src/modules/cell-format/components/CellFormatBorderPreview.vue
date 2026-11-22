@@ -216,7 +216,7 @@ const { t } = useAppI18n();
 .cell-format-border-preview {
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr);
-  grid-template-rows: 176px 30px;
+  grid-template-rows: minmax(156px, 1fr) 30px;
   gap: 8px;
   padding: 10px;
   border: 0;

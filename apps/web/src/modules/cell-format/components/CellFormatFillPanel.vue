@@ -99,16 +99,18 @@ function setGradient(gradient: CellFillGradient): void {
   <section class="cell-format-fill" :aria-label="t('cellFormat.fill')">
     <div class="cell-format-fill__layout">
       <div class="cell-format-fill__background">
-        <span>{{ t("format.fillColor") }}</span>
-        <button
-          type="button"
-          class="cell-format-fill__no-fill"
-          data-cell-format-no-fill
-          :aria-pressed="noFill"
-          @click="clearFill"
-        >
-          {{ t("cellFormat.noFill") }}
-        </button>
+        <div class="cell-format-fill__header">
+          <h3>{{ t("format.fillColor") }}</h3>
+          <button
+            type="button"
+            class="cell-format-fill__no-fill"
+            data-cell-format-no-fill
+            :aria-pressed="noFill"
+            @click="clearFill"
+          >
+            {{ t("cellFormat.noFill") }}
+          </button>
+        </div>
         <div class="cell-format-fill__palette">
           <ColorPalette
             compact
@@ -131,45 +133,49 @@ function setGradient(gradient: CellFillGradient): void {
         </button>
       </div>
       <div class="cell-format-fill__pattern">
-        <div
-          class="cell-format-fill__field"
-          role="group"
-          :aria-label="t('cellFormat.patternStyle')"
-        >
-          <span>{{ t("cellFormat.patternStyle") }}</span>
-          <CellFormatPatternControl
-            :model-value="pattern"
-            :background-color="fill?.fillColor"
-            :pattern-color="fill?.fillPatternColor"
-            data-cell-format-pattern-style
-            @select="setPattern"
-          />
-        </div>
-        <div
-          class="cell-format-fill__field"
-          role="group"
-          :aria-label="t('cellFormat.patternColor')"
-        >
-          <span>{{ t("cellFormat.patternColor") }}</span>
-          <CellFormatColorControl
-            :model-value="fill?.fillPatternColor"
-            :label="t('cellFormat.patternColor')"
-            :disabled="!fill?.fillPattern && !isMixed('fillPattern')"
-            :mixed="isMixed('fillPatternColor')"
-            data-cell-format-pattern-color
-            @select="emit('update:patch', { fillPatternColor: $event ?? '#000000' })"
-          />
+        <div class="cell-format-fill__controls-card">
+          <div
+            class="cell-format-fill__field"
+            role="group"
+            :aria-label="t('cellFormat.patternStyle')"
+          >
+            <span>{{ t("cellFormat.patternStyle") }}</span>
+            <CellFormatPatternControl
+              :model-value="pattern"
+              :background-color="fill?.fillColor"
+              :pattern-color="fill?.fillPatternColor"
+              data-cell-format-pattern-style
+              @select="setPattern"
+            />
+          </div>
+          <div
+            class="cell-format-fill__field"
+            role="group"
+            :aria-label="t('cellFormat.patternColor')"
+          >
+            <span>{{ t("cellFormat.patternColor") }}</span>
+            <CellFormatColorControl
+              :model-value="fill?.fillPatternColor"
+              :label="t('cellFormat.patternColor')"
+              :disabled="!fill?.fillPattern && !isMixed('fillPattern')"
+              :mixed="isMixed('fillPatternColor')"
+              data-cell-format-pattern-color
+              @select="emit('update:patch', { fillPatternColor: $event ?? '#000000' })"
+            />
+          </div>
         </div>
         <div class="cell-format-fill__preview-group">
           <h3>{{ t("cellFormat.preview") }}</h3>
-          <div
-            class="cell-format-fill__preview"
-            :style="mixed ? {} : getCellFillStyle(fill)"
-            role="img"
-            :aria-label="mixed ? t('format.mixed') : t('cellFormat.preview')"
-            data-cell-format-fill-preview
-          >
-            <span v-if="mixed">{{ t("format.mixed") }}</span>
+          <div class="cell-format-fill__preview-stage">
+            <div
+              class="cell-format-fill__preview"
+              :style="mixed ? {} : getCellFillStyle(fill)"
+              role="img"
+              :aria-label="mixed ? t('format.mixed') : t('cellFormat.preview')"
+              data-cell-format-fill-preview
+            >
+              <span v-if="mixed">{{ t("format.mixed") }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -186,11 +192,14 @@ function setGradient(gradient: CellFillGradient): void {
 
 <style scoped lang="scss">
 .cell-format-fill {
-  display: grid;
-  gap: 4px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
   color: var(--sheetcraft-text-primary);
   font-size: var(--sheetcraft-font-size-body-medium);
   line-height: var(--sheetcraft-line-height-body-medium);
+
   h3 {
     margin: 0;
     font-size: inherit;
@@ -198,25 +207,29 @@ function setGradient(gradient: CellFillGradient): void {
   }
   &__layout {
     display: grid;
+    flex: 1;
     grid-template-columns: max-content minmax(0, 1fr);
     gap: 16px;
+    min-height: 0;
   }
   &__background {
-    display: grid;
-    align-content: start;
-    justify-items: start;
+    display: flex;
+    flex-direction: column;
     gap: 8px;
     min-width: 0;
     width: max-content;
     max-width: 100%;
-
-    > span {
-      color: var(--sheetcraft-text-secondary);
-    }
+  }
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
   }
   &__no-fill,
   &__effects {
-    height: 28px;
+    height: 26px;
     padding: 0 12px;
     border: 0;
     border-radius: var(--sheetcraft-radius-floating-item);
@@ -225,18 +238,23 @@ function setGradient(gradient: CellFillGradient): void {
     font: inherit;
     font-weight: var(--sheetcraft-font-weight-medium);
     cursor: pointer;
-    transition: background-color 0.12s ease;
+    transition:
+      background-color 0.12s ease,
+      color 0.12s ease;
 
     &:hover {
       background: var(--sheetcraft-surface-button-secondary-hover);
     }
   }
   &__no-fill {
-    width: 100%;
     &[aria-pressed="true"] {
       background: var(--sheetcraft-action-primary-subtle);
       color: var(--sheetcraft-action-primary);
     }
+  }
+  &__effects {
+    width: 100%;
+    height: 28px;
   }
   &__palette {
     max-width: 100%;
@@ -245,50 +263,66 @@ function setGradient(gradient: CellFillGradient): void {
     overflow: hidden;
   }
   &__pattern {
-    display: grid;
-    align-content: start;
-    gap: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
     min-width: 0;
+    min-height: 0;
+  }
+  &__controls-card {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
   }
   &__field {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: 56px minmax(0, 1fr);
     align-items: center;
     gap: 8px;
     min-width: 0;
 
     > span {
       color: var(--sheetcraft-text-secondary);
+      text-align: right;
     }
   }
   &__preview-group {
-    display: grid;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
     gap: 6px;
     min-width: 0;
-    margin-top: 6px;
+    min-height: 0;
+  }
+  &__preview-stage {
+    flex: 1;
+    min-height: 120px;
+    padding: 10px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
   }
   &__preview {
     display: grid;
     place-items: center;
-    height: 104px;
+    width: 100%;
+    height: 100%;
     min-width: 0;
     overflow: hidden;
     color: var(--sheetcraft-text-muted);
     background-color: var(--sheetcraft-surface-panel);
     border: 1px solid var(--sheetcraft-border-divider);
-    border-radius: var(--sheetcraft-radius-dialog-card);
+    border-radius: var(--sheetcraft-radius-floating-item);
   }
 }
 @media (max-width: 560px) {
   .cell-format-fill {
+    height: auto;
     &__layout {
       grid-template-columns: minmax(0, 1fr);
     }
     &__palette {
-      max-width: 100%;
-    }
-    &__no-fill {
-      width: 245px;
       max-width: 100%;
     }
   }

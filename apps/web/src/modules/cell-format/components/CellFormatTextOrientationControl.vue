@@ -15,6 +15,7 @@ const emit = defineEmits<{
 }>();
 const { t } = useAppI18n();
 const degrees = computed(() => (typeof props.modelValue === "number" ? props.modelValue : 0));
+const QUICK_ANGLES = [-45, 0, 45, 90] as const;
 let activePointer: number | undefined;
 
 function setDegrees(next: InputNumberValue): void {
@@ -120,6 +121,23 @@ function endDialDrag(event: PointerEvent): void {
       </div>
     </div>
     <div
+      class="cell-format-text-orientation__presets"
+      role="group"
+      :aria-label="t('cellFormat.quickAngle')"
+    >
+      <button
+        v-for="angle in QUICK_ANGLES"
+        :key="angle"
+        type="button"
+        class="cell-format-text-orientation__preset"
+        :class="{ 'is-active': !mixed && modelValue !== 'vertical' && degrees === angle }"
+        :aria-pressed="!mixed && modelValue !== 'vertical' && degrees === angle"
+        @click="setDegrees(angle)"
+      >
+        {{ angle }}°
+      </button>
+    </div>
+    <div
       class="cell-format-text-orientation__input"
       role="group"
       :aria-label="t('cellFormat.rotationDegrees')"
@@ -150,12 +168,15 @@ function endDialDrag(event: PointerEvent): void {
 
 <style scoped lang="scss">
 .cell-format-text-orientation {
-  display: grid;
-  align-self: start;
-  gap: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   min-width: 0;
+  height: 100%;
   margin: 0;
-  padding: 0;
+  padding: 12px;
+  border-radius: var(--sheetcraft-radius-dialog-card);
+  background: var(--sheetcraft-surface-dialog-card);
 
   > h3 {
     margin: 0;
@@ -165,9 +186,10 @@ function endDialDrag(event: PointerEvent): void {
 
   &__controls {
     display: grid;
-    grid-template-columns: 40px minmax(0, 1fr);
+    flex: 1;
+    grid-template-columns: 38px minmax(0, 1fr);
     gap: 8px;
-    height: 144px;
+    min-height: 148px;
   }
 
   &__vertical {
@@ -175,20 +197,24 @@ function endDialDrag(event: PointerEvent): void {
     place-items: center;
     min-width: 0;
     padding: 0;
-    border: 0;
+    border: 1px solid var(--sheetcraft-border-divider);
     border-radius: var(--sheetcraft-radius-floating-item);
-    background: var(--sheetcraft-surface-dialog-card);
+    background: var(--sheetcraft-surface-panel);
     color: var(--sheetcraft-text-primary);
     font: inherit;
     writing-mode: vertical-rl;
     text-orientation: upright;
     cursor: pointer;
-    transition: background-color 0.12s ease;
+    transition:
+      background-color 0.12s ease,
+      border-color 0.12s ease,
+      color 0.12s ease;
 
     &:hover {
       background: var(--sheetcraft-surface-button-secondary);
     }
     &.is-selected {
+      border-color: var(--sheetcraft-action-primary);
       color: var(--sheetcraft-action-primary);
       background: var(--sheetcraft-action-primary-subtle);
     }
@@ -198,9 +224,9 @@ function endDialDrag(event: PointerEvent): void {
     position: relative;
     min-width: 0;
     overflow: hidden;
-    border: 0;
-    border-radius: var(--sheetcraft-radius-dialog-card);
-    background: var(--sheetcraft-surface-dialog-card);
+    border: 1px solid var(--sheetcraft-border-divider);
+    border-radius: var(--sheetcraft-radius-floating-item);
+    background: var(--sheetcraft-surface-panel);
 
     svg {
       display: block;
@@ -223,6 +249,39 @@ function endDialDrag(event: PointerEvent): void {
     }
   }
 
+  &__presets {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  &__preset {
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: var(--sheetcraft-surface-panel);
+    color: var(--sheetcraft-text-secondary);
+    font: inherit;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition:
+      background-color 0.12s ease,
+      color 0.12s ease;
+
+    &:hover {
+      background: var(--sheetcraft-surface-button-secondary);
+      color: var(--sheetcraft-text-primary);
+    }
+
+    &.is-active {
+      background: var(--sheetcraft-action-primary-subtle);
+      color: var(--sheetcraft-action-primary);
+      font-weight: var(--sheetcraft-font-weight-semibold);
+    }
+  }
+
   &__pointer {
     text {
       font: inherit;
@@ -241,6 +300,10 @@ function endDialDrag(event: PointerEvent): void {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 8px;
+
+    > span {
+      color: var(--sheetcraft-text-secondary);
+    }
 
     > .cell-format-text-orientation__degrees {
       width: 100%;

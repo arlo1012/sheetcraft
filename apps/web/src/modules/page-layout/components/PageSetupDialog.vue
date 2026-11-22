@@ -134,7 +134,11 @@ watch(
     @close="close"
   >
     <div class="page-setup-dialog">
-      <TTabs :key="draftGeneration" v-model="activeTab" class="page-setup-dialog__tabs">
+      <TTabs
+        :key="draftGeneration"
+        v-model="activeTab"
+        class="page-setup-dialog__tabs sheetcraft-tabs--fixed-height"
+      >
         <TTabPanel value="page" :label="t('pageLayout.page')"
           ><PageSetupPagePanel v-model:setup="draft"
         /></TTabPanel>
@@ -173,6 +177,7 @@ watch(
   min-width: 0;
   &__tabs {
     min-width: 0;
+    height: min(392px, calc(100dvh - 210px));
   }
   &__error {
     margin: var(--sheetcraft-space-2) 0 0;

@@ -1692,6 +1692,9 @@ export const zhCN = {
     borderPreview: "边框预览",
     borderLines: "线条",
     borderHint: "点击预设、预览图或周围的按钮，可添加或移除边框。",
+    resetChanges: "重置更改",
+    quickAlignment: "快捷对齐",
+    quickAngle: "常用角度",
   },
   colorPalette: {
     label: "颜色选择",

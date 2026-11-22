@@ -1663,6 +1663,9 @@ export type MessageSchema = ToolMessageSchema & {
     borderPreview: string;
     borderLines: string;
     borderHint: string;
+    resetChanges: string;
+    quickAlignment: string;
+    quickAngle: string;
   };
   colorPalette: {
     label: string;
