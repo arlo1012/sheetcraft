@@ -218,27 +218,22 @@ function setGradient(gradient: CellFillGradient): void {
   &__effects {
     height: 28px;
     padding: 0 12px;
-    border: 1px solid var(--sheetcraft-border-subtle);
+    border: 0;
     border-radius: var(--sheetcraft-radius-floating-item);
-    background: var(--sheetcraft-surface-panel);
+    background: var(--sheetcraft-surface-button-secondary);
     color: inherit;
     font: inherit;
     font-weight: var(--sheetcraft-font-weight-medium);
-    box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
     cursor: pointer;
-    transition:
-      background-color 0.12s ease,
-      border-color 0.12s ease;
+    transition: background-color 0.12s ease;
 
     &:hover {
-      background: var(--sheetcraft-surface-dialog-card);
-      border-color: var(--sheetcraft-border-control);
+      background: var(--sheetcraft-surface-button-secondary-hover);
     }
   }
   &__no-fill {
     width: 100%;
     &[aria-pressed="true"] {
-      border-color: var(--sheetcraft-action-primary);
       background: var(--sheetcraft-action-primary-subtle);
       color: var(--sheetcraft-action-primary);
     }

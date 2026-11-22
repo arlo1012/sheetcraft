@@ -281,8 +281,7 @@ defineExpose({ focusQuery });
     align-items: center;
     flex-wrap: wrap;
     gap: var(--sheetcraft-space-3);
-    padding-top: 10px;
-    border-top: 1px solid var(--sheetcraft-border-divider);
+    padding-top: 6px;
   }
   &__status {
     margin: 0;

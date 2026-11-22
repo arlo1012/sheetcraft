@@ -417,6 +417,19 @@
   box-shadow: var(--sheetcraft-shadow-menu);
 }
 
+.t-checkbox .t-checkbox__input {
+  border-radius: 5px;
+}
+
+.t-checkbox:not(.t-is-checked):not(.t-is-indeterminate):not(.t-is-disabled) .t-checkbox__input {
+  border-color: var(--sheetcraft-border-input-hover);
+}
+
+.t-radio:not(.t-is-checked):not(.t-is-disabled) .t-radio__input {
+  border-color: var(--sheetcraft-border-input-hover);
+}
+
+// Seamless pure-white dialog surface inspired by Astryx, sized for dense spreadsheet work.
 .t-dialog__ctx .t-dialog:not(.t-dialog__fullscreen) {
   padding: 0;
   border: 1px solid var(--sheetcraft-border-dialog);
@@ -425,29 +438,30 @@
 }
 
 .t-dialog__ctx .t-dialog:not(.t-dialog__fullscreen) > .t-dialog__header {
-  padding: 11px var(--sheetcraft-dialog-padding-inline);
-  border-bottom: 1px solid var(--sheetcraft-border-divider);
+  padding: 15px var(--sheetcraft-dialog-padding-inline) 6px;
+  border-bottom: 0;
   border-radius: var(--sheetcraft-radius-dialog) var(--sheetcraft-radius-dialog) 0 0;
-  font-size: var(--sheetcraft-font-size-title-small);
-  line-height: var(--sheetcraft-line-height-title-small);
+  font-size: 15px;
+  line-height: 22px;
+  letter-spacing: -0.01em;
   font-weight: var(--sheetcraft-font-weight-semibold);
 }
 
 .t-dialog__ctx .t-dialog:not(.t-dialog__fullscreen) > .t-dialog__body {
-  padding: var(--sheetcraft-dialog-content-padding-block) var(--sheetcraft-dialog-padding-inline);
+  padding: 10px var(--sheetcraft-dialog-padding-inline) 14px;
 }
 
 // Dialogs without a footer retain a balanced bottom inset inside the frame.
 .t-dialog__ctx
   .t-dialog:not(.t-dialog__fullscreen):not(:has(> .t-dialog__footer))
   > .t-dialog__body {
-  padding-bottom: 14px;
+  padding-bottom: 16px;
 }
 
 .t-dialog__ctx .t-dialog:not(.t-dialog__fullscreen) > .t-dialog__footer {
-  padding: 10px var(--sheetcraft-dialog-padding-inline);
+  padding: 4px var(--sheetcraft-dialog-padding-inline) 16px;
   background: var(--sheetcraft-surface-dialog-footer);
-  border-top: 1px solid var(--sheetcraft-border-divider);
+  border-top: 0;
   border-radius: 0 0 var(--sheetcraft-radius-dialog) var(--sheetcraft-radius-dialog);
 }
 
@@ -456,60 +470,82 @@
   font-weight: var(--sheetcraft-font-weight-medium);
 }
 
-// Dialog secondary/outline buttons use a crisp bordered card look for clear action hierarchy.
+// Dialog secondary/outline buttons use borderless tonal fills for low visual noise.
 .t-dialog__ctx
   .t-dialog
   .t-button--theme-default:is(.t-button--variant-base, .t-button--variant-outline) {
-  background: var(--sheetcraft-surface-panel);
-  border-color: var(--sheetcraft-border-subtle);
+  background: var(--sheetcraft-surface-button-secondary);
+  border-color: transparent;
   color: var(--sheetcraft-text-primary);
-  box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
+  box-shadow: none;
 
   &:hover:not(.t-is-disabled):not(.t-is-loading) {
-    background: var(--sheetcraft-surface-dialog-card);
-    border-color: var(--sheetcraft-border-control);
+    background: var(--sheetcraft-surface-button-secondary-hover);
+    border-color: transparent;
   }
 
   &:active:not(.t-is-disabled):not(.t-is-loading) {
-    background: var(--sheetcraft-surface-active);
+    background: var(--sheetcraft-surface-button-secondary-active);
+    border-color: transparent;
   }
 
   &.t-is-disabled {
     background: var(--sheetcraft-surface-dialog-card);
-    border-color: var(--sheetcraft-border-divider);
+    border-color: transparent;
     color: var(--sheetcraft-text-disabled);
     box-shadow: none;
   }
 }
 
+.t-dialog__ctx .t-dialog .t-button--theme-danger.t-button--variant-base {
+  background: var(--sheetcraft-surface-button-danger);
+  border-color: transparent;
+  color: var(--sheetcraft-text-button-danger);
+
+  &:hover:not(.t-is-disabled):not(.t-is-loading) {
+    background: var(--sheetcraft-surface-button-danger-hover);
+    border-color: transparent;
+  }
+}
+
+.t-dialog__ctx .t-dialog .t-button--variant-text {
+  &:hover:not(.t-is-disabled):not(.t-is-loading) {
+    background: var(--sheetcraft-surface-menu-hover);
+  }
+}
+
 .t-dialog__ctx .t-dialog .t-input:not(.t-size-s),
 .t-dialog__ctx .t-dialog .t-textarea__inner {
-  border-radius: var(--sheetcraft-radius-medium);
+  border-radius: var(--sheetcraft-radius-floating-item);
+  border-color: var(--sheetcraft-border-input);
+  transition:
+    border-color 0.14s ease,
+    box-shadow 0.14s ease;
+
+  &:hover:not(.t-is-disabled):not(.t-is-focused) {
+    border-color: var(--sheetcraft-border-input-hover);
+  }
+}
+
+.t-dialog__ctx .t-dialog .t-input:not(.t-size-s).t-is-focused,
+.t-dialog__ctx .t-dialog .t-textarea__inner:focus {
+  border-color: var(--sheetcraft-action-primary);
+  box-shadow: 0 0 0 2px var(--sheetcraft-action-focus);
 }
 
 .t-dialog__ctx .t-dialog .t-form__label {
   color: var(--sheetcraft-text-secondary);
 }
 
-// Dialog horizontal navigation uses compact segmented pill tabs.
+// Dialog horizontal navigation uses lightweight underline tabs with low visual weight.
 .t-dialog__ctx .t-dialog .t-tabs:not(.t-tabs--card) {
   > .t-tabs__header .t-tabs__nav-container.t-is-top {
     &::after {
-      display: none;
-    }
-
-    .t-tabs__nav-scroll {
-      padding: 1px 0;
+      background-color: var(--sheetcraft-border-divider);
     }
 
     .t-tabs__nav-wrap {
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
-      padding: 3px;
-      border: 1px solid var(--sheetcraft-border-divider);
-      border-radius: 9px;
-      background: var(--sheetcraft-surface-dialog-card);
+      gap: 16px;
     }
 
     .t-tabs__bar.t-is-top {
@@ -517,27 +553,23 @@
     }
 
     .t-tabs__nav-item {
-      height: 26px;
-      line-height: 26px;
+      position: relative;
+      height: 30px;
+      line-height: 30px;
       padding: 0;
-      border-radius: 6px;
-      color: var(--sheetcraft-text-secondary);
+      color: var(--sheetcraft-text-muted);
       overflow: visible;
 
       .t-tabs__nav-item-wrapper {
-        height: 26px;
+        height: 28px;
         margin: 0;
-        padding: 0 12px;
+        padding: 0 2px;
         border-radius: 6px;
-        transition:
-          background-color 0.14s ease,
-          color 0.14s ease,
-          box-shadow 0.14s ease;
+        background: transparent;
+        transition: color 0.14s ease;
 
         &:has(:focus-visible) {
-          box-shadow:
-            var(--sheetcraft-shadow-segmented-active),
-            0 0 0 2px var(--sheetcraft-action-focus);
+          box-shadow: 0 0 0 2px var(--sheetcraft-action-focus);
         }
 
         button:focus-visible {
@@ -550,7 +582,7 @@
         color: var(--sheetcraft-text-primary);
 
         .t-tabs__nav-item-wrapper {
-          background-color: var(--sheetcraft-surface-menu-hover);
+          background-color: transparent;
         }
       }
 
@@ -559,9 +591,21 @@
         font-weight: var(--sheetcraft-font-weight-semibold);
         text-shadow: none;
 
+        &::after {
+          position: absolute;
+          right: 0;
+          bottom: 0;
+          left: 0;
+          z-index: 1;
+          display: block;
+          height: 2px;
+          border-radius: 2px 2px 0 0;
+          background-color: var(--sheetcraft-action-primary);
+          content: "";
+        }
+
         .t-tabs__nav-item-wrapper {
-          background-color: var(--sheetcraft-surface-panel);
-          box-shadow: var(--sheetcraft-shadow-segmented-active);
+          background-color: transparent;
         }
       }
     }
@@ -707,15 +751,14 @@
 
   .cell-format-dialog__tabs {
     box-sizing: border-box;
-    padding: var(--sheetcraft-dialog-content-padding-block) var(--sheetcraft-dialog-padding-inline)
-      0;
+    padding: 4px var(--sheetcraft-dialog-padding-inline) 0;
 
     > .t-tabs__header {
       flex: none;
     }
 
     > .t-tabs__content {
-      padding-block: var(--sheetcraft-dialog-content-padding-block);
+      padding: var(--sheetcraft-dialog-content-padding-block) 0 10px;
       flex: 1;
       min-height: 0;
       overflow: auto;

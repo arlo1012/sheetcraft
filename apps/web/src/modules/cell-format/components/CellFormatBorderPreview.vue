@@ -219,7 +219,7 @@ const { t } = useAppI18n();
   grid-template-rows: 176px 30px;
   gap: 8px;
   padding: 10px;
-  border: 1px solid var(--sheetcraft-border-divider);
+  border: 0;
   border-radius: var(--sheetcraft-radius-dialog-card);
   background: var(--sheetcraft-surface-dialog-card);
 
@@ -242,7 +242,7 @@ const { t } = useAppI18n();
       width: 30px;
       height: 30px;
       padding: 0;
-      border: 1px solid var(--sheetcraft-border-subtle);
+      border: 1px solid var(--sheetcraft-border-divider);
       border-radius: var(--sheetcraft-radius-floating-item);
       background: var(--sheetcraft-surface-panel);
       color: var(--sheetcraft-text-primary);
@@ -274,7 +274,7 @@ const { t } = useAppI18n();
     border: 1px solid var(--sheetcraft-border-divider);
     border-radius: var(--sheetcraft-radius-floating-item);
     background: var(--sheetcraft-surface-panel);
-    box-shadow: 0 1px 3px rgb(15 23 42 / 4%);
+    box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
 
     > svg {
       position: absolute;

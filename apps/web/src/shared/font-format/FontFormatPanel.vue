@@ -312,7 +312,7 @@ const previewText = computed(() =>
     height: 72px;
     overflow: hidden;
     padding: 12px 10px;
-    border: 1px solid var(--sheetcraft-border-divider);
+    border: 0;
     border-radius: var(--sheetcraft-radius-dialog-card);
     background: var(--sheetcraft-surface-dialog-card);
     line-height: normal;

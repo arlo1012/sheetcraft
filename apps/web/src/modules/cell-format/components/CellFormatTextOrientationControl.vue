@@ -175,7 +175,7 @@ function endDialDrag(event: PointerEvent): void {
     place-items: center;
     min-width: 0;
     padding: 0;
-    border: 1px solid var(--sheetcraft-border-divider);
+    border: 0;
     border-radius: var(--sheetcraft-radius-floating-item);
     background: var(--sheetcraft-surface-dialog-card);
     color: var(--sheetcraft-text-primary);
@@ -183,17 +183,13 @@ function endDialDrag(event: PointerEvent): void {
     writing-mode: vertical-rl;
     text-orientation: upright;
     cursor: pointer;
-    transition:
-      background-color 0.12s ease,
-      border-color 0.12s ease;
+    transition: background-color 0.12s ease;
 
     &:hover {
-      background: var(--sheetcraft-surface-menu-hover);
-      border-color: var(--sheetcraft-border-subtle);
+      background: var(--sheetcraft-surface-button-secondary);
     }
     &.is-selected {
       color: var(--sheetcraft-action-primary);
-      border-color: var(--sheetcraft-action-primary);
       background: var(--sheetcraft-action-primary-subtle);
     }
   }
@@ -202,7 +198,7 @@ function endDialDrag(event: PointerEvent): void {
     position: relative;
     min-width: 0;
     overflow: hidden;
-    border: 1px solid var(--sheetcraft-border-divider);
+    border: 0;
     border-radius: var(--sheetcraft-radius-dialog-card);
     background: var(--sheetcraft-surface-dialog-card);
 

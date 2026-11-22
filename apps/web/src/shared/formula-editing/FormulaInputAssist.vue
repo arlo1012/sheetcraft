@@ -370,7 +370,7 @@ defineExpose<
   max-height: min(360px, calc(100vh - 40px));
   padding: var(--sheetcraft-menu-inset);
   background: var(--sheetcraft-surface-panel);
-  border-color: var(--sheetcraft-border-floating);
+  border: 1px solid var(--sheetcraft-border-floating);
   border-radius: var(--sheetcraft-radius-floating);
   box-shadow: var(--sheetcraft-shadow-menu);
 

@@ -403,18 +403,19 @@ function getPanelAttach(): HTMLElement {
   &__actions button {
     width: 100%;
     min-height: 28px;
-    border: 1px solid var(--sheetcraft-border-control);
+    border: 0;
     border-radius: var(--sheetcraft-radius-floating-item);
-    background: var(--sheetcraft-surface-panel);
+    background: var(--sheetcraft-surface-button-secondary);
     color: inherit;
     font: inherit;
+    font-weight: var(--sheetcraft-font-weight-medium);
     font-size: var(--sheetcraft-font-size-body-medium);
     line-height: var(--sheetcraft-line-height-body-medium);
     cursor: pointer;
     transition: background-color 0.12s ease;
 
     &:hover {
-      background: var(--sheetcraft-surface-menu-hover);
+      background: var(--sheetcraft-surface-button-secondary-hover);
     }
   }
 
@@ -466,9 +467,14 @@ function getPanelAttach(): HTMLElement {
     justify-content: space-between;
     gap: 8px;
     margin-top: 9px;
-    border-width: 0;
+    padding-inline: 8px;
+    background: transparent;
     text-align: left;
     color: var(--sheetcraft-text-primary);
+
+    &:hover {
+      background: var(--sheetcraft-surface-menu-hover);
+    }
   }
   &__clear {
     margin-top: 8px;

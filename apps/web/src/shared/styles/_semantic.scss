@@ -22,8 +22,14 @@
     --sheetcraft-formula-reference-7: #6c7b1a;
     --sheetcraft-surface-canvas: var(--sheetcraft-palette-neutral-1);
     --sheetcraft-surface-panel: #fff;
-    --sheetcraft-surface-dialog-footer: #f8f9fb;
-    --sheetcraft-surface-dialog-card: #f6f7f9;
+    --sheetcraft-surface-dialog-footer: transparent;
+    --sheetcraft-surface-dialog-card: #f5f6f8;
+    --sheetcraft-surface-button-secondary: #edeff2;
+    --sheetcraft-surface-button-secondary-hover: #e3e6eb;
+    --sheetcraft-surface-button-secondary-active: #d8dce3;
+    --sheetcraft-surface-button-danger: #fce2df;
+    --sheetcraft-surface-button-danger-hover: #f8cec9;
+    --sheetcraft-text-button-danger: #9e1f1c;
     --sheetcraft-eye-comfort-surface: #e8f1e3;
     --sheetcraft-eye-comfort-header: #dce8d7;
     --sheetcraft-eye-comfort-gridline: #c4d1be;
@@ -51,22 +57,24 @@
     --sheetcraft-text-link: var(--sheetcraft-palette-brand-8);
     --sheetcraft-border-subtle: var(--sheetcraft-palette-neutral-4);
     --sheetcraft-border-divider: rgb(15 23 42 / 7%);
-    --sheetcraft-border-floating: rgb(15 23 42 / 9%);
-    --sheetcraft-border-dialog: rgb(15 23 42 / 8%);
+    --sheetcraft-border-input: #dfe2e8;
+    --sheetcraft-border-input-hover: #c5cbd6;
+    --sheetcraft-border-floating: rgb(15 23 42 / 6%);
+    --sheetcraft-border-dialog: rgb(15 23 42 / 6%);
     --sheetcraft-border-control: var(--sheetcraft-palette-neutral-6);
     --sheetcraft-border-strong: var(--sheetcraft-palette-neutral-4);
     --sheetcraft-shadow-segmented-active:
       0 1px 3px rgb(15 23 42 / 10%), 0 0 0 1px rgb(15 23 42 / 4%);
     --sheetcraft-shadow-menu:
-      0 12px 32px -4px rgb(15 23 42 / 12%), 0 4px 10px -2px rgb(15 23 42 / 6%);
+      0 12px 32px -4px rgb(15 23 42 / 10%), 0 3px 10px -2px rgb(15 23 42 / 5%);
     --sheetcraft-shadow-floating:
-      0 16px 40px -6px rgb(15 23 42 / 14%), 0 6px 14px -3px rgb(15 23 42 / 7%);
-    --sheetcraft-mask-active: rgb(15 23 42 / 36%);
+      0 16px 40px -6px rgb(15 23 42 / 12%), 0 5px 14px -3px rgb(15 23 42 / 6%);
+    --sheetcraft-mask-active: rgb(15 23 42 / 34%);
     --sheetcraft-mask-disabled: rgb(255 255 255 / 60%);
     --sheetcraft-shadow-raised:
       0 1px 10px rgb(0 0 0 / 5%), 0 4px 5px rgb(0 0 0 / 8%), 0 2px 4px -1px rgb(0 0 0 / 12%);
     --sheetcraft-shadow-dialog:
-      0 24px 56px -12px rgb(15 23 42 / 18%), 0 10px 24px -6px rgb(15 23 42 / 10%);
+      0 24px 56px -12px rgb(15 23 42 / 16%), 0 8px 22px -6px rgb(15 23 42 / 8%);
     --sheetcraft-shadow-inset: #e7eaef;
     --sheetcraft-table-shadow: rgb(0 0 0 / 8%);
     --sheetcraft-scrollbar-thumb: rgb(0 0 0 / 10%);
@@ -101,8 +109,14 @@
     --sheetcraft-formula-reference-7: #c4d96a;
     --sheetcraft-surface-canvas: var(--sheetcraft-palette-neutral-14);
     --sheetcraft-surface-panel: var(--sheetcraft-palette-neutral-13);
-    --sheetcraft-surface-dialog-footer: #1d2025;
+    --sheetcraft-surface-dialog-footer: transparent;
     --sheetcraft-surface-dialog-card: #282c34;
+    --sheetcraft-surface-button-secondary: #30353e;
+    --sheetcraft-surface-button-secondary-hover: #3a404b;
+    --sheetcraft-surface-button-secondary-active: #454c59;
+    --sheetcraft-surface-button-danger: #4f2528;
+    --sheetcraft-surface-button-danger-hover: #632c30;
+    --sheetcraft-text-button-danger: #ffb4ae;
     --sheetcraft-eye-comfort-surface: #26332b;
     --sheetcraft-eye-comfort-header: #212b25;
     --sheetcraft-eye-comfort-gridline: #3c5041;
@@ -130,8 +144,10 @@
     --sheetcraft-text-link: var(--sheetcraft-palette-brand-8);
     --sheetcraft-border-subtle: var(--sheetcraft-palette-neutral-11);
     --sheetcraft-border-divider: rgb(255 255 255 / 9%);
-    --sheetcraft-border-floating: rgb(255 255 255 / 12%);
-    --sheetcraft-border-dialog: rgb(255 255 255 / 12%);
+    --sheetcraft-border-input: #434952;
+    --sheetcraft-border-input-hover: #5b6370;
+    --sheetcraft-border-floating: rgb(255 255 255 / 10%);
+    --sheetcraft-border-dialog: rgb(255 255 255 / 10%);
     --sheetcraft-border-control: var(--sheetcraft-palette-neutral-9);
     --sheetcraft-border-strong: var(--sheetcraft-palette-neutral-9);
     --sheetcraft-shadow-segmented-active:

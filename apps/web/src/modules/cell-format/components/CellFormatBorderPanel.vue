@@ -331,7 +331,7 @@ const previewState = computed<SelectionBorderState>(() => ({
   }
   &__style-list {
     padding: 6px;
-    border: 1px solid var(--sheetcraft-border-divider);
+    border: 0;
     border-radius: var(--sheetcraft-radius-dialog-card);
     background: var(--sheetcraft-surface-dialog-card);
   }
@@ -343,8 +343,8 @@ const previewState = computed<SelectionBorderState>(() => ({
     height: 28px;
     padding: 0 8px;
     overflow: hidden;
-    border: 1px solid var(--sheetcraft-border-divider);
-    border-radius: var(--sheetcraft-radius-medium);
+    border: 0;
+    border-radius: var(--sheetcraft-radius-floating-item);
     background: var(--sheetcraft-surface-dialog-card);
     color: inherit;
     font: inherit;
@@ -367,7 +367,7 @@ const previewState = computed<SelectionBorderState>(() => ({
       gap: 4px;
       min-width: 0;
       padding: 8px 4px 6px;
-      border: 1px solid var(--sheetcraft-border-divider);
+      border: 0;
       border-radius: var(--sheetcraft-radius-dialog-card);
       background: var(--sheetcraft-surface-dialog-card);
       color: var(--sheetcraft-text-secondary);
@@ -376,19 +376,15 @@ const previewState = computed<SelectionBorderState>(() => ({
       cursor: pointer;
       transition:
         background-color 0.14s ease,
-        border-color 0.14s ease,
-        color 0.14s ease,
-        box-shadow 0.14s ease;
+        color 0.14s ease;
 
       &:hover:not(:disabled) {
-        background: var(--sheetcraft-surface-panel);
-        border-color: var(--sheetcraft-border-subtle);
+        background: var(--sheetcraft-surface-button-secondary);
         color: var(--sheetcraft-text-primary);
-        box-shadow: 0 1px 3px rgb(15 23 42 / 6%);
       }
 
       &:active:not(:disabled) {
-        background: var(--sheetcraft-surface-active);
+        background: var(--sheetcraft-surface-button-secondary-hover);
       }
 
       &:disabled {

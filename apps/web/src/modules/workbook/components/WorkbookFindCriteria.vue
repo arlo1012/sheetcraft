@@ -230,7 +230,7 @@ defineExpose({ focusQuery });
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--sheetcraft-space-3);
     padding: 10px 12px;
-    border: 1px solid var(--sheetcraft-border-divider);
+    border: 0;
     border-radius: var(--sheetcraft-radius-dialog-card);
     background: var(--sheetcraft-surface-dialog-card);
     min-width: 0;

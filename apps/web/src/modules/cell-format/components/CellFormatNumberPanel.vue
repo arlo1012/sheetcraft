@@ -259,7 +259,7 @@ function selectNegative(code: string): void {
     min-width: 0;
     overflow: auto;
     padding: 8px 12px;
-    border: 1px solid var(--sheetcraft-border-divider);
+    border: 0;
     border-radius: var(--sheetcraft-radius-dialog-card);
     color: var(--sheetcraft-text-primary);
     background: var(--sheetcraft-surface-dialog-card);
