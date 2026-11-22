@@ -42,7 +42,7 @@ type FloatingImageContextMenuOptions = {
   onSelect: (id: string) => void;
   onSourceAction: (
     action: PictureContextSourceAction,
-    ids: readonly string[],
+    ids: string[],
     owner: object | undefined,
   ) => void;
   onConvertToCell: (id: string) => void;

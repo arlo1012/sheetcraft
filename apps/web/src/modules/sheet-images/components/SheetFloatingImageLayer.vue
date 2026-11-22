@@ -30,10 +30,7 @@ import {
   type FloatingImageResizeDirection,
   type FloatingImageViewportFragment,
 } from "@sheetcraft/sheet-engine/floating-image-layout";
-import {
-  adjustImageCropSelection,
-  type ImageCropGesture,
-} from "@sheetcraft/sheet-engine/image-crop-selection";
+import type { ImageCropGesture } from "@sheetcraft/sheet-engine/image-crop-selection";
 import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import type { Point } from "@sheetcraft/sheet-engine/geometry";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";

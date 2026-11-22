@@ -25,10 +25,10 @@ type ImageLayerSurfaceTarget = {
 };
 
 type HeaderInputController = {
-  onPointerDown: (point: Point, event: PointerEvent, element: HTMLElement) => boolean;
-  onPointerMove: (point: Point) => void;
+  onPointerDown: (point: Point, event: PointerEvent, element: HTMLElement) => unknown;
+  onPointerMove: (point: Point) => unknown;
   onPointerLeave: () => void;
-  onContextMenu: (point: Point, event: MouseEvent, element: HTMLElement) => boolean;
+  onContextMenu: (point: Point, event: MouseEvent, element: HTMLElement) => unknown;
   onKeyDown: (event: KeyboardEvent, element: HTMLElement) => boolean;
   focus: (target: undefined) => void;
 };
@@ -84,6 +84,7 @@ type SheetGridSurfaceInteractionOptions = {
   cancelTransparentColor: () => void;
   isPictureCropActive: () => boolean;
   finishPictureCrop: () => boolean;
+  notePreviewRefs: Ref<(InstanceType<typeof SheetNotePreviewType> | null)[]>;
 };
 
 /** Owns canvas pointer/hover/hyperlink/note-preview interactions and outside-click dismissal for SheetGrid. */
@@ -376,7 +377,7 @@ export function useSheetGridSurfaceInteraction(options: SheetGridSurfaceInteract
     });
   });
 
-  const notePreviewRefs = ref<(InstanceType<typeof SheetNotePreviewType> | null)[]>([]);
+  const { notePreviewRefs } = options;
 
   function onDocumentPointerDown(event: PointerEvent): void {
     if (
@@ -427,7 +428,6 @@ export function useSheetGridSurfaceInteraction(options: SheetGridSurfaceInteract
     onSurfaceDoubleClick,
     onSurfaceKeydown,
     visibleNotes,
-    notePreviewRefs,
     onDocumentPointerDown,
   };
 }

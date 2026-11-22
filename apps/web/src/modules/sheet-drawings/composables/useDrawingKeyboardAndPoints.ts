@@ -87,9 +87,12 @@ type DrawingKeyboardAndPointsOptions<TFragment extends KeyboardAndPointsFragment
     key: string,
   ) => void;
   commitUpdate: (next: SheetDrawing, owner: SheetDrawing) => boolean;
-  moveView: (drawing: SheetDrawing, delta: { x: number; y: number }) => SheetDrawing | undefined;
-  rotateRootSelection: (degrees: number) => readonly SourceSheetDrawing[] | undefined;
-  runSelectionPlan: (plan: () => readonly SourceSheetDrawing[] | undefined) => boolean;
+  moveView: (
+    drawing: SheetDrawing,
+    delta: { x: number; y: number },
+  ) => SheetDrawing | null | undefined;
+  rotateRootSelection: (degrees: number) => readonly SourceSheetDrawing[];
+  runSelectionPlan: (plan: () => readonly SourceSheetDrawing[]) => boolean;
   deleteSelected: () => void;
   formatConnector: (drawing: SheetDrawing) => boolean;
   beginCanvasText: (drawing: SheetDrawing, selection: "all" | "end", text?: string) => boolean;
@@ -98,7 +101,7 @@ type DrawingKeyboardAndPointsOptions<TFragment extends KeyboardAndPointsFragment
     fragment: TFragment,
     event: PointerEvent,
     resize?: FloatingImageResizeDirection,
-    mode?: "move" | "resize" | "rotate" | "adjust" | "text-warp-adjust" | "endpoint" | "point",
+    mode?: "move" | "rotate" | "adjust" | "text-warp-adjust" | "endpoint" | "point",
     index?: number,
     point?: FreeShapePointDescriptor,
   ) => void;

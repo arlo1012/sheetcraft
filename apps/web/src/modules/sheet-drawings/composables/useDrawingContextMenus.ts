@@ -1,9 +1,11 @@
-import { computed, nextTick, ref, shallowRef, watch, type ComputedRef, type Ref } from "vue";
+import { computed, nextTick, shallowRef, watch, type ComputedRef, type Ref } from "vue";
 import type { PictureSheetMetrics } from "@sheetcraft/core/picture-axis-metrics";
 import type { ShapeGroupDrawing, ShapeGroupPath } from "@sheetcraft/core/shape-group";
 import { canEditShapeObject } from "@sheetcraft/core/shape-protection";
 import type {
   SheetDrawing as SourceSheetDrawing,
+  SheetFramedGraphicDrawing,
+  SheetGraphicDrawing,
   SheetLegacyDrawing as SheetDrawing,
 } from "@sheetcraft/core/sheet-drawings";
 import type { Sheet } from "@sheetcraft/core/workbook";
@@ -47,6 +49,7 @@ type DrawingContextMenusOptions<TFragment extends DrawingContextMenuFragment> = 
   selectionFailure: Ref<boolean>;
   pointEditingId: Ref<string | null>;
   activeVertex: Ref<number>;
+  shapeTextMenuSurface: Ref<InstanceType<typeof MenuSurface> | null>;
   legacyDrawings: ComputedRef<readonly SheetDrawing[]>;
   getCopyObjects: () => ((paths: readonly ShapeGroupPath[]) => boolean) | undefined;
   getCutObjects: () => ((paths: readonly ShapeGroupPath[]) => boolean) | undefined;
@@ -70,7 +73,7 @@ type DrawingContextMenusOptions<TFragment extends DrawingContextMenuFragment> = 
   pointContext: (fragment: TFragment, event: MouseEvent) => void;
   onEdit: (drawing: SourceSheetDrawing) => void;
   onEditOwned: (root: ShapeGroupDrawing, path: ShapeGroupPath) => void;
-  onFormat: (drawing: Extract<SourceSheetDrawing, { kind: "shape" | "textBox" }>) => void;
+  onFormat: (drawing: SheetGraphicDrawing | SheetFramedGraphicDrawing) => void;
   onFormatGroup: (root: ShapeGroupDrawing, path: ShapeGroupPath) => void;
   onSelect: () => void;
 };
@@ -82,7 +85,7 @@ export function useDrawingContextMenus<TFragment extends DrawingContextMenuFragm
   const shapeTextMenu = shallowRef<ShapeTextContextMenuState>();
   const shapeTextMenuAnchor = shallowRef<FloatingReference | null>(null);
   const shapeTextMenuTrigger = shallowRef<HTMLElement | null>(null);
-  const shapeTextMenuSurface = ref<InstanceType<typeof MenuSurface> | null>(null);
+  const { shapeTextMenuSurface } = options;
   const { floatingStyles: shapeTextMenuStyles, dismiss: dismissShapeTextMenu } = useContextMenu({
     anchor: shapeTextMenuAnchor,
     panelRef: computed(() => shapeTextMenuSurface.value?.rootElement ?? null),
@@ -381,7 +384,6 @@ export function useDrawingContextMenus<TFragment extends DrawingContextMenuFragm
 
   return {
     shapeTextMenu,
-    shapeTextMenuSurface,
     shapeTextMenuStyles,
     dismissShapeTextMenu,
     groupClipboardContext,

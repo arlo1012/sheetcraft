@@ -3,15 +3,16 @@ import {
   isFramedPictureObject,
   type StandalonePictureObject as FloatingImage,
 } from "@sheetcraft/core/picture-object";
-import type { FloatingImage as PictureObject } from "@sheetcraft/core/workbook";
+import type {
+  FloatingImage as PictureObject,
+  ImageCrop,
+  LegacyFloatingImage,
+} from "@sheetcraft/core/workbook";
 import {
   getFloatingImageSheetRect,
   reanchorFloatingImageAtSheetRect,
 } from "@sheetcraft/sheet-engine/floating-image-layout";
-import {
-  adjustImageCropSelection,
-  type ImageCropSelection,
-} from "@sheetcraft/sheet-engine/image-crop-selection";
+import { adjustImageCropSelection } from "@sheetcraft/sheet-engine/image-crop-selection";
 import type { PictureFrameLayoutContext } from "@sheetcraft/sheet-engine/picture-frame-layout";
 import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layout";
 import { requireStandalonePictures } from "../picture-document-support";
@@ -20,8 +21,8 @@ import { movePictureRootSelectionBy } from "../picture-root-selection-planning";
 import type { PictureAlignment, PictureAlignmentReference } from "../usePictureTools";
 
 type CropState = {
-  image: FloatingImage;
-  selection: ImageCropSelection;
+  image: LegacyFloatingImage;
+  selection: ImageCrop;
 };
 
 type FloatingImageArrangementAndKeysOptions<TCrop extends CropState> = {

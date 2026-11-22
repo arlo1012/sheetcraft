@@ -114,8 +114,6 @@ import { restoreFocusAfterRemount } from "../../../shared/floating/useDismissibl
 import {
   MAX_COLUMN_WIDTH,
   MAX_ROW_HEIGHT,
-  MAX_SHEET_COLUMNS,
-  MAX_SHEET_ROWS,
   MIN_COLUMN_WIDTH,
   MIN_ROW_HEIGHT,
   createSheetEvaluator,
@@ -1593,6 +1591,7 @@ const overlayState = computed<SheetOverlayState>(() => {
     },
   };
 });
+const notePreviewRefs = ref<(InstanceType<typeof SheetNotePreviewType> | null)[]>([]);
 const {
   hoveredHyperlink,
   surfaceCursor,
@@ -1608,7 +1607,6 @@ const {
   onSurfaceDoubleClick,
   onSurfaceKeydown,
   visibleNotes,
-  notePreviewRefs,
   onDocumentPointerDown,
 } = useSheetGridSurfaceInteraction({
   getSheet: () => props.sheet,
@@ -1655,6 +1653,7 @@ const {
   cancelTransparentColor: () => pictureTransparentColor.cancel(),
   isPictureCropActive: () => pictureCrop.active.value,
   finishPictureCrop: () => finishPictureCrop(),
+  notePreviewRefs,
 });
 
 const activeCellRect = computed(
@@ -2004,7 +2003,7 @@ const {
   selectedImageIds,
   selectedOwnedPicturePath,
   getActiveCell: () => activeCell.value,
-  setActiveCell: (address, restoreFocus) => setActiveCell(address, restoreFocus),
+  setActiveCell: (address) => setActiveCell(address),
   isEditing: () => isEditing.value,
   isComposing: () => isComposing.value,
   isReadOnly: () => Boolean(props.readOnly),
@@ -2013,8 +2012,7 @@ const {
   isPictureLayerReadOnly: () => pictureLayerReadOnly.value,
   isPictureCropActive: () => pictureCrop.active.value,
   finishPictureCrop,
-  finishEdit: (destination, restoreFocus, finishOptions) =>
-    finishEdit(destination, restoreFocus, finishOptions),
+  finishEdit: (destination, restoreFocus) => finishEdit(destination, restoreFocus),
   stopDragSelection,
   clearContextMenus: () => {
     axisContextMenu.value = undefined;
@@ -2064,11 +2062,10 @@ const {
   floatingClipboard,
   ownedClipboard,
   clearPendingClipboard,
-  setActiveCell: (address, restoreFocus) => setActiveCell(address, restoreFocus),
+  setActiveCell: (address) => setActiveCell(address),
   pasteSelection,
   pasteCapturedText,
-  finishEdit: (destination, restoreFocus, finishOptions) =>
-    finishEdit(destination, restoreFocus, finishOptions),
+  finishEdit: (destination, restoreFocus) => finishEdit(destination, restoreFocus),
   onEditorInput,
   focusEditor,
   onPasteImageFile: (file, mode, address) => emit("pasteImageFile", file, mode, address),
