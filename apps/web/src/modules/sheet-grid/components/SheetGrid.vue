@@ -43,7 +43,7 @@ import type {
   SheetGraphicDrawing,
   SheetFramedGraphicDrawing,
 } from "@sheetcraft/core/sheet-drawings";
-import { canEditCell, canEditRange, canSelectCell, canUseSheetPermission } from "@sheetcraft/core";
+import { canEditCell, canEditRange, canUseSheetPermission } from "@sheetcraft/core";
 import {
   computed,
   defineAsyncComponent,
@@ -96,6 +96,7 @@ import { useSheetGridPictureSelection } from "../useSheetGridPictureSelection";
 import { useSheetGridPictureEditing } from "../composables/useSheetGridPictureEditing";
 import { useSheetGridImagePreview } from "../composables/useSheetGridImagePreview";
 import { useSheetGridSurfaceInteraction } from "../composables/useSheetGridSurfaceInteraction";
+import { useSheetGridSelectionAndNavigation } from "../composables/useSheetGridSelectionAndNavigation";
 import {
   useSheetGridContextMenus,
   type AxisContextMenuState,
@@ -141,12 +142,10 @@ import {
   createAxisSelection,
   createCellSelection,
   extendAxisSelection,
-  extendCellSelection,
   getSelectionMode,
   getSelectionRange,
   isSingleCellSelection,
   moveActiveCellWithinSelection,
-  moveCellSelection,
   type CellSelection,
 } from "@sheetcraft/sheet-engine/selection";
 import {
@@ -169,7 +168,6 @@ import { getViewportAxisBoundaryOffset } from "@sheetcraft/sheet-engine/axis-int
 import { useCellEditing } from "../composables/useCellEditing";
 import { getCellStyle } from "@sheetcraft/core/workbook";
 import { isTextCellNumberFormat } from "@sheetcraft/core/number-format";
-import { useFormulaReferenceNavigation } from "../composables/useFormulaReferenceNavigation";
 import { useDragSelection } from "../composables/useDragSelection";
 import { useSheetAutoFill } from "../composables/useSheetAutoFill";
 import type { GridFillFeedback, GridFillRequest, GridFillResult } from "../auto-fill-contracts";
@@ -1634,12 +1632,12 @@ const {
   getOwnedImageLayer: () => ownedImageLayerRef.value,
   getImageLayer: () => imageLayerRef.value,
   isFormatPainterActive: () => Boolean(props.formatPainterActive),
-  getReferenceEditor,
+  getReferenceEditor: () => getReferenceEditor(),
   hasActiveShapeTextEdit: () =>
     Boolean(props.shapeTextEditSnapshot && props.shapeTextEditCallbacks?.isActive()),
   commitShapeTextEdit: () => props.shapeTextEditCallbacks?.commit() ?? true,
   flushPendingEquationEdit,
-  onCellMouseDown,
+  onCellMouseDown: (address, event) => onCellMouseDown(address, event),
   onCellDoubleClick,
   openCellContextMenu: (address, event) => openCellContextMenu(address, event),
   onEditorKeydown: (event) => onEditorKeydown(event),
@@ -1706,6 +1704,9 @@ const referenceEditor = computed<FormulaReferenceEditor | null>(() => {
   if (props.referenceEditor?.editingFormula) return props.referenceEditor;
   return editorRef.value?.formulaReferenceEditor ?? null;
 });
+function getReferenceEditor(): FormulaReferenceEditor | null {
+  return referenceEditor.value?.canPickReference() ? referenceEditor.value : null;
+}
 const formulaReferenceGroups = computed<readonly FormulaReferenceOverlayGroup[]>(() => {
   const editor = referenceEditor.value;
   if (!editor?.editingFormula) return [];
@@ -2003,7 +2004,7 @@ const {
   selectedImageIds,
   selectedOwnedPicturePath,
   getActiveCell: () => activeCell.value,
-  setActiveCell,
+  setActiveCell: (address, restoreFocus) => setActiveCell(address, restoreFocus),
   isEditing: () => isEditing.value,
   isComposing: () => isComposing.value,
   isReadOnly: () => Boolean(props.readOnly),
@@ -2012,7 +2013,8 @@ const {
   isPictureLayerReadOnly: () => pictureLayerReadOnly.value,
   isPictureCropActive: () => pictureCrop.active.value,
   finishPictureCrop,
-  finishEdit,
+  finishEdit: (destination, restoreFocus, finishOptions) =>
+    finishEdit(destination, restoreFocus, finishOptions),
   stopDragSelection,
   clearContextMenus: () => {
     axisContextMenu.value = undefined;
@@ -2062,10 +2064,11 @@ const {
   floatingClipboard,
   ownedClipboard,
   clearPendingClipboard,
-  setActiveCell,
+  setActiveCell: (address, restoreFocus) => setActiveCell(address, restoreFocus),
   pasteSelection,
   pasteCapturedText,
-  finishEdit,
+  finishEdit: (destination, restoreFocus, finishOptions) =>
+    finishEdit(destination, restoreFocus, finishOptions),
   onEditorInput,
   focusEditor,
   onPasteImageFile: (file, mode, address) => emit("pasteImageFile", file, mode, address),
@@ -2107,395 +2110,75 @@ watch(
   { flush: "sync" },
 );
 
-function normalizeSelectionForSheet(nextSelection: CellSelection): CellSelection {
-  if (nextSelection.mode !== "cells") {
-    return {
-      active: { ...nextSelection.active },
-      anchor: { ...nextSelection.anchor },
-      focus: { ...nextSelection.focus },
-      mode: nextSelection.mode,
-    };
-  }
-  const range = expandSelectionToMergedCellRanges(
-    { start: nextSelection.anchor, end: nextSelection.focus },
-    props.sheet.mergedCells,
-  );
-  return {
-    active: layout.value.getAnchorForAddress(nextSelection.active),
-    anchor: { ...range.start },
-    focus: { ...range.end },
-    mode: "cells",
-  };
-}
-
-function areSelectionsEqual(left: CellSelection, right: CellSelection): boolean {
-  return (
-    left.mode === right.mode &&
-    areCellAddressesEqual(left.active, right.active) &&
-    areCellAddressesEqual(left.anchor, right.anchor) &&
-    areCellAddressesEqual(left.focus, right.focus)
-  );
-}
-
-function setSelection(
-  nextSelection: CellSelection,
-  visibleAddress: CellAddress = nextSelection.active,
-  restoreFocus = true,
-): void {
-  if (
-    !canSelectCell(props.sheet, nextSelection.active) ||
-    !canSelectCell(props.sheet, nextSelection.focus)
-  )
-    return;
-  selectedImageId.value = null;
-  axisContextMenu.value = undefined;
-  cellContextMenu.value = undefined;
-  ensureGridExtentContains(visibleAddress);
-  ensureGridExtentContains(nextSelection.active);
-  ensureGridExtentContains(nextSelection.anchor);
-  ensureGridExtentContains(nextSelection.focus);
-  const normalized = normalizeSelectionForSheet(nextSelection);
-  if (!areSelectionsEqual(selection.value, normalized)) {
-    // Extending a range does not change its active cell or the cell content layer.
-    if (areCellAddressesEqual(selection.value.active, normalized.active)) {
-      normalized.active = selection.value.active;
-    }
-    selection.value = normalized;
-  }
-  ensureSelectionVisible(visibleAddress, nextSelection.mode);
-  emitViewState();
-  if (restoreFocus) {
-    focusEditor();
-  }
-}
-
-function setActiveCell(address: CellAddress, restoreFocus = true): void {
-  setSelection(createCellSelection(address), address, restoreFocus);
-}
-
-function getReferenceEditor(): FormulaReferenceEditor | null {
-  return referenceEditor.value?.canPickReference() ? referenceEditor.value : null;
-}
-
-function stopFormulaReferenceDrag(): void {
-  stopFormulaReferenceDragInternal();
-  formulaReferenceDragEditor = undefined;
-}
-
-function finishEdit(
-  destination?: CellSelection,
-  restoreFocus = true,
-  finishOptions: CellEditFinishOptions = {},
-): boolean {
-  stopFormulaReferenceDrag();
-  return finishCellEdit(destination, restoreFocus, finishOptions);
-}
-
-function cancelEdit(restoreFocus = true): void {
-  stopFormulaReferenceDrag();
-  cancelCellEdit(restoreFocus);
-}
-
-function onEditorBlur(event: FocusEvent): void {
-  stopFormulaReferenceDrag();
-  onCellEditorBlur(event);
-}
-
-const { handleReferenceKeydown } = useFormulaReferenceNavigation({
-  session: editSession,
-  getEditor: getReferenceEditor,
-  getActiveAddress: () => activeCell.value,
-  getVisibleRow: (row, direction) =>
-    direction > 0
-      ? navigationRows.value.getNextVisibleRow(row)
-      : navigationRows.value.getPreviousVisibleRow(row),
-  getVisibleColumn: getNextVisibleColumn,
-  ensureVisible: (address) => {
-    ensureGridExtentContains(address);
-    ensureSelectionVisible(address, "cells");
+const {
+  normalizeSelectionForSheet,
+  areSelectionsEqual,
+  setSelection,
+  setActiveCell,
+  stopFormulaReferenceDrag,
+  finishEdit,
+  cancelEdit,
+  onEditorBlur,
+  handleReferenceKeydown,
+  getNextVisibleColumn,
+  navigateToCell,
+  navigateToRange,
+  moveSelection,
+  onDimensionResizeRequest,
+  onDimensionResizeStart,
+  onGridKeydown,
+  onCellMouseDown,
+  selectAxis,
+  onColumnHeaderSelect,
+  onRowHeaderSelect,
+} = useSheetGridSelectionAndNavigation({
+  getSheet: () => props.sheet,
+  isFormatPainterActive: () => Boolean(props.formatPainterActive),
+  selection,
+  activeCell,
+  layout,
+  geometry,
+  navigationRows,
+  outlineHiddenColumnSet,
+  selectedImageId,
+  clearContextMenus: () => {
+    axisContextMenu.value = undefined;
+    cellContextMenu.value = undefined;
   },
+  getReferenceEditor,
+  editSession,
+  formulaReferenceRange,
+  setFormulaReferenceDragEditor: (editor) => {
+    formulaReferenceDragEditor = editor;
+  },
+  isEditing,
+  isComposing,
+  hasActiveDimensionResize: () => Boolean(dimensionResize.value),
+  hasPendingClipboardRange: () => Boolean(clipboardRange.value),
+  hasActiveTransparentColor: () => Boolean(pictureTransparentColor.session.value),
+  cancelTransparentColor: () => pictureTransparentColor.cancel(),
+  hasActivePictureCrop: () => pictureCrop.active.value,
+  onPictureCropKeydown,
+  dimensionReadOnly,
+  ensureGridExtentContains,
+  ensureSelectionVisible,
+  emitViewState,
+  focusEditor,
+  finishCellEdit,
+  cancelCellEdit,
+  onCellEditorBlur,
+  deferSelectionWhileComposing,
+  stopDragSelection,
+  startDragSelection,
+  stopFormulaReferenceDragInternal,
+  startFormulaReferenceDrag,
+  requestDimensionResize,
+  startDimensionResize,
+  stopDimensionResize,
+  clearPendingClipboard,
+  handleHistoryShortcut: (event) => handleHistoryShortcut(event),
+  onCancelFormatPainter: () => emit("cancelFormatPainter"),
 });
-
-function startReferencePick(address: CellAddress, event: MouseEvent): boolean {
-  const editor = getReferenceEditor();
-  if (!editor || isComposing.value) return false;
-  const range = { start: { ...address }, end: { ...address } };
-  if (!editor.pickReference(range, "start")) return false;
-  axisContextMenu.value = undefined;
-  cellContextMenu.value = undefined;
-  formulaReferenceRange.value = range;
-  stopDragSelection();
-  stopFormulaReferenceDrag();
-  formulaReferenceDragEditor = editor;
-  startFormulaReferenceDrag(createCellSelection(address), event);
-  return true;
-}
-
-function getNextVisibleColumn(column: number, direction: -1 | 1): number | null {
-  let next = column + direction;
-  while (next >= 0 && next < MAX_SHEET_COLUMNS) {
-    if (!outlineHiddenColumnSet.value.has(next)) return next;
-    next += direction;
-  }
-  return null;
-}
-
-watch(
-  [navigationRows, outlineHiddenColumnSet],
-  () => {
-    const current = selection.value.active;
-    const rows = navigationRows.value;
-    const row = rows.isRowVisible(current.row)
-      ? current.row
-      : (rows.getNextVisibleRow(current.row) ?? rows.getPreviousVisibleRow(current.row));
-    const column = !outlineHiddenColumnSet.value.has(current.column)
-      ? current.column
-      : (getNextVisibleColumn(current.column, 1) ?? getNextVisibleColumn(current.column, -1));
-    if (row === null || column === null || (row === current.row && column === current.column))
-      return;
-    ensureGridExtentContains({ row, column });
-    setSelection(createCellSelection({ row, column }));
-  },
-  { deep: true },
-);
-
-watch(
-  () => props.sheet.mergedCells,
-  () => {
-    const normalized = normalizeSelectionForSheet(selection.value);
-    if (areSelectionsEqual(normalized, selection.value)) return;
-    selection.value = normalized;
-    emitViewState();
-  },
-  { deep: true },
-);
-
-function navigateToCell(address: CellAddress): void {
-  const nextSelection = createCellSelection(address);
-  if (deferSelectionWhileComposing(nextSelection)) {
-    return;
-  }
-
-  if (isEditing.value) {
-    if (!finishEdit(nextSelection)) return;
-  } else {
-    setSelection(nextSelection, address);
-  }
-}
-
-function navigateToRange(range: CellRange): void {
-  const nextSelection: CellSelection = {
-    active: { ...range.start },
-    anchor: { ...range.start },
-    focus: { ...range.end },
-    mode: "cells",
-  };
-  if (deferSelectionWhileComposing(nextSelection)) return;
-  if (isEditing.value && !finishEdit(nextSelection)) return;
-  ensureGridExtentContains(range.end);
-  setSelection(nextSelection, range.start);
-}
-
-function moveSelection(
-  delta: { rows?: number; columns?: number },
-  commitEdit: boolean,
-  extend = false,
-  finishOptions: CellEditFinishOptions = {},
-): void {
-  const destination = moveCellSelection(
-    selection.value,
-    delta,
-    {
-      rowCount: MAX_SHEET_ROWS,
-      columnCount: MAX_SHEET_COLUMNS,
-    },
-    extend,
-  );
-  if (delta.rows) {
-    const source = extend ? selection.value.focus : selection.value.active;
-    const row =
-      delta.rows > 0
-        ? navigationRows.value.getNextVisibleRow(source.row)
-        : navigationRows.value.getPreviousVisibleRow(source.row);
-    if (row === null) return;
-    if (!extend) {
-      destination.active.row = row;
-      destination.anchor.row = row;
-    }
-    destination.focus.row = row;
-  }
-  if (delta.columns) {
-    const source = extend ? selection.value.focus : selection.value.active;
-    const column = getNextVisibleColumn(source.column, delta.columns > 0 ? 1 : -1);
-    if (column === null) return;
-    if (!extend) {
-      destination.active.column = column;
-      destination.anchor.column = column;
-    }
-    destination.focus.column = column;
-  }
-  const visibleAddress = extend ? destination.focus : destination.active;
-  ensureGridExtentContains(visibleAddress);
-
-  if (commitEdit) {
-    if (!finishEdit(destination, true, finishOptions)) return;
-  } else {
-    setSelection(destination, visibleAddress);
-  }
-}
-
-function onDimensionResizeRequest(
-  axis: SheetDimensionAxis,
-  payload: { index: number; size: number },
-): void {
-  if (dimensionReadOnly(axis)) return;
-  requestDimensionResize(axis, payload);
-}
-
-function onDimensionResizeStart(
-  axis: SheetDimensionAxis,
-  payload: { index: number; event: PointerEvent },
-): void {
-  if (dimensionReadOnly(axis)) return;
-  const startSize =
-    axis === "row"
-      ? geometry.value.getRowHeight(payload.index)
-      : geometry.value.getColumnWidth(payload.index);
-  startDimensionResize(axis, { ...payload, startSize });
-}
-
-function onGridKeydown(event: KeyboardEvent): void {
-  if (pictureTransparentColor.session.value) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      pictureTransparentColor.cancel();
-      focusEditor();
-    } else if (event.key === "Tab") pictureTransparentColor.cancel();
-    return;
-  }
-  if (
-    event.target instanceof Element &&
-    event.target.closest("[data-shape-canvas-text-editor], [data-equation-session]")
-  )
-    return;
-  if (pictureCrop.active.value) {
-    onPictureCropKeydown(event);
-    return;
-  }
-  if (event.target instanceof Element && event.target.closest("[data-page-header-footer]")) return;
-  if (
-    event.target instanceof Element &&
-    event.target.closest(
-      "[data-floating-image-id], [data-owned-picture-selected], [data-sheet-drawing-id], [data-shape-creation-layer]",
-    )
-  ) {
-    handleHistoryShortcut(event);
-    return;
-  }
-  if (event.key !== "Escape") {
-    return;
-  }
-  if (dimensionResize.value) {
-    event.preventDefault();
-    event.stopPropagation();
-    stopDimensionResize();
-    return;
-  }
-  if (props.formatPainterActive) {
-    event.preventDefault();
-    event.stopPropagation();
-    emit("cancelFormatPainter");
-    return;
-  }
-  if (!isEditing.value && clipboardRange.value) {
-    event.preventDefault();
-    event.stopPropagation();
-    clearPendingClipboard();
-  }
-}
-
-function onCellMouseDown(address: CellAddress, event: MouseEvent): void {
-  if (startReferencePick(address, event)) {
-    return;
-  }
-  const previousSelection = selection.value;
-  const nextSelection = event.shiftKey
-    ? extendCellSelection(previousSelection, address)
-    : createCellSelection(address);
-
-  if (deferSelectionWhileComposing(nextSelection)) {
-    return;
-  }
-
-  if (isEditing.value) {
-    if (!finishEdit(nextSelection)) return;
-  } else {
-    setSelection(nextSelection, address);
-  }
-
-  startDragSelection(nextSelection, event);
-}
-
-function selectAxis(
-  mode: "rows" | "columns" | "all",
-  address: CellAddress,
-  shiftKey: boolean,
-  restoreFocus = true,
-): void {
-  const nextSelection =
-    shiftKey && mode !== "all"
-      ? extendAxisSelection(selection.value, mode, address)
-      : createAxisSelection(mode, address);
-  if (deferSelectionWhileComposing(nextSelection)) {
-    return;
-  }
-  if (isEditing.value) {
-    if (!finishEdit(nextSelection, restoreFocus)) return;
-  } else {
-    setSelection(nextSelection, address, restoreFocus);
-  }
-}
-
-function onColumnHeaderSelect(payload: { column: number; shiftKey: boolean }): void {
-  if (pickAxisReference("columns", { row: 0, column: payload.column }, payload.shiftKey)) return;
-  selectAxis("columns", { row: 0, column: payload.column }, payload.shiftKey);
-}
-
-function onRowHeaderSelect(payload: { row: number; shiftKey: boolean }): void {
-  if (pickAxisReference("rows", { row: payload.row, column: 0 }, payload.shiftKey)) return;
-  selectAxis("rows", { row: payload.row, column: 0 }, payload.shiftKey);
-}
-
-function pickAxisReference(
-  mode: "rows" | "columns",
-  address: CellAddress,
-  shiftKey: boolean,
-): boolean {
-  const editor = getReferenceEditor();
-  if (!editor || isComposing.value) return false;
-  const previous = editor.referenceActive ? editor.referenceRange : null;
-  const next =
-    shiftKey && previous
-      ? extendAxisSelection(
-          createAxisSelection(mode, {
-            row: previous.start.row,
-            column: previous.start.column,
-          }),
-          mode,
-          address,
-        )
-      : createAxisSelection(mode, address);
-  const range = getSelectionRange(next);
-  const rangeKind = mode === "rows" ? "row-axis" : "column-axis";
-  if (!editor.pickReference(range, "start", rangeKind)) return false;
-  formulaReferenceRange.value = range;
-  axisContextMenu.value = undefined;
-  cellContextMenu.value = undefined;
-  stopDragSelection();
-  stopFormulaReferenceDrag();
-  return true;
-}
 
 const {
   isAxisIndexSelected,
