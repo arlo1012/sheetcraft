@@ -275,6 +275,7 @@ const previewText = computed(() =>
   }
   &__field {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     align-content: start;
     gap: 5px;
     min-width: 0;

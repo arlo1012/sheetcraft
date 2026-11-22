@@ -356,6 +356,7 @@ const activePreset = computed<"none" | "outer" | "inner" | "all" | null>(() => {
   &__field,
   &__section {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     align-content: start;
     gap: 6px;
     min-width: 0;
