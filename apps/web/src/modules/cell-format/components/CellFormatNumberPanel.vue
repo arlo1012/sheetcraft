@@ -87,12 +87,10 @@ function selectNegative(code: string): void {
       />
       <div class="cell-format-number__details">
         <div class="cell-format-number__preview">
-          <div class="cell-format-number__preview-head">
-            <h3 class="cell-format-number__heading">{{ t("cellFormat.preview") }}</h3>
-          </div>
           <output
             class="cell-format-number__sample"
             :style="{ color: preview.color }"
+            :aria-label="t('cellFormat.preview')"
             data-cell-format-number-preview
           >
             <template v-if="preview.fill">
@@ -252,25 +250,13 @@ function selectNegative(code: string): void {
     font-weight: var(--sheetcraft-font-weight-medium);
     line-height: var(--sheetcraft-line-height-body-medium);
   }
-  &__heading {
-    margin: 0;
-    color: var(--sheetcraft-text-muted);
-    font-size: var(--sheetcraft-font-size-body-small);
-    font-weight: var(--sheetcraft-font-weight-medium);
-    line-height: var(--sheetcraft-line-height-body-small);
-  }
   &__preview {
     display: grid;
-    gap: 4px;
+    gap: 2px;
     flex: none;
     padding: 10px 14px;
     border-radius: var(--sheetcraft-radius-dialog-card);
     background: var(--sheetcraft-surface-dialog-card);
-  }
-  &__preview-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
   }
   &__sample {
     display: flex;

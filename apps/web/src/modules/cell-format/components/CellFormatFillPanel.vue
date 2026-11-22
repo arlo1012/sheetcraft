@@ -164,18 +164,15 @@ function setGradient(gradient: CellFillGradient): void {
             />
           </div>
         </div>
-        <div class="cell-format-fill__preview-group">
-          <h3>{{ t("cellFormat.preview") }}</h3>
-          <div class="cell-format-fill__preview-stage">
-            <div
-              class="cell-format-fill__preview"
-              :style="mixed ? {} : getCellFillStyle(fill)"
-              role="img"
-              :aria-label="mixed ? t('format.mixed') : t('cellFormat.preview')"
-              data-cell-format-fill-preview
-            >
-              <span v-if="mixed">{{ t("format.mixed") }}</span>
-            </div>
+        <div class="cell-format-fill__preview-stage">
+          <div
+            class="cell-format-fill__preview"
+            :style="mixed ? {} : getCellFillStyle(fill)"
+            role="img"
+            :aria-label="mixed ? t('format.mixed') : t('cellFormat.preview')"
+            data-cell-format-fill-preview
+          >
+            <span v-if="mixed">{{ t("format.mixed") }}</span>
           </div>
         </div>
       </div>
@@ -215,7 +212,7 @@ function setGradient(gradient: CellFillGradient): void {
   &__background {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     min-width: 0;
     width: max-content;
     max-width: 100%;
@@ -265,14 +262,14 @@ function setGradient(gradient: CellFillGradient): void {
   &__pattern {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
     min-width: 0;
     min-height: 0;
   }
   &__controls-card {
     display: grid;
-    gap: 10px;
-    padding: 12px;
+    gap: 8px;
+    padding: 10px 12px;
     border-radius: var(--sheetcraft-radius-dialog-card);
     background: var(--sheetcraft-surface-dialog-card);
   }
@@ -288,18 +285,10 @@ function setGradient(gradient: CellFillGradient): void {
       text-align: right;
     }
   }
-  &__preview-group {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 0;
-    min-height: 0;
-  }
   &__preview-stage {
     flex: 1;
-    min-height: 120px;
-    padding: 10px;
+    min-height: 100px;
+    padding: 8px;
     border-radius: var(--sheetcraft-radius-dialog-card);
     background: var(--sheetcraft-surface-dialog-card);
   }

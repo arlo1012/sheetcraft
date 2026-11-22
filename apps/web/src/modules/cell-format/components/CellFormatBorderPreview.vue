@@ -216,9 +216,9 @@ const { t } = useAppI18n();
 .cell-format-border-preview {
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr);
-  grid-template-rows: minmax(156px, 1fr) 30px;
-  gap: 8px;
-  padding: 10px;
+  grid-template-rows: minmax(124px, 1fr) 30px;
+  gap: 6px;
+  padding: 8px;
   border: 0;
   border-radius: var(--sheetcraft-radius-dialog-card);
   background: var(--sheetcraft-surface-dialog-card);

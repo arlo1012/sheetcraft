@@ -401,7 +401,6 @@ const previewTextStyle = computed(() => {
         </section>
 
         <section class="cell-format-alignment__preview-card" :aria-label="t('cellFormat.preview')">
-          <span class="cell-format-alignment__preview-label">{{ t("cellFormat.preview") }}</span>
           <div class="cell-format-alignment__preview-cell" :style="previewCellStyle">
             <span class="cell-format-alignment__preview-text" :style="previewTextStyle">{{
               previewSampleText
@@ -437,13 +436,13 @@ const previewTextStyle = computed(() => {
   &__content {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
     min-width: 0;
     min-height: 0;
   }
   &__group {
     display: grid;
-    gap: 8px;
+    gap: 6px;
     min-width: 0;
   }
   &__group-head {
@@ -516,8 +515,8 @@ const previewTextStyle = computed(() => {
   }
   &__card {
     display: grid;
-    gap: 10px;
-    padding: 10px 12px;
+    gap: 8px;
+    padding: 9px 12px;
     border-radius: var(--sheetcraft-radius-dialog-card);
     background: var(--sheetcraft-surface-dialog-card);
   }
@@ -542,16 +541,10 @@ const previewTextStyle = computed(() => {
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: 6px;
-    min-height: 92px;
-    padding: 10px 12px;
+    min-height: 76px;
+    padding: 8px;
     border-radius: var(--sheetcraft-radius-dialog-card);
     background: var(--sheetcraft-surface-dialog-card);
-  }
-  &__preview-label {
-    color: var(--sheetcraft-text-muted);
-    font-size: var(--sheetcraft-font-size-body-small);
-    line-height: var(--sheetcraft-line-height-body-small);
   }
   &__preview-cell {
     display: flex;

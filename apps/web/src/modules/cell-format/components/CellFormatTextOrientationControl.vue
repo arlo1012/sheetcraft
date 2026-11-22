@@ -170,11 +170,11 @@ function endDialDrag(event: PointerEvent): void {
 .cell-format-text-orientation {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
   height: 100%;
   margin: 0;
-  padding: 12px;
+  padding: 10px 12px;
   border-radius: var(--sheetcraft-radius-dialog-card);
   background: var(--sheetcraft-surface-dialog-card);
 
@@ -189,7 +189,7 @@ function endDialDrag(event: PointerEvent): void {
     flex: 1;
     grid-template-columns: 38px minmax(0, 1fr);
     gap: 8px;
-    min-height: 148px;
+    min-height: 112px;
   }
 
   &__vertical {

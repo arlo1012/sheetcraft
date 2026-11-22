@@ -219,28 +219,25 @@ const previewText = computed(() =>
           >{{ t("cellFormat.subscript") }}</TCheckbox
         >
       </div>
-      <div class="font-format__preview-group">
-        <h3>{{ t("cellFormat.preview") }}</h3>
-        <div class="font-format__preview" :aria-label="t('cellFormat.preview')">
-          <div class="font-format__preview-content">
-            <span class="font-format__preview-rule" aria-hidden="true" />
-            <span
-              class="font-format__preview-text"
-              :style="{
-                ...getCellTextTypographyStyle(previewStyle, { includeDecorations: false }),
-                ...(options?.sizeUnit === 'pt'
-                  ? { fontSize: `${getCellTextRenderFontSize(previewStyle)}pt` }
-                  : {}),
-                ...getCellTextScriptStyle(previewStyle),
-                ...getCellTextUnderlineStyle(previewStyle),
-              }"
-              data-cell-format-font-preview
-              ><span :style="getCellTextStrikethroughStyle(previewStyle)">{{
-                previewText
-              }}</span></span
-            >
-            <span class="font-format__preview-rule" aria-hidden="true" />
-          </div>
+      <div class="font-format__preview" :aria-label="t('cellFormat.preview')">
+        <div class="font-format__preview-content">
+          <span class="font-format__preview-rule" aria-hidden="true" />
+          <span
+            class="font-format__preview-text"
+            :style="{
+              ...getCellTextTypographyStyle(previewStyle, { includeDecorations: false }),
+              ...(options?.sizeUnit === 'pt'
+                ? { fontSize: `${getCellTextRenderFontSize(previewStyle)}pt` }
+                : {}),
+              ...getCellTextScriptStyle(previewStyle),
+              ...getCellTextUnderlineStyle(previewStyle),
+            }"
+            data-cell-format-font-preview
+            ><span :style="getCellTextStrikethroughStyle(previewStyle)">{{
+              previewText
+            }}</span></span
+          >
+          <span class="font-format__preview-rule" aria-hidden="true" />
         </div>
       </div>
     </div>
@@ -251,7 +248,7 @@ const previewText = computed(() =>
 .font-format {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   height: 100%;
   min-height: 0;
   color: var(--sheetcraft-text-primary);
@@ -277,7 +274,7 @@ const previewText = computed(() =>
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     align-content: start;
-    gap: 5px;
+    gap: 4px;
     min-width: 0;
 
     > span {
@@ -285,7 +282,7 @@ const previewText = computed(() =>
     }
   }
   &__list {
-    height: 132px;
+    height: 112px;
   }
   &__family-search {
     display: flex;
@@ -307,21 +304,14 @@ const previewText = computed(() =>
   &__effects {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 3px;
     min-width: 0;
     padding: 8px 12px;
     border-radius: var(--sheetcraft-radius-dialog-card);
     background: var(--sheetcraft-surface-dialog-card);
   }
-  &__preview-group {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    min-width: 0;
-  }
   &__preview {
     display: flex;
-    flex: 1;
     align-items: center;
     justify-content: center;
     min-width: 0;
@@ -363,9 +353,6 @@ const previewText = computed(() =>
     }
     &__bottom {
       grid-template-columns: minmax(0, 1fr);
-    }
-    &__preview-group {
-      grid-column: auto;
     }
   }
 }

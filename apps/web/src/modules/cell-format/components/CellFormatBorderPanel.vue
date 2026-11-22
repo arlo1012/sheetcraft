@@ -348,7 +348,7 @@ const activePreset = computed<"none" | "outer" | "inner" | "all" | null>(() => {
   &__lines {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
     min-width: 0;
     padding-right: 16px;
     border-right: 1px solid var(--sheetcraft-border-divider);
@@ -358,7 +358,7 @@ const activePreset = computed<"none" | "outer" | "inner" | "all" | null>(() => {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     align-content: start;
-    gap: 6px;
+    gap: 5px;
     min-width: 0;
   }
   &__section--preview {
@@ -394,7 +394,7 @@ const activePreset = computed<"none" | "outer" | "inner" | "all" | null>(() => {
   &__borders {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
     min-width: 0;
     min-height: 0;
   }
@@ -407,9 +407,9 @@ const activePreset = computed<"none" | "outer" | "inner" | "all" | null>(() => {
       display: grid;
       justify-items: center;
       align-content: center;
-      gap: 3px;
+      gap: 2px;
       min-width: 0;
-      padding: 7px 4px 6px;
+      padding: 6px 4px 5px;
       border: 0;
       border-radius: var(--sheetcraft-radius-dialog-card);
       background: var(--sheetcraft-surface-dialog-card);

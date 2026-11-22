@@ -398,7 +398,7 @@ function confirm(): void {
 .cell-format-dialog__tabs {
   display: flex;
   flex-direction: column;
-  height: min(464px, calc(100dvh - 176px));
+  height: min(400px, calc(100dvh - 176px));
 }
 
 .cell-format-dialog__footer {

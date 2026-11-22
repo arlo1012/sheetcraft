@@ -28,7 +28,6 @@ const options = computed(() =>
 
 <template>
   <div class="number-format-categories">
-    <h3 class="number-format-categories__label">{{ t("cellFormat.category") }}</h3>
     <OptionList
       class="number-format-categories__list"
       :model-value="modelValue"
@@ -46,19 +45,11 @@ const options = computed(() =>
 .number-format-categories {
   display: flex;
   flex-direction: column;
-  gap: 8px;
   min-width: 0;
   min-height: 0;
   font-size: var(--sheetcraft-font-size-body-medium);
   line-height: var(--sheetcraft-line-height-body-medium);
 
-  &__label {
-    margin: 0;
-    color: var(--sheetcraft-text-primary);
-    font-size: inherit;
-    font-weight: var(--sheetcraft-font-weight-semibold);
-    line-height: var(--sheetcraft-line-height-body-medium);
-  }
   &__list {
     flex: 1;
     min-height: 0;
