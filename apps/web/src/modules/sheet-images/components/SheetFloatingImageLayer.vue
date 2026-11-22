@@ -38,8 +38,7 @@ import type { SheetViewportLayout } from "@sheetcraft/sheet-engine/viewport-layo
 import type { Point } from "@sheetcraft/sheet-engine/geometry";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
-import type { PictureAlignment, PictureAlignmentReference } from "../usePictureTools";
-import { planEqualPictureDimensions } from "../picture-equal-dimensions";
+import type { PictureAlignmentReference } from "../usePictureTools";
 import { createContextMenuPoint } from "../../../shared/menu/useContextMenu";
 import SheetFloatingImageContextMenu from "./SheetFloatingImageContextMenu.vue";
 import SheetFloatingImageSelection from "../../../shared/sheet-objects/SheetObjectSelection.vue";
@@ -70,6 +69,11 @@ import SheetFramedPictureSelection from "./SheetFramedPictureSelection.vue";
 import type { DrawingThemeEffects } from "../drawing-theme-effects";
 
 import { useFloatingImageEditing } from "../useFloatingImageEditing";
+import {
+  useFloatingImageContextMenu,
+  type FloatingImageContextMenuState as ContextMenuState,
+} from "../composables/useFloatingImageContextMenu";
+import { useFloatingImageArrangementAndKeys } from "../composables/useFloatingImageArrangementAndKeys";
 import {
   getFloatingImageViewportFragmentsForPaint,
   type FloatingImagePaintState,
@@ -200,16 +204,6 @@ type Gesture = {
   selectionAtStart: string[];
   selectionSettled: boolean;
   groups: Map<string, string[]>;
-};
-
-type ContextMenuState = {
-  imageId: string;
-  anchor: FloatingReference;
-  trigger: HTMLElement;
-  owner: object | undefined;
-  rootsReference: readonly PictureObject[];
-  roots: PictureObject[];
-  selectedIds: string[];
 };
 
 const gesture = shallowRef<Gesture>();
@@ -851,180 +845,44 @@ function onWindowKeydown(event: KeyboardEvent): void {
   }
 }
 
-function closeContextMenu(restoreFocus: boolean): void {
-  const trigger = contextMenu.value?.trigger;
-  contextMenu.value = undefined;
-  if (restoreFocus) {
-    void nextTick(() => {
-      if (trigger?.isConnected) trigger.focus({ preventScroll: true });
-    });
-  }
-}
-
-function openContextMenu(
-  image: FloatingImage,
-  trigger: HTMLElement,
-  anchor: FloatingReference = trigger,
-): void {
-  if (gesture.value || crop.value || !isRootAvailable(image.id)) return;
-  emit("select", image.id);
-  trigger.focus({ preventScroll: true });
-  contextMenu.value = {
-    imageId: image.id,
-    trigger,
-    anchor,
-    owner: props.owner,
-    rootsReference: selectionImages(),
-    roots: selectionImages().map(cloneFloatingImage),
-    selectedIds: [...selectedIds.value],
-  };
-  const menu = contextMenu.value;
-  // Selection is an emitted controlled contract. Allow its one render-cycle
-  // acknowledgement, while uncontrolled consumers keep their original state.
-  void nextTick(() => {
-    if (contextMenu.value === menu && props.selectedImageId === menu.imageId)
-      menu.selectedIds = [...selectedIds.value];
-  });
-}
-
-function onImageContextMenu(image: FloatingImage, event: MouseEvent): void {
-  if (!isRootAvailable(image.id)) return;
-  event.preventDefault();
-  event.stopPropagation();
-  const trigger = event.currentTarget as HTMLElement;
-  openContextMenu(image, trigger, createContextMenuPoint(event, layerRef.value ?? trigger));
-}
-
-function openImageKeyboardContextMenu(image: FloatingImage, event: KeyboardEvent): boolean {
-  if (event.key !== "ContextMenu" && !(event.key === "F10" && event.shiftKey)) return false;
-  event.preventDefault();
-  event.stopPropagation();
-  const trigger = event.currentTarget as HTMLElement;
-  openContextMenu(image, trigger);
-  return true;
-}
-
-function isContextMenuOwnerCurrent(menu: ContextMenuState): boolean {
-  try {
-    return (
-      contextMenu.value === menu &&
-      menu.owner === props.owner &&
-      menu.rootsReference === selectionImages() &&
-      menu.selectedIds.length === selectedIds.value.size &&
-      menu.selectedIds.every((id) => selectedIds.value.has(id)) &&
-      areFloatingImageCollectionsEqual(menu.roots, selectionImages())
-    );
-  } catch {
-    return false;
-  }
-}
-const contextActions = computed(() => {
-  const menu = contextMenu.value;
-  const current = () => !!menu && isContextMenuOwnerCurrent(menu);
-  function sourceAction(action: PictureContextSourceAction): void {
-    if (
-      !current() ||
-      !menu ||
-      props.sourceToolsDisabled ||
-      (action !== "format" && selectedIds.value.size !== 1) ||
-      props.croppingExternally ||
-      (interactionReadOnly.value && !["save", "preview", "format"].includes(action))
-    )
-      return;
-    const image = currentImages.value.find((root) => root.id === menu.imageId);
-    if (
-      !image ||
-      (action !== "replace" && action !== "format" && !props.assetUrls.has(image.assetId))
-    )
-      return;
-    closeContextMenu(false);
-    emit("sourceAction", action, [menu.imageId], menu.owner);
-  }
-  return {
-    replace: () => sourceAction("replace"),
-    save: () => sourceAction("save"),
-    crop: () => sourceAction("crop"),
-    annotate: () => sourceAction("annotate"),
-    format: () => sourceAction("format"),
-    copy: () => {
-      if (current()) requestClipboard("copy");
-    },
-    cut: () => {
-      if (current()) requestClipboard("cut");
-    },
-    paste: () => {
-      if (current()) requestClipboard("paste");
-    },
-    preview: () => {
-      if (current()) requestPreview();
-    },
-    convert: () => {
-      if (current()) requestConvertToCell();
-    },
-    delete: () => {
-      if (current()) requestDelete();
-    },
-    close: (restoreFocus: boolean) => {
-      if (contextMenu.value === menu) closeContextMenu(restoreFocus);
-    },
-  };
+const {
+  closeContextMenu,
+  openContextMenu,
+  onImageContextMenu,
+  openImageKeyboardContextMenu,
+  contextActions,
+  onImageDoubleClick,
+  onLayerDoubleClick,
+  openSelectedContextMenu,
+} = useFloatingImageContextMenu({
+  contextMenu,
+  layerRef,
+  currentImages,
+  selectedImage,
+  selectedIds,
+  interactionReadOnly,
+  getOwner: () => props.owner,
+  getSelectedImageId: () => props.selectedImageId,
+  getAssetUrls: () => props.assetUrls,
+  isSourceToolsDisabled: () => Boolean(props.sourceToolsDisabled),
+  isCroppingExternally: () => Boolean(props.croppingExternally),
+  isPreviewOnDoubleClick: () => Boolean(props.previewOnDoubleClick),
+  hasActiveGesture: () => Boolean(gesture.value),
+  hasActiveCrop: () => Boolean(crop.value),
+  getLastGestureMode: () => lastGestureMode,
+  canConvertToCell: (id) => props.canConvertToCell?.(id) !== false,
+  isRootAvailable,
+  selectionImages,
+  applyCrop,
+  onSelect: (id) => emit("select", id),
+  onSourceAction: (action, ids, owner) => emit("sourceAction", action, ids, owner),
+  onConvertToCell: (id) => emit("convertToCell", id),
+  onPreview: (image, trigger) => emit("preview", image, trigger),
+  onCopy: (id) => emit("copy", id),
+  onCut: (id) => emit("cut", id),
+  onPaste: (id) => emit("paste", id),
+  onDelete: (id) => emit("delete", id),
 });
-function requestConvertToCell(): void {
-  if (props.croppingExternally) return;
-  const imageId = contextMenu.value?.imageId;
-  if (imageId && props.canConvertToCell?.(imageId) === false) return;
-  closeContextMenu(false);
-  if (imageId && !interactionReadOnly.value) emit("convertToCell", imageId);
-}
-
-function requestPreview(): void {
-  if (props.croppingExternally || props.sourceToolsDisabled) return;
-  const image = currentImages.value.find((entry) => entry.id === contextMenu.value?.imageId);
-  const trigger = contextMenu.value?.trigger;
-  closeContextMenu(false);
-  if (image) emit("preview", image, trigger);
-}
-
-function requestClipboard(mode: "copy" | "cut" | "paste"): void {
-  const imageId = contextMenu.value?.imageId;
-  closeContextMenu(true);
-  if (!imageId) return;
-  if (mode === "copy") emit("copy", imageId);
-  else if (mode === "cut" && !interactionReadOnly.value) emit("cut", imageId);
-  else if (mode === "paste" && !interactionReadOnly.value) emit("paste", imageId);
-}
-
-function onImageDoubleClick(image: FloatingImage, event: MouseEvent): void {
-  if (!isRootAvailable(image.id)) return;
-  if (crop.value) {
-    applyCrop();
-    return;
-  }
-  if (props.previewOnDoubleClick && !props.croppingExternally)
-    emit("preview", image, event.currentTarget as HTMLElement);
-}
-
-function onLayerDoubleClick(event: MouseEvent): void {
-  // Pointer capture keeps drags alive across frozen panes and retargets clicks to this layer.
-  if (
-    crop.value ||
-    props.croppingExternally ||
-    event.target !== event.currentTarget ||
-    gesture.value ||
-    lastGestureMode !== "move" ||
-    !props.previewOnDoubleClick
-  )
-    return;
-  const image = currentImages.value.find((entry) => entry.id === props.selectedImageId);
-  if (image)
-    emit("preview", image, layerRef.value?.querySelector<HTMLElement>(".is-selected") ?? undefined);
-}
-
-function requestDelete(): void {
-  const imageId = contextMenu.value?.imageId;
-  closeContextMenu(false);
-  if (imageId && !interactionReadOnly.value) emit("delete", imageId);
-}
 
 function getPaintState(): FloatingImagePaintState {
   return {
@@ -1219,137 +1077,37 @@ onBeforeUnmount(() => {
   closeContextMenu(false);
 });
 
-function arrangeImages(
-  ids: readonly string[],
-  action: PictureAlignment,
-  reference: PictureAlignmentReference = "selection",
-): void {
-  if (interactionReadOnly.value) return;
-  if (action === "equal-height" || action === "equal-width" || action === "equal-size") {
-    try {
-      const next = planEqualPictureDimensions(
-        currentImages.value,
-        ids,
-        props.selectedImageId ?? ids.at(-1),
-        action,
-        props.layout,
-        props.frameContext,
-      );
-      commitImages([...requireStandalonePictures(next.filter((root) => ids.includes(root.id)))]);
-    } catch {
-      emit("feedback", "picture.operationFailed");
-    }
-    return;
-  }
-  if (currentImages.value.some((image) => ids.includes(image.id) && isFramedPictureObject(image))) {
-    emit("feedback", "picture.operationFailed");
-    return;
-  }
-  if (
-    new Set(ids).size !== ids.length ||
-    ids.some((id) => !currentImages.value.some((image) => image.id === id))
-  ) {
-    emit("feedback", "picture.operationFailed");
-    return;
-  }
-  const members = currentImages.value
-    .filter((image) => ids.includes(image.id))
-    .flatMap((image) => {
-      if (isFramedPictureObject(image)) return [];
-      const rect = getFloatingImageSheetRect(image, props.layout);
-      return rect ? [{ image, rect }] : [];
-    });
-  if (!members.length) return;
-  if (members.length !== ids.length) {
-    emit("feedback", "picture.operationFailed");
-    return;
-  }
-  if ((action === "horizontal" || action === "vertical") && members.length < 3) return;
-  if (action === "grid") {
-    commitImages(members.map(({ image }) => ({ ...image, offsetX: 0, offsetY: 0 })));
-    return;
-  }
-  const left = Math.min(...members.map((entry) => entry.rect.x));
-  const right = Math.max(...members.map((entry) => entry.rect.x + entry.rect.width));
-  const top = Math.min(...members.map((entry) => entry.rect.y));
-  const bottom = Math.max(...members.map((entry) => entry.rect.y + entry.rect.height));
-  const last =
-    members.find((entry) => entry.image.id === props.selectedImageId) ??
-    members.find((entry) => entry.image.id === ids.at(-1));
-  const base =
-    reference === "last-selected" && last
-      ? last.rect
-      : { x: left, y: top, width: right - left, height: bottom - top };
-  const ordered = [...members].sort((a, b) =>
-    action === "horizontal" ? a.rect.x - b.rect.x : a.rect.y - b.rect.y,
-  );
-  let cursor = action === "horizontal" ? left : top;
-  const gap =
-    members.length < 2
-      ? 0
-      : (action === "horizontal"
-          ? right - left - members.reduce((sum, entry) => sum + entry.rect.width, 0)
-          : bottom - top - members.reduce((sum, entry) => sum + entry.rect.height, 0)) /
-        (members.length - 1);
-  const next = ordered.map(({ image, rect }) => {
-    const target = { ...rect };
-    if (action === "left") target.x = base.x;
-    if (action === "center" || action === "both") target.x = base.x + (base.width - rect.width) / 2;
-    if (action === "right") target.x = base.x + base.width - rect.width;
-    if (action === "top") target.y = base.y;
-    if (action === "middle" || action === "both")
-      target.y = base.y + (base.height - rect.height) / 2;
-    if (action === "bottom") target.y = base.y + base.height - rect.height;
-    if (action === "horizontal") {
-      target.x = cursor;
-      cursor += rect.width + gap;
-    }
-    if (action === "vertical") {
-      target.y = cursor;
-      cursor += rect.height + gap;
-    }
-    return target.x < 0 || target.y < 0
-      ? null
-      : target.x === rect.x && target.y === rect.y
-        ? image
-        : reanchorFloatingImageAtSheetRect(image, target, props.layout);
-  });
-  if (next.every((image) => image !== null)) commitImages(next);
-  else emit("feedback", "picture.operationFailed");
-}
+const {
+  arrangeImages,
+  alignSelection,
+  changeAlignmentReference,
+  groupSelection,
+  dismissSelection,
+  onImageKeydown,
+} = useFloatingImageArrangementAndKeys({
+  currentImages,
+  selectedIds,
+  selectionKey,
+  interactionReadOnly,
+  crop,
+  getSelectedImageId: () => props.selectedImageId,
+  getLayout: () => props.layout,
+  getFrameContext: () => props.frameContext,
+  canGroup: () => props.canGroup !== false,
+  hasActiveGesture: () => Boolean(gesture.value),
+  selectionImages,
+  commitImages,
+  openImageKeyboardContextMenu,
+  finishGesture,
+  cancelCrop,
+  applyCrop,
+  onSelect: (id) => emit("select", id),
+  onDelete: (id) => emit("delete", id),
+  onReference: (reference) => emit("reference", reference),
+  onGroup: (ids) => emit("group", ids),
+  onFeedback: (key) => emit("feedback", key),
+});
 
-function alignSelection(
-  action: PictureAlignment,
-  reference: PictureAlignmentReference,
-  key: string,
-): void {
-  if (key === selectionKey.value && !gesture.value && !crop.value)
-    arrangeImages([...selectedIds.value], action, reference);
-}
-function changeAlignmentReference(reference: PictureAlignmentReference, key: string): void {
-  if (key === selectionKey.value && !interactionReadOnly.value && !gesture.value && !crop.value)
-    emit("reference", reference);
-}
-function groupSelection(key: string): void {
-  if (
-    key === selectionKey.value &&
-    props.canGroup !== false &&
-    !interactionReadOnly.value &&
-    !gesture.value &&
-    !crop.value
-  )
-    emit("group", [...selectedIds.value]);
-}
-function dismissSelection(key: string): void {
-  if (key === selectionKey.value) emit("select", null);
-}
-
-function openSelectedContextMenu(event: MouseEvent): void {
-  const image = selectedImage.value,
-    layer = layerRef.value;
-  if (!image || !layer || selectedIds.value.size !== 1) return;
-  openContextMenu(image, layer, createContextMenuPoint(event, layer));
-}
 defineExpose({
   closePictureContextMenu: () => closeContextMenu(false),
   openSelectedContextMenu,
@@ -1368,80 +1126,6 @@ defineExpose({
   handleSurfaceContextMenu,
   getSurfaceCursor,
 });
-
-function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
-  try {
-    planImageKeydown(image, event);
-  } catch {
-    event.preventDefault();
-    emit("feedback", "picture.operationFailed");
-  }
-}
-function planImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
-  if (crop.value) {
-    event.stopPropagation();
-    if (event.key === "Escape") {
-      event.preventDefault();
-      cancelCrop();
-    } else if (event.key === "Enter") {
-      event.preventDefault();
-      applyCrop();
-    } else {
-      const distance = event.shiftKey ? 10 : 1;
-      const delta = {
-        ArrowLeft: { x: -distance, y: 0 },
-        ArrowRight: { x: distance, y: 0 },
-        ArrowUp: { x: 0, y: -distance },
-        ArrowDown: { x: 0, y: distance },
-      }[event.key];
-      if (delta) {
-        event.preventDefault();
-        const current = crop.value;
-        crop.value = {
-          ...current,
-          selection: adjustImageCropSelection(
-            current.selection,
-            "move",
-            { x: delta.x / current.image.width, y: delta.y / current.image.height },
-            { width: 0, height: 0 },
-          ),
-        };
-      }
-    }
-    return;
-  }
-  if (openImageKeyboardContextMenu(image, event)) return;
-  if (event.key === "Escape") {
-    if (gesture.value) finishGesture(false);
-    else emit("select", null);
-    event.preventDefault();
-    return;
-  }
-  if (!interactionReadOnly.value && (event.key === "Delete" || event.key === "Backspace")) {
-    emit("delete", image.id);
-    event.preventDefault();
-    return;
-  }
-  if (interactionReadOnly.value) return;
-  const distance = event.shiftKey ? 10 : 1;
-  const offset = {
-    ArrowLeft: { x: -distance, y: 0 },
-    ArrowRight: { x: distance, y: 0 },
-    ArrowUp: { x: 0, y: -distance },
-    ArrowDown: { x: 0, y: distance },
-  }[event.key];
-  if (!offset) return;
-  const members = selectionImages().filter((entry) => selectedIds.value.has(entry.id));
-  if (members.length !== selectedIds.value.size) {
-    emit("feedback", "picture.operationFailed");
-    event.preventDefault();
-    return;
-  }
-  const next = movePictureRootSelectionBy(members, offset, props.layout, props.frameContext);
-  if (!next) emit("feedback", "picture.operationFailed");
-  else commitImages(next);
-  event.preventDefault();
-}
 </script>
 
 <template>
