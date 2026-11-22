@@ -369,6 +369,7 @@ defineExpose<
   max-width: min(480px, calc(100vw - 24px));
   max-height: min(360px, calc(100vh - 40px));
   padding: var(--sheetcraft-menu-inset);
+  background: var(--sheetcraft-surface-panel);
   border-color: var(--sheetcraft-border-floating);
   border-radius: var(--sheetcraft-radius-floating);
   box-shadow: var(--sheetcraft-shadow-menu);
@@ -383,9 +384,9 @@ defineExpose<
     display: grid;
     grid-template-columns: 100px minmax(0, 1fr);
     align-items: center;
-    min-height: 28px;
+    min-height: 26px;
     gap: var(--sheetcraft-space-2);
-    padding: 3px 10px;
+    padding: 2px 9px;
     border-radius: var(--sheetcraft-radius-menu-item);
 
     strong {

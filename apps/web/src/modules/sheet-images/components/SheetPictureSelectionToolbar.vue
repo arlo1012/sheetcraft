@@ -267,7 +267,7 @@ watch(
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 4px;
+  padding: 3px;
   max-width: calc(100vw - 16px);
   overflow-x: auto;
   button {

@@ -226,7 +226,7 @@
 }
 
 .t-select-option {
-  --td-comp-size-s: 28px;
+  --td-comp-size-s: 26px;
 }
 
 // A single visible formula line still needs textarea selection and line breaks.
@@ -369,7 +369,7 @@
 
 .t-select__dropdown .t-select-option {
   border-radius: var(--sheetcraft-radius-menu-item);
-  padding: 0 10px;
+  padding: 0 9px;
   transition: background-color 0.12s ease;
 
   &:not(.t-is-disabled):not(.t-is-selected):hover {
@@ -418,37 +418,154 @@
 }
 
 .t-dialog__ctx .t-dialog:not(.t-dialog__fullscreen) {
-  --td-comp-paddingTB-xxl: var(--sheetcraft-space-7);
-  --td-comp-paddingLR-xxl: var(--sheetcraft-space-7);
-
+  padding: 0;
   border: 1px solid var(--sheetcraft-border-dialog);
   border-radius: var(--sheetcraft-radius-dialog);
   box-shadow: var(--sheetcraft-shadow-dialog);
 }
 
-.t-dialog__header {
+.t-dialog__ctx .t-dialog:not(.t-dialog__fullscreen) > .t-dialog__header {
+  padding: 11px var(--sheetcraft-dialog-padding-inline);
+  border-bottom: 1px solid var(--sheetcraft-border-divider);
+  border-radius: var(--sheetcraft-radius-dialog) var(--sheetcraft-radius-dialog) 0 0;
+  font-size: var(--sheetcraft-font-size-title-small);
+  line-height: var(--sheetcraft-line-height-title-small);
   font-weight: var(--sheetcraft-font-weight-semibold);
 }
 
-.t-dialog__body {
-  padding-block: var(--sheetcraft-dialog-content-padding-block);
+.t-dialog__ctx .t-dialog:not(.t-dialog__fullscreen) > .t-dialog__body {
+  padding: var(--sheetcraft-dialog-content-padding-block) var(--sheetcraft-dialog-padding-inline);
 }
 
-// Find owns actions and results in its body; the frame owns the bottom inset.
-.workbook-find-dialog-frame .t-dialog__body {
-  padding-bottom: 0;
+// Dialogs without a footer retain a balanced bottom inset inside the frame.
+.t-dialog__ctx
+  .t-dialog:not(.t-dialog__fullscreen):not(:has(> .t-dialog__footer))
+  > .t-dialog__body {
+  padding-bottom: 14px;
 }
 
-.t-dialog__footer {
-  padding: 0;
+.t-dialog__ctx .t-dialog:not(.t-dialog__fullscreen) > .t-dialog__footer {
+  padding: 10px var(--sheetcraft-dialog-padding-inline);
+  background: var(--sheetcraft-surface-dialog-footer);
+  border-top: 1px solid var(--sheetcraft-border-divider);
+  border-radius: 0 0 var(--sheetcraft-radius-dialog) var(--sheetcraft-radius-dialog);
 }
 
 .t-dialog__ctx .t-dialog .t-button:not(.t-size-s) {
   border-radius: var(--sheetcraft-radius-floating-item);
+  font-weight: var(--sheetcraft-font-weight-medium);
 }
 
-.t-dialog__ctx .t-dialog .t-input:not(.t-size-s) {
+// Dialog secondary/outline buttons use a crisp bordered card look for clear action hierarchy.
+.t-dialog__ctx
+  .t-dialog
+  .t-button--theme-default:is(.t-button--variant-base, .t-button--variant-outline) {
+  background: var(--sheetcraft-surface-panel);
+  border-color: var(--sheetcraft-border-subtle);
+  color: var(--sheetcraft-text-primary);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
+
+  &:hover:not(.t-is-disabled):not(.t-is-loading) {
+    background: var(--sheetcraft-surface-dialog-card);
+    border-color: var(--sheetcraft-border-control);
+  }
+
+  &:active:not(.t-is-disabled):not(.t-is-loading) {
+    background: var(--sheetcraft-surface-active);
+  }
+
+  &.t-is-disabled {
+    background: var(--sheetcraft-surface-dialog-card);
+    border-color: var(--sheetcraft-border-divider);
+    color: var(--sheetcraft-text-disabled);
+    box-shadow: none;
+  }
+}
+
+.t-dialog__ctx .t-dialog .t-input:not(.t-size-s),
+.t-dialog__ctx .t-dialog .t-textarea__inner {
   border-radius: var(--sheetcraft-radius-medium);
+}
+
+.t-dialog__ctx .t-dialog .t-form__label {
+  color: var(--sheetcraft-text-secondary);
+}
+
+// Dialog horizontal navigation uses compact segmented pill tabs.
+.t-dialog__ctx .t-dialog .t-tabs:not(.t-tabs--card) {
+  > .t-tabs__header .t-tabs__nav-container.t-is-top {
+    &::after {
+      display: none;
+    }
+
+    .t-tabs__nav-scroll {
+      padding: 1px 0;
+    }
+
+    .t-tabs__nav-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 3px;
+      border: 1px solid var(--sheetcraft-border-divider);
+      border-radius: 9px;
+      background: var(--sheetcraft-surface-dialog-card);
+    }
+
+    .t-tabs__bar.t-is-top {
+      display: none;
+    }
+
+    .t-tabs__nav-item {
+      height: 26px;
+      line-height: 26px;
+      padding: 0;
+      border-radius: 6px;
+      color: var(--sheetcraft-text-secondary);
+      overflow: visible;
+
+      .t-tabs__nav-item-wrapper {
+        height: 26px;
+        margin: 0;
+        padding: 0 12px;
+        border-radius: 6px;
+        transition:
+          background-color 0.14s ease,
+          color 0.14s ease,
+          box-shadow 0.14s ease;
+
+        &:has(:focus-visible) {
+          box-shadow:
+            var(--sheetcraft-shadow-segmented-active),
+            0 0 0 2px var(--sheetcraft-action-focus);
+        }
+
+        button:focus-visible {
+          outline: none;
+          box-shadow: none;
+        }
+      }
+
+      &:not(.t-is-disabled):not(.t-is-active):hover {
+        color: var(--sheetcraft-text-primary);
+
+        .t-tabs__nav-item-wrapper {
+          background-color: var(--sheetcraft-surface-menu-hover);
+        }
+      }
+
+      &.t-is-active {
+        color: var(--sheetcraft-text-primary);
+        font-weight: var(--sheetcraft-font-weight-semibold);
+        text-shadow: none;
+
+        .t-tabs__nav-item-wrapper {
+          background-color: var(--sheetcraft-surface-panel);
+          box-shadow: var(--sheetcraft-shadow-segmented-active);
+        }
+      }
+    }
+  }
 }
 
 // The chart source frame bounds its height; only its body scrolls.
@@ -562,11 +679,12 @@
 
 // Dialog action/status icons retain their geometry independently of body text.
 .t-dialog__ctx .t-dialog__close {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
+  margin: -2px -4px -2px 0;
   justify-content: center;
   border-radius: var(--sheetcraft-radius-floating-item);
-  font-size: 18px;
+  font-size: 16px;
   transition:
     background-color 0.14s ease,
     color 0.14s ease;
@@ -578,7 +696,7 @@
 }
 
 .t-dialog__header .t-icon:not(.t-icon-close) {
-  font-size: 24px;
+  font-size: 20px;
 }
 
 .cell-format-dialog {
@@ -589,7 +707,8 @@
 
   .cell-format-dialog__tabs {
     box-sizing: border-box;
-    padding-top: var(--sheetcraft-dialog-content-padding-block);
+    padding: var(--sheetcraft-dialog-content-padding-block) var(--sheetcraft-dialog-padding-inline)
+      0;
 
     > .t-tabs__header {
       flex: none;

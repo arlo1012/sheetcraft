@@ -35,18 +35,18 @@
   min-height: 0;
   overflow: auto;
   padding: 4px;
-  border: 1px solid var(--sheetcraft-border-subtle);
-  border-radius: var(--sheetcraft-radius-default);
-  background: var(--sheetcraft-surface-panel);
+  border: 1px solid var(--sheetcraft-border-divider);
+  border-radius: var(--sheetcraft-radius-dialog-card);
+  background: var(--sheetcraft-surface-dialog-card);
 }
 
 @mixin item {
   display: block;
   width: 100%;
-  min-height: 24px;
+  min-height: 26px;
   padding: 2px 8px;
   border: 0;
-  border-radius: var(--sheetcraft-radius-small);
+  border-radius: var(--sheetcraft-radius-medium);
   background: transparent;
   color: var(--sheetcraft-text-primary);
   font: inherit;
@@ -55,12 +55,15 @@
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
+  transition: background-color 0.12s ease;
 
   &:hover:not(:disabled):not([aria-selected="true"]) {
-    background: var(--sheetcraft-surface-secondary);
+    background: var(--sheetcraft-surface-menu-hover);
   }
   &[aria-selected="true"] {
-    background: var(--sheetcraft-surface-active);
+    background: var(--sheetcraft-action-primary-subtle);
+    color: var(--sheetcraft-action-primary);
+    font-weight: var(--sheetcraft-font-weight-medium);
   }
   &.is-located:not([aria-selected="true"]) {
     background: var(--sheetcraft-surface-secondary);

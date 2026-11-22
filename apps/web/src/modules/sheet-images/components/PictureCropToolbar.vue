@@ -179,8 +179,8 @@ defineExpose({
   position: fixed;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px;
+  gap: 3px;
+  padding: 3px;
   max-width: calc(100vw - 16px);
   flex-wrap: wrap;
   &__button {

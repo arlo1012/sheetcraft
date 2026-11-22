@@ -290,6 +290,7 @@ async function selectDraftReference(
     min-width: 0;
 
     > span {
+      color: var(--sheetcraft-text-secondary);
       text-align: right;
     }
 

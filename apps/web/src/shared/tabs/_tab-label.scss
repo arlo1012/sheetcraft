@@ -7,6 +7,11 @@
   background: transparent;
   cursor: pointer;
 
+  &:focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
+
   @if $with-icon {
     display: inline-flex;
     align-items: center;

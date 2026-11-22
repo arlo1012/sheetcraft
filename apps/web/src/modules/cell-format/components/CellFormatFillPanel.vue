@@ -209,37 +209,50 @@ function setGradient(gradient: CellFillGradient): void {
     min-width: 0;
     width: max-content;
     max-width: 100%;
+
+    > span {
+      color: var(--sheetcraft-text-secondary);
+    }
   }
   &__no-fill,
   &__effects {
     height: 28px;
     padding: 0 12px;
-    border: 1px solid var(--sheetcraft-border-strong);
-    border-radius: var(--sheetcraft-radius-default);
+    border: 1px solid var(--sheetcraft-border-subtle);
+    border-radius: var(--sheetcraft-radius-floating-item);
     background: var(--sheetcraft-surface-panel);
     color: inherit;
     font: inherit;
+    font-weight: var(--sheetcraft-font-weight-medium);
+    box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
     cursor: pointer;
+    transition:
+      background-color 0.12s ease,
+      border-color 0.12s ease;
+
     &:hover {
-      background: var(--sheetcraft-surface-hover);
+      background: var(--sheetcraft-surface-dialog-card);
+      border-color: var(--sheetcraft-border-control);
     }
   }
   &__no-fill {
     width: 100%;
     &[aria-pressed="true"] {
-      background: var(--sheetcraft-surface-hover);
+      border-color: var(--sheetcraft-action-primary);
+      background: var(--sheetcraft-action-primary-subtle);
+      color: var(--sheetcraft-action-primary);
     }
   }
   &__palette {
     max-width: 100%;
-    border: 1px solid var(--sheetcraft-border-subtle);
-    border-radius: var(--sheetcraft-radius-default);
+    border: 1px solid var(--sheetcraft-border-divider);
+    border-radius: var(--sheetcraft-radius-dialog-card);
     overflow: hidden;
   }
   &__pattern {
     display: grid;
     align-content: start;
-    gap: 8px;
+    gap: 10px;
     min-width: 0;
   }
   &__field {
@@ -248,23 +261,27 @@ function setGradient(gradient: CellFillGradient): void {
     align-items: center;
     gap: 8px;
     min-width: 0;
+
+    > span {
+      color: var(--sheetcraft-text-secondary);
+    }
   }
   &__preview-group {
     display: grid;
-    gap: 4px;
+    gap: 6px;
     min-width: 0;
-    margin-top: 8px;
+    margin-top: 6px;
   }
   &__preview {
     display: grid;
     place-items: center;
-    height: 96px;
+    height: 104px;
     min-width: 0;
     overflow: hidden;
     color: var(--sheetcraft-text-muted);
-    background-color: #fff;
-    border: 1px solid var(--sheetcraft-border-subtle);
-    border-radius: var(--sheetcraft-radius-default);
+    background-color: var(--sheetcraft-surface-panel);
+    border: 1px solid var(--sheetcraft-border-divider);
+    border-radius: var(--sheetcraft-radius-dialog-card);
   }
 }
 @media (max-width: 560px) {

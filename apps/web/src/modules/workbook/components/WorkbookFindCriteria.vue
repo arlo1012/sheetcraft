@@ -203,19 +203,21 @@ defineExpose({ focusQuery });
 <style scoped lang="scss">
 .workbook-find-criteria {
   display: grid;
-  gap: var(--sheetcraft-space-4);
+  gap: 10px;
   min-width: 0;
   &__query-row {
     display: grid;
-    grid-template-columns: 6em minmax(0, 1fr);
+    grid-template-columns: 5.5em minmax(0, 1fr);
     align-items: center;
-    gap: var(--sheetcraft-space-2);
+    gap: var(--sheetcraft-space-3);
     min-width: 0;
     &.is-expanded {
-      grid-template-columns: 6em minmax(0, 1fr) 108px auto;
+      grid-template-columns: 5.5em minmax(0, 1fr) 108px auto;
     }
   }
   &__query-label {
+    color: var(--sheetcraft-text-secondary);
+    text-align: right;
     white-space: nowrap;
   }
   &__query,
@@ -227,6 +229,10 @@ defineExpose({ focusQuery });
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--sheetcraft-space-3);
+    padding: 10px 12px;
+    border: 1px solid var(--sheetcraft-border-divider);
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
     min-width: 0;
   }
   &__option {
@@ -234,6 +240,9 @@ defineExpose({ focusQuery });
     grid-template-columns: minmax(0, 1fr);
     gap: var(--sheetcraft-space-2);
     min-width: 0;
+    > span {
+      color: var(--sheetcraft-text-secondary);
+    }
     > * {
       min-width: 0;
       max-width: 100%;
@@ -243,7 +252,8 @@ defineExpose({ focusQuery });
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: var(--sheetcraft-space-2);
+    gap: var(--sheetcraft-space-3);
+    padding-left: calc(5.5em + var(--sheetcraft-space-3));
     min-width: 0;
   }
   &__special-content {
@@ -269,6 +279,9 @@ defineExpose({ focusQuery });
     }
     &__options {
       grid-template-columns: minmax(0, 1fr);
+    }
+    &__tools {
+      padding-left: 0;
     }
   }
 }

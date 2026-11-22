@@ -22,6 +22,8 @@
     --sheetcraft-formula-reference-7: #6c7b1a;
     --sheetcraft-surface-canvas: var(--sheetcraft-palette-neutral-1);
     --sheetcraft-surface-panel: #fff;
+    --sheetcraft-surface-dialog-footer: #f8f9fb;
+    --sheetcraft-surface-dialog-card: #f6f7f9;
     --sheetcraft-eye-comfort-surface: #e8f1e3;
     --sheetcraft-eye-comfort-header: #dce8d7;
     --sheetcraft-eye-comfort-gridline: #c4d1be;
@@ -48,10 +50,13 @@
     --sheetcraft-text-inverse: #fff;
     --sheetcraft-text-link: var(--sheetcraft-palette-brand-8);
     --sheetcraft-border-subtle: var(--sheetcraft-palette-neutral-4);
+    --sheetcraft-border-divider: rgb(15 23 42 / 7%);
     --sheetcraft-border-floating: rgb(15 23 42 / 9%);
     --sheetcraft-border-dialog: rgb(15 23 42 / 8%);
     --sheetcraft-border-control: var(--sheetcraft-palette-neutral-6);
     --sheetcraft-border-strong: var(--sheetcraft-palette-neutral-4);
+    --sheetcraft-shadow-segmented-active:
+      0 1px 3px rgb(15 23 42 / 10%), 0 0 0 1px rgb(15 23 42 / 4%);
     --sheetcraft-shadow-menu:
       0 12px 32px -4px rgb(15 23 42 / 12%), 0 4px 10px -2px rgb(15 23 42 / 6%);
     --sheetcraft-shadow-floating:
@@ -96,6 +101,8 @@
     --sheetcraft-formula-reference-7: #c4d96a;
     --sheetcraft-surface-canvas: var(--sheetcraft-palette-neutral-14);
     --sheetcraft-surface-panel: var(--sheetcraft-palette-neutral-13);
+    --sheetcraft-surface-dialog-footer: #1d2025;
+    --sheetcraft-surface-dialog-card: #282c34;
     --sheetcraft-eye-comfort-surface: #26332b;
     --sheetcraft-eye-comfort-header: #212b25;
     --sheetcraft-eye-comfort-gridline: #3c5041;
@@ -122,10 +129,13 @@
     --sheetcraft-text-inverse: #fff;
     --sheetcraft-text-link: var(--sheetcraft-palette-brand-8);
     --sheetcraft-border-subtle: var(--sheetcraft-palette-neutral-11);
+    --sheetcraft-border-divider: rgb(255 255 255 / 9%);
     --sheetcraft-border-floating: rgb(255 255 255 / 12%);
     --sheetcraft-border-dialog: rgb(255 255 255 / 12%);
     --sheetcraft-border-control: var(--sheetcraft-palette-neutral-9);
     --sheetcraft-border-strong: var(--sheetcraft-palette-neutral-9);
+    --sheetcraft-shadow-segmented-active:
+      0 1px 3px rgb(0 0 0 / 36%), 0 0 0 1px rgb(255 255 255 / 8%);
     --sheetcraft-shadow-menu: 0 14px 32px -4px rgb(0 0 0 / 48%), 0 4px 12px -2px rgb(0 0 0 / 32%);
     --sheetcraft-shadow-floating:
       0 18px 40px -6px rgb(0 0 0 / 54%), 0 6px 16px -3px rgb(0 0 0 / 36%);

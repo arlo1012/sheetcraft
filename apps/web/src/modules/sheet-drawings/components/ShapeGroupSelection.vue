@@ -315,7 +315,7 @@ const selectionActions = computed(() => {
     pointer-events: auto;
     z-index: var(--sheetcraft-layer-toolbar);
     @include panel.toolbar-surface(var(--sheetcraft-layer-toolbar));
-    padding: 4px;
+    padding: 3px;
     button {
       font: inherit;
       color: inherit;

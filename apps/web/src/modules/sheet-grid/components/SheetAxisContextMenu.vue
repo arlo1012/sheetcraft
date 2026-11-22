@@ -307,9 +307,9 @@ function requestClear(mode: "contents" | "formats" | "all"): void {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    min-height: 32px;
+    min-height: 28px;
     gap: 8px;
-    padding: 0 calc(var(--sheetcraft-menu-inset) + 10px);
+    padding: 0 calc(var(--sheetcraft-menu-inset) + 9px);
     list-style: none;
   }
 }

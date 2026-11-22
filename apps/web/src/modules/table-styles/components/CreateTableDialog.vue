@@ -119,7 +119,11 @@ function confirm(context?: { e?: Event }): void {
 
   &__field {
     display: grid;
-    gap: 4px;
+    gap: 5px;
+
+    > span {
+      color: var(--sheetcraft-text-secondary);
+    }
   }
   &__modes,
   &__mode,

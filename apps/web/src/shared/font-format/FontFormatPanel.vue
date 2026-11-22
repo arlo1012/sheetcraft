@@ -269,8 +269,12 @@ const previewText = computed(() =>
   &__field {
     display: grid;
     align-content: start;
-    gap: 4px;
+    gap: 5px;
     min-width: 0;
+
+    > span {
+      color: var(--sheetcraft-text-secondary);
+    }
   }
   &__list {
     height: 160px;
@@ -307,10 +311,10 @@ const previewText = computed(() =>
     min-width: 0;
     height: 72px;
     overflow: hidden;
-    padding: 12px 8px;
-    border: 1px solid var(--sheetcraft-border-subtle);
-    border-radius: var(--sheetcraft-radius-default);
-    background: var(--sheetcraft-surface-panel);
+    padding: 12px 10px;
+    border: 1px solid var(--sheetcraft-border-divider);
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
     line-height: normal;
     white-space: pre;
   }

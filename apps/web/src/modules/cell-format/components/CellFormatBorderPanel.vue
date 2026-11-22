@@ -293,44 +293,47 @@ const previewState = computed<SelectionBorderState>(() => ({
 <style scoped lang="scss">
 .cell-format-border-panel {
   display: grid;
-  gap: 20px;
+  gap: 12px;
   color: var(--sheetcraft-text-primary);
   font-size: var(--sheetcraft-font-size-body-medium);
   line-height: var(--sheetcraft-line-height-body-medium);
 
   h3 {
-    margin: 0;
+    margin: 0 0 2px;
     font-size: inherit;
     font-weight: var(--sheetcraft-font-weight-semibold);
   }
   &__layout {
     display: grid;
-    grid-template-columns: 192px minmax(0, 1fr);
+    grid-template-columns: 196px minmax(0, 1fr);
     gap: 16px;
   }
   &__lines {
     display: grid;
     align-content: start;
-    gap: 4px;
+    gap: 8px;
     min-width: 0;
     padding-right: 16px;
-    border-right: 1px solid var(--sheetcraft-border-subtle);
+    border-right: 1px solid var(--sheetcraft-border-divider);
   }
   &__field,
   &__section {
     display: grid;
     align-content: start;
-    gap: 4px;
+    gap: 6px;
     min-width: 0;
   }
+  &__field > span {
+    color: var(--sheetcraft-text-secondary);
+  }
   &__field + &__field {
-    margin-top: 4px;
+    margin-top: 2px;
   }
   &__style-list {
-    padding: var(--sheetcraft-tool-panel-padding);
-    border: 1px solid var(--sheetcraft-border-subtle);
-    border-radius: var(--sheetcraft-radius-default);
-    background: var(--sheetcraft-surface-panel);
+    padding: 6px;
+    border: 1px solid var(--sheetcraft-border-divider);
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
   }
   &__line-sample {
     display: flex;
@@ -340,16 +343,16 @@ const previewState = computed<SelectionBorderState>(() => ({
     height: 28px;
     padding: 0 8px;
     overflow: hidden;
-    border: 1px solid var(--sheetcraft-border-subtle);
-    border-radius: var(--sheetcraft-radius-default);
-    background: var(--sheetcraft-surface-panel);
+    border: 1px solid var(--sheetcraft-border-divider);
+    border-radius: var(--sheetcraft-radius-medium);
+    background: var(--sheetcraft-surface-dialog-card);
     color: inherit;
     font: inherit;
   }
   &__borders {
     display: grid;
     align-content: start;
-    gap: 16px;
+    gap: 12px;
     min-width: 0;
   }
   &__presets {
@@ -360,20 +363,32 @@ const previewState = computed<SelectionBorderState>(() => ({
     > button {
       display: grid;
       justify-items: center;
-      align-content: start;
+      align-content: center;
       gap: 4px;
       min-width: 0;
-      padding: 0;
-      border: 0;
-      border-radius: var(--sheetcraft-radius-default);
-      background: transparent;
-      color: inherit;
+      padding: 8px 4px 6px;
+      border: 1px solid var(--sheetcraft-border-divider);
+      border-radius: var(--sheetcraft-radius-dialog-card);
+      background: var(--sheetcraft-surface-dialog-card);
+      color: var(--sheetcraft-text-secondary);
       font: inherit;
       text-align: center;
       cursor: pointer;
+      transition:
+        background-color 0.14s ease,
+        border-color 0.14s ease,
+        color 0.14s ease,
+        box-shadow 0.14s ease;
 
-      &:hover:not(:disabled) .cell-format-border-panel__preset-icon {
-        background: var(--sheetcraft-icon-button-hover-bg);
+      &:hover:not(:disabled) {
+        background: var(--sheetcraft-surface-panel);
+        border-color: var(--sheetcraft-border-subtle);
+        color: var(--sheetcraft-text-primary);
+        box-shadow: 0 1px 3px rgb(15 23 42 / 6%);
+      }
+
+      &:active:not(:disabled) {
+        background: var(--sheetcraft-surface-active);
       }
 
       &:disabled {
@@ -386,15 +401,13 @@ const previewState = computed<SelectionBorderState>(() => ({
   &__preset-icon {
     display: grid;
     place-items: center;
-    width: 48px;
-    height: 48px;
-    border: 1px solid var(--sheetcraft-border-subtle);
-    border-radius: var(--sheetcraft-radius-default);
-    background: var(--sheetcraft-surface-panel);
+    width: 32px;
+    height: 32px;
+    color: var(--sheetcraft-text-primary);
   }
   &__hint {
     margin: 0;
-    color: var(--sheetcraft-text-secondary);
+    color: var(--sheetcraft-text-muted);
     font-size: var(--sheetcraft-font-size-body-small);
     line-height: var(--sheetcraft-line-height-body-small);
   }

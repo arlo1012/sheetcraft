@@ -229,7 +229,7 @@ watch(
   align-items: center;
   gap: 8px;
   min-height: 30px;
-  padding: 4px;
+  padding: 3px;
 
   &__action {
     position: relative;

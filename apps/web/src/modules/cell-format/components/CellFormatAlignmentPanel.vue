@@ -291,12 +291,12 @@ function checkboxPressed(
   }
   &__content {
     display: grid;
-    gap: 16px;
+    gap: 14px;
     align-content: start;
   }
   &__group {
     display: grid;
-    gap: 4px;
+    gap: 6px;
     min-width: 0;
   }
   h3 {
@@ -307,7 +307,7 @@ function checkboxPressed(
   &__fields {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr)) 96px;
-    gap: 12px;
+    gap: 10px;
   }
   &__field {
     display: grid;
@@ -315,6 +315,10 @@ function checkboxPressed(
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
     gap: 4px;
+
+    > span {
+      color: var(--sheetcraft-text-secondary);
+    }
   }
   &__checks {
     display: flex;

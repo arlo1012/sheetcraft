@@ -188,11 +188,9 @@ const { t } = useAppI18n();
     line-height: var(--sheetcraft-line-height-body-medium);
 
     &[aria-checked="true"] {
-      --sheetcraft-icon-feedback-background: color-mix(
-        in srgb,
-        var(--sheetcraft-text-primary) 12%,
-        transparent
-      );
+      --sheetcraft-icon-feedback-background: var(--sheetcraft-surface-panel);
+      background: var(--sheetcraft-surface-panel);
+      box-shadow: var(--sheetcraft-shadow-segmented-active);
     }
   }
 }

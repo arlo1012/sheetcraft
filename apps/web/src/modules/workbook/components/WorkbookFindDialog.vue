@@ -121,7 +121,7 @@ defineExpose({ focusQuery });
     dialog-class-name="workbook-find-dialog-frame"
     draggable
     top="160px"
-    width="min(600px, calc(100vw - 32px))"
+    width="min(520px, calc(100vw - 32px))"
     :show-overlay="false"
     :prevent-scroll-through="false"
     :close-on-overlay-click="false"
@@ -257,25 +257,32 @@ defineExpose({ focusQuery });
   min-width: 0;
   &__pane {
     display: grid;
-    gap: var(--sheetcraft-space-4);
-    padding-top: var(--sheetcraft-space-4);
+    gap: 10px;
+    padding-top: var(--sheetcraft-space-5);
     min-width: 0;
   }
   &__replacement {
     display: grid;
-    grid-template-columns: 6em minmax(0, 1fr);
+    grid-template-columns: 5.5em minmax(0, 1fr);
     &.is-expanded {
-      grid-template-columns: 6em minmax(0, 1fr) 108px auto;
+      grid-template-columns: 5.5em minmax(0, 1fr) 108px auto;
     }
     align-items: center;
-    gap: var(--sheetcraft-space-2);
+    gap: var(--sheetcraft-space-3);
+
+    > span {
+      color: var(--sheetcraft-text-secondary);
+      text-align: right;
+    }
   }
   &__actions {
     display: flex;
     justify-content: flex-end;
     align-items: center;
     flex-wrap: wrap;
-    gap: var(--sheetcraft-space-2);
+    gap: var(--sheetcraft-space-3);
+    padding-top: 10px;
+    border-top: 1px solid var(--sheetcraft-border-divider);
   }
   &__status {
     margin: 0;

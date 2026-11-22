@@ -238,7 +238,7 @@ function selectNegative(code: string): void {
     min-height: 0;
   }
   &__label {
-    color: var(--sheetcraft-text-primary);
+    color: var(--sheetcraft-text-secondary);
     font-weight: var(--sheetcraft-font-weight-medium);
     line-height: var(--sheetcraft-line-height-body-medium);
   }
@@ -250,7 +250,7 @@ function selectNegative(code: string): void {
   &__preview {
     display: grid;
     grid-template-rows: auto 40px;
-    gap: 8px;
+    gap: 6px;
     flex: none;
   }
   &__sample {
@@ -259,10 +259,10 @@ function selectNegative(code: string): void {
     min-width: 0;
     overflow: auto;
     padding: 8px 12px;
-    border: 1px solid var(--sheetcraft-border-subtle);
-    border-radius: var(--sheetcraft-radius-default);
+    border: 1px solid var(--sheetcraft-border-divider);
+    border-radius: var(--sheetcraft-radius-dialog-card);
     color: var(--sheetcraft-text-primary);
-    background: var(--sheetcraft-surface-panel);
+    background: var(--sheetcraft-surface-dialog-card);
     font-size: var(--sheetcraft-font-size-body-large);
     font-weight: var(--sheetcraft-font-weight-regular);
     line-height: var(--sheetcraft-line-height-body-large);
@@ -273,7 +273,7 @@ function selectNegative(code: string): void {
   &__settings {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
     flex: 1;
     min-height: 0;
   }
@@ -289,6 +289,10 @@ function selectNegative(code: string): void {
     align-items: center;
     gap: 8px;
     flex: none;
+
+    > span {
+      color: var(--sheetcraft-text-secondary);
+    }
   }
   &__digits {
     max-width: 144px;

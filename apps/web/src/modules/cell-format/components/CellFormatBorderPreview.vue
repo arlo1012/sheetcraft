@@ -215,9 +215,13 @@ const { t } = useAppI18n();
 <style scoped lang="scss">
 .cell-format-border-preview {
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
-  grid-template-rows: 208px 32px;
+  grid-template-columns: 30px minmax(0, 1fr);
+  grid-template-rows: 176px 30px;
   gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--sheetcraft-border-divider);
+  border-radius: var(--sheetcraft-radius-dialog-card);
+  background: var(--sheetcraft-surface-dialog-card);
 
   &__horizontal-controls {
     display: flex;
@@ -235,17 +239,22 @@ const { t } = useAppI18n();
       display: grid;
       flex: none;
       place-items: center;
-      width: 32px;
-      height: 32px;
+      width: 30px;
+      height: 30px;
       padding: 0;
       border: 1px solid var(--sheetcraft-border-subtle);
-      border-radius: var(--sheetcraft-radius-default);
+      border-radius: var(--sheetcraft-radius-floating-item);
       background: var(--sheetcraft-surface-panel);
       color: var(--sheetcraft-text-primary);
       cursor: pointer;
+      transition:
+        background-color 0.12s ease,
+        border-color 0.12s ease;
+
       &[aria-pressed="true"] {
         border-color: var(--sheetcraft-action-primary);
-        background: var(--sheetcraft-surface-selected);
+        background: var(--sheetcraft-action-primary-subtle);
+        color: var(--sheetcraft-action-primary);
       }
       &[aria-pressed="mixed"] {
         border-style: dashed;
@@ -262,9 +271,10 @@ const { t } = useAppI18n();
     position: relative;
     min-width: 0;
     overflow: hidden;
-    border: 1px solid var(--sheetcraft-border-subtle);
-    border-radius: var(--sheetcraft-radius-default);
+    border: 1px solid var(--sheetcraft-border-divider);
+    border-radius: var(--sheetcraft-radius-floating-item);
     background: var(--sheetcraft-surface-panel);
+    box-shadow: 0 1px 3px rgb(15 23 42 / 4%);
 
     > svg {
       position: absolute;

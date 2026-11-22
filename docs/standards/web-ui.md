@@ -80,12 +80,12 @@ Use CSS pixels at 100% scale; size and line height are a pair.
 
 ## Surfaces, controls, and focus
 
-| Surface        | Padding / Radius                         | Owner                                                                   |
-| -------------- | ---------------------------------------- | ----------------------------------------------------------------------- |
-| Content panel  | 8px inset; 16px outer / 8px inner radius | `--sheetcraft-tool-panel-padding`, `--sheetcraft-radius-floating`       |
-| List menu      | 6px vertical; 16px outer / 10px row      | `--sheetcraft-menu-padding`, `--sheetcraft-menu-inset`; rows own insets |
-| Dialog frame   | 20px inset; 18px outer / 8px action      | Shared TDesign adapter, `--sheetcraft-radius-dialog`                    |
-| Dialog content | 12px vertical                            | `--sheetcraft-dialog-content-padding-block`; adapter or body-owning tab |
+| Surface        | Padding / Radius                                           | Owner                                                                   |
+| -------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Content panel  | 8px inset; 14px outer / 7px inner radius                   | `--sheetcraft-tool-panel-padding`, `--sheetcraft-radius-floating`       |
+| List menu      | 5px vertical; 14px outer / 9px row (28px height)           | `--sheetcraft-menu-padding`, `--sheetcraft-menu-inset`; rows own insets |
+| Dialog frame   | 14px radius; 11×16 header, 12×16 body, 10×16 tinted footer | Shared TDesign adapter, `--sheetcraft-radius-dialog`                    |
+| Dialog content | 12px vertical; 10px soft card groups, segmented pill tabs  | `--sheetcraft-dialog-content-padding-block`; adapter or body-owning tab |
 
 - One layer owns each inset. Keep control/row padding and gaps separate; hover
   and selected menu backgrounds span the row. Suggestions, input assists, and

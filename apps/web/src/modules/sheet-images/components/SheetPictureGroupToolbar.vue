@@ -111,7 +111,7 @@ function onKeydown(event: KeyboardEvent): void {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 4px;
+  padding: 3px;
   button {
     display: inline-flex;
     align-items: center;

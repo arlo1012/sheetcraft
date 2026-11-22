@@ -97,10 +97,10 @@ function onKeydown(event: KeyboardEvent): void {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  min-height: 32px;
-  gap: 10px;
+  min-height: 28px;
+  gap: 8px;
   margin-inline: var(--sheetcraft-menu-inset);
-  padding: 0 var(--sheetcraft-menu-item-padding-inline, 10px);
+  padding: 0 var(--sheetcraft-menu-item-padding-inline, 9px);
   border-radius: var(--sheetcraft-radius-menu-item);
   color: var(--sheetcraft-text-primary);
   font: inherit;
@@ -175,7 +175,7 @@ function onKeydown(event: KeyboardEvent): void {
 
     .sheetcraft-menu-item--with-icon & {
       grid-template-columns: 16px minmax(0, 1fr);
-      gap: 10px;
+      gap: 8px;
     }
 
     &:focus-visible {
