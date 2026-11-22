@@ -560,6 +560,7 @@ watch(
       @close="closeCellDialog()"
     />
     <Dialog
+      v-if="isSizeDialogOpen"
       role="dialog"
       aria-modal="true"
       :aria-label="t(sizeTarget?.axis === 'row' ? 'axisMenu.rowHeight' : 'axisMenu.columnWidth')"
@@ -600,6 +601,7 @@ watch(
       </div>
     </Dialog>
     <Dialog
+      v-if="isStandardWidthDialogOpen"
       role="dialog"
       aria-modal="true"
       :aria-label="t('axisMenu.standardColumnWidth')"

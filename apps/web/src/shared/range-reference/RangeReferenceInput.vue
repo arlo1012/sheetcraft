@@ -99,7 +99,13 @@ async function pickReference(): Promise<void> {
       :clearable="clearable"
       :placeholder="placeholder"
       autocomplete="off"
-      @enter="emit('enter')"
+      @enter="
+        (_value, context) => {
+          context.e.preventDefault();
+          context.e.stopPropagation();
+          emit('enter');
+        }
+      "
     >
       <template #suffixIcon>
         <SquareMousePointer

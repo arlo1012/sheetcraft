@@ -9,6 +9,7 @@ import type { PrimaryTableCol } from "tdesign-vue-next/es/table/type";
 import { formatCellAddress } from "@sheetcraft/core/coordinates";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 import type { useWordProofreading } from "../useWordProofreading";
 const props = defineProps<{ controller: ReturnType<typeof useWordProofreading> }>();
 const { t } = useAppI18n();
@@ -70,6 +71,7 @@ function scan() {
 </script>
 <template>
   <Dialog
+    v-if="controller.panel.value === 'review'"
     :visible="controller.panel.value === 'review'"
     :header="t('wordProof.review')"
     width="960px"
@@ -81,6 +83,13 @@ function scan() {
         <span>{{ t("wordProof.scope") }}</span>
         <Select
           v-model="controller.scope.value"
+          v-native-control="{
+            attributes: {
+              id: 'word-review-scope',
+              name: 'word-review-scope',
+              'aria-label': t('wordProof.scope'),
+            },
+          }"
           :aria-label="t('wordProof.scope')"
           class="word-review__scope"
         >

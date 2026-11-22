@@ -35,6 +35,7 @@ const labels = computed(() => messages[props.confirmation ?? "reload"]);
 
 <template>
   <Dialog
+    v-if="confirmation !== undefined"
     :visible="confirmation !== undefined"
     :header="t(labels.title)"
     :body="t(labels.description)"

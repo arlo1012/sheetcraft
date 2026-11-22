@@ -310,6 +310,7 @@ watch(
     />
 
     <Dialog
+      v-if="renameDialogOpen"
       :visible="renameDialogOpen"
       :header="t('sheetTabs.renameAction')"
       :confirm-btn="{
@@ -339,6 +340,7 @@ watch(
     </Dialog>
 
     <Dialog
+      v-if="unhideDialogOpen"
       :visible="unhideDialogOpen"
       :header="t('sheetTabs.hiddenSheets')"
       :footer="false"

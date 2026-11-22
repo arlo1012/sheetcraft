@@ -25,7 +25,9 @@ const draft = ref({
 });
 const styleOnly = computed(() => !inserting.value && draft.value.mode === "styleOnly");
 
-function confirm(): void {
+function confirm(context?: { e?: Event }): void {
+  context?.e?.preventDefault();
+  context?.e?.stopPropagation();
   emit("confirm", { ...draft.value, ...(inserting.value ? { mode: "table" as const } : {}) });
 }
 </script>

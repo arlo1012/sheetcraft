@@ -162,6 +162,7 @@ function editEntry(target: DictionaryCategory, entry: WordRule) {
 </script>
 <template>
   <Dialog
+    v-if="visible"
     :visible="visible"
     :header="title"
     :width="

@@ -37,6 +37,7 @@ watch(
 
 <template>
   <TDialog
+    v-if="visible"
     :visible="visible"
     :header="t('pageDecoration.backgroundWatermarkConflictTitle')"
     :confirm-btn="{
