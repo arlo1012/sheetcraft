@@ -5,8 +5,8 @@
 <style scoped lang="scss">
 .sheetcraft-menu-separator {
   height: 1px;
-  margin: 4px 0;
+  margin: 5px calc(var(--sheetcraft-menu-inset) + 6px);
   list-style: none;
-  background: var(--sheetcraft-border-subtle);
+  background: var(--sheetcraft-border-floating);
 }
 </style>

@@ -229,7 +229,7 @@ watch(
   align-items: center;
   gap: 8px;
   min-height: 30px;
-  padding: 2px;
+  padding: 4px;
 
   &__action {
     position: relative;
@@ -241,7 +241,7 @@ watch(
     padding: 0;
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 2px;
+    border-radius: var(--sheetcraft-radius-floating-item);
     color: var(--sheetcraft-text-primary);
     cursor: pointer;
 

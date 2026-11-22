@@ -44,7 +44,9 @@ defineSlots<{ default(): VNode[]; actions?(): VNode[] }>();
     align-items: center;
     justify-content: space-between;
     gap: var(--sheetcraft-space-2);
-    padding: var(--sheetcraft-space-1) var(--sheetcraft-space-5);
+    margin-inline: var(--sheetcraft-gallery-header-inset, 0);
+    padding: var(--sheetcraft-space-1) var(--sheetcraft-space-4);
+    border-radius: var(--sheetcraft-gallery-header-radius, var(--sheetcraft-radius-medium));
     background: var(--sheetcraft-surface-secondary);
     color: var(--sheetcraft-text-secondary);
   }

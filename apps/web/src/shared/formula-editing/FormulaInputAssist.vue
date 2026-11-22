@@ -368,6 +368,9 @@ defineExpose<
   min-width: 210px;
   max-width: min(480px, calc(100vw - 24px));
   max-height: min(360px, calc(100vh - 40px));
+  padding: var(--sheetcraft-menu-inset);
+  border-color: var(--sheetcraft-border-floating);
+  border-radius: var(--sheetcraft-radius-floating);
   box-shadow: var(--sheetcraft-shadow-menu);
 
   // Argument help may overlap the grid but must not intercept reference picks.
@@ -379,7 +382,11 @@ defineExpose<
     @include option-list.item;
     display: grid;
     grid-template-columns: 100px minmax(0, 1fr);
+    align-items: center;
+    min-height: 28px;
     gap: var(--sheetcraft-space-2);
+    padding: 3px 10px;
+    border-radius: var(--sheetcraft-radius-menu-item);
 
     strong {
       font-weight: var(--sheetcraft-font-weight-medium);

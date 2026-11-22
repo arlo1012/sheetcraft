@@ -45,7 +45,7 @@ defineExpose({ focus: () => fieldRef.value?.querySelector<HTMLInputElement>("inp
     right: 0;
     bottom: 100%;
     left: 0;
-    height: var(--sheetcraft-space-4);
+    height: var(--sheetcraft-menu-inset);
     background: var(--sheetcraft-surface-panel);
     content: "";
     pointer-events: none;
@@ -55,7 +55,7 @@ defineExpose({ focus: () => fieldRef.value?.querySelector<HTMLInputElement>("inp
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 0 8px 6px;
+    padding: 0 var(--sheetcraft-menu-inset) 6px;
 
     > :first-child {
       flex: 1;

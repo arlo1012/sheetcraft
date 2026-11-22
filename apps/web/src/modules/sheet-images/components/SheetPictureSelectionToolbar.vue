@@ -279,7 +279,7 @@ watch(
     height: 28px;
     padding: 4px;
     border: 1px solid transparent;
-    border-radius: 4px;
+    border-radius: var(--sheetcraft-radius-floating-item);
     background: transparent;
     color: var(--sheetcraft-text-primary);
     cursor: pointer;

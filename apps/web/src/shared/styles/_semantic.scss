@@ -26,6 +26,8 @@
     --sheetcraft-eye-comfort-header: #dce8d7;
     --sheetcraft-eye-comfort-gridline: #c4d1be;
     --sheetcraft-surface-hover: var(--sheetcraft-palette-neutral-3);
+    --sheetcraft-surface-menu-hover: rgb(15 23 42 / 5.5%);
+    --sheetcraft-surface-menu-danger-hover: var(--sheetcraft-palette-error-1);
     --sheetcraft-surface-active: var(--sheetcraft-palette-neutral-3);
     --sheetcraft-surface-selected: #fff;
     --sheetcraft-surface-secondary: var(--sheetcraft-palette-neutral-2);
@@ -46,17 +48,20 @@
     --sheetcraft-text-inverse: #fff;
     --sheetcraft-text-link: var(--sheetcraft-palette-brand-8);
     --sheetcraft-border-subtle: var(--sheetcraft-palette-neutral-4);
+    --sheetcraft-border-floating: rgb(15 23 42 / 9%);
+    --sheetcraft-border-dialog: rgb(15 23 42 / 8%);
     --sheetcraft-border-control: var(--sheetcraft-palette-neutral-6);
     --sheetcraft-border-strong: var(--sheetcraft-palette-neutral-4);
-    --sheetcraft-shadow-menu: 0 2px 12px 2px rgb(68 73 77 / 16%);
-    --sheetcraft-shadow-floating: 0 8px 24px rgb(32 36 44 / 18%);
-    --sheetcraft-mask-active: rgb(0 0 0 / 60%);
+    --sheetcraft-shadow-menu:
+      0 12px 32px -4px rgb(15 23 42 / 12%), 0 4px 10px -2px rgb(15 23 42 / 6%);
+    --sheetcraft-shadow-floating:
+      0 16px 40px -6px rgb(15 23 42 / 14%), 0 6px 14px -3px rgb(15 23 42 / 7%);
+    --sheetcraft-mask-active: rgb(15 23 42 / 36%);
     --sheetcraft-mask-disabled: rgb(255 255 255 / 60%);
     --sheetcraft-shadow-raised:
       0 1px 10px rgb(0 0 0 / 5%), 0 4px 5px rgb(0 0 0 / 8%), 0 2px 4px -1px rgb(0 0 0 / 12%);
     --sheetcraft-shadow-dialog:
-      0 6px 30px 5px rgb(0 0 0 / 5%), 0 16px 24px 2px rgb(0 0 0 / 4%),
-      0 8px 10px -5px rgb(0 0 0 / 8%);
+      0 24px 56px -12px rgb(15 23 42 / 18%), 0 10px 24px -6px rgb(15 23 42 / 10%);
     --sheetcraft-shadow-inset: #e7eaef;
     --sheetcraft-table-shadow: rgb(0 0 0 / 8%);
     --sheetcraft-scrollbar-thumb: rgb(0 0 0 / 10%);
@@ -95,6 +100,8 @@
     --sheetcraft-eye-comfort-header: #212b25;
     --sheetcraft-eye-comfort-gridline: #3c5041;
     --sheetcraft-surface-hover: var(--sheetcraft-palette-neutral-12);
+    --sheetcraft-surface-menu-hover: rgb(255 255 255 / 8%);
+    --sheetcraft-surface-menu-danger-hover: var(--sheetcraft-palette-error-1);
     --sheetcraft-surface-active: var(--sheetcraft-palette-neutral-10);
     --sheetcraft-surface-selected: var(--sheetcraft-palette-neutral-9);
     --sheetcraft-surface-secondary: var(--sheetcraft-palette-neutral-12);
@@ -115,17 +122,19 @@
     --sheetcraft-text-inverse: #fff;
     --sheetcraft-text-link: var(--sheetcraft-palette-brand-8);
     --sheetcraft-border-subtle: var(--sheetcraft-palette-neutral-11);
+    --sheetcraft-border-floating: rgb(255 255 255 / 12%);
+    --sheetcraft-border-dialog: rgb(255 255 255 / 12%);
     --sheetcraft-border-control: var(--sheetcraft-palette-neutral-9);
     --sheetcraft-border-strong: var(--sheetcraft-palette-neutral-9);
-    --sheetcraft-shadow-menu: 0 4px 16px rgb(0 0 0 / 32%);
+    --sheetcraft-shadow-menu: 0 14px 32px -4px rgb(0 0 0 / 48%), 0 4px 12px -2px rgb(0 0 0 / 32%);
     --sheetcraft-shadow-floating:
-      0 8px 10px rgb(0 0 0 / 12%), 0 3px 14px rgb(0 0 0 / 10%), 0 5px 5px rgb(0 0 0 / 16%);
-    --sheetcraft-mask-active: rgb(0 0 0 / 40%);
+      0 18px 40px -6px rgb(0 0 0 / 54%), 0 6px 16px -3px rgb(0 0 0 / 36%);
+    --sheetcraft-mask-active: rgb(0 0 0 / 52%);
     --sheetcraft-mask-disabled: rgb(0 0 0 / 60%);
     --sheetcraft-shadow-raised:
       0 4px 6px rgb(0 0 0 / 6%), 0 1px 10px rgb(0 0 0 / 8%), 0 2px 4px rgb(0 0 0 / 12%);
     --sheetcraft-shadow-dialog:
-      0 16px 24px rgb(0 0 0 / 14%), 0 6px 30px rgb(0 0 0 / 12%), 0 8px 10px rgb(0 0 0 / 20%);
+      0 24px 56px -12px rgb(0 0 0 / 58%), 0 10px 24px -6px rgb(0 0 0 / 38%);
     --sheetcraft-shadow-inset: #5e5e5e;
     --sheetcraft-table-shadow: rgb(0 0 0 / 55%);
     --sheetcraft-scrollbar-thumb: rgb(255 255 255 / 10%);

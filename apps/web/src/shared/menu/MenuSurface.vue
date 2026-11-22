@@ -163,6 +163,9 @@ defineExpose({ focusFirstItem, focusLastItem, rootElement });
   @include option-list.scrollbar;
   @include panel.chrome;
 
+  --sheetcraft-gallery-header-inset: var(--sheetcraft-menu-inset);
+  --sheetcraft-gallery-header-radius: var(--sheetcraft-radius-menu-item);
+
   display: grid;
   width: max-content;
   max-width: calc(100vw - var(--sheetcraft-space-4) - var(--sheetcraft-space-4));

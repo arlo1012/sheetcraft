@@ -84,14 +84,15 @@ const { t } = useAppI18n();
 <style scoped lang="scss">
 .context-clipboard-actions {
   display: flex;
-  gap: 2px;
+  gap: 4px;
   align-items: center;
-  min-height: 28px;
-  padding: 0 8px;
+  min-height: 32px;
+  padding: 2px var(--sheetcraft-menu-inset);
 
   :deep(.ribbon-button) {
     width: 28px;
     height: 28px;
+    border-radius: var(--sheetcraft-radius-floating-item);
   }
 }
 </style>

@@ -1,7 +1,7 @@
 @mixin choice($padding: 3px) {
   padding: $padding;
   border: 0;
-  border-radius: var(--sheetcraft-radius-small);
+  border-radius: var(--sheetcraft-radius-medium);
   background: transparent;
   color: inherit;
   cursor: pointer;

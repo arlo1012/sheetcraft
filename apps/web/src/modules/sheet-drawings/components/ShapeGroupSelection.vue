@@ -321,6 +321,7 @@ const selectionActions = computed(() => {
       color: inherit;
       background: transparent;
       border: 0;
+      border-radius: var(--sheetcraft-radius-floating-item);
       cursor: pointer;
       padding: 4px 6px;
       white-space: nowrap;

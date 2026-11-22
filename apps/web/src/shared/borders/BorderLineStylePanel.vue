@@ -181,7 +181,7 @@ const { t } = useAppI18n();
     background: transparent;
     color: var(--sheetcraft-text-primary);
     border: 0;
-    border-radius: 3px;
+    border-radius: var(--sheetcraft-radius-floating-item);
     cursor: pointer;
     font: inherit;
     font-size: var(--sheetcraft-font-size-body-medium);

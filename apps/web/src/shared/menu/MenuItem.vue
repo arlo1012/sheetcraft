@@ -97,9 +97,11 @@ function onKeydown(event: KeyboardEvent): void {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  min-height: 30px;
-  gap: 8px;
-  padding: 0 var(--sheetcraft-menu-item-padding-inline, 14px);
+  min-height: 32px;
+  gap: 10px;
+  margin-inline: var(--sheetcraft-menu-inset);
+  padding: 0 var(--sheetcraft-menu-item-padding-inline, 10px);
+  border-radius: var(--sheetcraft-radius-menu-item);
   color: var(--sheetcraft-text-primary);
   font: inherit;
   font-size: var(--sheetcraft-font-size-body-medium);
@@ -110,6 +112,7 @@ function onKeydown(event: KeyboardEvent): void {
   white-space: nowrap;
   cursor: default;
   user-select: none;
+  transition: background-color 0.12s ease;
 
   &--with-icon {
     grid-template-columns: 16px minmax(0, 1fr) auto;
@@ -125,8 +128,12 @@ function onKeydown(event: KeyboardEvent): void {
 
   &:hover:not(&--disabled),
   &:focus-visible:not(&--disabled) {
-    background: var(--sheetcraft-surface-hover);
+    background: var(--sheetcraft-surface-menu-hover);
     outline: none;
+  }
+
+  &--danger:hover:not(&--disabled) {
+    background: var(--sheetcraft-surface-menu-danger-hover);
   }
 
   &:focus-visible:not(&--disabled) {
@@ -168,7 +175,7 @@ function onKeydown(event: KeyboardEvent): void {
 
     .sheetcraft-menu-item--with-icon & {
       grid-template-columns: 16px minmax(0, 1fr);
-      gap: 8px;
+      gap: 10px;
     }
 
     &:focus-visible {
@@ -192,7 +199,7 @@ function onKeydown(event: KeyboardEvent): void {
     justify-content: flex-end;
     min-height: var(--sheetcraft-line-height-body-medium);
     gap: 5px;
-    color: var(--sheetcraft-text-secondary);
+    color: var(--sheetcraft-text-muted);
     font-size: var(--sheetcraft-font-size-body-small);
     line-height: inherit;
 

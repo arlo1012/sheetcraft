@@ -114,12 +114,12 @@ const overlay = computed(() => {
   align-items: start;
   box-sizing: border-box;
   width: max-content;
-  padding: var(--sheetcraft-tool-panel-padding);
+  padding: 10px 12px;
   color: var(--sheetcraft-text-primary);
   background: var(--sheetcraft-surface-panel);
   pointer-events: none;
-  border: 1px solid var(--sheetcraft-border-control);
-  border-radius: var(--sheetcraft-radius-small);
+  border: 1px solid var(--sheetcraft-border-floating);
+  border-radius: var(--sheetcraft-radius-floating-compact);
   box-shadow: var(--sheetcraft-shadow-menu);
 
   &--warning {

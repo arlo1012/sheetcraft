@@ -242,7 +242,7 @@ function getPopupAttach(): HTMLElement {
 @use "../../../shared/floating/floating-panel" as panel;
 
 .sheet-context-format-toolbar {
-  @include panel.toolbar-surface(var(--sheetcraft-layer-context-menu), 0, none);
+  @include panel.toolbar-surface(var(--sheetcraft-layer-context-menu));
 
   --cell-format-font-width: 130px;
   --cell-format-font-size-width: 48px;
@@ -255,7 +255,6 @@ function getPopupAttach(): HTMLElement {
   width: 302px;
   gap: 4px;
   padding: 6px 8px;
-  border-bottom: 1px solid var(--sheetcraft-border-subtle);
 
   &__row {
     display: grid;

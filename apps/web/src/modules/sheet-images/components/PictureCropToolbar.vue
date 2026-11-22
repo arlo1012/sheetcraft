@@ -190,7 +190,7 @@ defineExpose({
     min-height: 30px;
     padding: 4px 7px;
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--sheetcraft-radius-floating-item);
     background: transparent;
     color: inherit;
     font: inherit;

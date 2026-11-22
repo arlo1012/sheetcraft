@@ -205,7 +205,8 @@ function openFile(event: Event) {
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  border-radius: var(--sheetcraft-radius-small);
+  border: 1px solid var(--sheetcraft-border-floating);
+  border-radius: var(--sheetcraft-radius-floating-compact);
   background: var(--sheetcraft-surface-panel);
   box-shadow: var(--sheetcraft-shadow-floating);
   font-variant-numeric: tabular-nums;
