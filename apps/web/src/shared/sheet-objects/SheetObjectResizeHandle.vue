@@ -10,12 +10,13 @@ const props = defineProps<{
   fragment: FloatingImageViewportFragment;
   direction: FloatingImageResizeDirection;
   variant?: "crop";
+  target?: "image" | "object";
 }>();
 const emit = defineEmits<{
   resize: [direction: FloatingImageResizeDirection, event: PointerEvent];
 }>();
 const { t } = useAppI18n();
-const labelKeys: Record<FloatingImageResizeDirection, MessageKey> = {
+const imageLabelKeys: Record<FloatingImageResizeDirection, MessageKey> = {
   n: "image.resizeTop",
   s: "image.resizeBottom",
   w: "image.resizeLeft",
@@ -25,6 +26,17 @@ const labelKeys: Record<FloatingImageResizeDirection, MessageKey> = {
   sw: "image.resizeBottomLeft",
   se: "image.resizeBottomRight",
 };
+const objectLabelKeys: Record<FloatingImageResizeDirection, MessageKey> = {
+  n: "drawing.resizeTop",
+  s: "drawing.resizeBottom",
+  w: "drawing.resizeLeft",
+  e: "drawing.resizeRight",
+  nw: "drawing.resizeTopLeft",
+  ne: "drawing.resizeTopRight",
+  sw: "drawing.resizeBottomLeft",
+  se: "drawing.resizeBottomRight",
+};
+const labelKeys = computed(() => (props.target === "object" ? objectLabelKeys : imageLabelKeys));
 const cropLabelKeys: Record<FloatingImageResizeDirection, MessageKey> = {
   n: "image.cropTop",
   s: "image.cropBottom",

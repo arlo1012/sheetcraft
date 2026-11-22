@@ -165,6 +165,7 @@ function confirm() {
         <Select
           v-model="draft.control.type"
           :options="options"
+          :aria-label="t('control.type')"
           v-native-control="{ attributes: { 'aria-label': t('control.type') } }"
         />
       </FormItem>
@@ -213,6 +214,7 @@ function confirm() {
         <FormItem :label="t('control.min')"
           ><InputNumber
             v-model="draft.control.min"
+            :aria-label="t('control.min')"
             v-native-control="{ attributes: { 'aria-label': t('control.min') } }"
             theme="column"
             class="sheetcraft-input-number--persistent-controls"
@@ -220,6 +222,7 @@ function confirm() {
         <FormItem :label="t('control.max')"
           ><InputNumber
             v-model="draft.control.max"
+            :aria-label="t('control.max')"
             v-native-control="{ attributes: { 'aria-label': t('control.max') } }"
             theme="column"
             class="sheetcraft-input-number--persistent-controls"
@@ -227,6 +230,7 @@ function confirm() {
         <FormItem :label="t('control.step')"
           ><InputNumber
             v-model="draft.control.step"
+            :aria-label="t('control.step')"
             v-native-control="{ attributes: { 'aria-label': t('control.step') } }"
             :min="0.000001"
             theme="column"
@@ -239,6 +243,7 @@ function confirm() {
           <Select
             v-model="resetType"
             :options="resetTypeOptions"
+            :aria-label="t('control.resetType')"
             v-native-control="{ attributes: { 'aria-label': t('control.resetType') } }"
           />
         </FormItem>
@@ -247,6 +252,7 @@ function confirm() {
             v-if="resetType === 'text'"
             v-model="resetText"
             :maxlength="1000"
+            :aria-label="t('control.resetValue')"
             v-native-control="{ attributes: { 'aria-label': t('control.resetValue') } }"
           />
           <InputNumber
@@ -254,6 +260,7 @@ function confirm() {
             v-model="resetNumber"
             theme="column"
             class="sheetcraft-input-number--persistent-controls"
+            :aria-label="t('control.resetValue')"
             v-native-control="{ attributes: { 'aria-label': t('control.resetValue') } }"
           />
           <Select
@@ -263,6 +270,7 @@ function confirm() {
               { value: true, label: 'TRUE' },
               { value: false, label: 'FALSE' },
             ]"
+            :aria-label="t('control.resetValue')"
             v-native-control="{ attributes: { 'aria-label': t('control.resetValue') } }"
           />
         </FormItem>

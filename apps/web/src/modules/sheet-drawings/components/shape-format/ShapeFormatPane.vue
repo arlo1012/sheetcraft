@@ -262,7 +262,13 @@ defineExpose({
           snapshot.drawing.name
         }}</span>
       </div>
-      <TButton variant="text" shape="square" size="small" :aria-label="t('close')" @click="close">
+      <TButton
+        variant="text"
+        shape="square"
+        size="small"
+        :aria-label="controller.s.value(controller.isGroup.value ? 'closeGroupPane' : 'closePane')"
+        @click="close"
+      >
         <template #icon><X class="sheetcraft-action-icon" aria-hidden="true" /></template>
       </TButton>
     </header>

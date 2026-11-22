@@ -89,7 +89,10 @@ function scrollByKey(event: KeyboardEvent) {
 <template>
   <div
     class="form-control-content"
-    :class="{ 'form-control-content--radio': control.type === 'radio' }"
+    :class="{
+      'form-control-content--radio': control.type === 'radio',
+      'form-control-content--group': control.type === 'group',
+    }"
   >
     <fieldset v-if="control.type === 'group'">
       <legend>{{ control.label }}</legend>
@@ -184,9 +187,15 @@ function scrollByKey(event: KeyboardEvent) {
   display: flex;
   flex-direction: column;
   padding: 4px 8px;
+  border: 1px solid var(--sheetcraft-border-subtle);
+  border-radius: var(--sheetcraft-radius-default);
   background: var(--sheetcraft-surface-panel);
   &--radio {
+    border: 0;
     background: transparent;
+  }
+  &--group {
+    border: 0;
   }
   color: var(--sheetcraft-text-primary);
   pointer-events: auto;

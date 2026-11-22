@@ -6,7 +6,10 @@ import type {
 } from "@sheetcraft/sheet-engine/floating-image-layout";
 import SheetObjectResizeHandle from "./SheetObjectResizeHandle.vue";
 
-const props = defineProps<{ fragment: FloatingImageViewportFragment }>();
+const props = defineProps<{
+  fragment: FloatingImageViewportFragment;
+  target?: "image" | "object";
+}>();
 const emit = defineEmits<{
   resize: [direction: FloatingImageResizeDirection, event: PointerEvent];
 }>();
@@ -31,14 +34,54 @@ function onResize(direction: FloatingImageResizeDirection, event: PointerEvent):
     <div class="sheet-floating-image-selection__clip">
       <div class="sheet-floating-image-selection__outline" :style="outlineStyle" />
     </div>
-    <SheetObjectResizeHandle :fragment="fragment" direction="n" @resize="onResize" />
-    <SheetObjectResizeHandle :fragment="fragment" direction="s" @resize="onResize" />
-    <SheetObjectResizeHandle :fragment="fragment" direction="w" @resize="onResize" />
-    <SheetObjectResizeHandle :fragment="fragment" direction="e" @resize="onResize" />
-    <SheetObjectResizeHandle :fragment="fragment" direction="nw" @resize="onResize" />
-    <SheetObjectResizeHandle :fragment="fragment" direction="ne" @resize="onResize" />
-    <SheetObjectResizeHandle :fragment="fragment" direction="sw" @resize="onResize" />
-    <SheetObjectResizeHandle :fragment="fragment" direction="se" @resize="onResize" />
+    <SheetObjectResizeHandle
+      :fragment="fragment"
+      :target="target"
+      direction="n"
+      @resize="onResize"
+    />
+    <SheetObjectResizeHandle
+      :fragment="fragment"
+      :target="target"
+      direction="s"
+      @resize="onResize"
+    />
+    <SheetObjectResizeHandle
+      :fragment="fragment"
+      :target="target"
+      direction="w"
+      @resize="onResize"
+    />
+    <SheetObjectResizeHandle
+      :fragment="fragment"
+      :target="target"
+      direction="e"
+      @resize="onResize"
+    />
+    <SheetObjectResizeHandle
+      :fragment="fragment"
+      :target="target"
+      direction="nw"
+      @resize="onResize"
+    />
+    <SheetObjectResizeHandle
+      :fragment="fragment"
+      :target="target"
+      direction="ne"
+      @resize="onResize"
+    />
+    <SheetObjectResizeHandle
+      :fragment="fragment"
+      :target="target"
+      direction="sw"
+      @resize="onResize"
+    />
+    <SheetObjectResizeHandle
+      :fragment="fragment"
+      :target="target"
+      direction="se"
+      @resize="onResize"
+    />
   </div>
 </template>
 

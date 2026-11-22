@@ -43,14 +43,14 @@ const actionElement = ref<HTMLDivElement | null>(null);
 const label = (key: MessageKey): string =>
   props.locale ? composer.t(key, {}, { locale: props.locale }) : composer.t(key);
 const resizeLabels: Record<FloatingImageResizeDirection, MessageKey> = {
-  n: "image.resizeTop",
-  s: "image.resizeBottom",
-  w: "image.resizeLeft",
-  e: "image.resizeRight",
-  nw: "image.resizeTopLeft",
-  ne: "image.resizeTopRight",
-  sw: "image.resizeBottomLeft",
-  se: "image.resizeBottomRight",
+  n: "drawing.resizeTop",
+  s: "drawing.resizeBottom",
+  w: "drawing.resizeLeft",
+  e: "drawing.resizeRight",
+  nw: "drawing.resizeTopLeft",
+  ne: "drawing.resizeTopRight",
+  sw: "drawing.resizeBottomLeft",
+  se: "drawing.resizeBottomRight",
 };
 const directions: FloatingImageResizeDirection[] = ["n", "s", "w", "e", "nw", "ne", "sw", "se"];
 // rect is the canonical sheet frame. The host supplies its complete viewport

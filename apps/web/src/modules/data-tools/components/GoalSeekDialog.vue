@@ -72,6 +72,7 @@ function confirm() {
 </script>
 <template>
   <Dialog
+    v-if="visible"
     role="dialog"
     aria-modal="true"
     :aria-label="tr('simulation.goalSeek')"

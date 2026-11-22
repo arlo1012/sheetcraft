@@ -122,6 +122,7 @@ watch(
 
 <template>
   <Dialog
+    v-if="visible"
     :visible="visible && !suspended"
     :header="t('pageLayout.pageSetup')"
     width="min(560px, calc(100vw - 32px))"

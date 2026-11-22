@@ -119,6 +119,7 @@ watch(draft, (value) => emit("draftChange", copyDraft(value)), { deep: true });
 
 <template>
   <Dialog
+    v-if="visible"
     role="dialog"
     aria-modal="true"
     :aria-label="t('dataTable.title')"

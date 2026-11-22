@@ -37,6 +37,7 @@ const sample = computed(() => formatFillDateSample(draft.value.format, draft.val
 </script>
 <template>
   <Dialog
+    v-if="visible"
     :visible="visible"
     :header="t('dataTools.fill.currentDateTitle')"
     width="min(400px, calc(100vw - 32px))"

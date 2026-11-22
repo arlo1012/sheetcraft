@@ -34,6 +34,7 @@ watch(
 </script>
 <template>
   <Dialog
+    v-if="visible"
     :visible="visible"
     :header="t('dataTools.fill.blanksTitle')"
     width="min(440px, calc(100vw - 32px))"

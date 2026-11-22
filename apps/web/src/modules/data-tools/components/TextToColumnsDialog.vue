@@ -402,6 +402,7 @@ function confirm(): void {
 </script>
 <template>
   <Dialog
+    v-if="visible"
     :visible="visible && !picking"
     :header="t('dataTools.textToColumns.wizardTitle')"
     width="680px"

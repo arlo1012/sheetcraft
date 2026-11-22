@@ -33,14 +33,14 @@ const emit = defineEmits<{
 }>();
 const { t } = useAppI18n();
 const labels: Record<FloatingImageResizeDirection, MessageKey> = {
-  n: "image.resizeTop",
-  s: "image.resizeBottom",
-  w: "image.resizeLeft",
-  e: "image.resizeRight",
-  nw: "image.resizeTopLeft",
-  ne: "image.resizeTopRight",
-  sw: "image.resizeBottomLeft",
-  se: "image.resizeBottomRight",
+  n: "drawing.resizeTop",
+  s: "drawing.resizeBottom",
+  w: "drawing.resizeLeft",
+  e: "drawing.resizeRight",
+  nw: "drawing.resizeTopLeft",
+  ne: "drawing.resizeTopRight",
+  sw: "drawing.resizeBottomLeft",
+  se: "drawing.resizeBottomRight",
 };
 const directions: FloatingImageResizeDirection[] = ["n", "s", "w", "e", "nw", "ne", "sw", "se"];
 const point = (local: { x: number; y: number }) =>

@@ -3625,7 +3625,12 @@ defineExpose({
       @outline-level="emit('outlineLevel', $event)"
     />
     <button
-      v-if="fillHandlePoint && !shapeCreationRequest"
+      v-if="
+        fillHandlePoint &&
+        !shapeCreationRequest &&
+        !selectedShapeDrawingId &&
+        !selectedImageIds.length
+      "
       type="button"
       class="sheet-grid__fill-handle"
       :style="fillHandleStyle"
@@ -4090,7 +4095,7 @@ defineExpose({
 
   &__fill-handle {
     position: absolute;
-    z-index: 8;
+    z-index: 5;
     display: grid;
     place-items: center;
     width: calc(12px / var(--sheet-scale, 1));

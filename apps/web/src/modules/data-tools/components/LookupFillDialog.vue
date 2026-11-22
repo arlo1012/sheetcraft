@@ -211,6 +211,7 @@ watch(
 
 <template>
   <Dialog
+    v-if="visible"
     :visible="visible && !picking"
     :header="t('dataTools.lookupFill.title')"
     :width="step === 'fields' ? 'min(860px, calc(100vw - 32px))' : 'min(640px, calc(100vw - 32px))'"

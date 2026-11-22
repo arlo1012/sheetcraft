@@ -15,6 +15,7 @@ watch(
 </script>
 <template>
   <TDialog
+    v-if="visible"
     :visible="visible"
     :header="t('review.unlockRange')"
     :confirm-btn="t('review.unlockRange')"

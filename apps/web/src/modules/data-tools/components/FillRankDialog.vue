@@ -54,6 +54,7 @@ function apply(): void {
 
 <template>
   <Dialog
+    v-if="visible"
     :visible="visible && !picking"
     :header="t('dataTools.fill.rank')"
     width="min(480px, calc(100vw - 32px))"

@@ -23,6 +23,7 @@ const message = computed(() => {
 
 <template>
   <TDialog
+    v-if="fontSettingsVisible"
     v-model:visible="fontSettingsVisible"
     :header="t('format.fontSettings')"
     width="min(480px, calc(100vw - 32px))"

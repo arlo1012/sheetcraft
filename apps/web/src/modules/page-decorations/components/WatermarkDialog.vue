@@ -205,6 +205,7 @@ onBeforeUnmount(clearLocalImage);
 
 <template>
   <Dialog
+    v-if="visible"
     :visible="visible"
     :header="t('pageDecoration.customWatermark')"
     :aria-label="t('pageDecoration.customWatermark')"

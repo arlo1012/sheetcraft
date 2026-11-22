@@ -120,6 +120,7 @@ function apply(): void {
 </script>
 <template>
   <Dialog
+    v-if="visible"
     :visible="visible"
     :header="t('dataTools.fill.seriesTitle')"
     width="min(480px, calc(100vw - 32px))"

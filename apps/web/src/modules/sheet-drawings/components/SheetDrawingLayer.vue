@@ -3016,6 +3016,7 @@ watch(
       <SheetObjectSelection
         v-else-if="isSelectedView(fragment.drawing) && canChange(fragment.drawing)"
         :fragment="fragment"
+        target="object"
         @resize="(direction, event) => start(fragment, event, direction)"
       />
     </div>

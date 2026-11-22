@@ -56,6 +56,7 @@ function invertSelection(): void {
 </script>
 <template>
   <Dialog
+    v-if="visible"
     role="dialog"
     aria-modal="true"
     :aria-label="t('dataTools.removeDuplicates.title')"

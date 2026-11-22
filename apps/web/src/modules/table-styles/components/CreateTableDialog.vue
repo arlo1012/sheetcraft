@@ -39,7 +39,7 @@ function confirm(): void {
     :aria-label="title"
     width="min(360px, calc(100vw - 32px))"
     :close-on-overlay-click="false"
-    :confirm-on-enter="false"
+    :confirm-on-enter="!suspended && Boolean(draft.range.trim())"
     :confirm-btn="{ content: t('tables.confirm'), disabled: !draft.range.trim() }"
     :cancel-btn="t('tables.cancel')"
     @confirm="confirm"

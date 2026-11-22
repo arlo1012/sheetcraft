@@ -2,6 +2,8 @@
 const en = {
   paneTitle: "Format Shape",
   groupPaneTitle: "Format Group",
+  closePane: "Close Format Shape",
+  closeGroupPane: "Close Format Group",
   groupScope: "Selected group",
   groupSizeScopeHelp:
     "Size and object properties apply to this group. Text-box settings apply to its shape and text-box members, including members of nested groups.",
@@ -124,6 +126,8 @@ const zh: Record<ShapeFormatLabelKey, string> = {
   connectorZeroSizeReason: "此轴没有可可靠测量的跨度。请先移动端点确定方向，再输入尺寸或缩放比例。",
   paneTitle: "设置形状格式",
   groupPaneTitle: "设置组合格式",
+  closePane: "关闭设置形状格式",
+  closeGroupPane: "关闭设置组合格式",
   groupScope: "所选组合",
   groupSizeScopeHelp:
     "大小和对象属性应用于此组合；文本框设置应用于组合内所有形状和文本框，包括嵌套组合中的成员。",

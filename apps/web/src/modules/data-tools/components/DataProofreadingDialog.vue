@@ -88,6 +88,7 @@ function selectIssues(keys: Array<string | number>): void {
 
 <template>
   <Dialog
+    v-if="visible"
     role="dialog"
     aria-modal="true"
     width="min(980px, calc(100vw - 32px))"

@@ -32,6 +32,7 @@ watch(
 </script>
 <template>
   <Dialog
+    v-if="visible"
     :visible="visible"
     :header="t('dataTools.fill.insertTextTitle')"
     width="min(480px, calc(100vw - 32px))"

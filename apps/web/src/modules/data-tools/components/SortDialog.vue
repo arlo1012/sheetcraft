@@ -348,6 +348,7 @@ function apply(): void {
 
 <template>
   <Dialog
+    v-if="visible"
     :visible="visible && !optionsVisible && customListRowId === undefined"
     :header="t('dataTools.sort.title')"
     width="min(900px, calc(100vw - 32px))"
@@ -568,6 +569,7 @@ function apply(): void {
     @apply="applyCustomList"
   />
   <Dialog
+    v-if="visible && optionsVisible"
     :visible="visible && optionsVisible"
     :header="t('dataTools.sort.optionsTitle')"
     width="min(320px, calc(100vw - 32px))"

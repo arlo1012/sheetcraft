@@ -54,6 +54,7 @@ const canApply = computed(() =>
 </script>
 <template>
   <Dialog
+    v-if="visible"
     role="dialog"
     aria-modal="true"
     :aria-label="t('dataTools.advanced.title')"

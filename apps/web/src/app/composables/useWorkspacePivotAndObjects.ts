@@ -250,9 +250,7 @@ export function useWorkspacePivotAndObjects(options: WorkspacePivotAndObjectsOpt
     getAddress: options.getActiveAddress,
     getEvaluator: options.getEvaluator,
     selectSheet: options.selectSheet,
-    selectDrawing: (id) => {
-      options.selectShapeObjects([[id]]);
-    },
+    selectDrawing: options.selectDrawing,
     isBusy: options.isBusy,
     flush: options.flushCellEdit,
     execute: options.executeCommand,

@@ -36,6 +36,7 @@ function save(): void {
 </script>
 <template>
   <TDialog
+    v-if="visible"
     :visible="visible"
     :header="t(protected ? 'review.unprotectWorkbook' : 'review.protectWorkbook')"
     :confirm-btn="t('review.confirm')"

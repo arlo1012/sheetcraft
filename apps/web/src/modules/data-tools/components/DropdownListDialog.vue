@@ -235,6 +235,7 @@ async function selectRange(current: string): Promise<string | undefined> {
 
 <template>
   <Dialog
+    v-if="visible"
     role="dialog"
     aria-modal="true"
     :aria-label="t('dataTools.dropdown.title')"

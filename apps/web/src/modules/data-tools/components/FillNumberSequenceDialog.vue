@@ -48,6 +48,7 @@ function apply(): void {
 
 <template>
   <Dialog
+    v-if="visible"
     :visible="visible"
     :header="t('dataTools.fill.numberSequence')"
     width="min(400px, calc(100vw - 32px))"

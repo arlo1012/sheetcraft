@@ -126,6 +126,7 @@ function save(protect = false): void {
 </script>
 <template>
   <TDialog
+    v-if="visible"
     :visible="visible && !editor"
     :header="t('review.editableRanges')"
     :footer="!readOnly"
