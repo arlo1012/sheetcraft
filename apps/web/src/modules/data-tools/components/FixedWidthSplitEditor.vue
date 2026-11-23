@@ -192,10 +192,14 @@ onBeforeUnmount(() => endDrag?.());
 </template>
 <style scoped lang="scss">
 .fixed-width-split-editor {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: 100%;
   min-width: 0;
+  min-height: 0;
   &__preview {
-    height: 220px;
     min-width: 0;
+    min-height: 0;
   }
   &__ruler,
   &__row {

@@ -739,7 +739,9 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
           :select-reference="selectReference ? selectRange : undefined"
         />
       </TFormItem>
-      <section class="conditional-format-editor__section">
+      <section
+        class="conditional-format-editor__section conditional-format-editor__section--detail"
+      >
         <h3>{{ t("conditionalFormatting.editRuleDescription") }}</h3>
         <p class="conditional-format-editor__description">
           {{ ruleDescription }}
@@ -1023,10 +1025,10 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
             :format="category === 'visual' ? undefined : format"
           />
         </div>
+        <p v-if="error.format" class="conditional-format-editor__error" role="alert">
+          {{ error.format }}
+        </p>
       </section>
-      <p v-if="error.format" class="conditional-format-editor__error" role="alert">
-        {{ error.format }}
-      </p>
     </TForm>
   </Dialog>
   <ConditionalFormatStyleDialog
@@ -1054,15 +1056,29 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
   />
 </template>
 <style scoped lang="scss">
+@use "../../../shared/option-list/option-list" as option-list;
+
 .conditional-format-editor {
   display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 12px;
-  max-height: calc(100vh - 172px);
-  overflow: auto;
+  height: min(580px, calc(100vh - 172px));
+  min-width: 0;
+  overflow: hidden;
   &__section {
     display: grid;
     gap: 8px;
     min-width: 0;
+  }
+  &__section--detail {
+    @include option-list.scrollbar;
+    align-content: start;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
   }
   h3 {
     margin: 0;

@@ -413,7 +413,12 @@ function confirm(): void {
     @confirm="confirm"
   >
     <div class="text-to-columns-dialog">
-      <TForm label-align="left" :label-width="96" @submit.prevent>
+      <TForm
+        class="text-to-columns-dialog__form sheetcraft-form-grid"
+        label-align="left"
+        :label-width="96"
+        @submit.prevent
+      >
         <TFormItem :label="t('dataTools.textToColumns.source')">
           <div class="text-to-columns-dialog__source">
             <RangeReferenceInput
@@ -424,202 +429,206 @@ function confirm(): void {
             />
           </div>
         </TFormItem>
-        <template v-if="step === 0">
-          <TTabs :value="setupMode" @change="setSetupMode($event as 'auto' | 'custom')">
-            <TTabPanel value="auto" :label="t('dataTools.textToColumns.autoSplit')">
-              <div class="text-to-columns-dialog__auto-settings">
-                <TRadioGroup
-                  v-if="suggestions.length"
-                  :value="draft.autoSuggestionId"
-                  class="text-to-columns-dialog__suggestions"
-                  @change="chooseSuggestion(String($event))"
-                >
-                  <TRadio
-                    v-for="suggestion in suggestions"
-                    :key="suggestion.id"
-                    :value="suggestion.id"
-                    >{{ suggestionLabel(suggestion) }}</TRadio
+        <div class="text-to-columns-dialog__stage">
+          <template v-if="step === 0">
+            <TTabs :value="setupMode" @change="setSetupMode($event as 'auto' | 'custom')">
+              <TTabPanel value="auto" :label="t('dataTools.textToColumns.autoSplit')">
+                <div class="text-to-columns-dialog__auto-settings">
+                  <TRadioGroup
+                    v-if="suggestions.length"
+                    :value="draft.autoSuggestionId"
+                    class="text-to-columns-dialog__suggestions"
+                    @change="chooseSuggestion(String($event))"
                   >
+                    <TRadio
+                      v-for="suggestion in suggestions"
+                      :key="suggestion.id"
+                      :value="suggestion.id"
+                      >{{ suggestionLabel(suggestion) }}</TRadio
+                    >
+                  </TRadioGroup>
+                  <p v-else class="text-to-columns-dialog__error">
+                    {{ t("dataTools.textToColumns.autoNoSuggestion") }}
+                  </p>
+                </div>
+              </TTabPanel>
+              <TTabPanel value="custom" :label="t('dataTools.textToColumns.customSplit')">
+                <TRadioGroup
+                  :value="draft.mode"
+                  class="text-to-columns-dialog__mode-tabs"
+                  @change="setCustomMode"
+                >
+                  <TRadio v-for="item in splitModeOptions" :key="item.value" :value="item.value">{{
+                    item.label
+                  }}</TRadio>
                 </TRadioGroup>
-                <p v-else class="text-to-columns-dialog__error">
-                  {{ t("dataTools.textToColumns.autoNoSuggestion") }}
-                </p>
-              </div>
-            </TTabPanel>
-            <TTabPanel value="custom" :label="t('dataTools.textToColumns.customSplit')">
-              <TRadioGroup
-                :value="draft.mode"
-                class="text-to-columns-dialog__mode-tabs"
-                @change="setCustomMode"
+              </TTabPanel>
+            </TTabs>
+            <template v-if="draft.mode === 'delimiter'">
+              <div
+                class="text-to-columns-dialog__delimiter-group"
+                role="group"
+                :aria-label="t('dataTools.textToColumns.delimiter')"
               >
-                <TRadio v-for="item in splitModeOptions" :key="item.value" :value="item.value">{{
-                  item.label
-                }}</TRadio>
-              </TRadioGroup>
-            </TTabPanel>
-          </TTabs>
-          <template v-if="draft.mode === 'delimiter'">
+                <div class="text-to-columns-dialog__inline">
+                  <TCheckbox
+                    v-for="item in delimiterOptions"
+                    :key="item.value"
+                    :checked="draft.delimiters.includes(item.value)"
+                    @change="toggleDelimiter(item.value, Boolean($event))"
+                    >{{ item.label }}</TCheckbox
+                  >
+                </div>
+                <div class="text-to-columns-dialog__other">
+                  <TCheckbox
+                    v-model="otherEnabled"
+                    @change="!$event && (draft.otherDelimiter = '')"
+                    >{{ t("dataTools.textToColumns.other") }}</TCheckbox
+                  ><TInput
+                    v-model="draft.otherDelimiter"
+                    :disabled="!otherEnabled"
+                    :aria-label="t('dataTools.textToColumns.other')"
+                  />
+                  <TRadioGroup
+                    v-model="draft.otherDelimiterMode"
+                    :disabled="!otherEnabled"
+                    class="text-to-columns-dialog__inline"
+                  >
+                    <TRadio value="characters">{{
+                      t("dataTools.textToColumns.anyCharacter")
+                    }}</TRadio>
+                    <TRadio value="token">{{ t("dataTools.textToColumns.fullToken") }}</TRadio>
+                  </TRadioGroup>
+                </div>
+                <TCheckbox v-model="draft.mergeDelimiters">{{
+                  t("dataTools.textToColumns.mergeDelimiters")
+                }}</TCheckbox>
+              </div>
+              <TFormItem :label="t('dataTools.textToColumns.qualifier')"
+                ><TSelect
+                  v-model="draft.textQualifier"
+                  :options="qualifierOptions"
+                  :aria-label="t('dataTools.textToColumns.qualifier')"
+              /></TFormItem>
+            </template>
             <div
-              class="text-to-columns-dialog__delimiter-group"
+              v-else-if="draft.mode === 'text-type'"
+              class="text-to-columns-dialog__setting"
               role="group"
-              :aria-label="t('dataTools.textToColumns.delimiter')"
+              :aria-label="t('dataTools.textToColumns.textType')"
             >
               <div class="text-to-columns-dialog__inline">
                 <TCheckbox
-                  v-for="item in delimiterOptions"
-                  :key="item.value"
-                  :checked="draft.delimiters.includes(item.value)"
-                  @change="toggleDelimiter(item.value, Boolean($event))"
-                  >{{ item.label }}</TCheckbox
+                  :checked="draft.textTypes?.includes('chinese')"
+                  @change="toggleTextType('chinese', Boolean($event))"
+                  >{{ t("dataTools.textToColumns.chinese") }}</TCheckbox
                 >
-              </div>
-              <div class="text-to-columns-dialog__other">
                 <TCheckbox
-                  v-model="otherEnabled"
-                  @change="!$event && (draft.otherDelimiter = '')"
-                  >{{ t("dataTools.textToColumns.other") }}</TCheckbox
-                ><TInput
-                  v-model="draft.otherDelimiter"
-                  :disabled="!otherEnabled"
-                  :aria-label="t('dataTools.textToColumns.other')"
-                />
-                <TRadioGroup
-                  v-model="draft.otherDelimiterMode"
-                  :disabled="!otherEnabled"
-                  class="text-to-columns-dialog__inline"
+                  :checked="draft.textTypes?.includes('english')"
+                  @change="toggleTextType('english', Boolean($event))"
+                  >{{ t("dataTools.textToColumns.english") }}</TCheckbox
                 >
-                  <TRadio value="characters">{{
-                    t("dataTools.textToColumns.anyCharacter")
-                  }}</TRadio>
-                  <TRadio value="token">{{ t("dataTools.textToColumns.fullToken") }}</TRadio>
-                </TRadioGroup>
+                <TCheckbox
+                  :checked="draft.textTypes?.includes('number')"
+                  @change="toggleTextType('number', Boolean($event))"
+                  >{{ t("dataTools.textToColumns.number") }}</TCheckbox
+                >
               </div>
-              <TCheckbox v-model="draft.mergeDelimiters">{{
-                t("dataTools.textToColumns.mergeDelimiters")
-              }}</TCheckbox>
             </div>
-            <TFormItem :label="t('dataTools.textToColumns.qualifier')"
-              ><TSelect
-                v-model="draft.textQualifier"
-                :options="qualifierOptions"
-                :aria-label="t('dataTools.textToColumns.qualifier')"
-            /></TFormItem>
-          </template>
-          <div
-            v-else-if="draft.mode === 'text-type'"
-            class="text-to-columns-dialog__setting"
-            role="group"
-            :aria-label="t('dataTools.textToColumns.textType')"
-          >
-            <div class="text-to-columns-dialog__inline">
-              <TCheckbox
-                :checked="draft.textTypes?.includes('chinese')"
-                @change="toggleTextType('chinese', Boolean($event))"
-                >{{ t("dataTools.textToColumns.chinese") }}</TCheckbox
-              >
-              <TCheckbox
-                :checked="draft.textTypes?.includes('english')"
-                @change="toggleTextType('english', Boolean($event))"
-                >{{ t("dataTools.textToColumns.english") }}</TCheckbox
-              >
-              <TCheckbox
-                :checked="draft.textTypes?.includes('number')"
-                @change="toggleTextType('number', Boolean($event))"
-                >{{ t("dataTools.textToColumns.number") }}</TCheckbox
-              >
-            </div>
-          </div>
-          <div
-            v-else-if="draft.mode === 'keyword'"
-            class="text-to-columns-dialog__keywords"
-            role="group"
-            :aria-label="t('dataTools.textToColumns.keyword')"
-          >
-            <div class="text-to-columns-dialog__keyword-inputs" @keydown="handleKeywordKeydown">
-              <TInput
-                v-for="(_, index) in draft.keywords"
-                :key="index"
-                :value="draft.keywords?.[index]"
-                :aria-label="`${t('dataTools.textToColumns.keyword')} ${index + 1}`"
-                @change="setKeyword(index, $event)"
-              />
-            </div>
-            <TRadioGroup v-model="draft.keywordPosition" class="text-to-columns-dialog__inline"
-              ><TRadio value="before">{{ t("dataTools.textToColumns.beforeKeyword") }}</TRadio
-              ><TRadio value="after">{{
-                t("dataTools.textToColumns.afterKeyword")
-              }}</TRadio></TRadioGroup
+            <div
+              v-else-if="draft.mode === 'keyword'"
+              class="text-to-columns-dialog__keywords"
+              role="group"
+              :aria-label="t('dataTools.textToColumns.keyword')"
             >
-            <TCheckbox v-model="draft.keepKeywords">{{
-              t("dataTools.textToColumns.keepKeywords")
-            }}</TCheckbox>
-          </div>
-          <TFormItem
-            v-else-if="draft.mode === 'fixed-width'"
-            :label="t('dataTools.textToColumns.breakPosition')"
-            :help="t('dataTools.textToColumns.breakPositionHint')"
-            :status="widthsValid ? undefined : 'error'"
-          >
-            <div class="text-to-columns-dialog__break-position">
-              <div class="text-to-columns-dialog__break-controls">
+              <div class="text-to-columns-dialog__keyword-inputs" @keydown="handleKeywordKeydown">
                 <TInput
-                  v-model="breakPositionInput"
-                  :aria-label="t('dataTools.textToColumns.breakPosition')"
-                  placeholder="5"
-                  @enter="addBreakPosition"
+                  v-for="(_, index) in draft.keywords"
+                  :key="index"
+                  :value="draft.keywords?.[index]"
+                  :aria-label="`${t('dataTools.textToColumns.keyword')} ${index + 1}`"
+                  @change="setKeyword(index, $event)"
                 />
-                <TButton theme="primary" variant="outline" @click="addBreakPosition">{{
-                  t("dataTools.textToColumns.createBreak")
-                }}</TButton>
               </div>
-              <span v-if="widthsInput">{{
-                t("dataTools.textToColumns.currentBreaks", { positions: widthsInput })
-              }}</span>
-            </div>
-          </TFormItem>
-        </template>
-        <template v-else>
-          <TFormItem :label="t('dataTools.textToColumns.destination')"
-            ><div class="text-to-columns-dialog__destination">
-              <RangeReferenceInput
-                v-model="draft.destination"
-                :label="t('dataTools.textToColumns.destination')"
-                :select-reference="selectReference"
-              /><TCheckbox v-model="draft.overwrite">{{
-                t("dataTools.textToColumns.overwrite")
+              <TRadioGroup v-model="draft.keywordPosition" class="text-to-columns-dialog__inline"
+                ><TRadio value="before">{{ t("dataTools.textToColumns.beforeKeyword") }}</TRadio
+                ><TRadio value="after">{{
+                  t("dataTools.textToColumns.afterKeyword")
+                }}</TRadio></TRadioGroup
+              >
+              <TCheckbox v-model="draft.keepKeywords">{{
+                t("dataTools.textToColumns.keepKeywords")
               }}</TCheckbox>
-            </div></TFormItem
-          >
-          <TFormItem :label="t('dataTools.textToColumns.columnFormat')">
-            <div class="text-to-columns-dialog__format">
-              <TRadioGroup
-                :value="draft.columnTypes[selectedColumn] ?? 'general'"
-                class="text-to-columns-dialog__inline"
-                :aria-label="t('dataTools.textToColumns.columnFormat')"
-                data-text-to-columns-column-type
-                @change="setColumnType"
-              >
-                <TRadio v-for="option in typeOptions" :key="option.value" :value="option.value">{{
-                  option.label
-                }}</TRadio> </TRadioGroup
-              ><span>{{
-                t("dataTools.textToColumns.columnSelected", { column: selectedColumn + 1 })
-              }}</span>
-              <div
-                v-if="draft.columnTypes[selectedColumn] === 'date'"
-                class="text-to-columns-dialog__date-order"
-              >
-                <TSelect
-                  :value="draft.dateOrders?.[selectedColumn] ?? 'YMD'"
-                  :options="dateOrderOptions"
-                  :aria-label="t('dataTools.textToColumns.dateOrder')"
-                  @change="setDateOrder"
-                />
-              </div>
             </div>
-          </TFormItem>
-          <p class="text-to-columns-dialog__hint">{{ t("dataTools.textToColumns.formatHint") }}</p>
-        </template>
+            <TFormItem
+              v-else-if="draft.mode === 'fixed-width'"
+              :label="t('dataTools.textToColumns.breakPosition')"
+              :help="t('dataTools.textToColumns.breakPositionHint')"
+              :status="widthsValid ? undefined : 'error'"
+            >
+              <div class="text-to-columns-dialog__break-position">
+                <div class="text-to-columns-dialog__break-controls">
+                  <TInput
+                    v-model="breakPositionInput"
+                    :aria-label="t('dataTools.textToColumns.breakPosition')"
+                    placeholder="5"
+                    @enter="addBreakPosition"
+                  />
+                  <TButton theme="primary" variant="outline" @click="addBreakPosition">{{
+                    t("dataTools.textToColumns.createBreak")
+                  }}</TButton>
+                </div>
+                <span v-if="widthsInput">{{
+                  t("dataTools.textToColumns.currentBreaks", { positions: widthsInput })
+                }}</span>
+              </div>
+            </TFormItem>
+          </template>
+          <template v-else>
+            <TFormItem :label="t('dataTools.textToColumns.destination')"
+              ><div class="text-to-columns-dialog__destination">
+                <RangeReferenceInput
+                  v-model="draft.destination"
+                  :label="t('dataTools.textToColumns.destination')"
+                  :select-reference="selectReference"
+                /><TCheckbox v-model="draft.overwrite">{{
+                  t("dataTools.textToColumns.overwrite")
+                }}</TCheckbox>
+              </div></TFormItem
+            >
+            <TFormItem :label="t('dataTools.textToColumns.columnFormat')">
+              <div class="text-to-columns-dialog__format">
+                <TRadioGroup
+                  :value="draft.columnTypes[selectedColumn] ?? 'general'"
+                  class="text-to-columns-dialog__inline"
+                  :aria-label="t('dataTools.textToColumns.columnFormat')"
+                  data-text-to-columns-column-type
+                  @change="setColumnType"
+                >
+                  <TRadio v-for="option in typeOptions" :key="option.value" :value="option.value">{{
+                    option.label
+                  }}</TRadio> </TRadioGroup
+                ><span>{{
+                  t("dataTools.textToColumns.columnSelected", { column: selectedColumn + 1 })
+                }}</span>
+                <div
+                  v-if="draft.columnTypes[selectedColumn] === 'date'"
+                  class="text-to-columns-dialog__date-order"
+                >
+                  <TSelect
+                    :value="draft.dateOrders?.[selectedColumn] ?? 'YMD'"
+                    :options="dateOrderOptions"
+                    :aria-label="t('dataTools.textToColumns.dateOrder')"
+                    @change="setDateOrder"
+                  />
+                </div>
+              </div>
+            </TFormItem>
+            <p class="text-to-columns-dialog__hint">
+              {{ t("dataTools.textToColumns.formatHint") }}
+            </p>
+          </template>
+        </div>
       </TForm>
       <div class="text-to-columns-dialog__preview-section">
         <div class="text-to-columns-dialog__preview-heading">
@@ -627,52 +636,56 @@ function confirm(): void {
           <p v-if="previewError" class="text-to-columns-dialog__error">{{ previewError }}</p>
           <span>{{ t("dataTools.textToColumns.previewHint") }}</span>
         </div>
-        <FixedWidthSplitEditor
-          v-if="step === 0 && setupMode === 'custom' && draft.mode === 'fixed-width'"
-          :rows="sourceRows"
-          :widths="draft.fixedWidths"
-          @change="changeWidths"
-        />
-        <div
-          v-else
-          class="text-to-columns-dialog__preview"
-          :aria-label="t('dataTools.textToColumns.preview')"
-        >
-          <TableHeightWrapper v-slot="{ height }">
-            <TTable
-              class="sheetcraft-table--mini"
-              row-key="row"
-              :data="previewData"
-              :columns="previewColumns"
-              :height="height"
-              :table-content-width="previewTableWidth"
-              :bordered="false"
-              cell-empty-content=""
-              size="small"
-              table-layout="fixed"
-              hover
-              :aria-label="t('dataTools.textToColumns.preview')"
-            >
-              <template #row="{ row }">{{ row.row + 1 }}</template>
-              <template #previewColumnTitle="{ colIndex }">
-                <TButton
-                  v-if="step === 1"
-                  variant="text"
-                  :theme="selectedColumn === colIndex - 1 ? 'primary' : 'default'"
-                  :aria-pressed="selectedColumn === colIndex - 1"
-                  :data-split-column="colIndex - 1"
-                  @click="selectedColumn = colIndex - 1"
-                >
-                  {{ t("dataTools.textToColumns.column", { column: colIndex }) }} ·
-                  {{
-                    typeOptions.find((type) => type.value === draft.columnTypes[colIndex - 1])
-                      ?.label
-                  }}
-                </TButton>
-                <span v-else>{{ t("dataTools.textToColumns.column", { column: colIndex }) }}</span>
-              </template>
-            </TTable>
-          </TableHeightWrapper>
+        <div class="text-to-columns-dialog__preview-stage">
+          <FixedWidthSplitEditor
+            v-if="step === 0 && setupMode === 'custom' && draft.mode === 'fixed-width'"
+            :rows="sourceRows"
+            :widths="draft.fixedWidths"
+            @change="changeWidths"
+          />
+          <div
+            v-else
+            class="text-to-columns-dialog__preview"
+            :aria-label="t('dataTools.textToColumns.preview')"
+          >
+            <TableHeightWrapper v-slot="{ height }">
+              <TTable
+                class="sheetcraft-table--mini"
+                row-key="row"
+                :data="previewData"
+                :columns="previewColumns"
+                :height="height"
+                :table-content-width="previewTableWidth"
+                :bordered="false"
+                cell-empty-content=""
+                size="small"
+                table-layout="fixed"
+                hover
+                :aria-label="t('dataTools.textToColumns.preview')"
+              >
+                <template #row="{ row }">{{ row.row + 1 }}</template>
+                <template #previewColumnTitle="{ colIndex }">
+                  <TButton
+                    v-if="step === 1"
+                    variant="text"
+                    :theme="selectedColumn === colIndex - 1 ? 'primary' : 'default'"
+                    :aria-pressed="selectedColumn === colIndex - 1"
+                    :data-split-column="colIndex - 1"
+                    @click="selectedColumn = colIndex - 1"
+                  >
+                    {{ t("dataTools.textToColumns.column", { column: colIndex }) }} ·
+                    {{
+                      typeOptions.find((type) => type.value === draft.columnTypes[colIndex - 1])
+                        ?.label
+                    }}
+                  </TButton>
+                  <span v-else>{{
+                    t("dataTools.textToColumns.column", { column: colIndex })
+                  }}</span>
+                </template>
+              </TTable>
+            </TableHeightWrapper>
+          </div>
         </div>
       </div>
     </div>
@@ -694,10 +707,32 @@ function confirm(): void {
   </Dialog>
 </template>
 <style scoped lang="scss">
+@use "../../../shared/option-list/option-list" as option-list;
+
 .text-to-columns-dialog {
   display: grid;
-  gap: 8px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 10px;
+  height: min(556px, calc(100vh - 172px));
   min-width: 0;
+  overflow: hidden;
+  &__form {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 10px;
+    min-width: 0;
+    min-height: 0;
+  }
+  &__stage {
+    @include option-list.scrollbar;
+    display: grid;
+    align-content: start;
+    gap: 8px;
+    min-width: 0;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
   &__hint {
     margin: 0;
     color: var(--sheetcraft-text-secondary);
@@ -798,8 +833,13 @@ function confirm(): void {
       color: var(--sheetcraft-text-secondary);
     }
   }
+  &__preview-stage {
+    height: 244px;
+    min-width: 0;
+    min-height: 0;
+  }
   &__preview {
-    height: 220px;
+    height: 100%;
     min-width: 0;
     min-height: 0;
     :deep(.text-to-columns-dialog__column--selected) {
