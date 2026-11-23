@@ -262,8 +262,8 @@ const shapes: DrawingShape[] = [
       </div>
       <Form
         class="drawing-editor__fields sheetcraft-form-grid"
-        label-align="right"
-        :label-width="locale === 'zh-CN' ? 88 : 112"
+        label-align="left"
+        :label-width="locale === 'zh-CN' ? 76 : 108"
         :prevent-submit-default="true"
       >
         <p v-if="applyError" role="alert">{{ t("drawing.changeRejected") }}</p>

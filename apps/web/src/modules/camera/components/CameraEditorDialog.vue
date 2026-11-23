@@ -18,7 +18,7 @@ const props = defineProps<{
   selectReference: (current: string) => Promise<string | undefined>;
 }>();
 const emit = defineEmits<{ confirm: [drawing: SheetCameraDrawing, source: string]; close: [] }>();
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 const titleInputId = `camera-title-${useId()}`;
 const draft = ref({ ...props.drawing, camera: { ...props.drawing.camera } });
 const source = ref(
@@ -31,7 +31,8 @@ const source = ref(
   <Dialog
     :visible="!suspended"
     :header="t('camera.title')"
-    width="min(480px, calc(100vw - 32px))"
+    width="min(440px, calc(100vw - 32px))"
+    placement="center"
     :close-on-overlay-click="false"
     :confirm-btn="{ content: t('picture.confirm'), disabled }"
     :cancel-btn="t('picture.cancel')"
@@ -39,8 +40,7 @@ const source = ref(
     @close="emit('close')"
     ><Form
       class="camera-editor sheetcraft-form-grid"
-      label-align="right"
-      :label-width="locale === 'zh-CN' ? 88 : 112"
+      label-align="top"
       :prevent-submit-default="true"
     >
       <FormItem :label="t('chart.source')">
@@ -62,9 +62,9 @@ const source = ref(
             },
           }"
       /></FormItem>
-      <FormItem
-        ><Checkbox v-model="draft.camera.gridLines">{{ t("camera.gridLines") }}</Checkbox></FormItem
-      >
+      <div class="camera-editor__card">
+        <Checkbox v-model="draft.camera.gridLines">{{ t("camera.gridLines") }}</Checkbox>
+      </div>
       <p>{{ t("camera.hint") }}</p>
       <p v-if="error" role="alert">{{ t("camera.invalid") }}</p>
     </Form></Dialog
@@ -73,9 +73,14 @@ const source = ref(
 <style scoped lang="scss">
 .camera-editor {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   &__reference {
     width: 100%;
+  }
+  &__card {
+    padding: 9px 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
   }
   p {
     margin: 0;

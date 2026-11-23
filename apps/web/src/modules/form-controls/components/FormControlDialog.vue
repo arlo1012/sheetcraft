@@ -156,8 +156,8 @@ function confirm() {
   >
     <Form
       class="form-control-editor sheetcraft-form-grid"
-      label-align="right"
-      :label-width="locale === 'zh-CN' ? 100 : 144"
+      label-align="left"
+      :label-width="locale === 'zh-CN' ? 88 : 132"
       :data="draft"
       :prevent-submit-default="true"
     >

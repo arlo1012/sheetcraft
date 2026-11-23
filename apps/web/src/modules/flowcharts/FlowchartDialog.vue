@@ -205,7 +205,7 @@ function remove() {
   >
     <FlowchartPicker v-if="!draft" :start="start" :existing="existing" @choose="choose" />
     <div v-else ref="historyElement" class="editor">
-      <Form label-align="right" :label-width="zh ? 60 : 75" :prevent-submit-default="true"
+      <Form label-align="left" :label-width="zh ? 60 : 75" :prevent-submit-default="true"
         ><FormItem :label="t('flowchart.name')"
           ><Input
             :aria-label="t('flowchart.name')"
@@ -311,8 +311,8 @@ function remove() {
       </div>
       <Form
         v-if="node || edge"
-        label-align="right"
-        :label-width="zh ? 84 : 100"
+        label-align="left"
+        :label-width="zh ? 76 : 96"
         :prevent-submit-default="true"
       >
         <FormItem v-if="node" :label="t('flowchart.nodeText')"
@@ -335,8 +335,8 @@ function remove() {
       <Form
         v-if="node"
         class="geometry"
-        label-align="right"
-        :label-width="zh ? 40 : 55"
+        label-align="left"
+        :label-width="zh ? 36 : 52"
         :prevent-submit-default="true"
       >
         <FormItem

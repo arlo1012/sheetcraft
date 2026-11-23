@@ -410,7 +410,7 @@ function choose(kind: DashboardKind) {
       @confirm="saveSettings"
       @close="preference = undefined"
     >
-      <Form label-align="right" :label-width="locale === 'zh-CN' ? 80 : 105">
+      <Form label-align="left" :label-width="locale === 'zh-CN' ? 76 : 100">
         <template v-if="preference === 'boardTitle'"
           ><FormItem :label="t('dashboard.boardTitle')"
             ><Input

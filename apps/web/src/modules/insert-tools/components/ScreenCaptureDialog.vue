@@ -282,8 +282,8 @@ onBeforeUnmount(() => {
       <Form
         v-if="size.width"
         class="screen-capture__controls sheetcraft-form-grid"
-        label-align="right"
-        :label-width="locale === 'zh-CN' ? 112 : 120"
+        label-align="left"
+        :label-width="locale === 'zh-CN' ? 96 : 116"
         :prevent-submit-default="true"
       >
         <FormItem v-if="!recordingRegion" :label="t('drawing.captureShape')"

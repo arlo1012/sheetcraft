@@ -168,6 +168,7 @@ function confirm(): void {
     role="dialog"
     aria-modal="true"
     width="min(680px, calc(100vw - 32px))"
+    placement="center"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
     :confirm-btn="{
@@ -186,8 +187,8 @@ function confirm(): void {
         {{ t(mode === "cell" ? "image.batchCellHint" : "image.batchFloatingHint") }}
       </p>
       <Form
-        label-align="right"
-        :label-width="locale === 'zh-CN' ? 144 : 192"
+        label-align="left"
+        :label-width="locale === 'zh-CN' ? 132 : 176"
         :prevent-submit-default="true"
       >
         <FormItem :label="t('image.batchArrangement')"

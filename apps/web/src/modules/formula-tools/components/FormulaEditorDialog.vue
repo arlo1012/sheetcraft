@@ -480,7 +480,7 @@ watch(
 
       > span {
         color: var(--sheetcraft-text-secondary);
-        text-align: right;
+        text-align: left;
         overflow-wrap: anywhere;
       }
     }

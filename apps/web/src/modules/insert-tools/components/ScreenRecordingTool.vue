@@ -121,8 +121,9 @@ function openFile(event: Event) {
     </div>
     <div v-else class="record-tool">
       <Form
-        label-align="right"
-        :label-width="locale === 'zh-CN' ? 84 : 120"
+        class="sheetcraft-form-grid"
+        label-align="left"
+        :label-width="locale === 'zh-CN' ? 76 : 112"
         :prevent-submit-default="true"
       >
         <FormItem :label="t('drawing.recordMode')">

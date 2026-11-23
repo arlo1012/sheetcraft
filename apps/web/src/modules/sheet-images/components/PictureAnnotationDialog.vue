@@ -513,8 +513,8 @@ onBeforeUnmount(() => {
       </RadioGroup>
       <Form
         class="picture-annotation__options sheetcraft-form-grid"
-        label-align="right"
-        :label-width="locale === 'zh-CN' ? 80 : 112"
+        label-align="left"
+        :label-width="locale === 'zh-CN' ? 76 : 104"
         :prevent-submit-default="true"
       >
         <FormItem :label="t('picture.annotationColor')"

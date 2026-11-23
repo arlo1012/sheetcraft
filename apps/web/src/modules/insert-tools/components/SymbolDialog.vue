@@ -662,8 +662,8 @@ function onCustomListKey(event: KeyboardEvent): void {
     <Form
       class="symbol-dialog sheetcraft-form-grid"
       :data-cell-edit-session="editSessionId"
-      label-align="right"
-      :label-width="locale === 'zh-CN' ? 80 : 112"
+      label-align="left"
+      :label-width="locale === 'zh-CN' ? 72 : 104"
       :prevent-submit-default="true"
     >
       <Tabs v-model="tab" size="medium">

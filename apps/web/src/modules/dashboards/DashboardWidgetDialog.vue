@@ -157,8 +157,8 @@ function save() {
             :label="t('dashboard.style')"
         /></Tabs>
         <Form
-          label-align="right"
-          :label-width="locale === 'zh-CN' ? 82 : 108"
+          label-align="left"
+          :label-width="locale === 'zh-CN' ? 76 : 104"
           :prevent-submit-default="true"
         >
           <template v-if="tab === 'data'">

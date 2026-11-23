@@ -269,7 +269,7 @@ function fontSize(value: string | number) {
         <Form
           class="properties"
           :label-width="locale === 'zh-CN' ? 65 : 80"
-          label-align="right"
+          label-align="left"
           :prevent-submit-default="true"
         >
           <FormItem :label="t('mindMap.name')"

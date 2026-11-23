@@ -26,7 +26,7 @@ const emit = defineEmits<{
   confirm: [value: { width: number; height: number; locked: boolean; all: boolean }];
   close: [];
 }>();
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 const fallbackOwner = useId();
 const owner = computed(() => props.ownerKey ?? fallbackOwner);
 const width = ref(props.width);
@@ -105,7 +105,8 @@ function confirm() {
   <Dialog
     :visible="true"
     :header="t('picture.batchSize')"
-    width="min(440px, calc(100vw - 32px))"
+    width="min(420px, calc(100vw - 32px))"
+    placement="center"
     :close-on-overlay-click="false"
     :confirm-btn="t('picture.confirm')"
     :cancel-btn="t('picture.cancel')"
@@ -114,60 +115,76 @@ function confirm() {
   >
     <Form
       class="picture-batch-size sheetcraft-form-grid"
-      label-align="right"
-      :label-width="locale === 'zh-CN' ? 104 : 144"
+      label-align="top"
       :prevent-submit-default="true"
     >
-      <p v-if="error" role="alert">{{ error }}</p>
-      <FormItem :label="t('image.widthPoints')"
-        ><div class="picture-batch-size__control">
-          <NumericField
-            ref="widthControl"
-            data-picture-batch-width
-            :owner-key="owner"
-            :value="{ kind: 'value', value: width }"
-            :spec="spec"
-            :label="t('image.widthPoints')"
-            :invalid-message="t('picture.invalidSize')"
-            :rejected-message="t('picture.operationFailed')"
-            :on-commit="widthCommit"
-            presentation="inline-stepper"
-            @draft-change="updateWidthDraft"
-          /></div
-      ></FormItem>
-      <FormItem :label="t('image.heightPoints')"
-        ><div class="picture-batch-size__control">
-          <NumericField
-            ref="heightControl"
-            data-picture-batch-height
-            :owner-key="`${owner}:${locked ? 'ratio' : 'explicit'}`"
-            :value="locked ? derivedHeight : { kind: 'value', value: height }"
-            :disabled="locked"
-            :spec="spec"
-            :label="t('image.heightPoints')"
-            :mixed-text="t('format.mixed')"
-            :empty-text="t('pictureFormat.notAvailable')"
-            :invalid-message="t('picture.invalidSize')"
-            :rejected-message="t('picture.operationFailed')"
-            :on-commit="heightCommit"
-            presentation="inline-stepper"
-          /></div
-      ></FormItem>
-      <FormItem
-        ><Checkbox v-model="locked">{{ t("picture.keepEachRatio") }}</Checkbox></FormItem
-      >
-      <FormItem
-        ><Checkbox v-model="all">{{ t("picture.allPictures") }}</Checkbox></FormItem
-      >
+      <p v-if="error" class="picture-batch-size__error" role="alert">{{ error }}</p>
+      <div class="picture-batch-size__row">
+        <FormItem :label="t('image.widthPoints')"
+          ><div class="picture-batch-size__control">
+            <NumericField
+              ref="widthControl"
+              data-picture-batch-width
+              :owner-key="owner"
+              :value="{ kind: 'value', value: width }"
+              :spec="spec"
+              :label="t('image.widthPoints')"
+              :invalid-message="t('picture.invalidSize')"
+              :rejected-message="t('picture.operationFailed')"
+              :on-commit="widthCommit"
+              presentation="inline-stepper"
+              @draft-change="updateWidthDraft"
+            /></div
+        ></FormItem>
+        <FormItem :label="t('image.heightPoints')"
+          ><div class="picture-batch-size__control">
+            <NumericField
+              ref="heightControl"
+              data-picture-batch-height
+              :owner-key="`${owner}:${locked ? 'ratio' : 'explicit'}`"
+              :value="locked ? derivedHeight : { kind: 'value', value: height }"
+              :disabled="locked"
+              :spec="spec"
+              :label="t('image.heightPoints')"
+              :mixed-text="t('format.mixed')"
+              :empty-text="t('pictureFormat.notAvailable')"
+              :invalid-message="t('picture.invalidSize')"
+              :rejected-message="t('picture.operationFailed')"
+              :on-commit="heightCommit"
+              presentation="inline-stepper"
+            /></div
+        ></FormItem>
+      </div>
+      <div class="picture-batch-size__card">
+        <Checkbox v-model="locked">{{ t("picture.keepEachRatio") }}</Checkbox>
+        <Checkbox v-model="all">{{ t("picture.allPictures") }}</Checkbox>
+      </div>
     </Form>
   </Dialog>
 </template>
 <style scoped lang="scss">
 .picture-batch-size {
   display: grid;
-  gap: 12px;
+  gap: 10px;
+  &__row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    min-width: 0;
+  }
   &__control {
     width: 100%;
+  }
+  &__card {
+    display: grid;
+    gap: 6px;
+    padding: 9px 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
+  }
+  &__error {
+    margin: 0;
+    color: var(--sheetcraft-status-error);
   }
 }
 </style>

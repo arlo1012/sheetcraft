@@ -16,7 +16,7 @@ const props = defineProps<{
   suspended?: boolean;
   selectReference: (current: string) => Promise<string | undefined>;
 }>();
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 const source = ref(props.request.initial);
 const sourceSheetId = ref(props.request.sheetId);
 const sheets = computed(() =>
@@ -31,8 +31,8 @@ function confirm() {
   <Dialog
     :visible="!suspended"
     :header="t('drawing.textBoxReferenceTitle')"
-    width="540px"
-    :style="{ maxWidth: 'calc(100vw - 32px)' }"
+    width="min(480px, calc(100vw - 32px))"
+    placement="center"
     :close-on-overlay-click="false"
     :confirm-btn="{
       content: t(
@@ -53,8 +53,8 @@ function confirm() {
         {{ t("drawing.textBoxReferenceReadonly") }}
       </p>
       <Form
-        label-align="right"
-        :label-width="locale === 'zh-CN' ? 96 : 144"
+        class="textbox-reference-dialog__form sheetcraft-form-grid"
+        label-align="top"
         :prevent-submit-default="true"
       >
         <FormItem :label="t('drawing.textBoxReferenceSheet')"
@@ -100,7 +100,8 @@ function confirm() {
       </p>
       <Button
         v-if="request.linked"
-        variant="outline"
+        theme="default"
+        variant="base"
         :disabled="disabled"
         @click="request.unlink"
         >{{ t("drawing.textBoxReferenceUnlink") }}</Button
@@ -111,9 +112,13 @@ function confirm() {
 <style scoped lang="scss">
 .textbox-reference-dialog {
   display: grid;
-  gap: 14px;
+  gap: 10px;
   p {
     margin: 0;
+  }
+  &__form {
+    display: grid;
+    gap: 10px;
   }
   &__reference {
     width: 100%;
@@ -132,15 +137,15 @@ function confirm() {
   }
   &__preview {
     display: grid;
-    gap: 8px;
-    min-height: 68px;
-    max-height: 180px;
+    gap: 6px;
+    min-height: 64px;
+    max-height: 168px;
     overflow: auto;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-    padding: 12px;
-    background: var(--sheetcraft-surface-secondary);
-    border-radius: 6px;
+    padding: 10px 12px;
+    background: var(--sheetcraft-surface-dialog-card);
+    border-radius: var(--sheetcraft-radius-dialog-card);
   }
 }
 </style>

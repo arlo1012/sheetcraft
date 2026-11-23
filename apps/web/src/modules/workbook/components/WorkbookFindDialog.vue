@@ -272,7 +272,7 @@ defineExpose({ focusQuery });
 
     > span {
       color: var(--sheetcraft-text-secondary);
-      text-align: right;
+      text-align: left;
     }
   }
   &__actions {

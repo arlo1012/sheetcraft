@@ -217,7 +217,7 @@ defineExpose({ focusQuery });
   }
   &__query-label {
     color: var(--sheetcraft-text-secondary);
-    text-align: right;
+    text-align: left;
     white-space: nowrap;
   }
   &__query,
