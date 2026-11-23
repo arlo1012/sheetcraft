@@ -798,7 +798,7 @@ function onCustomListKey(event: KeyboardEvent): void {
         </section>
         <section
           v-show="tab === 'special'"
-          class="symbol-dialog__page"
+          class="symbol-dialog__page symbol-dialog__page--fill"
           :aria-label="t('symbolTools.special')"
         >
           <OptionList
@@ -822,7 +822,7 @@ function onCustomListKey(event: KeyboardEvent): void {
         </section>
         <section
           v-show="tab === 'custom'"
-          class="symbol-dialog__page"
+          class="symbol-dialog__page symbol-dialog__page--fill"
           :aria-label="t('symbolTools.custom')"
         >
           <div
@@ -1057,12 +1057,14 @@ function onCustomListKey(event: KeyboardEvent): void {
   font-size: var(--sheetcraft-font-size-body-medium);
   line-height: var(--sheetcraft-line-height-body-medium);
   &__body {
+    @include option-list.scrollbar;
     display: flex;
     flex-direction: column;
     gap: 6px;
-    max-height: calc(100dvh - 190px);
+    height: min(492px, calc(100dvh - 190px));
     min-height: 0;
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
     overscroll-behavior: contain;
   }
   &__page {
@@ -1074,6 +1076,9 @@ function onCustomListKey(event: KeyboardEvent): void {
     min-width: 0;
     > * {
       flex-shrink: 0;
+    }
+    &--fill {
+      flex: 1 0 280px;
     }
   }
   &__fields {
@@ -1134,9 +1139,8 @@ function onCustomListKey(event: KeyboardEvent): void {
     }
   }
   &__special-list {
-    height: clamp(180px, 38dvh, 320px);
-    min-height: 120px;
-    flex: none;
+    flex: 1 1 0;
+    min-height: 180px;
   }
   &__custom-symbol {
     display: flex;
@@ -1144,9 +1148,8 @@ function onCustomListKey(event: KeyboardEvent): void {
     align-items: center;
   }
   &__custom-list {
-    height: clamp(160px, 34dvh, 280px);
-    min-height: 120px;
-    flex: none;
+    flex: 1 1 0;
+    min-height: 160px;
     overflow: hidden;
   }
   &__coverage-warning {

@@ -256,8 +256,10 @@ defineExpose({ focusQuery });
 .workbook-find-dialog {
   min-width: 0;
   &__pane {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 10px;
+    min-height: 240px;
     padding-top: var(--sheetcraft-space-5);
     min-width: 0;
   }
@@ -281,6 +283,7 @@ defineExpose({ focusQuery });
     align-items: center;
     flex-wrap: wrap;
     gap: var(--sheetcraft-space-3);
+    margin-top: auto;
     padding-top: 6px;
   }
   &__status {

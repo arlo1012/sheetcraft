@@ -98,12 +98,17 @@ defineExpose({ focus });
 
 <style scoped lang="scss">
 .workbook-go-to-panel {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
   gap: var(--sheetcraft-space-4);
   &__kinds {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--sheetcraft-space-3) var(--sheetcraft-space-2);
+    padding: 10px 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
   }
   &__data,
   &__data-options {
@@ -124,7 +129,9 @@ defineExpose({ focus });
   &__actions {
     display: flex;
     justify-content: flex-end;
-    gap: var(--sheetcraft-space-2);
+    gap: var(--sheetcraft-space-3);
+    margin-top: auto;
+    padding-top: 6px;
   }
 }
 @media (max-width: 520px) {

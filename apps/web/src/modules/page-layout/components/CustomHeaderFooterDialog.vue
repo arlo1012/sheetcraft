@@ -338,6 +338,7 @@ watch(
     :visible="visible"
     :header="t(section === 'header' ? 'pageLayout.header' : 'pageLayout.footer')"
     width="min(560px, calc(100vw - 32px))"
+    placement="center"
     :confirm-btn="t('pageLayout.confirm')"
     :cancel-btn="t('pageLayout.cancel')"
     :close-on-overlay-click="false"

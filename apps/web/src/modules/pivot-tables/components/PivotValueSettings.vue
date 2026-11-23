@@ -205,29 +205,48 @@ function confirmFormat(change: CellFormatChange): void {
 </template>
 <style scoped lang="scss">
 .pivot-value-settings__panel {
+  display: flex;
+  flex-direction: column;
+  height: 270px;
   margin-top: 12px;
   padding: 12px;
-  border: 1px solid var(--sheetcraft-border-subtle);
-  border-radius: 6px;
+  border-radius: var(--sheetcraft-radius-dialog-card);
+  background: var(--sheetcraft-surface-dialog-card);
   p {
     margin: 0 0 8px;
     color: var(--sheetcraft-text-secondary);
   }
   :deep(.option-list) {
-    height: 214px;
+    flex: 1;
+    min-height: 0;
   }
 }
 .pivot-value-settings__bases {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  flex: 1;
+  min-height: 0;
   gap: 12px;
   margin-top: 12px;
+  > div {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
   span {
     display: block;
     margin-bottom: 6px;
+    color: var(--sheetcraft-text-secondary);
+  }
+  > div > div {
+    display: flex;
+    flex: 1;
+    min-height: 0;
   }
   :deep(.option-list) {
-    height: 178px;
+    flex: 1;
+    width: 100%;
+    min-height: 0;
   }
   .is-disabled {
     opacity: 0.45;
