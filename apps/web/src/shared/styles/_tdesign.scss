@@ -697,6 +697,13 @@
   }
 }
 
+// RangeReferenceInput wraps TInput in a div; match TInput's full-row width inside FormItem flex rows.
+.t-form:not(.t-form-inline) .t-form__controls-content > .sheetcraft-range-reference-input {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+
 .t-tabs__header {
   --td-comp-size-xxl: 32px;
   --td-comp-size-xxxxl: 40px;

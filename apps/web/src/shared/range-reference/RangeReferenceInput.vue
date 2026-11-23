@@ -84,7 +84,7 @@ async function pickReference(): Promise<void> {
 </script>
 
 <template>
-  <div ref="root">
+  <div ref="root" class="sheetcraft-range-reference-input">
     <TInput
       ref="control"
       v-native-control="{
@@ -120,3 +120,8 @@ async function pickReference(): Promise<void> {
     </TInput>
   </div>
 </template>
+<style scoped lang="scss">
+.sheetcraft-range-reference-input {
+  min-width: 0;
+}
+</style>
