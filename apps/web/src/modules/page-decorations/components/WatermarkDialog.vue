@@ -43,7 +43,7 @@ const imageDraft = ref({ assetId: "", scale: null as number | null, washout: tru
 const previewCanvas = ref<HTMLCanvasElement>();
 const localImageUrl = ref<string>();
 const previewImage = ref<HTMLImageElement>();
-const labelWidth = computed(() => (locale.value === "zh-CN" ? 72 : 104));
+const labelWidth = computed(() => (locale.value === "zh-CN" ? 84 : 108));
 const { fontOptions, fontResourceRevision } = useFontCatalog(() =>
   draft.value.fontFamily ? [draft.value.fontFamily] : [],
 );
