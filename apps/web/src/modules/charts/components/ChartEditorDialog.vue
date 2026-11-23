@@ -595,8 +595,8 @@ function onDialogKeydown(event: KeyboardEvent): void {
         </div>
         <Form
           v-if="rectangularSource"
-          label-align="right"
-          :label-width="locale === 'zh-CN' ? 88 : 112"
+          label-align="left"
+          :label-width="locale === 'zh-CN' ? 76 : 104"
           :prevent-submit-default="true"
         >
           <FormItem :label="t('chart.source')">
@@ -683,8 +683,8 @@ function onDialogKeydown(event: KeyboardEvent): void {
           }}</Button>
         </p>
         <Form
-          label-align="right"
-          :label-width="locale === 'zh-CN' ? 88 : 112"
+          label-align="left"
+          :label-width="locale === 'zh-CN' ? 76 : 104"
           :prevent-submit-default="true"
         >
           <FormItem :label="t('chart.source')"

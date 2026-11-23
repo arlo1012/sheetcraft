@@ -13,7 +13,7 @@ const props = defineProps<{
   failed: boolean;
 }>();
 const emit = defineEmits<{ confirm: [patch: SparklineDataOptions]; close: [] }>();
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 const empty = ref(props.initial.empty);
 const showHidden = ref(props.initial.showHidden);
 function confirm(): void {
@@ -36,7 +36,8 @@ function confirm(): void {
     :aria-label="t('sparkline.dataOptionsTitle')"
     role="dialog"
     aria-modal="true"
-    width="min(420px, calc(100vw - 32px))"
+    width="min(400px, calc(100vw - 32px))"
+    placement="center"
     :close-on-overlay-click="false"
     :confirm-btn="{ content: t('picture.confirm'), disabled }"
     :cancel-btn="t('picture.cancel')"
@@ -45,32 +46,33 @@ function confirm(): void {
   >
     <Form
       class="sparkline-data-options sheetcraft-form-grid"
-      label-align="right"
-      :label-width="locale === 'zh-CN' ? 128 : 152"
+      label-align="top"
       :prevent-submit-default="true"
     >
       <FormItem :label="t('sparkline.emptyDisplay')">
-        <RadioGroup
-          v-model="empty"
-          role="radiogroup"
-          :aria-label="t('sparkline.emptyDisplay')"
-          :disabled="disabled"
-          class="sparkline-data-options__choices"
-        >
-          <Radio value="gap">{{ t("sparkline.gap") }}</Radio>
-          <Radio value="zero">{{ t("sparkline.zero") }}</Radio>
-          <Radio value="connect">{{ t("sparkline.connect") }}</Radio>
-        </RadioGroup>
+        <div class="sparkline-data-options__card">
+          <RadioGroup
+            v-model="empty"
+            role="radiogroup"
+            :aria-label="t('sparkline.emptyDisplay')"
+            :disabled="disabled"
+            class="sparkline-data-options__choices"
+          >
+            <Radio value="gap">{{ t("sparkline.gap") }}</Radio>
+            <Radio value="zero">{{ t("sparkline.zero") }}</Radio>
+            <Radio value="connect">{{ t("sparkline.connect") }}</Radio>
+          </RadioGroup>
+        </div>
       </FormItem>
-      <FormItem
-        ><Checkbox
+      <div class="sparkline-data-options__card">
+        <Checkbox
           :checked="showHidden === true"
           :indeterminate="showHidden === undefined"
           :disabled="disabled"
           @change="showHidden = Boolean($event)"
           >{{ t("sparkline.showHiddenData") }}</Checkbox
-        ></FormItem
-      >
+        >
+      </div>
       <p v-if="failed" class="sparkline-data-options__error" role="alert">
         {{ t("sparkline.failed") }}
       </p>
@@ -81,7 +83,13 @@ function confirm(): void {
 <style scoped lang="scss">
 .sparkline-data-options {
   display: grid;
-  gap: 16px;
+  gap: 10px;
+  &__card {
+    width: 100%;
+    padding: 9px 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
+  }
   &__choices {
     display: flex;
     flex-direction: column;

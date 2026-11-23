@@ -722,8 +722,8 @@ onBeforeUnmount(() => {
         }}
       </p>
       <Form
-        label-align="right"
-        :label-width="locale === 'zh-CN' ? 112 : 152"
+        label-align="left"
+        :label-width="locale === 'zh-CN' ? 96 : 136"
         :prevent-submit-default="true"
       >
         <FormItem :label="t('chart.sourceChartRange')" data-chart-source-range

@@ -47,7 +47,8 @@ function toggleAll(): void {
     :aria-label="t('tables.insertSlicer')"
     :header="t('tables.insertSlicer')"
     visible
-    width="min(320px, calc(100vw - 32px))"
+    width="min(340px, calc(100vw - 32px))"
+    placement="center"
     :close-on-overlay-click="false"
     :confirm-btn="{ content: t('tables.confirm'), disabled: !selected.length }"
     :cancel-btn="t('tables.cancel')"
@@ -55,7 +56,7 @@ function toggleAll(): void {
     @confirm="emit('confirm', selected, tableId)"
   >
     <div class="slicer-dialog">
-      <Form v-if="tableOptions.length > 1" label-align="right" label-width="76px">
+      <Form v-if="tableOptions.length > 1" class="sheetcraft-form-grid" label-align="top">
         <FormItem :label="t('tables.slicerTable')">
           <Select
             v-native-control="{
@@ -93,6 +94,8 @@ function toggleAll(): void {
   </Dialog>
 </template>
 <style scoped lang="scss">
+@use "../../../shared/option-list/option-list";
+
 .slicer-dialog {
   display: flex;
   flex-direction: column;
@@ -105,10 +108,10 @@ function toggleAll(): void {
 }
 
 .slicer-fields {
+  @include option-list.surface;
   display: grid;
   gap: 6px;
   max-height: min(50vh, 320px);
-  overflow: auto;
-  padding: 4px;
+  padding: 10px 12px;
 }
 </style>

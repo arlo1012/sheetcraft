@@ -68,43 +68,46 @@ function onConfirm(): void {
     :header="t('tables.slicerSettings')"
     visible
     width="min(420px, calc(100vw - 32px))"
+    placement="center"
     :close-on-overlay-click="false"
     :confirm-btn="t('tables.confirm')"
     :cancel-btn="t('tables.cancel')"
     @close="emit('close')"
     @confirm="onConfirm"
   >
-    <Form label-align="right" label-width="96px">
-      <FormItem :label="t('tables.slicerCaption')">
-        <Input
-          v-model="caption"
-          size="small"
-          clearable
-          :placeholder="state?.fieldName ?? t('tables.slicerCaptionPlaceholder')"
-          data-slicer-settings-caption
-        />
-      </FormItem>
-      <FormItem :label="t('tables.slicerColumns')">
-        <InputNumber
-          v-model="columns"
-          theme="column"
-          size="small"
-          class="sheetcraft-input-number--persistent-controls slicer-settings__columns"
-          :min="1"
-          :max="MAX_TABLE_SLICER_COLUMNS"
-          :step="1"
-          :decimal-places="0"
-          data-slicer-settings-columns
-        />
-      </FormItem>
+    <Form class="slicer-settings sheetcraft-form-grid" label-align="top">
+      <div class="slicer-settings__row">
+        <FormItem :label="t('tables.slicerCaption')">
+          <Input
+            v-model="caption"
+            clearable
+            :placeholder="state?.fieldName ?? t('tables.slicerCaptionPlaceholder')"
+            data-slicer-settings-caption
+          />
+        </FormItem>
+        <FormItem :label="t('tables.slicerColumns')">
+          <InputNumber
+            v-model="columns"
+            theme="column"
+            class="sheetcraft-input-number--persistent-controls slicer-settings__columns"
+            :min="1"
+            :max="MAX_TABLE_SLICER_COLUMNS"
+            :step="1"
+            :decimal-places="0"
+            data-slicer-settings-columns
+          />
+        </FormItem>
+      </div>
       <FormItem :label="t('tables.slicerSortOrder')">
-        <RadioGroup v-model="sortOrder" data-slicer-settings-sort>
-          <Radio value="asc">{{ t("tables.slicerSortAsc") }}</Radio>
-          <Radio value="desc">{{ t("tables.slicerSortDesc") }}</Radio>
-        </RadioGroup>
+        <div class="slicer-settings__card">
+          <RadioGroup v-model="sortOrder" data-slicer-settings-sort>
+            <Radio value="asc">{{ t("tables.slicerSortAsc") }}</Radio>
+            <Radio value="desc">{{ t("tables.slicerSortDesc") }}</Radio>
+          </RadioGroup>
+        </div>
       </FormItem>
       <FormItem :label="t('tables.slicerOptions')">
-        <div class="slicer-settings__checks">
+        <div class="slicer-settings__card slicer-settings__checks">
           <Checkbox v-model="showHeader" data-slicer-settings-header>{{
             t("tables.slicerShowHeader")
           }}</Checkbox>
@@ -119,14 +122,31 @@ function onConfirm(): void {
 
 <style scoped lang="scss">
 .slicer-settings {
+  display: grid;
+  gap: 10px;
+
+  &__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 104px;
+    gap: 12px;
+    min-width: 0;
+  }
+
   &__columns {
-    width: 112px;
+    width: 100%;
+  }
+
+  &__card {
+    width: 100%;
+    padding: 9px 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
   }
 
   &__checks {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
   }
 }
 </style>

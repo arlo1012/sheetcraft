@@ -33,7 +33,7 @@ const sources = defineModel<string[]>({ required: true });
 const pageItems = defineModel<string[][]>("pageItems", { required: true });
 const pendingPageItems = defineModel<string[]>("pendingPageItems", { required: true });
 defineSlots<{ "page-count"?: () => unknown }>();
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 const reference = ref(props.initialReference);
 const selected = ref<number | undefined>(sources.value.length ? 0 : undefined);
 const browseError = ref(false);
@@ -116,11 +116,7 @@ function select(keys: Array<string | number>): void {
 </script>
 <template>
   <div class="pivot-consolidation-ranges">
-    <Form
-      label-align="right"
-      :label-width="locale === 'zh-CN' ? 72 : 104"
-      :prevent-submit-default="true"
-    >
+    <Form class="sheetcraft-form-grid" label-align="top" :prevent-submit-default="true">
       <FormItem :label="t('pivot.addRange')">
         <div class="pivot-consolidation-ranges__add">
           <RangeReferenceInput

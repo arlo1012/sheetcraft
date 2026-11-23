@@ -8,7 +8,7 @@ import { vNativeControl } from "../../../shared/tdesign/native-control";
 import { useAppI18n } from "../../../shared/i18n";
 const props = defineProps<{ initial: SparklineLimitDraft; failed: boolean }>();
 const emit = defineEmits<{ confirm: [value: number]; close: [] }>();
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 const text = ref(props.initial.value?.toString() ?? "");
 const value = computed(() => {
   const source = text.value.trim();
@@ -31,17 +31,14 @@ function confirm() {
     :header="t('sparkline.axisLimitTitle')"
     :aria-label="t('sparkline.axisLimitTitle')"
     width="min(360px, calc(100vw - 32px))"
+    placement="center"
     :close-on-overlay-click="false"
     :confirm-btn="{ content: t('picture.confirm'), disabled: value === undefined }"
     :cancel-btn="t('picture.cancel')"
     @confirm="confirm"
     @close="emit('close')"
   >
-    <Form
-      label-align="right"
-      :label-width="locale === 'zh-CN' ? 76 : 110"
-      :prevent-submit-default="true"
-    >
+    <Form class="sheetcraft-form-grid" label-align="top" :prevent-submit-default="true">
       <FormItem :label="label"
         ><TInput
           v-model="text"

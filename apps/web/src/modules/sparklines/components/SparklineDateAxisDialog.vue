@@ -11,7 +11,7 @@ const props = defineProps<{
   selectReference: (current: string) => Promise<string | undefined>;
 }>();
 const emit = defineEmits<{ confirm: [value: string]; close: [] }>();
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 const reference = ref(props.initial);
 </script>
 <template>
@@ -21,18 +21,15 @@ const reference = ref(props.initial);
     aria-modal="true"
     :aria-label="t('sparkline.dateAxisTitle')"
     :header="t('sparkline.dateAxisTitle')"
-    width="min(460px, calc(100vw - 32px))"
+    width="min(420px, calc(100vw - 32px))"
+    placement="center"
     :close-on-overlay-click="false"
     :confirm-btn="{ content: t('picture.confirm'), disabled: !reference.trim() }"
     :cancel-btn="t('picture.cancel')"
     @confirm="emit('confirm', reference)"
     @close="emit('close')"
   >
-    <Form
-      :label-width="locale === 'zh-CN' ? 76 : 94"
-      label-align="right"
-      :prevent-submit-default="true"
-    >
+    <Form class="sheetcraft-form-grid" label-align="top" :prevent-submit-default="true">
       <FormItem :label="t('sparkline.dateRange')"
         ><RangeReferenceInput
           v-model="reference"

@@ -36,7 +36,7 @@ const props = defineProps<{
   selectReference?: ChartSourceReferencePicker;
 }>();
 const emit = defineEmits<{ close: [] }>();
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 const root = ref<HTMLElement>();
 const nameText = ref(formatChartSourceName(props.workbook, props.entry.name));
 const valuesText = ref(formatChartSourceValues(props.workbook, props.entry.values));
@@ -148,7 +148,8 @@ onBeforeUnmount(() => {
     :aria-label="t(adding ? 'chart.sourceAddSeries' : 'chart.sourceEditSeries')"
     :visible="!suspended"
     :header="t(adding ? 'chart.sourceAddSeries' : 'chart.sourceEditSeries')"
-    width="min(660px, calc(100vw - 32px))"
+    width="min(540px, calc(100vw - 32px))"
+    placement="center"
     :close-on-overlay-click="false"
     :confirm-btn="{ content: t('picture.confirm'), disabled }"
     :cancel-btn="t('picture.cancel')"
@@ -165,8 +166,7 @@ onBeforeUnmount(() => {
     >
       <Form
         class="chart-series-editor__form sheetcraft-form-grid"
-        label-align="right"
-        :label-width="locale === 'zh-CN' ? 104 : 144"
+        label-align="top"
         :prevent-submit-default="true"
       >
         <FormItem :label="t('chart.sourceSeriesName')" data-series-name

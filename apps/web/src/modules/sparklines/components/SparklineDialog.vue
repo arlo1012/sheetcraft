@@ -32,7 +32,7 @@ function focusInitialRange(): void {
   focused = true;
 }
 watch([sourceInput, destinationInput], focusInitialRange, { flush: "post" });
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 </script>
 <template>
   <Dialog
@@ -41,7 +41,8 @@ const { t, locale } = useAppI18n();
     :aria-label="t(editing ? 'sparkline.edit' : 'sparkline.create')"
     role="dialog"
     aria-modal="true"
-    width="min(530px, calc(100vw - 32px))"
+    width="min(460px, calc(100vw - 32px))"
+    placement="center"
     :close-on-overlay-click="false"
     :confirm-btn="{ content: t('picture.confirm'), disabled }"
     :cancel-btn="t('picture.cancel')"
@@ -51,8 +52,7 @@ const { t, locale } = useAppI18n();
   >
     <Form
       class="sparkline-dialog sheetcraft-form-grid"
-      label-align="right"
-      :label-width="locale === 'zh-CN' ? 104 : 136"
+      label-align="top"
       :prevent-submit-default="true"
     >
       <fieldset class="sparkline-dialog__range">
@@ -84,49 +84,51 @@ const { t, locale } = useAppI18n();
         </FormItem>
       </fieldset>
       <template v-if="editing">
-        <FormItem :label="t('sparkline.type')"
-          ><Select
-            v-model="draft.sparkline.type"
-            v-native-control="{ attributes: { 'aria-label': t('sparkline.type') } }"
-            :options="[
-              { value: 'line', label: t('chart.line') },
-              { value: 'column', label: t('chart.column') },
-              { value: 'winLoss', label: t('sparkline.winLoss') },
-            ]"
-        /></FormItem>
-        <FormItem :label="t('sparkline.color')"
-          ><input
-            name="sparkline-color"
-            v-model="draft.sparkline.color"
-            type="color"
-            :aria-label="t('sparkline.color')"
-        /></FormItem>
-        <FormItem :label="t('sparkline.negative')"
-          ><input
-            name="sparkline-negative-color"
-            v-model="draft.sparkline.negativeColor"
-            type="color"
-            :aria-label="t('sparkline.negative')"
-        /></FormItem>
-        <FormItem
-          ><div class="sparkline-dialog__row">
-            <Checkbox v-if="draft.sparkline.type === 'line'" v-model="draft.sparkline.markers">{{
-              t("sparkline.markers")
-            }}</Checkbox
-            ><Checkbox v-model="draft.sparkline.axis">{{ t("sparkline.axis") }}</Checkbox
-            ><Checkbox v-model="draft.sparkline.showHidden">{{ t("chart.showHidden") }}</Checkbox>
-          </div></FormItem
-        >
-        <FormItem :label="t('sparkline.empty')"
-          ><Select
-            v-model="draft.sparkline.empty"
-            v-native-control="{ attributes: { 'aria-label': t('sparkline.empty') } }"
-            :options="[
-              { value: 'gap', label: t('sparkline.gap') },
-              { value: 'zero', label: t('sparkline.zero') },
-              { value: 'connect', label: t('sparkline.connect') },
-            ]"
-        /></FormItem>
+        <div class="sparkline-dialog__edit-row">
+          <FormItem :label="t('sparkline.type')"
+            ><Select
+              v-model="draft.sparkline.type"
+              v-native-control="{ attributes: { 'aria-label': t('sparkline.type') } }"
+              :options="[
+                { value: 'line', label: t('chart.line') },
+                { value: 'column', label: t('chart.column') },
+                { value: 'winLoss', label: t('sparkline.winLoss') },
+              ]"
+          /></FormItem>
+          <FormItem :label="t('sparkline.empty')"
+            ><Select
+              v-model="draft.sparkline.empty"
+              v-native-control="{ attributes: { 'aria-label': t('sparkline.empty') } }"
+              :options="[
+                { value: 'gap', label: t('sparkline.gap') },
+                { value: 'zero', label: t('sparkline.zero') },
+                { value: 'connect', label: t('sparkline.connect') },
+              ]"
+          /></FormItem>
+        </div>
+        <div class="sparkline-dialog__edit-row">
+          <FormItem :label="t('sparkline.color')"
+            ><input
+              name="sparkline-color"
+              v-model="draft.sparkline.color"
+              type="color"
+              :aria-label="t('sparkline.color')"
+          /></FormItem>
+          <FormItem :label="t('sparkline.negative')"
+            ><input
+              name="sparkline-negative-color"
+              v-model="draft.sparkline.negativeColor"
+              type="color"
+              :aria-label="t('sparkline.negative')"
+          /></FormItem>
+        </div>
+        <div class="sparkline-dialog__row">
+          <Checkbox v-if="draft.sparkline.type === 'line'" v-model="draft.sparkline.markers">{{
+            t("sparkline.markers")
+          }}</Checkbox
+          ><Checkbox v-model="draft.sparkline.axis">{{ t("sparkline.axis") }}</Checkbox
+          ><Checkbox v-model="draft.sparkline.showHidden">{{ t("chart.showHidden") }}</Checkbox>
+        </div>
       </template>
       <p>{{ t("sparkline.hint") }}</p>
       <p v-if="error" class="sparkline-dialog__error" role="alert">
@@ -138,17 +140,27 @@ const { t, locale } = useAppI18n();
 <style scoped lang="scss">
 .sparkline-dialog {
   display: grid;
-  gap: 14px;
+  gap: 10px;
   &__range {
     min-width: 0;
     margin: 0;
-    padding: 12px 0 0;
+    padding: 10px 12px;
     border: 0;
-    border-top: 1px solid var(--sheetcraft-border-subtle);
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
     legend {
-      padding: 0 8px 0 0;
-      font-weight: 500;
+      padding: 0;
+      margin-bottom: 6px;
+      font-weight: var(--sheetcraft-font-weight-semibold);
+      float: left;
+      width: 100%;
     }
+  }
+  &__edit-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    min-width: 0;
   }
   &__reference {
     width: 100%;
@@ -157,7 +169,10 @@ const { t, locale } = useAppI18n();
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 14px;
+    gap: 8px 14px;
+    padding: 9px 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
   }
   input[type="color"] {
     width: 34px;
