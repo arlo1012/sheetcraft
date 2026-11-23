@@ -81,6 +81,7 @@ export const conditionalFormattingZhCN = {
     threeStars: "三颗星",
     toolbar: "条件格式",
     manageRules: "管理规则…",
+    manageRulesTitle: "管理规则",
     newRule: "新建条件格式规则",
     editRule: "编辑条件格式规则",
     deleteRule: "删除规则",

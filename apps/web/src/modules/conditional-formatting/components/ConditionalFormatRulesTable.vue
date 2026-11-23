@@ -113,7 +113,7 @@ function moveAction(id: string, index: number, offset: -1 | 1): void {
       resizable
       hover
       :empty="t('conditionalFormatting.noRules')"
-      :aria-label="t('conditionalFormatting.manageRules')"
+      :aria-label="t('conditionalFormatting.manageRulesTitle')"
       @active-change="selectRows"
       @drag-sort="reorderRows"
       @row-dblclick="editRow"

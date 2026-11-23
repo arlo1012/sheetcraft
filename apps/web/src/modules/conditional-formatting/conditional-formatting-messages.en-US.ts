@@ -81,6 +81,7 @@ export const conditionalFormattingEnUS = {
     threeStars: "3 stars",
     toolbar: "Conditional formatting",
     manageRules: "Manage rules…",
+    manageRulesTitle: "Manage rules",
     newRule: "New conditional formatting rule",
     editRule: "Edit conditional formatting rule",
     deleteRule: "Delete rule",

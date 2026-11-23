@@ -79,6 +79,7 @@ export type ConditionalFormattingMessageSchema = {
     threeStars: string;
     toolbar: string;
     manageRules: string;
+    manageRulesTitle: string;
     newRule: string;
     editRule: string;
     deleteRule: string;

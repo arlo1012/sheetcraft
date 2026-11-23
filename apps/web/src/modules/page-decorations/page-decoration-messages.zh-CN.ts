@@ -44,7 +44,7 @@ export const pageDecorationZhCN = {
     topSecret: "绝密",
     noCopy: "严禁复制",
     internalUse: "内部资料",
-    customWatermark: "自定义水印…",
+    customWatermark: "自定义水印",
     customWatermarks: "自定义水印",
     presetWatermarks: "预设水印",
     addWatermark: "添加水印",

@@ -314,7 +314,7 @@ watch(() => [props.visible, props.rules, props.createKind, props.sheets, props.s
 <template>
   <Dialog
     :visible="visible && !editorVisible && !pickingRange"
-    :header="t('conditionalFormatting.manageRules')"
+    :header="t('conditionalFormatting.manageRulesTitle')"
     :confirm-btn="{ content: t('conditionalFormatting.save') }"
     :cancel-btn="t('conditionalFormatting.cancel')"
     width="min(1000px, calc(100vw - 32px))"

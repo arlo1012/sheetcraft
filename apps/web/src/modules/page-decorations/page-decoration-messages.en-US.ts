@@ -48,7 +48,7 @@ export const pageDecorationEnUS = {
     topSecret: "TOP SECRET",
     noCopy: "DO NOT COPY",
     internalUse: "INTERNAL USE ONLY",
-    customWatermark: "Custom watermark…",
+    customWatermark: "Custom watermark",
     customWatermarks: "Custom watermarks",
     presetWatermarks: "Preset watermarks",
     addWatermark: "Add watermark",
