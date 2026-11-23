@@ -466,6 +466,108 @@
   border-radius: 0 0 var(--sheetcraft-radius-dialog) var(--sheetcraft-radius-dialog);
 }
 
+// Dialog footers with a left semantic TAlert slot keep right-aligned actions anchored.
+.sheetcraft-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sheetcraft-space-5);
+  width: 100%;
+  min-width: 0;
+
+  > .t-alert {
+    flex: 0 1 auto;
+    min-width: 0;
+    min-height: var(--td-comp-size-m);
+    margin-right: auto;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: var(--sheetcraft-radius-floating-item);
+    text-align: left;
+
+    .t-alert__icon {
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    .t-alert__icon + .t-alert__content {
+      margin-left: 6px;
+    }
+
+    .t-alert__content {
+      min-width: 0;
+      font-size: var(--sheetcraft-font-size-body-small);
+      line-height: var(--sheetcraft-line-height-body-small);
+    }
+
+    .t-alert__description {
+      overflow-wrap: anywhere;
+    }
+  }
+
+  > .t-alert--info {
+    background-color: transparent;
+    padding-inline: 0;
+
+    .t-alert__icon {
+      color: var(--sheetcraft-text-muted);
+    }
+
+    .t-alert__description {
+      color: var(--sheetcraft-text-secondary);
+    }
+  }
+
+  > .t-alert--warning {
+    background-color: var(--td-warning-color-light);
+
+    .t-alert__icon {
+      color: var(--sheetcraft-status-warning);
+    }
+
+    .t-alert__description {
+      color: var(--sheetcraft-status-warning-strong);
+    }
+  }
+
+  > .t-alert--error {
+    background-color: var(--td-error-color-light);
+
+    .t-alert__icon {
+      color: var(--sheetcraft-status-error);
+    }
+
+    .t-alert__description {
+      color: var(--sheetcraft-status-error);
+    }
+  }
+
+  > .t-alert--success {
+    background-color: var(--td-success-color-light);
+
+    .t-alert__icon {
+      color: var(--sheetcraft-status-success);
+    }
+
+    .t-alert__description {
+      color: var(--sheetcraft-status-success);
+    }
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-shrink: 0;
+    gap: var(--td-comp-margin-s);
+    margin-left: auto;
+
+    .t-button + .t-button {
+      margin-left: 0;
+    }
+  }
+}
+
 .t-dialog__ctx .t-dialog .t-button:not(.t-size-s) {
   border-radius: var(--sheetcraft-radius-floating-item);
   font-weight: var(--sheetcraft-font-weight-medium);

@@ -127,6 +127,16 @@ Use CSS pixels at 100% scale; size and line height are a pair.
   `.sheetcraft-tabs--fixed-height` or a definite tab height anchored to the
   primary tab's natural content height) so switching tabs never causes vertical
   jitter or shifting footer actions.
+- Wide dialogs (`>= 520px`) whose footer left side has no auxiliary action
+  button place form/step-level blocking hints, global submit errors, and brief
+  status summaries in the footer left slot using `.sheetcraft-dialog-footer`
+  with TDesign `Alert` (`theme="info" | "warning" | "error" | "success"`). Use
+  `warning` for incomplete prerequisites or no-op warnings, `error` for invalid
+  conflicts or submission failures, `success` for positive readiness/results,
+  and `info` for neutral summaries or recalculation notes. Keep field-specific
+  validation errors attached to their `FormItem`, explanatory guidance near the
+  controls it describes, and avoid crowding narrow (`< 500px`) dialogs or
+  footers that already place a destructive/reset button on the left.
 
 - Use `NewCellStyleDialog` (the Style dialog) as the reference for footer actions.
   Prefer TDesign Dialog's built-in `confirmBtn` and `cancelBtn` APIs. Custom

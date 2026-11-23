@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -71,6 +72,28 @@ const fieldsReady = computed(
     draft.value.fillFields.length > 0,
 );
 const canApply = computed(() => fieldsReady.value && (props.preview?.writeCount ?? 0) > 0);
+const footerAlert = computed<{ theme: "error" | "warning"; message: string } | undefined>(() => {
+  if (props.error) return { theme: "error", message: props.error };
+  if (step.value === "ranges") {
+    if (!rangesReady.value && (draft.value.sourceRange || draft.value.targetRange)) {
+      return { theme: "warning", message: t("dataTools.lookupFill.invalidRange") };
+    }
+    return undefined;
+  }
+  if (step.value === "fields") {
+    if (invalidMappings.value) {
+      return { theme: "error", message: t("dataTools.lookupFill.invalidMappings") };
+    }
+    if (!fieldsReady.value) {
+      return { theme: "warning", message: t("dataTools.lookupFill.completeMappings") };
+    }
+    return undefined;
+  }
+  if (props.preview && props.preview.writeCount === 0) {
+    return { theme: "warning", message: t("dataTools.lookupFill.noChanges") };
+  }
+  return undefined;
+});
 const previewChanges = computed(() => props.preview?.changes ?? []);
 const previewRows = computed(() =>
   previewChanges.value.map((change) => ({
@@ -264,13 +287,6 @@ watch(
         <TCheckbox v-model="draft.hasHeader" :disabled="busy">{{
           t("dataTools.lookupFill.hasHeader")
         }}</TCheckbox>
-        <p
-          v-if="!rangesReady && (draft.sourceRange || draft.targetRange)"
-          class="lookup-fill-dialog__notice"
-          role="alert"
-        >
-          {{ t("dataTools.lookupFill.invalidRange") }}
-        </p>
       </TForm>
       <div v-else-if="step === 'fields'" class="lookup-fill-dialog__fields">
         <div class="lookup-fill-dialog__tables">
@@ -321,13 +337,6 @@ watch(
             t("dataTools.lookupFill.overwriteExisting")
           }}</TCheckbox>
         </div>
-        <p v-if="invalidMappings || !fieldsReady" class="lookup-fill-dialog__notice" role="alert">
-          {{
-            invalidMappings
-              ? t("dataTools.lookupFill.invalidMappings")
-              : t("dataTools.lookupFill.completeMappings")
-          }}
-        </p>
       </div>
       <section
         v-else
@@ -371,35 +380,33 @@ watch(
             />
           </TableHeightWrapper>
         </div>
-        <p
-          v-if="preview && preview.writeCount === 0 && !error"
-          class="lookup-fill-dialog__notice"
-          role="alert"
-        >
-          {{ t("dataTools.lookupFill.noChanges") }}
-        </p>
       </section>
-      <p v-if="error" role="alert" class="lookup-fill-dialog__error">
-        {{ error }}
-      </p>
     </div>
     <template #footer
-      ><div class="lookup-fill-dialog__footer">
-        <TButton theme="default" :disabled="busy" @click="emit('close')">{{
-          t("dataTools.common.cancel")
-        }}</TButton
-        ><TButton v-if="step !== 'ranges'" theme="default" :disabled="busy" @click="back">{{
-          t("dataTools.lookupFill.back")
-        }}</TButton
-        ><TButton
-          v-if="step !== 'preview'"
-          theme="primary"
-          :disabled="busy || (step === 'ranges' ? !rangesReady : !fieldsReady)"
-          @click="next"
-          >{{ t("dataTools.lookupFill.next") }}</TButton
-        ><TButton v-else theme="primary" :disabled="busy || !canApply" @click="apply">{{
-          t("dataTools.lookupFill.apply")
-        }}</TButton>
+      ><div class="sheetcraft-dialog-footer">
+        <TAlert
+          v-if="footerAlert"
+          :theme="footerAlert.theme"
+          :message="footerAlert.message"
+          role="alert"
+        />
+        <div class="sheetcraft-dialog-footer__actions">
+          <TButton theme="default" :disabled="busy" @click="emit('close')">{{
+            t("dataTools.common.cancel")
+          }}</TButton
+          ><TButton v-if="step !== 'ranges'" theme="default" :disabled="busy" @click="back">{{
+            t("dataTools.lookupFill.back")
+          }}</TButton
+          ><TButton
+            v-if="step !== 'preview'"
+            theme="primary"
+            :disabled="busy || (step === 'ranges' ? !rangesReady : !fieldsReady)"
+            @click="next"
+            >{{ t("dataTools.lookupFill.next") }}</TButton
+          ><TButton v-else theme="primary" :disabled="busy || !canApply" @click="apply">{{
+            t("dataTools.lookupFill.apply")
+          }}</TButton>
+        </div>
       </div></template
     >
   </Dialog>
@@ -441,22 +448,12 @@ watch(
     grid-template-columns: minmax(0, 1fr);
   }
 }
-.lookup-fill-dialog__notice,
-.lookup-fill-dialog__empty,
-.lookup-fill-dialog__error {
+.lookup-fill-dialog__empty {
   margin: 0;
+  padding-block: var(--sheetcraft-space-2);
+  color: var(--sheetcraft-text-secondary);
   font-size: var(--sheetcraft-font-size-body-small);
   line-height: var(--sheetcraft-line-height-body-small);
-}
-.lookup-fill-dialog__notice,
-.lookup-fill-dialog__empty {
-  color: var(--sheetcraft-text-secondary);
-}
-.lookup-fill-dialog__empty {
-  padding-block: var(--sheetcraft-space-2);
-}
-.lookup-fill-dialog__error {
-  color: var(--sheetcraft-status-error);
 }
 .lookup-fill-dialog__summary {
   display: grid;
@@ -491,12 +488,6 @@ watch(
   height: 192px;
   min-width: 0;
   min-height: 0;
-}
-.lookup-fill-dialog__footer {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: var(--sheetcraft-space-2);
 }
 @media (max-width: 520px) {
   .lookup-fill-dialog__summary {
