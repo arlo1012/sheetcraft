@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Trash2 } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -143,13 +144,11 @@ const methodHint = computed(() =>
     :visible="visible && !suspended"
     :header="tr('simulation.planning')"
     width="min(760px, calc(100vw - 32px))"
+    placement="center"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
-    :confirm-btn="{ content: confirmLabel, disabled: busy || !hasModel }"
-    :cancel-btn="result ? tr('simulation.close') : tr('simulation.cancel')"
     :close-btn="!busy"
     @close="emit('close')"
-    @confirm="confirm"
   >
     <div class="simulation-dialog">
       <div class="simulation-dialog__fields">
@@ -314,9 +313,22 @@ const methodHint = computed(() =>
         </div>
         <p class="simulation-dialog__hint">{{ methodHint }}</p>
       </div>
-      <p v-if="error" class="simulation-dialog__error" role="alert">{{ error }}</p>
-      <SimulationResultPanel v-if="result" :result="result" /></div
-  ></Dialog>
+      <SimulationResultPanel v-if="result" :result="result" />
+    </div>
+    <template #footer>
+      <div class="sheetcraft-dialog-footer">
+        <TAlert v-if="error" theme="error" :message="error" role="alert" />
+        <div class="sheetcraft-dialog-footer__actions">
+          <TButton theme="default" :disabled="busy" @click="emit('close')">{{
+            result ? tr("simulation.close") : tr("simulation.cancel")
+          }}</TButton>
+          <TButton theme="primary" :disabled="busy || !hasModel" @click="confirm">{{
+            confirmLabel
+          }}</TButton>
+        </div>
+      </div>
+    </template>
+  </Dialog>
 </template>
 <style scoped lang="scss">
 .simulation-dialog {
@@ -383,10 +395,6 @@ const methodHint = computed(() =>
   &__hint {
     margin: 0;
     color: var(--sheetcraft-text-secondary);
-  }
-  &__error {
-    margin: 0;
-    color: var(--sheetcraft-status-error);
   }
 }
 @media (max-width: 600px) {

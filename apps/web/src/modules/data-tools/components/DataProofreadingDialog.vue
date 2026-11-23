@@ -2,6 +2,7 @@
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 
 import { computed } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { PrimaryTable as TTable } from "tdesign-vue-next/es/table";
@@ -68,6 +69,21 @@ const selected = computed(() => new Set(props.selectedIds));
 const safeSelectedCount = computed(
   () => props.issues.filter((issue) => issue.safe && selected.value.has(issue.id)).length,
 );
+const footerAlert = computed<{
+  theme: "error" | "success" | "info";
+  role: "alert" | "status";
+  message: string;
+}>(() => {
+  if (props.error) return { theme: "error", role: "alert", message: props.error };
+  if (props.hasScanned && !props.issues.length) {
+    return { theme: "success", role: "status", message: t("proofreading.noIssues") };
+  }
+  const parts = [
+    ...(props.issues.length ? [t("proofreading.issues", { count: props.issues.length })] : []),
+    t("proofreading.selected", { count: safeSelectedCount.value }),
+  ];
+  return { theme: "info", role: "status", message: parts.join(" · ") };
+});
 
 function issueTypeLabel(type: DataProofreadingIssueKind): string {
   return t(`proofreading.types.${type}`);
@@ -92,6 +108,7 @@ function selectIssues(keys: Array<string | number>): void {
     role="dialog"
     aria-modal="true"
     width="min(980px, calc(100vw - 32px))"
+    placement="center"
     :visible="visible && !picking"
     :header="t('proofreading.title')"
     :aria-label="t('proofreading.title')"
@@ -114,8 +131,6 @@ function selectIssues(keys: Array<string | number>): void {
           @enter="!busy && emit('scan', draft)"
         />
       </div>
-
-      <div v-if="error" class="data-proofreading-dialog__error" role="alert">{{ error }}</div>
 
       <div v-if="hasScanned && issues.length" class="data-proofreading-dialog__table">
         <TableHeightWrapper v-slot="{ height }">
@@ -195,15 +210,14 @@ function selectIssues(keys: Array<string | number>): void {
       </div>
     </div>
     <template #footer>
-      <div class="data-proofreading-dialog__footer">
-        <div class="data-proofreading-dialog__summary" aria-live="polite">
-          <span v-if="issues.length">{{ t("proofreading.issues", { count: issues.length }) }}</span>
-          <span>{{ t("proofreading.selected", { count: safeSelectedCount }) }}</span>
-          <span v-if="hasScanned && !issues.length && !error">{{
-            t("proofreading.noIssues")
-          }}</span>
-        </div>
-        <div class="data-proofreading-dialog__footer-actions">
+      <div class="sheetcraft-dialog-footer">
+        <TAlert
+          :theme="footerAlert.theme"
+          :message="footerAlert.message"
+          :role="footerAlert.role"
+          aria-live="polite"
+        />
+        <div class="sheetcraft-dialog-footer__actions">
           <TButton theme="default" :disabled="busy" @click="emit('close')">{{
             t("proofreading.close")
           }}</TButton>
@@ -233,9 +247,7 @@ function selectIssues(keys: Array<string | number>): void {
     min-height: 0;
   }
 
-  &__toolbar,
-  &__footer,
-  &__summary {
+  &__toolbar {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -244,30 +256,11 @@ function selectIssues(keys: Array<string | number>): void {
   &__toolbar > :first-child {
     flex: 1;
   }
-  &__error {
-    color: var(--sheetcraft-status-error);
-  }
-  &__summary {
-    color: var(--sheetcraft-text-secondary);
-  }
-  &__summary {
-    flex-wrap: wrap;
-    gap: 12px;
-  }
   &__actions {
     display: flex;
     align-items: center;
     justify-content: center;
     flex-wrap: wrap;
-  }
-  &__footer {
-    justify-content: space-between;
-    color: var(--sheetcraft-text-secondary);
-  }
-  &__footer-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
   }
 }
 </style>

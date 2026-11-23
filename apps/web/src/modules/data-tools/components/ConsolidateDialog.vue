@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -118,15 +119,13 @@ watch(
     aria-modal="true"
     :aria-label="t('dataTools.consolidate.title')"
     width="min(640px, calc(100vw - 32px))"
+    placement="center"
     :visible="visible && !picking"
     :header="t('dataTools.consolidate.title')"
-    :confirm-btn="{ content: t('dataTools.consolidate.apply'), disabled: busy || !canApply }"
-    :cancel-btn="t('dataTools.consolidate.close')"
     :close-btn="!busy"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
     @close="emit('close')"
-    @confirm="!busy && canApply && emit('apply', copyDraft(draft))"
   >
     <div class="consolidate-dialog">
       <section class="consolidate-dialog__functions">
@@ -244,9 +243,24 @@ watch(
             </div>
           </div>
         </details>
-        <p v-if="error" class="consolidate-dialog__error" role="alert">{{ error }}</p>
       </div>
     </div>
+    <template #footer>
+      <div class="sheetcraft-dialog-footer">
+        <TAlert v-if="error" theme="error" :message="error" role="alert" />
+        <div class="sheetcraft-dialog-footer__actions">
+          <TButton theme="default" :disabled="busy" @click="emit('close')">{{
+            t("dataTools.consolidate.close")
+          }}</TButton>
+          <TButton
+            theme="primary"
+            :disabled="busy || !canApply"
+            @click="!busy && canApply && emit('apply', copyDraft(draft))"
+            >{{ t("dataTools.consolidate.apply") }}</TButton
+          >
+        </div>
+      </div>
+    </template>
   </Dialog>
 </template>
 
@@ -323,10 +337,6 @@ watch(
       white-space: nowrap;
       border-right: 1px solid var(--sheetcraft-border-subtle);
     }
-  }
-  &__error {
-    margin: 0;
-    color: var(--sheetcraft-status-error);
   }
 }
 @media (max-width: 560px) {

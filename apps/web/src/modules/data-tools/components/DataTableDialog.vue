@@ -3,6 +3,7 @@ import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import { BaseTable } from "tdesign-vue-next/es/table";
 import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
 import { computed, ref, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Button } from "tdesign-vue-next/es/button";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
@@ -126,6 +127,7 @@ watch(draft, (value) => emit("draftChange", copyDraft(value)), { deep: true });
     :visible="visible && !suspended"
     :header="t('dataTable.title')"
     width="min(600px, calc(100vw - 32px))"
+    placement="center"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
     :close-btn="!busy"
@@ -197,13 +199,15 @@ watch(draft, (value) => emit("draftChange", copyDraft(value)), { deep: true });
         <p v-if="hasHiddenPreviewValues">{{ t("dataTable.previewLimited") }}</p>
         <p>{{ t("dataTable.previewHelp") }}</p>
       </section>
-
-      <p v-if="error" class="data-table-dialog__error" role="alert">{{ error }}</p>
     </div>
     <template #footer>
-      <div class="data-table-dialog__footer">
-        <p class="data-table-dialog__recalculation">{{ t("dataTable.recalculation") }}</p>
-        <div class="data-table-dialog__footer-actions">
+      <div class="sheetcraft-dialog-footer">
+        <TAlert
+          :theme="error ? 'error' : 'info'"
+          :message="error || t('dataTable.recalculation')"
+          :role="error ? 'alert' : 'status'"
+        />
+        <div class="sheetcraft-dialog-footer__actions">
           <Button theme="default" @click="emit('close')">{{ cancelLabel }}</Button>
           <Button theme="primary" :disabled="busy || !canSolve" @click="confirm">{{
             confirmLabel
@@ -236,7 +240,6 @@ watch(draft, (value) => emit("draftChange", copyDraft(value)), { deep: true });
   }
 
   &__hint,
-  &__recalculation,
   &__preview p {
     margin: 0;
     color: var(--sheetcraft-text-secondary);
@@ -244,23 +247,6 @@ watch(draft, (value) => emit("draftChange", copyDraft(value)), { deep: true });
 
   &__hint {
     padding-top: var(--sheetcraft-space-1);
-  }
-
-  &__footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-  }
-  &__recalculation {
-    flex: 1;
-    text-align: left;
-  }
-  &__footer-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    flex-shrink: 0;
   }
 
   &__preview {
@@ -290,11 +276,6 @@ watch(draft, (value) => emit("draftChange", copyDraft(value)), { deep: true });
   &__table-wrap {
     height: min(208px, calc(100dvh - 360px));
     min-height: 0;
-  }
-
-  &__error {
-    margin: 0;
-    color: var(--sheetcraft-status-error);
   }
 }
 
