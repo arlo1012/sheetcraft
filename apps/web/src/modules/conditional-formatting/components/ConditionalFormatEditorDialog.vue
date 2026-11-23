@@ -1062,7 +1062,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: 12px;
-  height: min(580px, calc(100vh - 172px));
+  height: min(614px, calc(100vh - 140px));
   min-width: 0;
   overflow: hidden;
   &__section {
@@ -1076,7 +1076,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     min-height: 0;
     overflow-x: hidden;
     overflow-y: auto;
-    padding: 12px;
+    padding: 10px 12px;
     border-radius: var(--sheetcraft-radius-dialog-card);
     background: var(--sheetcraft-surface-dialog-card);
   }
