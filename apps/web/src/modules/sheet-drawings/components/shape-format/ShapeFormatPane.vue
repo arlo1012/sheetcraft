@@ -272,18 +272,20 @@ defineExpose({
         <template #icon><X class="sheetcraft-action-icon" aria-hidden="true" /></template>
       </TButton>
     </header>
-    <TRadioGroup
-      class="shape-format-pane__modes"
-      :value="mode"
-      variant="default-filled"
-      :aria-label="controller.s.value('paneTitle')"
-      @change="selectMode"
-    >
-      <TRadioButton value="shape">{{ controller.s.value("shapeOptions") }}</TRadioButton>
-      <TRadioButton v-if="!isConnector" value="text">{{
-        controller.s.value("textOptions")
-      }}</TRadioButton>
-    </TRadioGroup>
+    <div class="shape-format-pane__modes">
+      <TRadioGroup
+        class="sheetcraft-radio-group--stretched"
+        :value="mode"
+        variant="default-filled"
+        :aria-label="controller.s.value('paneTitle')"
+        @change="selectMode"
+      >
+        <TRadioButton value="shape">{{ controller.s.value("shapeOptions") }}</TRadioButton>
+        <TRadioButton v-if="!isConnector" value="text">{{
+          controller.s.value("textOptions")
+        }}</TRadioButton>
+      </TRadioGroup>
+    </div>
     <div
       class="shape-format-pane__tabs"
       role="tablist"
@@ -467,10 +469,10 @@ defineExpose({
     @include sidePane.heading;
   }
   &__modes {
-    margin: 0 12px 6px;
+    padding: 0 12px 6px;
   }
   &__tabs {
-    margin: 0 8px;
+    margin: 0 12px;
   }
   &__tab-label {
     @include tab-label.label($with-icon: true);
@@ -501,6 +503,9 @@ defineExpose({
   }
   &__scope {
     margin: 8px 0;
+    padding: 8px 10px;
+    border-radius: var(--sheetcraft-radius-floating-item);
+    background: var(--sheetcraft-surface-dialog-card);
     color: var(--sheetcraft-text-secondary);
     font-size: var(--sheetcraft-font-size-body-small);
     line-height: var(--sheetcraft-line-height-body-small);

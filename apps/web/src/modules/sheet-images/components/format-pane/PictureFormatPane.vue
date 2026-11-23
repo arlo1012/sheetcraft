@@ -481,7 +481,7 @@ defineExpose({
   }
   &__tabs {
     min-width: 0;
-    margin: 0 8px;
+    margin: 0 12px;
   }
   &__tab-label {
     @include tabLabel.label;

@@ -365,7 +365,7 @@ onUnmounted(() => {
         />
       </div>
       <div class="shape-line-ends__size-label">{{ labels.size }}</div>
-      <div class="shape-line-ends__axes">
+      <div class="shape-line-ends__axes" :class="{ 'is-disabled': disabled || !current?.[side] }">
         <span class="shape-line-ends__axis-title">{{ labels.width }} ↓</span>
         <div class="shape-line-ends__length-axis">
           <span class="shape-line-ends__axis-title">{{ labels.length }} →</span>
@@ -437,28 +437,43 @@ onUnmounted(() => {
 .shape-line-ends {
   display: grid;
   min-width: 0;
-  gap: var(--sheetcraft-space-3);
+  gap: var(--sheetcraft-space-4);
+  margin-top: var(--sheetcraft-space-2);
   font-size: var(--sheetcraft-font-size-body-small);
   line-height: var(--sheetcraft-line-height-body-small);
 
   &__endpoint {
     display: grid;
     min-width: 0;
-    gap: var(--sheetcraft-space-2);
+    gap: var(--sheetcraft-space-3);
+    padding: 8px 10px;
+    border-radius: var(--sheetcraft-radius-floating-item);
+    background: var(--sheetcraft-surface-dialog-card);
   }
 
   &__heading {
     margin: 0;
-    font-size: inherit;
-    line-height: inherit;
-    font-weight: 500;
+    color: var(--sheetcraft-text-primary);
+    font-size: var(--sheetcraft-font-size-body-medium);
+    line-height: var(--sheetcraft-line-height-body-medium);
+    font-weight: var(--sheetcraft-font-weight-medium);
   }
 
   &__type {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(118px, 46%);
     align-items: center;
-    gap: var(--sheetcraft-space-2);
+    gap: 4px 10px;
+
+    > span {
+      color: var(--sheetcraft-text-secondary);
+      font-size: var(--sheetcraft-font-size-body-medium);
+      line-height: var(--sheetcraft-line-height-body-medium);
+    }
+  }
+
+  &__size-label {
+    color: var(--sheetcraft-text-secondary);
   }
 
   &__axes {
@@ -466,12 +481,19 @@ onUnmounted(() => {
     grid-template-columns: auto minmax(0, 1fr);
     align-items: stretch;
     gap: var(--sheetcraft-space-1) var(--sheetcraft-space-2);
+
+    &.is-disabled {
+      opacity: 0.55;
+    }
   }
 
   &__axis-title,
-  &__hint,
-  &__feedback {
+  &__hint {
     color: var(--sheetcraft-text-secondary);
+  }
+
+  &__feedback {
+    color: var(--sheetcraft-status-error);
   }
 
   &__length-axis {

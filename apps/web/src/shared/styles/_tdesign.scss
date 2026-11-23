@@ -1041,3 +1041,38 @@
 .sheetcraft-radio-group--flush {
   --td-comp-margin-xxl: 0;
 }
+
+// Side-pane mode switchers fill their container width with equal segments.
+.sheetcraft-radio-group--stretched.t-radio-group {
+  display: flex;
+  width: 100%;
+
+  > .t-radio-button {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+  }
+}
+
+// Inline rename inputs stay calm at rest and reveal standard input chrome on hover or focus.
+.sheetcraft-input--ghost-editable .t-input {
+  transition:
+    border-color 0.12s ease,
+    background-color 0.12s ease;
+
+  &:not(.t-is-focused):not(.t-input--focused):not(.t-is-error) {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  &:hover:not(.t-is-disabled):not(.t-is-focused):not(.t-input--focused):not(.t-is-error) {
+    border-color: var(--sheetcraft-border-input);
+    background: var(--sheetcraft-surface-panel);
+  }
+
+  &.t-is-focused,
+  &.t-input--focused {
+    background: var(--sheetcraft-surface-panel);
+  }
+}

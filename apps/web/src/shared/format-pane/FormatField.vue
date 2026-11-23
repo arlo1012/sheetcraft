@@ -66,7 +66,7 @@ const feedbackId = `format-field-feedback-${useId()}`;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: var(--sheetcraft-text-primary);
+    color: var(--sheetcraft-text-secondary);
   }
 
   &__control {

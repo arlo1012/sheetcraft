@@ -1760,6 +1760,7 @@ function escapeDraft(event: KeyboardEvent): void {
             :label="t('format.textColor')"
             :default-label="t('chart.formatDefault')"
             :disabled="disabled"
+            size="small"
             show-value
             :onSelect="
               captureAction((value: string | null) => setText('color', value ?? undefined))
@@ -1826,6 +1827,7 @@ function escapeDraft(event: KeyboardEvent): void {
               :label="t('chart.formatFill')"
               :disabled="disabled"
               :default-label="t('chart.formatDefault')"
+              size="small"
               show-value
               :onSelect="captureAction(setFill)"
             /><TButton
@@ -1848,6 +1850,7 @@ function escapeDraft(event: KeyboardEvent): void {
               :label="t('chart.formatLine')"
               :disabled="disabled"
               :default-label="t('chart.formatDefault')"
+              size="small"
               show-value
               :onSelect="captureAction(setLineColor)"
             /><TButton
@@ -2063,6 +2066,7 @@ function escapeDraft(event: KeyboardEvent): void {
             :label="t('chart.formatSeriesColor')"
             :disabled="disabled"
             :default-label="t('chart.formatDefault')"
+            size="small"
             show-value
             :onSelect="
               captureAction((value: string | null) => setSeries('color', value ?? undefined))
@@ -2358,6 +2362,7 @@ function escapeDraft(event: KeyboardEvent): void {
       min-height: 24px;
       display: flex;
       align-items: center;
+      color: var(--sheetcraft-text-secondary);
       overflow-wrap: anywhere;
     }
     &--stack {

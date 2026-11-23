@@ -301,69 +301,71 @@ const renderedRows = computed(() => {
         <template #icon><X class="sheetcraft-action-icon" aria-hidden="true" /></template>
       </TButton>
     </header>
-    <div class="shape-selection-pane__order" role="group" :aria-label="labels.order">
-      <TButton
-        variant="text"
-        shape="square"
-        size="small"
-        :disabled="orderDisabled"
-        :aria-label="labels.bringForward"
-        :title="labels.bringForward"
-        data-shape-pane-order="bring-forward"
-        @click="paneActions.forward"
-        ><MoveUp :size="16"
-      /></TButton>
-      <TButton
-        variant="text"
-        shape="square"
-        size="small"
-        :disabled="orderDisabled"
-        :aria-label="labels.sendBackward"
-        :title="labels.sendBackward"
-        data-shape-pane-order="send-backward"
-        @click="paneActions.backward"
-        ><MoveDown :size="16"
-      /></TButton>
-      <TButton
-        variant="text"
-        shape="square"
-        size="small"
-        :disabled="orderDisabled"
-        :aria-label="labels.bringFront"
-        :title="labels.bringFront"
-        data-shape-pane-order="bring-front"
-        @click="paneActions.front"
-        ><BringToFront :size="16"
-      /></TButton>
-      <TButton
-        variant="text"
-        shape="square"
-        size="small"
-        :disabled="orderDisabled"
-        :aria-label="labels.sendBack"
-        :title="labels.sendBack"
-        data-shape-pane-order="send-back"
-        @click="paneActions.back"
-        ><SendToBack :size="16"
-      /></TButton>
-    </div>
-    <div class="shape-selection-pane__visibility" role="group" :aria-label="labels.selectionPane">
-      <TButton
-        variant="text"
-        size="small"
-        :disabled="disabled || !canToggleAllVisibility"
-        data-shape-pane-show-all
-        @click="paneActions.allVisibility(false)"
-        >{{ labels.showAll }}</TButton
-      >
-      <TButton
-        variant="text"
-        size="small"
-        :disabled="disabled || !canToggleAllVisibility"
-        data-shape-pane-hide-all
-        @click="paneActions.allVisibility(true)"
-        >{{ labels.hideAll }}</TButton
-      >
+    <div class="shape-selection-pane__toolbar">
+      <div class="shape-selection-pane__order" role="group" :aria-label="labels.order">
+        <TButton
+          variant="text"
+          shape="square"
+          size="small"
+          :disabled="orderDisabled"
+          :aria-label="labels.bringForward"
+          :title="labels.bringForward"
+          data-shape-pane-order="bring-forward"
+          @click="paneActions.forward"
+          ><MoveUp :size="15"
+        /></TButton>
+        <TButton
+          variant="text"
+          shape="square"
+          size="small"
+          :disabled="orderDisabled"
+          :aria-label="labels.sendBackward"
+          :title="labels.sendBackward"
+          data-shape-pane-order="send-backward"
+          @click="paneActions.backward"
+          ><MoveDown :size="15"
+        /></TButton>
+        <TButton
+          variant="text"
+          shape="square"
+          size="small"
+          :disabled="orderDisabled"
+          :aria-label="labels.bringFront"
+          :title="labels.bringFront"
+          data-shape-pane-order="bring-front"
+          @click="paneActions.front"
+          ><BringToFront :size="15"
+        /></TButton>
+        <TButton
+          variant="text"
+          shape="square"
+          size="small"
+          :disabled="orderDisabled"
+          :aria-label="labels.sendBack"
+          :title="labels.sendBack"
+          data-shape-pane-order="send-back"
+          @click="paneActions.back"
+          ><SendToBack :size="15"
+        /></TButton>
+      </div>
+      <div class="shape-selection-pane__visibility" role="group" :aria-label="labels.selectionPane">
+        <TButton
+          variant="text"
+          size="small"
+          :disabled="disabled || !canToggleAllVisibility"
+          data-shape-pane-show-all
+          @click="paneActions.allVisibility(false)"
+          >{{ labels.showAll }}</TButton
+        >
+        <TButton
+          variant="text"
+          size="small"
+          :disabled="disabled || !canToggleAllVisibility"
+          data-shape-pane-hide-all
+          @click="paneActions.allVisibility(true)"
+          >{{ labels.hideAll }}</TButton
+        >
+      </div>
     </div>
     <p class="shape-selection-pane__hint">{{ labels.selectionHint }}</p>
     <p
@@ -381,7 +383,7 @@ const renderedRows = computed(() => {
         v-for="row in renderedRows"
         :key="row.key"
         class="shape-selection-pane__row"
-        :class="{ 'is-selected': row.selected }"
+        :class="{ 'is-selected': row.selected, 'is-hidden': !row.visible || row.hiddenByAncestor }"
         :style="{ '--shape-row-depth': row.depth }"
         :data-shape-pane-path="row.key"
       >
@@ -390,6 +392,7 @@ const renderedRows = computed(() => {
             variant="text"
             shape="square"
             size="small"
+            class="shape-selection-pane__kind"
             :disabled="disabled"
             :aria-label="`${labels.select} ${row.name}`"
             :aria-pressed="row.selected"
@@ -397,15 +400,33 @@ const renderedRows = computed(() => {
             data-shape-pane-select
             @click.stop="row.select"
           >
-            <Group v-if="row.kind === 'shapeGroup'" :size="16" /><Type
+            <Group v-if="row.kind === 'shapeGroup'" :size="15" /><Type
               v-else-if="row.kind === 'textBox'"
-              :size="16"
-            /><Sigma v-else-if="row.kind === 'equation'" :size="16" /><Shapes v-else :size="16" />
+              :size="15"
+            /><Sigma v-else-if="row.kind === 'equation'" :size="15" /><Shapes v-else :size="15" />
           </TButton>
+          <TInput
+            class="sheetcraft-input--ghost-editable"
+            :model-value="row.value"
+            :disabled="disabled || !row.canEdit"
+            :aria-label="`${labels.name}: ${row.name}`"
+            :aria-invalid="!!row.error"
+            :aria-describedby="row.error ? row.errorId : undefined"
+            :status="row.error ? 'error' : 'default'"
+            :title="row.name"
+            size="small"
+            data-shape-pane-name
+            @click.stop
+            @change="row.edit"
+            @enter="row.enter"
+            @blur="row.blur"
+            @keydown="row.keydown"
+          />
           <TButton
             variant="text"
             shape="square"
             size="small"
+            class="shape-selection-pane__eye"
             :disabled="disabled || !row.canToggleVisibility"
             :aria-label="`${row.visible ? labels.hide : labels.show}: ${row.name}`"
             :aria-pressed="row.visible"
@@ -419,23 +440,8 @@ const renderedRows = computed(() => {
             data-shape-pane-visibility
             @click.stop="row.toggleVisibility"
           >
-            <Eye v-if="row.visible" :size="16" /><EyeOff v-else :size="16" />
+            <Eye v-if="row.visible" :size="15" /><EyeOff v-else :size="15" />
           </TButton>
-          <TInput
-            :model-value="row.value"
-            :disabled="disabled || !row.canEdit"
-            :aria-label="`${labels.name}: ${row.name}`"
-            :aria-invalid="!!row.error"
-            :aria-describedby="row.error ? row.errorId : undefined"
-            :title="row.name"
-            size="small"
-            data-shape-pane-name
-            @click.stop
-            @change="row.edit"
-            @enter="row.enter"
-            @blur="row.blur"
-            @keydown="row.keydown"
-          />
         </div>
         <p
           v-if="row.error"
@@ -456,7 +462,7 @@ const renderedRows = computed(() => {
 
 .shape-selection-pane {
   @include sidePane.shell(300px);
-  padding: var(--sheetcraft-tool-panel-padding);
+  padding: var(--sheetcraft-space-5);
   &__header {
     @include sidePane.header(0);
     strong {
@@ -466,50 +472,83 @@ const renderedRows = computed(() => {
       font-weight: var(--sheetcraft-font-weight-semibold);
     }
   }
+  &__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sheetcraft-space-2);
+    margin-top: var(--sheetcraft-space-3);
+    padding-bottom: var(--sheetcraft-space-3);
+    border-bottom: 1px solid var(--sheetcraft-border-subtle);
+  }
   &__order,
   &__visibility {
     display: flex;
+    align-items: center;
     gap: var(--sheetcraft-space-1);
-    margin-top: var(--sheetcraft-space-2);
   }
   &__hint,
   &__empty,
   &__failure {
-    margin: var(--sheetcraft-space-2) 0;
+    margin: var(--sheetcraft-space-3) 0 0;
     font-size: var(--sheetcraft-font-size-body-small);
     line-height: var(--sheetcraft-line-height-body-small);
     overflow-wrap: anywhere;
   }
-  &__hint {
+  &__hint,
+  &__empty {
     color: var(--sheetcraft-text-secondary);
   }
   &__failure {
     color: var(--sheetcraft-status-error);
   }
   &__list {
+    display: grid;
+    align-content: start;
+    gap: var(--sheetcraft-space-1);
     min-height: 0;
     overflow: auto;
     overscroll-behavior: contain;
     list-style: none;
     padding: 0;
-    margin: var(--sheetcraft-space-2) 0 0;
+    margin: var(--sheetcraft-space-3) 0 0;
   }
   &__row {
-    padding: var(--sheetcraft-space-1);
+    padding: var(--sheetcraft-space-1) var(--sheetcraft-space-2);
+    border-radius: var(--sheetcraft-radius-floating-item);
+    transition: background-color 0.12s ease;
+
+    &:hover:not(.is-selected) {
+      background: var(--sheetcraft-surface-hover);
+    }
     &.is-selected {
-      background: var(--sheetcraft-surface-active);
+      background: var(--sheetcraft-surface-selected);
+    }
+    &.is-hidden {
+      .shape-selection-pane__kind,
+      .sheetcraft-input--ghost-editable {
+        opacity: 0.55;
+      }
     }
   }
   &__row-controls {
     display: grid;
-    grid-template-columns: 28px 28px minmax(0, 1fr);
+    grid-template-columns: 24px minmax(0, 1fr) 24px;
     align-items: center;
-    gap: var(--sheetcraft-space-1);
+    gap: var(--sheetcraft-space-2);
     padding-left: min(calc(var(--shape-row-depth) * 14px), 84px);
     min-width: 0;
   }
+  &__kind,
+  &__eye {
+    color: var(--sheetcraft-text-secondary);
+  }
+  &__row.is-selected &__kind {
+    color: var(--sheetcraft-action-primary);
+  }
   &__row-error {
-    margin-left: 32px;
+    margin-left: 28px;
   }
 }
 </style>

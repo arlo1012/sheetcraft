@@ -32,7 +32,7 @@ const colorAction = computed(() => props.controller.session.fieldAction("textCol
         :reason="controller.fieldCapability('fontFamily').reason"
         data-shape-format-field="fontFamily"
       >
-        <ShapeFontFamilyField :controller="controller" />
+        <ShapeFontFamilyField :controller="controller" appearance="field" />
       </FormatField>
       <ShapeFormatNumberField :controller="controller" field="fontSizePt" />
       <FormatField :label="controller.s.value('textColor')" data-shape-format-field="textColor">
@@ -41,6 +41,7 @@ const colorAction = computed(() => props.controller.session.fieldAction("textCol
           :mixed="controller.isMixedField('textColor')"
           :label="controller.s.value('textColor')"
           :disabled="!controller.fieldCapability('textColor').enabled"
+          size="small"
           show-value
           @select="(color) => colorAction(color ?? '')"
         />

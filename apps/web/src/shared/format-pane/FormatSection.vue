@@ -74,7 +74,7 @@ defineExpose({
   }
   &__body {
     display: grid;
-    gap: 6px;
+    gap: 8px;
   }
 }
 </style>

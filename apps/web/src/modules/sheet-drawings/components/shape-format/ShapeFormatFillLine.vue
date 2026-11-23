@@ -114,15 +114,16 @@ defineExpose({
       >
         {{ wordArtStyleCapability.reason }}
       </p>
-      <details
+      <div
         v-if="!controller.props.snapshot?.wordArtStyleEditingScope"
         class="shape-format-fill-line__application-details"
       >
-        <summary>{{ wordArtApplicationSummary }}</summary>
-        <p class="shape-format-fill-line__reason" data-wordart-style-help>
-          {{ wordArtLabels.reapplyHelp }}
-        </p>
-      </details>
+        <FormatSection :title="wordArtApplicationSummary">
+          <p class="shape-format-fill-line__reason" data-wordart-style-help>
+            {{ wordArtLabels.reapplyHelp }}
+          </p>
+        </FormatSection>
+      </div>
       <TButton
         variant="outline"
         size="small"
@@ -233,17 +234,7 @@ defineExpose({
 </template>
 <style scoped lang="scss">
 .shape-format-fill-line__application-details {
-  color: var(--sheetcraft-text-secondary);
-  font-size: var(--sheetcraft-font-size-body-small);
-  line-height: var(--sheetcraft-line-height-body-small);
-
-  > summary {
-    cursor: pointer;
-  }
-
-  &[open] > summary {
-    margin-bottom: var(--sheetcraft-space-1);
-  }
+  min-width: 0;
 }
 
 .shape-format-fill-line__reason {

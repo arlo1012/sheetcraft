@@ -18,9 +18,10 @@ const props = withDefaults(
   defineProps<{
     controller: ShapeFormatController;
     sessionId?: number;
+    appearance?: "ribbon" | "field";
     feedbackPresentation?: "inline" | "floating";
   }>(),
-  { feedbackPresentation: "inline" },
+  { appearance: "ribbon", feedbackPresentation: "inline" },
 );
 const root = ref<HTMLElement>();
 const focused = ref(false);
@@ -206,6 +207,7 @@ defineExpose({ flush, focus: () => field.value?.focus() });
       :model-value="draft"
       :options="options"
       :label="controller.s.value('fontFamily')"
+      :appearance="appearance"
       :placeholder="
         !dirty && controller.isMixedField('fontFamily')
           ? controller.s.value('mixedValues')

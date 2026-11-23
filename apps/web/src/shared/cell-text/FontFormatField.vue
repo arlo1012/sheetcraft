@@ -13,28 +13,32 @@ import { filterFontFamilyOption } from "./font-catalog";
 import { vNativeControl } from "../tdesign/native-control";
 import type { FontFieldDraftBinding } from "./font-field-draft";
 
-const props = defineProps<{
-  modelValue?: string | number;
-  /** Optional external draft: the domain remains the sole parser, lease owner and writer. */
-  draft?: FontFieldDraftBinding;
-  readOnly?: boolean;
-  status?: "error" | "warning" | "success";
-  nativeAttributes?: Record<string, string | number | boolean | null | undefined>;
-  placeholder?: string;
-  describedBy?: string;
-  options: Array<{
+const props = withDefaults(
+  defineProps<{
+    modelValue?: string | number;
+    /** Optional external draft: the domain remains the sole parser, lease owner and writer. */
+    draft?: FontFieldDraftBinding;
+    readOnly?: boolean;
+    status?: "error" | "warning" | "success";
+    nativeAttributes?: Record<string, string | number | boolean | null | undefined>;
+    placeholder?: string;
+    describedBy?: string;
+    options: Array<{
+      label: string;
+      value: string | number;
+      fontFamily?: string;
+      aliases?: readonly string[];
+    }>;
     label: string;
-    value: string | number;
-    fontFamily?: string;
-    aliases?: readonly string[];
-  }>;
-  label: string;
-  disabled: boolean;
-  popupAttach?: () => HTMLElement;
-  matchPanelWidth?: boolean;
-  searchLabel?: string;
-  emptyLabel?: string;
-}>();
+    disabled: boolean;
+    appearance?: "ribbon" | "field";
+    popupAttach?: () => HTMLElement;
+    matchPanelWidth?: boolean;
+    searchLabel?: string;
+    emptyLabel?: string;
+  }>(),
+  { appearance: "ribbon" },
+);
 defineSlots<{ searchAction?: (props: { close: () => void }) => unknown }>();
 const emit = defineEmits<{ change: [value: string | number]; focusChange: [value: boolean] }>();
 const displayValue = computed(
@@ -287,13 +291,13 @@ defineExpose({
   <div
     ref="control"
     class="font-format-field"
-    :class="{ 'is-disabled': disabled, 'is-open': open }"
+    :class="{ 'is-disabled': disabled, 'is-open': open, 'is-field': appearance === 'field' }"
     @click="clickInput"
     @compositionstart.capture="composition($event, true)"
     @compositionend.capture="composition($event, false)"
   >
     <TSelectInput
-      class="sheetcraft-ribbon-font-input"
+      :class="{ 'sheetcraft-ribbon-font-input': appearance === 'ribbon' }"
       v-native-control="{ attributes: nativeControlAttributes }"
       :value="inputText"
       :input-value="inputText"
@@ -408,13 +412,24 @@ defineExpose({
   width: 100%;
   min-width: 0;
 
-  &:not(.is-disabled):is(:hover, .is-open)::after {
+  &:not(.is-disabled):not(.is-field):is(:hover, .is-open)::after {
     position: absolute;
     inset: 1px;
     border-radius: var(--sheetcraft-radius-default);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sheetcraft-text-primary) 14%, transparent);
     content: "";
     pointer-events: none;
+  }
+
+  &.is-field &__arrow {
+    width: 16px;
+    height: 22px;
+    padding-right: 0;
+    color: var(--sheetcraft-text-muted);
+
+    &::before {
+      display: none;
+    }
   }
 
   &__arrow {

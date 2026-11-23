@@ -389,6 +389,7 @@ defineExpose({
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    color: var(--sheetcraft-text-secondary);
   }
   &__unit {
     color: var(--sheetcraft-text-secondary);

@@ -263,23 +263,30 @@ const rows = computed(() => {
         <template #icon><X class="sheetcraft-action-icon" aria-hidden="true" /></template>
       </TButton>
     </header>
-    <TButton
-      size="small"
-      variant="text"
-      :disabled="disabled || !selectableIds.length"
-      @click="selectAllAction"
-      >{{ t("picture.selectAll") }}</TButton
-    >
+    <div class="picture-selection-pane__toolbar">
+      <TButton
+        size="small"
+        variant="text"
+        :disabled="disabled || !selectableIds.length"
+        @click="selectAllAction"
+        >{{ t("picture.selectAll") }}</TButton
+      >
+    </div>
     <p v-if="failure" class="picture-selection-pane__failure" role="status" aria-live="polite">
       {{ failure }}
     </p>
-    <p v-if="!images.length">{{ t("picture.noPictures") }}</p>
-    <ul class="picture-selection-pane__list">
+    <p v-if="!images.length" class="picture-selection-pane__empty">
+      {{ t("picture.noPictures") }}
+    </p>
+    <ul v-else class="picture-selection-pane__list">
       <li
         v-for="row in rows"
         :key="row.image.id"
         class="picture-selection-pane__row"
-        :class="{ 'is-selected': selectedIds.includes(row.image.id) }"
+        :class="{
+          'is-selected': selectedIds.includes(row.image.id),
+          'is-hidden': row.image.hidden,
+        }"
       >
         <TCheckbox
           :disabled="disabled || !available(row.image)"
@@ -289,6 +296,7 @@ const rows = computed(() => {
         />
         <div class="picture-selection-pane__name">
           <TInput
+            class="sheetcraft-input--ghost-editable"
             v-native-control="{
               attributes: {
                 'aria-label': t('picture.name'),
@@ -316,13 +324,14 @@ const rows = computed(() => {
           </p>
         </div>
         <TButton
+          class="picture-selection-pane__eye"
           size="small"
           variant="text"
           shape="square"
           :disabled="disabled || !available(row.image)"
           :aria-label="t(row.image.hidden ? 'picture.show' : 'picture.hide')"
           @click="row.visibility"
-          ><EyeOff v-if="row.image.hidden" :size="16" /><Eye v-else :size="16"
+          ><EyeOff v-if="row.image.hidden" :size="15" /><Eye v-else :size="15"
         /></TButton>
       </li>
     </ul>
@@ -333,7 +342,7 @@ const rows = computed(() => {
 
 .picture-selection-pane {
   @include sidePane.shell(300px);
-  padding: var(--sheetcraft-tool-panel-padding);
+  padding: var(--sheetcraft-space-5);
   &__header {
     @include sidePane.header(0);
     strong {
@@ -343,9 +352,25 @@ const rows = computed(() => {
       font-weight: var(--sheetcraft-font-weight-semibold);
     }
   }
+  &__toolbar {
+    display: flex;
+    align-items: center;
+    margin-top: var(--sheetcraft-space-3);
+    padding-bottom: var(--sheetcraft-space-3);
+    border-bottom: 1px solid var(--sheetcraft-border-subtle);
+  }
+  &__empty {
+    margin: var(--sheetcraft-space-3) 0 0;
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
+  }
   &__list {
+    display: grid;
+    align-content: start;
+    gap: var(--sheetcraft-space-1);
     padding: 0;
-    margin: var(--sheetcraft-space-2) 0;
+    margin: var(--sheetcraft-space-3) 0 0;
     list-style: none;
     overflow: auto;
     overscroll-behavior: contain;
@@ -363,12 +388,24 @@ const rows = computed(() => {
   }
   &__row {
     display: flex;
-    gap: var(--sheetcraft-space-1);
+    gap: var(--sheetcraft-space-2);
     align-items: center;
-    padding: var(--sheetcraft-space-1);
-    &.is-selected {
-      background: var(--sheetcraft-surface-active);
+    padding: var(--sheetcraft-space-1) var(--sheetcraft-space-2);
+    border-radius: var(--sheetcraft-radius-floating-item);
+    transition: background-color 0.12s ease;
+
+    &:hover:not(.is-selected) {
+      background: var(--sheetcraft-surface-hover);
     }
+    &.is-selected {
+      background: var(--sheetcraft-surface-selected);
+    }
+    &.is-hidden &__name {
+      opacity: 0.55;
+    }
+  }
+  &__eye {
+    color: var(--sheetcraft-text-secondary);
   }
 }
 </style>
