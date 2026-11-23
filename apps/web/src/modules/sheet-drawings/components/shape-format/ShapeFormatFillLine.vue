@@ -125,7 +125,8 @@ defineExpose({
         </FormatSection>
       </div>
       <TButton
-        variant="outline"
+        theme="default"
+        variant="base"
         size="small"
         :disabled="!clearWordArtCapability.enabled"
         data-clear-wordart-effects

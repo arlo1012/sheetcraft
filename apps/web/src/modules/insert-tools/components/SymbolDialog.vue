@@ -639,6 +639,14 @@ function onCustomListKey(event: KeyboardEvent): void {
 }
 const extensionsWrap = ref<HTMLElement>();
 const extensionsOpen = ref(false);
+let extensionsScrollTimer: ReturnType<typeof setTimeout> | undefined;
+function clearExtensionsScrollTimer(): void {
+  if (extensionsScrollTimer !== undefined) {
+    clearTimeout(extensionsScrollTimer);
+    extensionsScrollTimer = undefined;
+  }
+}
+onBeforeUnmount(clearExtensionsScrollTimer);
 watch(
   fontRestoreError,
   (error) => {
@@ -647,10 +655,15 @@ watch(
   { immediate: true },
 );
 watch(extensionsOpen, (open) => {
+  clearExtensionsScrollTimer();
   if (open) {
-    void nextTick(() => {
-      extensionsWrap.value?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
-    });
+    const reveal = () =>
+      extensionsWrap.value?.scrollIntoView?.({ behavior: "smooth", block: "end" });
+    void nextTick(reveal);
+    extensionsScrollTimer = setTimeout(() => {
+      extensionsScrollTimer = undefined;
+      if (mounted && extensionsOpen.value) reveal();
+    }, 240);
   }
 });
 </script>
@@ -1124,7 +1137,7 @@ watch(extensionsOpen, (open) => {
     overflow-wrap: anywhere;
   }
   &__error {
-    color: var(--sheetcraft-text-primary);
+    color: var(--sheetcraft-status-error);
     font-size: var(--sheetcraft-font-size-body-small);
     line-height: var(--sheetcraft-line-height-body-small);
   }

@@ -344,6 +344,7 @@ defineExpose({
         },
       }"
       class="sheetcraft-input-number--persistent-controls"
+      :class="{ 'sheetcraft-input-number--full-width': showLabel }"
       theme="column"
       size="small"
       :model-value="displayedNumber"

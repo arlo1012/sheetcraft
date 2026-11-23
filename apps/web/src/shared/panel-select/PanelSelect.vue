@@ -258,6 +258,7 @@ watch(open, (visible) => {
     gap: 8px;
     width: 100%;
     min-width: 0;
+    text-align: left;
   }
 
   &__panel {

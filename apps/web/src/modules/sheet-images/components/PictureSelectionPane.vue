@@ -398,7 +398,7 @@ const rows = computed(() => {
       background: var(--sheetcraft-surface-hover);
     }
     &.is-selected {
-      background: var(--sheetcraft-surface-selected);
+      background: var(--sheetcraft-action-primary-subtle);
     }
     &.is-hidden &__name {
       opacity: 0.55;

@@ -982,6 +982,12 @@
   }
 }
 
+// Labelled numeric fields fill their grid control track to align with sibling selects.
+.sheetcraft-input-number--full-width.t-input-number.t-is-controls-right,
+.sheetcraft-input-number--full-width.t-input-number.t-is-controls-right.t-size-s {
+  width: 100%;
+}
+
 // Opt-in spacing for selects embedded in compact menus and controls.
 .sheetcraft-select--compact {
   .t-input {

@@ -523,7 +523,7 @@ const renderedRows = computed(() => {
       background: var(--sheetcraft-surface-hover);
     }
     &.is-selected {
-      background: var(--sheetcraft-surface-selected);
+      background: var(--sheetcraft-action-primary-subtle);
     }
     &.is-hidden {
       .shape-selection-pane__kind,
