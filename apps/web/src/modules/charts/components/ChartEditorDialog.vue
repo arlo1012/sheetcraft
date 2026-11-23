@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Input } from "tdesign-vue-next/es/input";
 import { ref, computed, watch, onBeforeUnmount, nextTick } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Button } from "tdesign-vue-next/es/button";
 import { Dialog, type DialogCloseContext } from "tdesign-vue-next/es/dialog";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
@@ -428,6 +429,14 @@ function confirmStep(): void {
   if (sourceOpen.value) finishSource(true);
   else confirm();
 }
+const footerAlert = computed<{ theme: "error" | "warning"; message: string } | undefined>(() => {
+  if (error.value) return { theme: "error", message: t("chart.invalidSource") };
+  if (designFailed.value) return { theme: "error", message: t("chart.designApplyFailed") };
+  if (!sourceOpen.value && draft.value.chart.type === "combo" && !comboAvailable.value) {
+    return { theme: "warning", message: t("chart.comboUnavailable") };
+  }
+  return undefined;
+});
 function closeDialog(context: DialogCloseContext): void {
   if (sourceOpen.value && context.trigger === "cancel") finishSource(false);
   else emit("close");
@@ -454,14 +463,6 @@ function onDialogKeydown(event: KeyboardEvent): void {
     :close-on-overlay-click="false"
     :close-on-esc-keydown="!sourceOpen"
     :confirm-on-enter="false"
-    :confirm-btn="{
-      content: t(sourceOpen ? 'chart.backToPreview' : 'picture.confirm'),
-      theme: 'primary',
-      variant: 'base',
-      disabled,
-    }"
-    :cancel-btn="{ content: t('picture.cancel'), theme: 'default', variant: 'base' }"
-    @confirm="confirmStep"
     @close="closeDialog"
     @keydown="onDialogKeydown"
   >
@@ -650,15 +651,6 @@ function onDialogKeydown(event: KeyboardEvent): void {
             >{{ t("chart.selectData") }}</Button
           >
         </div>
-        <p v-if="draft.chart.type === 'combo' && !comboAvailable" class="chart-selector__hint">
-          {{ t("chart.comboUnavailable") }}
-        </p>
-        <p v-if="designFailed" class="chart-selector__error" role="alert">
-          {{ t("chart.designApplyFailed") }}
-        </p>
-        <p v-if="error" class="chart-selector__error" role="alert">
-          {{ t("chart.invalidSource") }}
-        </p>
       </section>
       <section
         v-else
@@ -762,6 +754,27 @@ function onDialogKeydown(event: KeyboardEvent): void {
         </p>
       </section>
     </div>
+    <template #footer>
+      <div class="sheetcraft-dialog-footer">
+        <TAlert
+          v-if="footerAlert"
+          :theme="footerAlert.theme"
+          :message="footerAlert.message"
+          role="alert"
+        />
+        <div class="sheetcraft-dialog-footer__actions">
+          <Button
+            theme="default"
+            variant="base"
+            @click="sourceOpen ? finishSource(false) : emit('close')"
+            >{{ t("picture.cancel") }}</Button
+          >
+          <Button theme="primary" variant="base" :disabled="disabled" @click="confirmStep">{{
+            t(sourceOpen ? "chart.backToPreview" : "picture.confirm")
+          }}</Button>
+        </div>
+      </div>
+    </template>
   </Dialog>
 </template>
 <style scoped lang="scss">
@@ -849,17 +862,11 @@ function onDialogKeydown(event: KeyboardEvent): void {
     display: grid;
     gap: 8px;
   }
-  &__hint,
-  &__error {
+  &__hint {
     margin: 0;
+    color: var(--sheetcraft-text-secondary);
     font-size: var(--sheetcraft-font-size-body-medium);
     line-height: var(--sheetcraft-line-height-body-medium);
-  }
-  &__hint {
-    color: var(--sheetcraft-text-secondary);
-  }
-  &__error {
-    color: var(--sheetcraft-status-error);
   }
 }
 @media (max-height: 550px) {

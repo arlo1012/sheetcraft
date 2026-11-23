@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { SheetConditionalFormatRule } from "@sheetcraft/core/conditional-formatting";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -315,13 +316,10 @@ watch(() => [props.visible, props.rules, props.createKind, props.sheets, props.s
   <Dialog
     :visible="visible && !editorVisible && !pickingRange"
     :header="t('conditionalFormatting.manageRulesTitle')"
-    :confirm-btn="{ content: t('conditionalFormatting.save') }"
-    :cancel-btn="t('conditionalFormatting.cancel')"
     width="min(1000px, calc(100vw - 32px))"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
     placement="center"
-    @confirm="save"
     @close="emit('close')"
   >
     <section class="conditional-format-manager">
@@ -364,8 +362,18 @@ watch(() => [props.visible, props.rules, props.createKind, props.sheets, props.s
         @update-range="updateRange"
         @update-stop="updateStop"
       />
-      <p v-if="error" class="conditional-format-manager__error" role="alert">{{ error }}</p>
     </section>
+    <template #footer>
+      <div class="sheetcraft-dialog-footer">
+        <TAlert v-if="error" theme="error" :message="error" role="alert" />
+        <div class="sheetcraft-dialog-footer__actions">
+          <TButton theme="default" @click="emit('close')">{{
+            t("conditionalFormatting.cancel")
+          }}</TButton>
+          <TButton theme="primary" @click="save">{{ t("conditionalFormatting.save") }}</TButton>
+        </div>
+      </div>
+    </template>
   </Dialog>
   <ConditionalFormatQuickDialog
     v-if="editorVisible && isConditionalFormatQuickDialogKind(createKind) && !editingRule"
@@ -410,10 +418,6 @@ watch(() => [props.visible, props.rules, props.createKind, props.sheets, props.s
   &__new {
     margin-left: auto;
     flex-shrink: 0;
-  }
-  &__error {
-    margin: 0;
-    color: var(--sheetcraft-status-error);
   }
 }
 </style>

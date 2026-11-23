@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch, type CSSProperties } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { TabPanel as TTabPanel, Tabs as TTabs } from "tdesign-vue-next/es/tabs";
 import { Textarea as TTextarea } from "tdesign-vue-next/es/textarea";
@@ -339,11 +341,8 @@ watch(
     :header="t(section === 'header' ? 'pageLayout.header' : 'pageLayout.footer')"
     width="min(560px, calc(100vw - 32px))"
     placement="center"
-    :confirm-btn="t('pageLayout.confirm')"
-    :cancel-btn="t('pageLayout.cancel')"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
-    @confirm="confirm"
     @close="close"
   >
     <div ref="fieldRoot" class="header-footer-custom-dialog">
@@ -437,10 +436,16 @@ watch(
           </label>
         </div>
       </div>
-      <p v-if="setupError" role="alert" class="header-footer-custom-dialog__error">
-        {{ setupError }}
-      </p>
     </div>
+    <template #footer>
+      <div class="sheetcraft-dialog-footer">
+        <TAlert v-if="setupError" theme="error" :message="setupError" role="alert" />
+        <div class="sheetcraft-dialog-footer__actions">
+          <TButton theme="default" @click="close">{{ t("pageLayout.cancel") }}</TButton>
+          <TButton theme="primary" @click="confirm">{{ t("pageLayout.confirm") }}</TButton>
+        </div>
+      </div>
+    </template>
   </Dialog>
 </template>
 
@@ -475,11 +480,6 @@ watch(
     display: grid;
     min-width: 0;
     gap: var(--sheetcraft-space-1);
-  }
-
-  &__error {
-    margin: 0;
-    color: var(--sheetcraft-status-error);
   }
 }
 </style>

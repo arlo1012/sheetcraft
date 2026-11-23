@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Button } from "tdesign-vue-next/es/button";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -667,6 +668,18 @@ watch(
     }
   },
 );
+const footerAlert = computed<{ theme: "error" | "warning"; message: string } | undefined>(() => {
+  if (compositionBlocked.value) {
+    return { theme: "warning", message: t("chart.sourceFinishComposition") };
+  }
+  if (invalidRange.value || preview.value.invalid) {
+    return { theme: "error", message: t("chart.sourceInvalidRange") };
+  }
+  if (props.error || feedback.value) {
+    return { theme: "error", message: t("chart.sourceApplyFailed") };
+  }
+  return undefined;
+});
 onBeforeUnmount(() => {
   alive = false;
   epoch++;
@@ -690,14 +703,6 @@ onBeforeUnmount(() => {
       maxHeight: 'calc(100dvh - 96px)',
     }"
     :close-on-overlay-click="false"
-    :confirm-btn="{
-      content: t('picture.confirm'),
-      theme: 'primary',
-      variant: 'base',
-      disabled: blocked,
-    }"
-    :cancel-btn="{ content: t('picture.cancel'), theme: 'default', variant: 'base' }"
-    @confirm="confirm"
     @close="close"
   >
     <div
@@ -936,19 +941,6 @@ onBeforeUnmount(() => {
       <Checkbox :checked="draft.chart.showHidden" :disabled="blocked" @change="changeHidden">{{
         t("chart.showHidden")
       }}</Checkbox>
-      <p v-if="compositionBlocked" class="chart-source-editor__error" role="alert">
-        {{ t("chart.sourceFinishComposition") }}
-      </p>
-      <p
-        v-else-if="invalidRange || preview.invalid"
-        class="chart-source-editor__error"
-        role="alert"
-      >
-        {{ t("chart.sourceInvalidRange") }}
-      </p>
-      <p v-else-if="error || feedback" class="chart-source-editor__error" role="alert">
-        {{ t("chart.sourceApplyFailed") }}
-      </p>
       <div class="chart-source-editor__preview" :aria-label="t('chart.sourcePreview')">
         <ChartContent
           :drawing="previewDrawing"
@@ -960,6 +952,22 @@ onBeforeUnmount(() => {
         />
       </div>
     </div>
+    <template #footer>
+      <div class="sheetcraft-dialog-footer">
+        <TAlert
+          v-if="footerAlert"
+          :theme="footerAlert.theme"
+          :message="footerAlert.message"
+          role="alert"
+        />
+        <div class="sheetcraft-dialog-footer__actions">
+          <Button theme="default" variant="base" @click="close">{{ t("picture.cancel") }}</Button>
+          <Button theme="primary" variant="base" :disabled="blocked" @click="confirm">{{
+            t("picture.confirm")
+          }}</Button>
+        </div>
+      </div>
+    </template>
   </Dialog>
   <ChartSeriesDialog
     v-if="nested?.kind === 'series'"
@@ -1129,17 +1137,11 @@ onBeforeUnmount(() => {
     font-size: 12px;
     line-height: 18px;
   }
-  &__hint,
-  &__error {
+  &__hint {
     margin: 0;
+    color: var(--sheetcraft-text-secondary);
     font-size: 12px;
     line-height: 18px;
-  }
-  &__hint {
-    color: var(--sheetcraft-text-secondary);
-  }
-  &__error {
-    color: var(--sheetcraft-status-error);
   }
   &__preview {
     height: 250px;

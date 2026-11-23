@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Button } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
@@ -238,13 +239,7 @@ watch(
     placement="center"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
-    :confirm-btn="{
-      content: t('formulaTools.editorConfirm'),
-      disabled: composing,
-    }"
-    :cancel-btn="t('formulaTools.cancel')"
     :data-cell-edit-session="editSessionId"
-    @confirm="onConfirm"
     @close="onClose"
   >
     <div class="formula-editor-dialog__content" :data-cell-edit-session="editSessionId">
@@ -368,10 +363,23 @@ watch(
           previewValue || "—"
         }}</output>
       </div>
-      <p v-if="error || localMessage" class="formula-editor-dialog__error" role="alert">
-        {{ error || localMessage }}
-      </p>
     </div>
+    <template #footer>
+      <div class="sheetcraft-dialog-footer">
+        <TAlert
+          v-if="error || localMessage"
+          theme="error"
+          :message="error || localMessage"
+          role="alert"
+        />
+        <div class="sheetcraft-dialog-footer__actions">
+          <Button theme="default" @click="onClose">{{ t("formulaTools.cancel") }}</Button>
+          <Button theme="primary" :disabled="composing" @click="onConfirm">{{
+            t("formulaTools.editorConfirm")
+          }}</Button>
+        </div>
+      </div>
+    </template>
   </Dialog>
 
   <FormulaFunctionBrowser
@@ -529,13 +537,6 @@ watch(
       white-space: pre-wrap;
       overflow-wrap: anywhere;
     }
-  }
-
-  &__error {
-    flex: none;
-    margin: 0;
-    color: var(--sheetcraft-status-error);
-    font-size: var(--sheetcraft-font-size-body-small);
   }
 }
 
