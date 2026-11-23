@@ -29,7 +29,7 @@ const emit = defineEmits<{
   draftChange: [draft: DataComparisonDraft];
   pickRange: [field: "firstRange" | "secondRange"];
 }>();
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 const draft = ref<DataComparisonDraft>(copyDraft(props.initial));
 const colors = [
   { value: "#ffc7ce", label: "lightRed" },
@@ -118,6 +118,7 @@ watch(
     aria-modal="true"
     :aria-label="title"
     width="min(500px, calc(100vw - 32px))"
+    placement="center"
     :visible="visible && !picking"
     :header="title"
     :confirm-btn="{
@@ -132,54 +133,63 @@ watch(
     @confirm="!busy && canApply && emit('apply', copyDraft(draft))"
   >
     <div class="data-comparison-dialog">
-      <TForm :data="draft" label-align="right" :label-width="locale === 'zh-CN' ? 88 : 104">
-        <TFormItem name="scope">
+      <TForm
+        class="data-comparison-dialog__form sheetcraft-form-grid"
+        :data="draft"
+        label-align="top"
+      >
+        <div class="data-comparison-dialog__card">
           <TRadioGroup v-model="draft.scope" :disabled="busy">
             <TRadio value="single">{{ t("dataTools.comparison.singleRange") }}</TRadio>
             <TRadio value="double">{{ t("dataTools.comparison.doubleRange") }}</TRadio>
           </TRadioGroup>
-        </TFormItem>
+        </div>
 
-        <TFormItem name="firstRange" :label="t('dataTools.comparison.firstRange')">
-          <TInput
-            v-model="draft.firstRange"
-            :disabled="busy"
-            autocomplete="off"
-            placeholder="A1:C10"
-            :aria-label="t('dataTools.comparison.firstRange')"
-          >
-            <template #suffixIcon>
-              <SquareMousePointer
-                class="sheetcraft-input-action-icon"
-                :aria-disabled="busy"
-                :aria-label="`${t('dataTools.comparison.pickRange')}：${t('dataTools.comparison.firstRange')}`"
-                @click="!busy && emit('pickRange', 'firstRange')"
-              />
-            </template>
-          </TInput>
-        </TFormItem>
-        <TFormItem
-          v-if="draft.scope === 'double'"
-          name="secondRange"
-          :label="t('dataTools.comparison.secondRange')"
+        <div
+          class="data-comparison-dialog__ranges"
+          :class="{ 'data-comparison-dialog__ranges--double': draft.scope === 'double' }"
         >
-          <TInput
-            v-model="draft.secondRange"
-            :disabled="busy"
-            autocomplete="off"
-            placeholder="E1:G10"
-            :aria-label="t('dataTools.comparison.secondRange')"
+          <TFormItem name="firstRange" :label="t('dataTools.comparison.firstRange')">
+            <TInput
+              v-model="draft.firstRange"
+              :disabled="busy"
+              autocomplete="off"
+              placeholder="A1:C10"
+              :aria-label="t('dataTools.comparison.firstRange')"
+            >
+              <template #suffixIcon>
+                <SquareMousePointer
+                  class="sheetcraft-input-action-icon"
+                  :aria-disabled="busy"
+                  :aria-label="`${t('dataTools.comparison.pickRange')}：${t('dataTools.comparison.firstRange')}`"
+                  @click="!busy && emit('pickRange', 'firstRange')"
+                />
+              </template>
+            </TInput>
+          </TFormItem>
+          <TFormItem
+            v-if="draft.scope === 'double'"
+            name="secondRange"
+            :label="t('dataTools.comparison.secondRange')"
           >
-            <template #suffixIcon>
-              <SquareMousePointer
-                class="sheetcraft-input-action-icon"
-                :aria-disabled="busy"
-                :aria-label="`${t('dataTools.comparison.pickRange')}：${t('dataTools.comparison.secondRange')}`"
-                @click="!busy && emit('pickRange', 'secondRange')"
-              />
-            </template>
-          </TInput>
-        </TFormItem>
+            <TInput
+              v-model="draft.secondRange"
+              :disabled="busy"
+              autocomplete="off"
+              placeholder="E1:G10"
+              :aria-label="t('dataTools.comparison.secondRange')"
+            >
+              <template #suffixIcon>
+                <SquareMousePointer
+                  class="sheetcraft-input-action-icon"
+                  :aria-disabled="busy"
+                  :aria-label="`${t('dataTools.comparison.pickRange')}：${t('dataTools.comparison.secondRange')}`"
+                  @click="!busy && emit('pickRange', 'secondRange')"
+                />
+              </template>
+            </TInput>
+          </TFormItem>
+        </div>
 
         <TFormItem name="comparisonMode" :label="t('dataTools.comparison.comparisonMode')">
           <div class="data-comparison-dialog__comparison">
@@ -188,10 +198,10 @@ watch(
                 <TRadio value="cells">{{ t("dataTools.comparison.cells") }}</TRadio>
                 <TRadio value="rows">{{ t("dataTools.comparison.rows") }}</TRadio>
               </TRadioGroup>
+              <TCheckbox v-model="draft.hasHeader" :disabled="busy">
+                {{ t("dataTools.comparison.header") }}
+              </TCheckbox>
             </div>
-            <TCheckbox v-model="draft.hasHeader" :disabled="busy">
-              {{ t("dataTools.comparison.header") }}
-            </TCheckbox>
             <div v-if="draft.comparisonMode === 'rows'" class="data-comparison-dialog__columns">
               <div class="data-comparison-dialog__selection-actions">
                 <TCheckbox
@@ -234,30 +244,34 @@ watch(
           name="side"
           :label="t('dataTools.comparison.resultSource')"
         >
-          <TRadioGroup v-model="draft.side" :disabled="busy">
-            <TRadio value="first">{{ t("dataTools.comparison.firstSource") }}</TRadio>
-            <TRadio value="second">{{ t("dataTools.comparison.secondSource") }}</TRadio>
-            <TRadio value="both">{{ t("dataTools.comparison.bothSource") }}</TRadio>
-          </TRadioGroup>
+          <div class="data-comparison-dialog__card">
+            <TRadioGroup v-model="draft.side" :disabled="busy">
+              <TRadio value="first">{{ t("dataTools.comparison.firstSource") }}</TRadio>
+              <TRadio value="second">{{ t("dataTools.comparison.secondSource") }}</TRadio>
+              <TRadio value="both">{{ t("dataTools.comparison.bothSource") }}</TRadio>
+            </TRadioGroup>
+          </div>
         </TFormItem>
 
         <TFormItem v-if="isMarking" name="fillColor" :label="t('dataTools.comparison.fillColor')">
-          <TRadioGroup
-            v-model="draft.fillColor"
-            direction="horizontal"
-            :disabled="busy"
-            :aria-label="t('dataTools.comparison.fillColor')"
-          >
-            <TRadio v-for="color in colors" :key="color.value" :value="color.value"
-              ><span class="data-comparison-dialog__color-label"
-                ><span
-                  class="data-comparison-dialog__swatch"
-                  :style="{ backgroundColor: color.value }"
-                  aria-hidden="true"
-                />{{ t(`dataTools.comparison.colors.${color.label}`) }}</span
-              ></TRadio
+          <div class="data-comparison-dialog__card">
+            <TRadioGroup
+              v-model="draft.fillColor"
+              direction="horizontal"
+              :disabled="busy"
+              :aria-label="t('dataTools.comparison.fillColor')"
             >
-          </TRadioGroup>
+              <TRadio v-for="color in colors" :key="color.value" :value="color.value"
+                ><span class="data-comparison-dialog__color-label"
+                  ><span
+                    class="data-comparison-dialog__swatch"
+                    :style="{ backgroundColor: color.value }"
+                    aria-hidden="true"
+                  />{{ t(`dataTools.comparison.colors.${color.label}`) }}</span
+                ></TRadio
+              >
+            </TRadioGroup>
+          </div>
         </TFormItem>
       </TForm>
       <p v-if="error" class="data-comparison-dialog__error" role="alert">
@@ -272,19 +286,47 @@ watch(
 
 .data-comparison-dialog {
   display: grid;
-  gap: var(--sheetcraft-space-2);
+  gap: 10px;
+
+  &__form {
+    display: grid;
+    gap: 10px;
+  }
+
+  &__card {
+    width: 100%;
+    padding: 9px 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
+  }
+
+  &__ranges {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    min-width: 0;
+
+    &--double {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
 
   &__comparison {
     display: grid;
     width: 100%;
     min-width: 0;
-    gap: var(--sheetcraft-space-2);
+    gap: 8px;
   }
 
   &__mode {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    min-height: 32px;
+    justify-content: space-between;
+    gap: 8px 16px;
+    padding: 9px 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
   }
 
   &__columns {
@@ -292,12 +334,9 @@ watch(
     width: 100%;
     display: grid;
     align-content: start;
-    gap: var(--sheetcraft-space-1);
-    max-height: 180px;
-    padding: var(--sheetcraft-space-2);
-    border-color: var(--sheetcraft-border-control);
-    border-radius: var(--sheetcraft-radius-default);
-    background: var(--sheetcraft-surface-special);
+    gap: 6px;
+    max-height: 168px;
+    padding: 10px 12px;
   }
 
   &__column {

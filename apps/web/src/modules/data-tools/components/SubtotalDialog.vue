@@ -13,7 +13,7 @@ const props = defineProps<{
   hasSubtotals?: boolean;
 }>();
 const emit = defineEmits<{ close: []; apply: [draft: SubtotalDraft]; removeAll: [] }>();
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 function createDraft(): SubtotalDraft {
   return {
     groupColumn: props.columns[0]?.column ?? 0,
@@ -64,39 +64,47 @@ function apply(): void {
     :visible="visible"
     :header="t('dataTools.outline.subtotalTitle')"
     width="min(480px, calc(100vw - 32px))"
+    placement="center"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
     @close="emit('close')"
   >
     <template #footer>
-      <TButton v-if="hasSubtotals" variant="text" @click="emit('removeAll')">{{
-        t("dataTools.outline.removeAll")
-      }}</TButton>
-      <TButton theme="default" @click="emit('close')">{{ t("dataTools.common.cancel") }}</TButton>
-      <TButton theme="primary" :disabled="draft.valueColumns.length === 0" @click="apply">{{
-        t("dataTools.outline.confirm")
-      }}</TButton>
+      <div class="subtotal-dialog__footer">
+        <TButton
+          v-if="hasSubtotals"
+          variant="text"
+          class="subtotal-dialog__remove"
+          @click="emit('removeAll')"
+          >{{ t("dataTools.outline.removeAll") }}</TButton
+        >
+        <div class="subtotal-dialog__footer-actions">
+          <TButton theme="default" @click="emit('close')">{{
+            t("dataTools.common.cancel")
+          }}</TButton>
+          <TButton theme="primary" :disabled="draft.valueColumns.length === 0" @click="apply">{{
+            t("dataTools.outline.confirm")
+          }}</TButton>
+        </div>
+      </div>
     </template>
-    <TForm
-      class="subtotal-dialog"
-      :data="draft"
-      label-align="right"
-      :label-width="locale === 'zh-CN' ? 88 : 128"
-    >
-      <TFormItem name="groupColumn" :label="t('dataTools.outline.groupBy')">
-        <TSelect
-          v-model="draft.groupColumn"
-          :aria-label="t('dataTools.outline.groupBy')"
-          :options="columns"
-        />
-      </TFormItem>
-      <TFormItem name="function" :label="t('dataTools.outline.useFunction')">
-        <TSelect
-          v-model="draft.function"
-          :aria-label="t('dataTools.outline.useFunction')"
-          :options="functions"
-        />
-      </TFormItem>
+    <TForm class="subtotal-dialog sheetcraft-form-grid" :data="draft" label-align="top">
+      <div class="subtotal-dialog__row">
+        <TFormItem name="groupColumn" :label="t('dataTools.outline.groupBy')">
+          <TSelect
+            v-model="draft.groupColumn"
+            :aria-label="t('dataTools.outline.groupBy')"
+            :options="columns"
+          />
+        </TFormItem>
+        <TFormItem name="function" :label="t('dataTools.outline.useFunction')">
+          <TSelect
+            v-model="draft.function"
+            :aria-label="t('dataTools.outline.useFunction')"
+            :options="functions"
+          />
+        </TFormItem>
+      </div>
       <TFormItem name="valueColumns" :label="t('dataTools.outline.addSubtotalTo')">
         <div
           class="subtotal-dialog__columns"
@@ -113,17 +121,13 @@ function apply(): void {
           >
         </div>
       </TFormItem>
-      <TFormItem>
-        <div class="subtotal-dialog__options">
-          <TCheckbox v-model="draft.replaceExisting">{{
-            t("dataTools.outline.replace")
-          }}</TCheckbox>
-          <TCheckbox v-model="draft.pageBreaks">{{ t("dataTools.outline.pageBreaks") }}</TCheckbox>
-          <TCheckbox v-model="draft.summaryBelow">{{
-            t("dataTools.outline.summaryBelow")
-          }}</TCheckbox>
-        </div>
-      </TFormItem>
+      <div class="subtotal-dialog__options">
+        <TCheckbox v-model="draft.replaceExisting">{{ t("dataTools.outline.replace") }}</TCheckbox>
+        <TCheckbox v-model="draft.pageBreaks">{{ t("dataTools.outline.pageBreaks") }}</TCheckbox>
+        <TCheckbox v-model="draft.summaryBelow">{{
+          t("dataTools.outline.summaryBelow")
+        }}</TCheckbox>
+      </div>
     </TForm>
   </Dialog>
 </template>
@@ -131,17 +135,24 @@ function apply(): void {
 @use "../../../shared/option-list/option-list";
 
 .subtotal-dialog {
+  display: grid;
+  gap: 12px;
+
+  &__row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    min-width: 0;
+  }
+
   &__columns {
     @include option-list.surface;
     width: 100%;
     min-width: 0;
     display: grid;
-    gap: var(--sheetcraft-space-1);
-    max-height: 180px;
-    padding: var(--sheetcraft-space-2);
-    border-color: var(--sheetcraft-border-control);
-    border-radius: var(--sheetcraft-radius-default);
-    background: var(--sheetcraft-surface-special);
+    gap: 6px;
+    max-height: 168px;
+    padding: 10px 12px;
   }
   &__column {
     min-width: max-content;
@@ -149,7 +160,25 @@ function apply(): void {
   }
   &__options {
     display: grid;
-    gap: var(--sheetcraft-space-1);
+    gap: 6px;
+    padding: 10px 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
+  }
+  &__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sheetcraft-space-4);
+  }
+  &__remove {
+    color: var(--sheetcraft-text-secondary);
+  }
+  &__footer-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sheetcraft-space-3);
+    margin-left: auto;
   }
 }
 </style>

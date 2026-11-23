@@ -405,14 +405,15 @@ function confirm(): void {
     v-if="visible"
     :visible="visible && !picking"
     :header="t('dataTools.textToColumns.wizardTitle')"
-    width="680px"
+    width="min(680px, calc(100vw - 32px))"
+    placement="center"
     :footer="true"
     :close-on-overlay-click="false"
     @close="emit('close')"
     @confirm="confirm"
   >
     <div class="text-to-columns-dialog">
-      <TForm label-align="right" :label-width="104" @submit.prevent>
+      <TForm label-align="left" :label-width="96" @submit.prevent>
         <TFormItem :label="t('dataTools.textToColumns.source')">
           <div class="text-to-columns-dialog__source">
             <RangeReferenceInput

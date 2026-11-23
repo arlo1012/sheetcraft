@@ -22,7 +22,7 @@ const props = withDefaults(
   { error: "", picking: false },
 );
 const emit = defineEmits<{ close: []; apply: [draft: FillRankDraft] }>();
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 const copy = (value: FillRankDraft): FillRankDraft => ({ ...value });
 const draft = ref(copy(props.initial));
 const canApply = computed(() =>
@@ -57,7 +57,8 @@ function apply(): void {
     v-if="visible"
     :visible="visible && !picking"
     :header="t('dataTools.fill.rank')"
-    width="min(480px, calc(100vw - 32px))"
+    width="min(460px, calc(100vw - 32px))"
+    placement="center"
     :confirm-btn="{ content: t('dataTools.fill.apply'), disabled: !canApply }"
     :cancel-btn="t('dataTools.fill.cancel')"
     :close-on-overlay-click="false"
@@ -70,32 +71,36 @@ function apply(): void {
         <Info :size="14" aria-hidden="true" />
         <span>{{ t("dataTools.fill.rankHint") }}</span>
       </p>
-      <TForm :data="draft" label-align="right" :label-width="locale === 'zh-CN' ? 72 : 112">
-        <TFormItem name="sourceRange" :label="t('dataTools.fill.rankSource')">
-          <div class="fill-rank-dialog__reference">
-            <RangeReferenceInput
-              v-model="draft.sourceRange"
-              :label="t('dataTools.fill.rankSource')"
-              :pick-label="t('dataTools.fill.pickRankSource')"
-              :select-reference="selectSourceReference"
-            />
-          </div>
-        </TFormItem>
-        <TFormItem name="destination" :label="t('dataTools.fill.rankDestination')">
-          <div class="fill-rank-dialog__reference">
-            <RangeReferenceInput
-              v-model="draft.destination"
-              :label="t('dataTools.fill.rankDestination')"
-              :pick-label="t('dataTools.fill.pickRankDestination')"
-              :select-reference="selectDestinationReference"
-            />
-          </div>
-        </TFormItem>
+      <TForm class="fill-rank-dialog__form sheetcraft-form-grid" :data="draft" label-align="top">
+        <div class="fill-rank-dialog__row">
+          <TFormItem name="sourceRange" :label="t('dataTools.fill.rankSource')">
+            <div class="fill-rank-dialog__reference">
+              <RangeReferenceInput
+                v-model="draft.sourceRange"
+                :label="t('dataTools.fill.rankSource')"
+                :pick-label="t('dataTools.fill.pickRankSource')"
+                :select-reference="selectSourceReference"
+              />
+            </div>
+          </TFormItem>
+          <TFormItem name="destination" :label="t('dataTools.fill.rankDestination')">
+            <div class="fill-rank-dialog__reference">
+              <RangeReferenceInput
+                v-model="draft.destination"
+                :label="t('dataTools.fill.rankDestination')"
+                :pick-label="t('dataTools.fill.pickRankDestination')"
+                :select-reference="selectDestinationReference"
+              />
+            </div>
+          </TFormItem>
+        </div>
         <TFormItem name="order" :label="t('dataTools.fill.rankOrder')">
-          <TRadioGroup v-model="draft.order" :aria-label="t('dataTools.fill.rankOrder')">
-            <TRadio value="descending">{{ t("dataTools.fill.rankDescending") }}</TRadio>
-            <TRadio value="ascending">{{ t("dataTools.fill.rankAscending") }}</TRadio>
-          </TRadioGroup>
+          <div class="fill-rank-dialog__card">
+            <TRadioGroup v-model="draft.order" :aria-label="t('dataTools.fill.rankOrder')">
+              <TRadio value="descending">{{ t("dataTools.fill.rankDescending") }}</TRadio>
+              <TRadio value="ascending">{{ t("dataTools.fill.rankAscending") }}</TRadio>
+            </TRadioGroup>
+          </div>
         </TFormItem>
         <TFormItem name="ties" :label="t('dataTools.fill.rankTies')">
           <TSelect
@@ -104,12 +109,10 @@ function apply(): void {
             :aria-label="t('dataTools.fill.rankTies')"
           />
         </TFormItem>
-        <TFormItem name="overwrite">
-          <div class="fill-rank-dialog__feedback">
-            <TCheckbox v-model="draft.overwrite">{{ t("dataTools.fill.rankOverwrite") }}</TCheckbox>
-            <p v-if="error" class="fill-rank-dialog__error" role="alert">{{ error }}</p>
-          </div>
-        </TFormItem>
+        <div class="fill-rank-dialog__card">
+          <TCheckbox v-model="draft.overwrite">{{ t("dataTools.fill.rankOverwrite") }}</TCheckbox>
+        </div>
+        <p v-if="error" class="fill-rank-dialog__error" role="alert">{{ error }}</p>
       </TForm>
     </div>
   </Dialog>
@@ -121,8 +124,23 @@ function apply(): void {
 .fill-rank-dialog {
   @include fill-dialog.surface;
 
-  &__feedback {
-    @include fill-dialog.group;
+  &__form {
+    display: grid;
+    gap: 10px;
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    min-width: 0;
+  }
+
+  &__card {
+    width: 100%;
+    padding: 9px 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
   }
 
   &__hint,

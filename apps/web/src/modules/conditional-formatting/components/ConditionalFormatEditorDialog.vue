@@ -713,7 +713,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     <TForm
       class="conditional-format-editor sheetcraft-form-grid"
       layout="vertical"
-      label-align="right"
+      label-align="left"
       :label-width="88"
     >
       <section class="conditional-format-editor__section">
@@ -1100,7 +1100,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     align-items: center;
     gap: 8px;
     > span:first-child {
-      text-align: right;
+      text-align: left;
       color: var(--sheetcraft-text-secondary);
     }
   }
@@ -1125,7 +1125,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     grid-template-rows: 20px repeat(3, 28px);
     gap: 8px;
     align-items: center;
-    text-align: right;
+    text-align: left;
     color: var(--sheetcraft-text-secondary);
   }
   &__threshold-column {
@@ -1153,7 +1153,8 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     align-items: center;
     gap: 8px;
     > span {
-      text-align: right;
+      text-align: left;
+      color: var(--sheetcraft-text-secondary);
     }
   }
   @media (max-width: 560px) {

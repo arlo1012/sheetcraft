@@ -30,7 +30,7 @@ const emit = defineEmits<{
   apply: [];
   draftChange: [draft: GoalSeekDraft];
 }>();
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 const tr = (key: SimulationMessageKey) => t(key as never);
 const draft = ref<GoalSeekDraft>({ ...props.initial });
 const canSolve = computed(() =>
@@ -78,7 +78,8 @@ function confirm() {
     :aria-label="tr('simulation.goalSeek')"
     :visible="visible && !suspended"
     :header="tr('simulation.goalSeek')"
-    width="min(480px, calc(100vw - 32px))"
+    width="min(440px, calc(100vw - 32px))"
+    placement="center"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
     :confirm-btn="{ content: confirmLabel, disabled: busy || !canSolve }"
@@ -88,7 +89,7 @@ function confirm() {
     @confirm="confirm"
   >
     <div class="simulation-dialog">
-      <TForm :data="draft" label-align="right" :label-width="locale === 'zh-CN' ? 108 : 130"
+      <TForm class="simulation-dialog__form sheetcraft-form-grid" :data="draft" label-align="top"
         ><TFormItem :label="tr('simulation.formulaCell')"
           ><RangeReferenceInput
             v-model="draft.formulaCell"
@@ -124,6 +125,10 @@ function confirm() {
 .simulation-dialog {
   display: grid;
   gap: 12px;
+  &__form {
+    display: grid;
+    gap: 10px;
+  }
   &__reference {
     width: 100%;
   }

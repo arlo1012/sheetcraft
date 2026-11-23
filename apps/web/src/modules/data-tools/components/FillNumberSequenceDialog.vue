@@ -19,7 +19,7 @@ const emit = defineEmits<{
   close: [];
   apply: [draft: FillNumberSequenceDraft];
 }>();
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 const copy = (value: FillNumberSequenceDraft): FillNumberSequenceDraft => ({
   ...value,
 });
@@ -52,6 +52,7 @@ function apply(): void {
     :visible="visible"
     :header="t('dataTools.fill.numberSequence')"
     width="min(400px, calc(100vw - 32px))"
+    placement="center"
     :confirm-btn="{ content: t('dataTools.fill.apply'), disabled: !canApply }"
     :cancel-btn="t('dataTools.fill.cancel')"
     :close-on-overlay-click="false"
@@ -60,29 +61,33 @@ function apply(): void {
     @confirm="apply"
   >
     <div class="fill-number-dialog">
-      <TForm :data="draft" label-align="right" :label-width="locale === 'zh-CN' ? 72 : 112">
+      <TForm class="fill-number-dialog__form sheetcraft-form-grid" :data="draft" label-align="top">
         <TFormItem name="axis" :label="t('dataTools.fill.sequenceDirection')">
-          <TRadioGroup v-model="draft.axis" :aria-label="t('dataTools.fill.sequenceDirection')">
-            <TRadio value="rows">{{ t("dataTools.fill.rows") }}</TRadio>
-            <TRadio value="columns">{{ t("dataTools.fill.columns") }}</TRadio>
-          </TRadioGroup>
+          <div class="fill-number-dialog__card">
+            <TRadioGroup v-model="draft.axis" :aria-label="t('dataTools.fill.sequenceDirection')">
+              <TRadio value="rows">{{ t("dataTools.fill.rows") }}</TRadio>
+              <TRadio value="columns">{{ t("dataTools.fill.columns") }}</TRadio>
+            </TRadioGroup>
+          </div>
         </TFormItem>
-        <TFormItem name="start" :label="t('dataTools.fill.startValue')">
-          <TInputNumber
-            v-model="draft.start"
-            theme="column"
-            class="sheetcraft-input-number--persistent-controls"
-            :aria-label="t('dataTools.fill.startValue')"
-          />
-        </TFormItem>
-        <TFormItem name="step" :label="t('dataTools.fill.step')">
-          <TInputNumber
-            v-model="draft.step"
-            theme="column"
-            class="sheetcraft-input-number--persistent-controls"
-            :aria-label="t('dataTools.fill.step')"
-          />
-        </TFormItem>
+        <div class="fill-number-dialog__row">
+          <TFormItem name="start" :label="t('dataTools.fill.startValue')">
+            <TInputNumber
+              v-model="draft.start"
+              theme="column"
+              class="sheetcraft-input-number--persistent-controls"
+              :aria-label="t('dataTools.fill.startValue')"
+            />
+          </TFormItem>
+          <TFormItem name="step" :label="t('dataTools.fill.step')">
+            <TInputNumber
+              v-model="draft.step"
+              theme="column"
+              class="sheetcraft-input-number--persistent-controls"
+              :aria-label="t('dataTools.fill.step')"
+            />
+          </TFormItem>
+        </div>
       </TForm>
       <p v-if="error" class="fill-number-dialog__error" role="alert">
         {{ error }}
@@ -96,6 +101,25 @@ function apply(): void {
 
 .fill-number-dialog {
   @include fill-dialog.surface;
+
+  &__form {
+    display: grid;
+    gap: 10px;
+  }
+
+  &__card {
+    width: 100%;
+    padding: 9px 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    min-width: 0;
+  }
 
   &__error {
     @include fill-dialog.auxiliary-text;

@@ -13,7 +13,7 @@ const props = withDefaults(
   { error: "" },
 );
 const emit = defineEmits<{ close: []; apply: [draft: FillTextDraft] }>();
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 const draft = ref<FillTextDraft>({ ...props.initial });
 const canApply = computed(() => Boolean(draft.value.text));
 watch(
@@ -35,7 +35,8 @@ watch(
     v-if="visible"
     :visible="visible"
     :header="t('dataTools.fill.insertTextTitle')"
-    width="min(480px, calc(100vw - 32px))"
+    width="min(440px, calc(100vw - 32px))"
+    placement="center"
     :confirm-btn="{ content: t('dataTools.fill.apply'), disabled: !canApply }"
     :cancel-btn="t('dataTools.fill.cancel')"
     :close-on-overlay-click="false"
@@ -48,27 +49,31 @@ watch(
         <Info :size="14" aria-hidden="true" />
         <span>{{ t("dataTools.fill.textHint") }}</span>
       </p>
-      <TForm :data="draft" label-align="right" :label-width="locale === 'zh-CN' ? 96 : 136">
+      <TForm class="fill-text-dialog__form sheetcraft-form-grid" :data="draft" label-align="top">
         <TFormItem name="text" :label="t('dataTools.fill.text')">
           <TInput v-model="draft.text" :aria-label="t('dataTools.fill.text')" autofocus />
         </TFormItem>
         <TFormItem name="position" :label="t('dataTools.fill.insertPosition')">
-          <TRadioGroup
-            v-model="draft.position"
-            direction="vertical"
-            :aria-label="t('dataTools.fill.insertPosition')"
-          >
-            <TRadio value="start">{{ t("dataTools.fill.insertAtStart") }}</TRadio>
-            <TRadio value="end">{{ t("dataTools.fill.insertAtEnd") }}</TRadio>
-            <TRadio value="index">{{ t("dataTools.fill.insertAtIndex") }}</TRadio>
-          </TRadioGroup>
-        </TFormItem>
-        <template v-if="draft.position === 'index'">
-          <TFormItem name="from" :label="t('dataTools.fill.countDirection')">
-            <TRadioGroup v-model="draft.from" :aria-label="t('dataTools.fill.countDirection')">
-              <TRadio value="left">{{ t("dataTools.fill.fromLeft") }}</TRadio>
-              <TRadio value="right">{{ t("dataTools.fill.fromRight") }}</TRadio>
+          <div class="fill-text-dialog__card">
+            <TRadioGroup
+              v-model="draft.position"
+              direction="vertical"
+              :aria-label="t('dataTools.fill.insertPosition')"
+            >
+              <TRadio value="start">{{ t("dataTools.fill.insertAtStart") }}</TRadio>
+              <TRadio value="end">{{ t("dataTools.fill.insertAtEnd") }}</TRadio>
+              <TRadio value="index">{{ t("dataTools.fill.insertAtIndex") }}</TRadio>
             </TRadioGroup>
+          </div>
+        </TFormItem>
+        <div v-if="draft.position === 'index'" class="fill-text-dialog__row">
+          <TFormItem name="from" :label="t('dataTools.fill.countDirection')">
+            <div class="fill-text-dialog__card">
+              <TRadioGroup v-model="draft.from" :aria-label="t('dataTools.fill.countDirection')">
+                <TRadio value="left">{{ t("dataTools.fill.fromLeft") }}</TRadio>
+                <TRadio value="right">{{ t("dataTools.fill.fromRight") }}</TRadio>
+              </TRadioGroup>
+            </div>
           </TFormItem>
           <TFormItem name="index" :label="t('dataTools.fill.index')">
             <TInputNumber
@@ -80,7 +85,7 @@ watch(
               :aria-label="t('dataTools.fill.index')"
             />
           </TFormItem>
-        </template>
+        </div>
       </TForm>
       <p v-if="error" class="fill-text-dialog__error" role="alert">{{ error }}</p>
     </div>
@@ -91,7 +96,26 @@ watch(
 
 .fill-text-dialog {
   display: grid;
-  gap: var(--sheetcraft-space-5);
+  gap: 10px;
+
+  &__form {
+    display: grid;
+    gap: 10px;
+  }
+
+  &__card {
+    width: 100%;
+    padding: 9px 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 128px;
+    gap: 12px;
+    min-width: 0;
+  }
 
   &__hint,
   &__error {

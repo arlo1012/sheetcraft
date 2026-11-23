@@ -37,7 +37,7 @@ const emit = defineEmits<{
   draftChange: [draft: LookupFillDraft];
   pickRange: [field: "sourceRange" | "targetRange"];
 }>();
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 const step = ref<Step>("ranges");
 const fieldDefaultsApplied = ref(false);
 const copy = (value: LookupFillDraft): LookupFillDraft => ({
@@ -215,6 +215,7 @@ watch(
     :visible="visible && !picking"
     :header="t('dataTools.lookupFill.title')"
     :width="step === 'fields' ? 'min(860px, calc(100vw - 32px))' : 'min(640px, calc(100vw - 32px))'"
+    placement="center"
     :close-btn="!busy"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
@@ -232,9 +233,9 @@ watch(
       /></TSteps>
       <TForm
         v-if="step === 'ranges'"
+        class="lookup-fill-dialog__ranges sheetcraft-form-grid"
         :data="draft"
-        label-align="right"
-        :label-width="locale === 'zh-CN' ? 88 : 116"
+        label-align="top"
       >
         <TFormItem name="sourceRange" :label="t('dataTools.lookupFill.sourceRange')"
           ><RangeReferenceInput
@@ -260,11 +261,9 @@ watch(
               }
             "
         /></TFormItem>
-        <TFormItem
-          ><TCheckbox v-model="draft.hasHeader" :disabled="busy">{{
-            t("dataTools.lookupFill.hasHeader")
-          }}</TCheckbox></TFormItem
-        >
+        <TCheckbox v-model="draft.hasHeader" :disabled="busy">{{
+          t("dataTools.lookupFill.hasHeader")
+        }}</TCheckbox>
         <p
           v-if="!rangesReady && (draft.sourceRange || draft.targetRange)"
           class="lookup-fill-dialog__notice"
@@ -426,6 +425,10 @@ watch(
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+.lookup-fill-dialog__ranges {
+  display: grid;
+  gap: 10px;
 }
 .lookup-fill-dialog__match-mode {
   display: flex;

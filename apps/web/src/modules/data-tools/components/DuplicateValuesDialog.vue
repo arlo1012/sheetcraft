@@ -26,7 +26,7 @@ const emit = defineEmits<{
   pickRange: [];
   draftChange: [draft: DuplicateToolDraft];
 }>();
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 const draft = ref<DuplicateToolDraft>({ ...props.initial });
 const colors = [
   { value: "#ffc7ce", label: "lightRed" },
@@ -62,7 +62,8 @@ watch(
     role="dialog"
     aria-modal="true"
     :aria-label="title"
-    width="min(440px, calc(100vw - 32px))"
+    width="min(420px, calc(100vw - 32px))"
+    placement="center"
     :visible="visible && !picking"
     :header="title"
     :confirm-btn="{
@@ -77,7 +78,11 @@ watch(
     @confirm="!busy && canApply && emit('apply', { ...draft })"
   >
     <div class="duplicate-values-dialog">
-      <TForm :data="draft" label-align="right" :label-width="locale === 'zh-CN' ? 88 : 104">
+      <TForm
+        class="duplicate-values-dialog__form sheetcraft-form-grid"
+        :data="draft"
+        label-align="top"
+      >
         <TFormItem name="range" :label="t('dataTools.duplicates.range')">
           <TInput
             v-model="draft.range"
@@ -95,32 +100,34 @@ watch(
             /></template>
           </TInput>
         </TFormItem>
-        <TFormItem v-if="mode === 'count'">
+        <div v-if="mode === 'count'" class="duplicate-values-dialog__card">
           <TCheckbox :checked="false" disabled>
             {{ t("dataTools.duplicates.insertChartTodo") }}
           </TCheckbox>
-        </TFormItem>
+        </div>
         <TFormItem
           v-if="mode === 'highlight'"
           name="fillColor"
           :label="t('dataTools.duplicates.fillColor')"
         >
-          <TRadioGroup
-            v-model="draft.fillColor"
-            direction="horizontal"
-            :disabled="busy"
-            :aria-label="t('dataTools.duplicates.fillColor')"
-          >
-            <TRadio v-for="color in colors" :key="color.value" :value="color.value"
-              ><span class="duplicate-values-dialog__color-label"
-                ><span
-                  class="duplicate-values-dialog__swatch"
-                  :style="{ backgroundColor: color.value }"
-                  aria-hidden="true"
-                />{{ t(`dataTools.duplicates.colors.${color.label}`) }}</span
-              ></TRadio
+          <div class="duplicate-values-dialog__card">
+            <TRadioGroup
+              v-model="draft.fillColor"
+              direction="horizontal"
+              :disabled="busy"
+              :aria-label="t('dataTools.duplicates.fillColor')"
             >
-          </TRadioGroup>
+              <TRadio v-for="color in colors" :key="color.value" :value="color.value"
+                ><span class="duplicate-values-dialog__color-label"
+                  ><span
+                    class="duplicate-values-dialog__swatch"
+                    :style="{ backgroundColor: color.value }"
+                    aria-hidden="true"
+                  />{{ t(`dataTools.duplicates.colors.${color.label}`) }}</span
+                ></TRadio
+              >
+            </TRadioGroup>
+          </div>
         </TFormItem>
       </TForm>
       <p v-if="error" class="duplicate-values-dialog__error" role="alert">
@@ -132,7 +139,17 @@ watch(
 <style scoped lang="scss">
 .duplicate-values-dialog {
   display: grid;
-  gap: var(--sheetcraft-space-2);
+  gap: 10px;
+  &__form {
+    display: grid;
+    gap: 10px;
+  }
+  &__card {
+    width: 100%;
+    padding: 9px 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
+  }
   &__color-label {
     display: inline-flex;
     align-items: center;
