@@ -55,8 +55,8 @@ const { t } = useAppI18n();
       label-align="top"
       :prevent-submit-default="true"
     >
-      <fieldset class="sparkline-dialog__range">
-        <legend>{{ t("sparkline.selectData") }}</legend>
+      <section class="sparkline-dialog__range" :aria-label="t('sparkline.selectData')">
+        <h3 class="sparkline-dialog__legend">{{ t("sparkline.selectData") }}</h3>
         <FormItem :label="t('sparkline.source')">
           <div class="sparkline-dialog__reference">
             <RangeReferenceInput
@@ -68,9 +68,9 @@ const { t } = useAppI18n();
             />
           </div>
         </FormItem>
-      </fieldset>
-      <fieldset class="sparkline-dialog__range">
-        <legend>{{ t("sparkline.selectLocation") }}</legend>
+      </section>
+      <section class="sparkline-dialog__range" :aria-label="t('sparkline.selectLocation')">
+        <h3 class="sparkline-dialog__legend">{{ t("sparkline.selectLocation") }}</h3>
         <FormItem :label="t('sparkline.destination')">
           <div class="sparkline-dialog__reference">
             <RangeReferenceInput
@@ -82,7 +82,7 @@ const { t } = useAppI18n();
             />
           </div>
         </FormItem>
-      </fieldset>
+      </section>
       <template v-if="editing">
         <div class="sparkline-dialog__edit-row">
           <FormItem :label="t('sparkline.type')"
@@ -142,19 +142,21 @@ const { t } = useAppI18n();
   display: grid;
   gap: 10px;
   &__range {
+    display: grid;
+    gap: 6px;
     min-width: 0;
     margin: 0;
     padding: 10px 12px;
     border: 0;
     border-radius: var(--sheetcraft-radius-dialog-card);
     background: var(--sheetcraft-surface-dialog-card);
-    legend {
-      padding: 0;
-      margin-bottom: 6px;
-      font-weight: var(--sheetcraft-font-weight-semibold);
-      float: left;
-      width: 100%;
-    }
+  }
+  &__legend {
+    margin: 0;
+    font-size: var(--sheetcraft-font-size-body-medium);
+    line-height: var(--sheetcraft-line-height-body-medium);
+    font-weight: var(--sheetcraft-font-weight-semibold);
+    color: var(--sheetcraft-text-primary);
   }
   &__edit-row {
     display: grid;

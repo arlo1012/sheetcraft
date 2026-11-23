@@ -103,6 +103,7 @@ function save(): void {
           ><TInput
             v-model="password"
             type="password"
+            :placeholder="t('review.optionalPasswordPlaceholder')"
             :disabled="clearPassword"
             :maxlength="255"
             autocomplete="new-password"

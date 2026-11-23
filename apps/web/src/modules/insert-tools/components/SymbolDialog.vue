@@ -16,6 +16,7 @@ import type {
   TableRowData,
 } from "tdesign-vue-next/es/table/type";
 import OptionList from "../../../shared/option-list/OptionList.vue";
+import FormatSection from "../../../shared/format-pane/FormatSection.vue";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import SymbolCharacterGrid from "./SymbolCharacterGrid.vue";
@@ -636,6 +637,22 @@ function onCustomListKey(event: KeyboardEvent): void {
     void insert();
   }
 }
+const extensionsWrap = ref<HTMLElement>();
+const extensionsOpen = ref(false);
+watch(
+  fontRestoreError,
+  (error) => {
+    if (error) extensionsOpen.value = true;
+  },
+  { immediate: true },
+);
+watch(extensionsOpen, (open) => {
+  if (open) {
+    void nextTick(() => {
+      extensionsWrap.value?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+    });
+  }
+});
 </script>
 <template>
   <Dialog
@@ -974,63 +991,67 @@ function onCustomListKey(event: KeyboardEvent): void {
             >{{ t(alreadyCustom ? "symbolTools.added" : "symbolTools.addCustom") }}</Button
           >
         </div>
-        <details class="symbol-dialog__extensions" :open="!!fontRestoreError">
-          <summary>{{ t("symbolTools.options") }}</summary>
-          <div class="symbol-dialog__extension-content">
-            <SymbolFontSourceControls
-              v-show="tab === 'symbols'"
-              :loading="loading"
-              :default-font-family="defaultFontFamily"
-              :restore-error="fontRestoreError"
-              @register="registerLocalFont"
-            />
-            <div v-if="catalog && !allUnicode && font" class="symbol-dialog__hint">
-              {{
-                t(font.source === "local" ? "symbolTools.localCoverage" : "symbolTools.coverage", {
-                  count: points.length,
-                  version: catalog.version,
-                })
-              }}
-            </div>
-            <div class="symbol-dialog__preview" :aria-label="t('symbolTools.preview')">
-              <span
-                class="symbol-dialog__preview-glyph"
-                :style="{ fontFamily: previewFontFamily }"
-                >{{ current ? (/^\s+$/u.test(current.text) ? "␣" : current.text) : "—" }}</span
-              >
-              <div>
-                <strong>{{ current ? currentCode : t("symbolTools.noSelection") }}</strong
-                ><span>{{ currentName }}</span
-                ><span v-if="currentAliases">{{ currentAliases }}</span
-                ><span v-if="currentMetadata">{{ currentMetadata }}</span
-                ><span>{{
-                  current?.fontFamily
-                    ? (localFontLabels[current.fontFamily] ?? current.fontFamily)
-                    : t("symbolTools.inherited")
-                }}</span>
+        <div ref="extensionsWrap" class="symbol-dialog__extensions">
+          <FormatSection v-model:open="extensionsOpen" :title="t('symbolTools.options')">
+            <div class="symbol-dialog__extension-content">
+              <SymbolFontSourceControls
+                v-show="tab === 'symbols'"
+                :loading="loading"
+                :default-font-family="defaultFontFamily"
+                :restore-error="fontRestoreError"
+                @register="registerLocalFont"
+              />
+              <div v-if="catalog && !allUnicode && font" class="symbol-dialog__hint">
+                {{
+                  t(
+                    font.source === "local" ? "symbolTools.localCoverage" : "symbolTools.coverage",
+                    {
+                      count: points.length,
+                      version: catalog.version,
+                    },
+                  )
+                }}
               </div>
+              <div class="symbol-dialog__preview" :aria-label="t('symbolTools.preview')">
+                <span
+                  class="symbol-dialog__preview-glyph"
+                  :style="{ fontFamily: previewFontFamily }"
+                  >{{ current ? (/^\s+$/u.test(current.text) ? "␣" : current.text) : "—" }}</span
+                >
+                <div>
+                  <strong>{{ current ? currentCode : t("symbolTools.noSelection") }}</strong
+                  ><span>{{ currentName }}</span
+                  ><span v-if="currentAliases">{{ currentAliases }}</span
+                  ><span v-if="currentMetadata">{{ currentMetadata }}</span
+                  ><span>{{
+                    current?.fontFamily
+                      ? (localFontLabels[current.fontFamily] ?? current.fontFamily)
+                      : t("symbolTools.inherited")
+                  }}</span>
+                </div>
+              </div>
+              <div v-show="tab === 'symbols'">
+                <FormItem
+                  class="symbol-dialog__literal symbol-dialog__field"
+                  :label="t('symbolTools.literal')"
+                  ><Input
+                    v-native-control="{ attributes: { 'aria-label': t('symbolTools.literal') } }"
+                    v-model="literal"
+                    :maxlength="16"
+                    :placeholder="t('symbolTools.literalHint')"
+                    @change="
+                      literalActive = true;
+                      selectionOverride = undefined;
+                    "
+                    @enter="insert"
+                /></FormItem>
+              </div>
+              <p v-if="tab === 'special'" class="symbol-dialog__hint">
+                {{ t("symbolTools.specialNote") }}
+              </p>
             </div>
-            <div v-show="tab === 'symbols'">
-              <FormItem
-                class="symbol-dialog__literal symbol-dialog__field"
-                :label="t('symbolTools.literal')"
-                ><Input
-                  v-native-control="{ attributes: { 'aria-label': t('symbolTools.literal') } }"
-                  v-model="literal"
-                  :maxlength="16"
-                  :placeholder="t('symbolTools.literalHint')"
-                  @change="
-                    literalActive = true;
-                    selectionOverride = undefined;
-                  "
-                  @enter="insert"
-              /></FormItem>
-            </div>
-            <p v-if="tab === 'special'" class="symbol-dialog__hint">
-              {{ t("symbolTools.specialNote") }}
-            </p>
-          </div>
-        </details>
+          </FormatSection>
+        </div>
       </div>
     </Form>
   </Dialog>
@@ -1218,23 +1239,14 @@ function onCustomListKey(event: KeyboardEvent): void {
   &__extensions {
     flex: 0 0 auto;
     min-width: 0;
-    border-top: 1px solid var(--sheetcraft-border-subtle);
-    > summary {
-      padding-block: 3px;
-      color: var(--sheetcraft-text-secondary);
-      cursor: pointer;
-      font-size: var(--sheetcraft-font-size-body-small);
-      line-height: var(--sheetcraft-line-height-body-small);
-    }
-    &[open] {
-      max-height: 220px;
-      overflow: auto;
-    }
+    border-top: 1px solid var(--sheetcraft-border-divider);
   }
   &__extension-content {
     display: grid;
     gap: 8px;
-    padding-block: 6px;
+    padding: 10px 12px;
+    border-radius: var(--sheetcraft-radius-dialog-card);
+    background: var(--sheetcraft-surface-dialog-card);
   }
   &__page-actions {
     flex: none;

@@ -5,6 +5,7 @@ import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import OptionList from "../../../shared/option-list/OptionList.vue";
+import FormatSection from "../../../shared/format-pane/FormatSection.vue";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { ConsolidateDraft, ConsolidatePreview } from "../consolidate-types";
@@ -217,32 +218,33 @@ watch(
         <TCheckbox v-model="draft.overwrite" :disabled="busy">{{
           t("dataTools.consolidate.overwrite")
         }}</TCheckbox>
-        <details v-if="preview" class="consolidate-dialog__preview">
-          <summary>
-            {{
-              t("dataTools.consolidate.preview", { rows: preview.rows, columns: preview.columns })
-            }}
-          </summary>
-          <p>
-            {{
-              t("dataTools.consolidate.previewCounts", {
-                sourceCells: preview.sourceCells,
-                outputCells: preview.outputCells,
-                numericValues: preview.numericValues,
-              })
-            }}
-          </p>
-          <div class="consolidate-dialog__sample">
-            <div
-              v-for="(row, rowIndex) in preview.sample"
-              :key="rowIndex"
-              class="consolidate-dialog__sample-row"
-              :style="{ gridTemplateColumns: `repeat(${row.length}, minmax(0, 1fr))` }"
-            >
-              <span v-for="(value, columnIndex) in row" :key="columnIndex">{{ value }}</span>
+        <div v-if="preview" class="consolidate-dialog__preview">
+          <FormatSection
+            :title="
+              t('dataTools.consolidate.preview', { rows: preview.rows, columns: preview.columns })
+            "
+          >
+            <p>
+              {{
+                t("dataTools.consolidate.previewCounts", {
+                  sourceCells: preview.sourceCells,
+                  outputCells: preview.outputCells,
+                  numericValues: preview.numericValues,
+                })
+              }}
+            </p>
+            <div class="consolidate-dialog__sample">
+              <div
+                v-for="(row, rowIndex) in preview.sample"
+                :key="rowIndex"
+                class="consolidate-dialog__sample-row"
+                :style="{ gridTemplateColumns: `repeat(${row.length}, minmax(0, 1fr))` }"
+              >
+                <span v-for="(value, columnIndex) in row" :key="columnIndex">{{ value }}</span>
+              </div>
             </div>
-          </div>
-        </details>
+          </FormatSection>
+        </div>
       </div>
     </div>
     <template #footer>
@@ -318,11 +320,8 @@ watch(
   }
   &__preview {
     color: var(--sheetcraft-text-secondary);
-    summary {
-      cursor: pointer;
-    }
     p {
-      margin: var(--sheetcraft-space-1) 0;
+      margin: 0;
     }
   }
   &__sample {

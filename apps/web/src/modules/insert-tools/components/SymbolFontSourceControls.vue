@@ -183,6 +183,7 @@ async function restoreLocalFonts(): Promise<void> {
       <div v-if="systemChoices.length" class="symbol-dialog__font-source-actions">
         <Select
           v-model="systemChoice"
+          class="symbol-dialog__font-source-select"
           :options="systemFontOptions"
           filterable
           :placeholder="t('symbolTools.chooseLocalFont')"
@@ -227,17 +228,17 @@ async function restoreLocalFonts(): Promise<void> {
     flex-wrap: wrap;
     gap: 8px;
     align-items: center;
-    > :first-child:not(button) {
-      flex: 1 1 240px;
-      min-width: 0;
-    }
+  }
+  &__font-source-select {
+    flex: 1 1 240px;
+    min-width: 0;
   }
   &__font-sources {
     display: grid;
     gap: 8px;
     padding: 10px;
-    border: 1px solid var(--sheetcraft-border-subtle);
-    border-radius: 4px;
+    border-radius: var(--sheetcraft-radius-floating-item);
+    background: var(--sheetcraft-surface-panel);
   }
   &__hint {
     color: var(--sheetcraft-text-secondary);

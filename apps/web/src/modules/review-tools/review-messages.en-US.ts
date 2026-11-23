@@ -41,7 +41,8 @@ export const reviewEnUS = {
     encryptDocument: "Encrypt document",
 
     password: "Password",
-    optionalPassword: "Password (optional)",
+    optionalPassword: "Password",
+    optionalPasswordPlaceholder: "Optional",
     confirmPassword: "Confirm password",
     passwordMismatch: "The passwords do not match.",
     incorrectPassword: "Incorrect password. Try again.",

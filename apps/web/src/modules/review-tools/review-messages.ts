@@ -37,6 +37,7 @@ export type ReviewMessageSchema = {
 
     password: string;
     optionalPassword: string;
+    optionalPasswordPlaceholder: string;
     confirmPassword: string;
     passwordMismatch: string;
     incorrectPassword: string;

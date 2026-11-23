@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Input } from "tdesign-vue-next/es/input";
@@ -149,15 +151,12 @@ function confirm() {
     width="min(540px, calc(100vw - 32px))"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
-    :confirm-btn="{ content: t('picture.confirm'), disabled: disabled || Boolean(localError) }"
-    :cancel-btn="t('picture.cancel')"
-    @confirm="confirm"
     @close="emit('close')"
   >
     <Form
       class="form-control-editor sheetcraft-form-grid"
       label-align="left"
-      :label-width="locale === 'zh-CN' ? 88 : 132"
+      :label-width="locale === 'zh-CN' ? 96 : 140"
       :data="draft"
       :prevent-submit-default="true"
     >
@@ -189,6 +188,7 @@ function confirm() {
           <RangeReferenceInput
             v-model="linked"
             :label="t('control.linked')"
+            :placeholder="t('control.linkedPlaceholder')"
             :select-reference="(current) => selectReference(current, true)"
           />
         </div>
@@ -199,12 +199,14 @@ function confirm() {
             <RangeReferenceInput
               v-model="source"
               :label="t('control.source')"
+              :placeholder="t('control.sourcePlaceholder')"
               :select-reference="selectReference"
             /></div
         ></FormItem>
         <FormItem :label="t('control.items')"
           ><Textarea
             v-model="items"
+            :placeholder="t('control.itemsPlaceholder')"
             :autosize="{ minRows: 3, maxRows: 6 }"
             v-native-control="{ attributes: { 'aria-label': t('control.items') } }"
         /></FormItem>
@@ -277,8 +279,23 @@ function confirm() {
         <p v-else>{{ t("control.emptyValueHint") }}</p>
       </template>
       <p>{{ t("control.hint") }}</p>
-      <p v-if="localError || error" role="alert">{{ localError || t("control.invalid") }}</p>
     </Form>
+    <template #footer>
+      <div class="sheetcraft-dialog-footer">
+        <TAlert
+          v-if="localError || error"
+          theme="error"
+          :message="localError || t('control.invalid')"
+          role="alert"
+        />
+        <div class="sheetcraft-dialog-footer__actions">
+          <TButton theme="default" @click="emit('close')">{{ t("picture.cancel") }}</TButton>
+          <TButton theme="primary" :disabled="disabled || Boolean(localError)" @click="confirm">{{
+            t("picture.confirm")
+          }}</TButton>
+        </div>
+      </div>
+    </template>
   </Dialog>
 </template>
 <style scoped lang="scss">
@@ -293,9 +310,6 @@ function confirm() {
   p {
     margin: 0;
     color: var(--sheetcraft-text-secondary);
-  }
-  [role="alert"] {
-    color: var(--sheetcraft-status-error);
   }
 }
 </style>

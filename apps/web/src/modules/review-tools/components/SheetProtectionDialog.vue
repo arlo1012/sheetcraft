@@ -96,6 +96,7 @@ function save(): void {
               },
             }"
             type="password"
+            :placeholder="protected ? undefined : t('review.optionalPasswordPlaceholder')"
             autocomplete="new-password"
             :maxlength="255"
           />

@@ -40,7 +40,8 @@ export const reviewZhCN = {
     encryptDocument: "文档加密",
 
     password: "密码",
-    optionalPassword: "密码（可选）",
+    optionalPassword: "密码",
+    optionalPasswordPlaceholder: "可选，留空则不设密码",
     confirmPassword: "确认密码",
     passwordMismatch: "两次输入的密码不一致。",
     incorrectPassword: "密码不正确，请重试。",
