@@ -362,7 +362,7 @@ watch(
       <TForm
         class="sheetcraft-form-grid"
         layout="vertical"
-        label-align="right"
+        label-align="left"
         :label-width="locale === 'zh-CN' ? 64 : 80"
       >
         <TFormItem :label="t('formulaTools.reference')">

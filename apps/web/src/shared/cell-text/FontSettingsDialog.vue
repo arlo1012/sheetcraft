@@ -7,7 +7,7 @@ import { useAppI18n } from "../i18n";
 import { localFontAccess } from "./local-fonts";
 import { fontSettingsVisible } from "./font-settings";
 
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 const { availability, loading, status, families, load } = localFontAccess;
 const message = computed(() => {
   if (availability.value === "insecure") return t("format.localFontsInsecure");
@@ -26,10 +26,11 @@ const message = computed(() => {
     v-if="fontSettingsVisible"
     v-model:visible="fontSettingsVisible"
     :header="t('format.fontSettings')"
-    width="min(480px, calc(100vw - 32px))"
+    width="min(440px, calc(100vw - 32px))"
+    placement="center"
     :footer="false"
   >
-    <TForm label-align="right" :label-width="locale === 'zh-CN' ? 88 : 112">
+    <TForm class="sheetcraft-form-grid" label-align="top">
       <TFormItem :label="t('format.localFonts')">
         <div class="font-settings" data-local-font-access>
           <TButton
@@ -55,10 +56,17 @@ const message = computed(() => {
   display: grid;
   justify-items: start;
   gap: 8px;
+  width: 100%;
   min-width: 0;
+  padding: 12px;
+  border-radius: var(--sheetcraft-radius-dialog-card);
+  background: var(--sheetcraft-surface-dialog-card);
+
   p {
     margin: 0;
     color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
   }
 }
 </style>

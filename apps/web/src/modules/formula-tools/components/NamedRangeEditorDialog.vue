@@ -29,7 +29,7 @@ const emit = defineEmits<{
   close: [];
   save: [draft: NamedRangeDraft];
 }>();
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 const contentRef = ref<HTMLElement | null>(null);
 const workbookScopeValue = "__sheetcraft_workbook_scope__";
 const scopePopupProps = { attach: () => contentRef.value ?? document.body };
@@ -106,32 +106,33 @@ watch(() => props.initialDraft, resetDraft, { deep: true, immediate: true });
       :data-cell-edit-session="editSessionId"
     >
       <TForm
-        class="named-range-editor-dialog__form"
+        class="named-range-editor-dialog__form sheetcraft-form-grid"
         layout="vertical"
-        label-align="right"
-        :label-width="locale === 'zh-CN' ? 64 : 80"
+        label-align="top"
         @submit="save"
       >
-        <TFormItem :label="t('formulaTools.name')">
-          <TInput
-            v-model="draft.name"
-            :aria-label="t('formulaTools.name')"
-            :status="nameError ? 'error' : 'default'"
-            :tips="nameError"
-            :aria-invalid="Boolean(nameError)"
-            data-formula-name
-            autocomplete="off"
-          />
-        </TFormItem>
-        <TFormItem :label="t('formulaTools.scope')">
-          <TSelect
-            v-model="scopeSelectValue"
-            :options="scopeOptions"
-            :popup-props="scopePopupProps"
-            :aria-label="t('formulaTools.scope')"
-            :disabled="isEditing"
-          />
-        </TFormItem>
+        <div class="named-range-editor-dialog__row">
+          <TFormItem :label="t('formulaTools.name')">
+            <TInput
+              v-model="draft.name"
+              :aria-label="t('formulaTools.name')"
+              :status="nameError ? 'error' : 'default'"
+              :tips="nameError"
+              :aria-invalid="Boolean(nameError)"
+              data-formula-name
+              autocomplete="off"
+            />
+          </TFormItem>
+          <TFormItem :label="t('formulaTools.scope')">
+            <TSelect
+              v-model="scopeSelectValue"
+              :options="scopeOptions"
+              :popup-props="scopePopupProps"
+              :aria-label="t('formulaTools.scope')"
+              :disabled="isEditing"
+            />
+          </TFormItem>
+        </div>
         <TFormItem :label="t('formulaTools.reference')">
           <div class="named-range-editor-dialog__reference">
             <RangeReferenceInput
@@ -157,6 +158,18 @@ watch(() => props.initialDraft, resetDraft, { deep: true, immediate: true });
 <style scoped lang="scss">
 .named-range-editor-dialog {
   &__content {
+    min-width: 0;
+  }
+
+  &__form {
+    display: grid;
+    gap: 12px;
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    gap: 12px;
     min-width: 0;
   }
 

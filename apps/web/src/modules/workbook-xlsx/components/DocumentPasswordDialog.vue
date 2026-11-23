@@ -7,7 +7,7 @@ import { useAppI18n } from "../../../shared/i18n";
 import { vNativeControl } from "../../../shared/tdesign/native-control";
 const props = defineProps<{ mode: "encrypt" | "decrypt"; busy: boolean; incorrect?: boolean }>();
 const emit = defineEmits<{ close: []; submit: [password: string] }>();
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 const passwordInputId = `document-password-${useId()}`;
 const confirmInputId = `document-password-confirm-${useId()}`;
 const password = ref(""),
@@ -38,49 +38,72 @@ function submit() {
     :close-btn="!busy"
     :close-on-esc-keydown="!busy"
     :close-on-overlay-click="false"
-    width="460px"
+    width="min(400px, calc(100vw - 32px))"
+    placement="center"
     @confirm="submit"
     @close="!busy && emit('close')"
   >
-    <TForm
-      label-align="right"
-      :label-width="locale === 'zh-CN' ? 96 : 144"
-      @submit.prevent="submit"
-    >
-      <TFormItem :for="passwordInputId" :label="t('review.password')"
-        ><TInput
-          v-model="password"
-          v-native-control="{
-            attributes: {
-              id: passwordInputId,
-              name: passwordInputId,
-              'aria-label': t('review.password'),
-            },
-          }"
-          type="password"
-          :disabled="busy"
-          :maxlength="255"
-          :autocomplete="mode === 'encrypt' ? 'new-password' : 'current-password'"
-      /></TFormItem>
-      <TFormItem
-        v-if="mode === 'encrypt'"
-        :for="confirmInputId"
-        :label="t('review.confirmPassword')"
-        ><TInput
-          v-model="confirmation"
-          v-native-control="{
-            attributes: {
-              id: confirmInputId,
-              name: confirmInputId,
-              'aria-label': t('review.confirmPassword'),
-            },
-          }"
-          type="password"
-          :disabled="busy"
-          :maxlength="255"
-          autocomplete="new-password"
-      /></TFormItem>
-    </TForm>
-    <p v-if="error || incorrect" role="alert">{{ error || t("review.incorrectPassword") }}</p>
+    <div class="document-password">
+      <TForm
+        class="document-password__form sheetcraft-form-grid"
+        label-align="top"
+        @submit.prevent="submit"
+      >
+        <TFormItem :for="passwordInputId" :label="t('review.password')"
+          ><TInput
+            v-model="password"
+            v-native-control="{
+              attributes: {
+                id: passwordInputId,
+                name: passwordInputId,
+                'aria-label': t('review.password'),
+              },
+            }"
+            type="password"
+            :disabled="busy"
+            :maxlength="255"
+            :autocomplete="mode === 'encrypt' ? 'new-password' : 'current-password'"
+        /></TFormItem>
+        <TFormItem
+          v-if="mode === 'encrypt'"
+          :for="confirmInputId"
+          :label="t('review.confirmPassword')"
+          ><TInput
+            v-model="confirmation"
+            v-native-control="{
+              attributes: {
+                id: confirmInputId,
+                name: confirmInputId,
+                'aria-label': t('review.confirmPassword'),
+              },
+            }"
+            type="password"
+            :disabled="busy"
+            :maxlength="255"
+            autocomplete="new-password"
+        /></TFormItem>
+      </TForm>
+      <p v-if="error || incorrect" class="document-password__error" role="alert">
+        {{ error || t("review.incorrectPassword") }}
+      </p>
+    </div>
   </TDialog>
 </template>
+<style scoped lang="scss">
+.document-password {
+  display: grid;
+  gap: 10px;
+
+  &__form {
+    display: grid;
+    gap: 10px;
+  }
+
+  &__error {
+    margin: 0;
+    color: var(--sheetcraft-status-error);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
+  }
+}
+</style>

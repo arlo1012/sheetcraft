@@ -18,7 +18,7 @@ const props = defineProps<{
   editing: boolean;
 }>();
 const emit = defineEmits<{ close: []; save: [range: EditableRange] }>();
-const { t, locale } = useAppI18n();
+const { t } = useAppI18n();
 const name = ref(""),
   reference = ref(""),
   password = ref(""),
@@ -80,50 +80,79 @@ function save(): void {
     :confirm-btn="t('review.save')"
     :cancel-btn="t('review.cancel')"
     :close-on-overlay-click="false"
-    width="470px"
+    width="min(440px, calc(100vw - 32px))"
     placement="center"
     @confirm="save"
     @close="emit('close')"
   >
-    <TForm label-align="right" :label-width="locale === 'zh-CN' ? 96 : 144">
-      <TFormItem :label="t('review.rangeName')"
-        ><TInput v-model="name" :maxlength="255"
-      /></TFormItem>
-      <TFormItem :label="t('review.rangeReference')">
-        <div class="editable-range-editor__reference">
-          <RangeReferenceInput
-            v-model="reference"
-            :select-reference="selectReference"
-            :label="t('review.rangeReference')"
-          />
-        </div>
-      </TFormItem>
-      <TFormItem :label="t('review.optionalPassword')"
-        ><TInput
-          v-model="password"
-          type="password"
-          :disabled="clearPassword"
-          :maxlength="255"
-          autocomplete="new-password"
-      /></TFormItem>
-      <TFormItem v-if="password && !clearPassword" :label="t('review.confirmPassword')"
-        ><TInput
-          v-model="confirmation"
-          type="password"
-          :maxlength="255"
-          autocomplete="new-password"
-      /></TFormItem>
-      <TFormItem v-if="draft.password"
-        ><TCheckbox v-model="clearPassword">{{ t("review.removePassword") }}</TCheckbox></TFormItem
-      >
-    </TForm>
-    <p v-if="draft.password && !clearPassword">{{ t("review.keepPasswordHint") }}</p>
-    <p v-if="error" role="alert">{{ error }}</p>
+    <div class="editable-range-editor">
+      <TForm class="editable-range-editor__form sheetcraft-form-grid" label-align="top">
+        <TFormItem :label="t('review.rangeName')"
+          ><TInput v-model="name" :maxlength="255"
+        /></TFormItem>
+        <TFormItem :label="t('review.rangeReference')">
+          <div class="editable-range-editor__reference">
+            <RangeReferenceInput
+              v-model="reference"
+              :select-reference="selectReference"
+              :label="t('review.rangeReference')"
+            />
+          </div>
+        </TFormItem>
+        <TFormItem :label="t('review.optionalPassword')"
+          ><TInput
+            v-model="password"
+            type="password"
+            :disabled="clearPassword"
+            :maxlength="255"
+            autocomplete="new-password"
+        /></TFormItem>
+        <TFormItem v-if="password && !clearPassword" :label="t('review.confirmPassword')"
+          ><TInput
+            v-model="confirmation"
+            type="password"
+            :maxlength="255"
+            autocomplete="new-password"
+        /></TFormItem>
+        <TCheckbox v-if="draft.password" v-model="clearPassword">{{
+          t("review.removePassword")
+        }}</TCheckbox>
+      </TForm>
+      <p v-if="draft.password && !clearPassword" class="editable-range-editor__hint">
+        {{ t("review.keepPasswordHint") }}
+      </p>
+      <p v-if="error" class="editable-range-editor__error" role="alert">{{ error }}</p>
+    </div>
   </TDialog>
 </template>
 
 <style scoped lang="scss">
-.editable-range-editor__reference {
-  width: 100%;
+.editable-range-editor {
+  display: grid;
+  gap: 10px;
+
+  &__form {
+    display: grid;
+    gap: 10px;
+  }
+
+  &__reference {
+    width: 100%;
+  }
+
+  &__hint,
+  &__error {
+    margin: 0;
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
+  }
+
+  &__hint {
+    color: var(--sheetcraft-text-secondary);
+  }
+
+  &__error {
+    color: var(--sheetcraft-status-error);
+  }
 }
 </style>
