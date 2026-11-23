@@ -916,10 +916,14 @@ function patternPreview(preset: PicturePatternPreset) {
   &__source {
     margin: 0;
     color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
   }
   &__error {
     margin: 0;
-    color: var(--sheetcraft-text-primary);
+    color: var(--sheetcraft-status-error);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
   }
 }
 </style>

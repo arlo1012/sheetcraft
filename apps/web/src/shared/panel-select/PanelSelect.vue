@@ -11,10 +11,11 @@ const props = withDefaults(
     label: string;
     valueLabel: string;
     disabled?: boolean;
+    size?: "small" | "medium" | "large";
     panelWidth?: "trigger" | "content";
     panelClass?: string;
   }>(),
-  { disabled: false, panelWidth: "trigger" },
+  { disabled: false, size: "medium", panelWidth: "trigger" },
 );
 const emit = defineEmits<{ "open-change": [open: boolean] }>();
 defineSlots<{
@@ -216,6 +217,7 @@ watch(open, (visible) => {
     <TSelectInput
       :value="{ value: modelValue, label: valueLabel }"
       :disabled="disabled"
+      :size="size"
       :popup-visible="open"
       :popup-props="popupProps"
       :input-props="{ onKeydown: onTriggerKeydown, onEnter: onTriggerKeydown }"

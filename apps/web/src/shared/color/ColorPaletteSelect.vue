@@ -14,11 +14,19 @@ const props = withDefaults(
     transparentLabel?: string;
     mixed?: boolean;
     disabled?: boolean;
+    size?: "small" | "medium" | "large";
     showValue?: boolean;
     showDefault?: boolean;
     panelClass?: string;
   }>(),
-  { defaultColor: "#000000", mixed: false, disabled: false, showValue: false, showDefault: true },
+  {
+    defaultColor: "#000000",
+    mixed: false,
+    disabled: false,
+    size: "medium",
+    showValue: false,
+    showDefault: true,
+  },
 );
 const emit = defineEmits<{ select: [color: string | null, reference?: ThemeColorReference] }>();
 const { t } = useAppI18n();
@@ -49,10 +57,12 @@ function select(
 <template>
   <PanelSelect
     class="color-palette-select"
+    :class="{ 'color-palette-select--small': size === 'small' }"
     :model-value="modelValue"
     :label="label"
     :value-label="valueLabel"
     :disabled="disabled"
+    :size="size"
     panel-width="content"
     :panel-class="panelClass"
   >
@@ -99,6 +109,10 @@ function select(
     height: 16px;
     border-radius: var(--sheetcraft-radius-small);
     box-shadow: inset 0 0 0 1px rgb(0 0 0 / 12%);
+  }
+
+  &--small &__swatch {
+    height: 14px;
   }
 
   &__label {

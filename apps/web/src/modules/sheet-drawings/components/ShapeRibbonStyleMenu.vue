@@ -2,6 +2,7 @@
 import { computed, ref, useId, watch } from "vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
+import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import { provideNativePopupScope } from "../../../shared/floating/useNativePopupOwnership";
 import { useShapeTextFieldDraft } from "../shape-text-field-drafts";
 import { useMenu } from "../../../shared/menu/useMenu";
@@ -95,33 +96,38 @@ const styles = computed(() => props.controller.wordArtStyleBinding());
         :id="id"
         ref="surface"
         :label="label"
-        class="shape-ribbon-style-menu__panel"
+        :class="[
+          'shape-ribbon-style-menu__panel',
+          { 'shape-ribbon-style-menu__panel--gallery': category === 'styles' },
+        ]"
         :style="menu.floatingStyles.value"
         :data-shape-text-edit-session="sessionId"
         data-shape-ribbon-style-panel
       >
         <template #body>
-          <PicturePaintEditor
-            v-if="category === 'fill'"
-            v-bind="fill"
-            :load-asset="controller.assetLoader(target, 'fill')"
-          />
-          <PictureLineEditor
-            v-else-if="category === 'line'"
-            v-bind="line"
-            :load-asset="controller.assetLoader(target, 'line')"
-          />
-          <ShapeFormatEffects
-            v-else-if="category === 'effects'"
-            :controller="controller"
-            :target="target"
-            available-only
-          />
           <WordArtStyleGallery
-            v-else
+            v-if="category === 'styles'"
             v-bind="styles"
             @applied="menu.dismiss('programmatic', true)"
           />
+          <GallerySection v-else :title="label">
+            <div
+              class="shape-ribbon-style-menu__body"
+              :class="{ 'shape-ribbon-style-menu__body--effects': category === 'effects' }"
+            >
+              <PicturePaintEditor
+                v-if="category === 'fill'"
+                v-bind="fill"
+                :load-asset="controller.assetLoader(target, 'fill')"
+              />
+              <PictureLineEditor
+                v-else-if="category === 'line'"
+                v-bind="line"
+                :load-asset="controller.assetLoader(target, 'line')"
+              />
+              <ShapeFormatEffects v-else :controller="controller" :target="target" available-only />
+            </div>
+          </GallerySection>
         </template>
       </MenuSurface>
     </Teleport>
@@ -134,6 +140,20 @@ const styles = computed(() => props.controller.wordArtStyleBinding());
     width: 330px;
     max-height: min(540px, 75vh);
     z-index: var(--sheetcraft-layer-menu);
+
+    &--gallery {
+      width: 544px;
+      max-width: calc(100vw - var(--sheetcraft-space-4) * 2);
+    }
+  }
+  &__body {
+    padding: var(--sheetcraft-space-2) var(--sheetcraft-space-2) var(--sheetcraft-space-1);
+
+    &--effects {
+      --sheetcraft-gallery-header-inset: 0;
+
+      padding: 0 var(--sheetcraft-space-2) var(--sheetcraft-space-1);
+    }
   }
 }
 </style>

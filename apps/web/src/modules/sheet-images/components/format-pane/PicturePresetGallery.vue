@@ -130,12 +130,13 @@ function open(value: boolean) {
       :label="label ?? t('preset')"
       :value-label="selected ? itemLabel(selected) : (emptyLabel ?? t('effectCustom'))"
       :disabled="disabled"
+      size="small"
       panel-width="content"
       @open-change="open"
     >
       <template #value
         ><img
-          v-if="selected && preview(selected)"
+          v-if="selected && selected.labelKey !== 'effectNone' && preview(selected)"
           :src="preview(selected)"
           alt=""
           class="picture-preset-gallery__selected"
@@ -185,8 +186,8 @@ function open(value: boolean) {
 }
 .picture-preset-gallery__selected {
   flex: 0 0 auto;
-  max-width: 28px;
-  max-height: 20px;
+  max-width: 24px;
+  max-height: 16px;
   object-fit: contain;
 }
 </style>

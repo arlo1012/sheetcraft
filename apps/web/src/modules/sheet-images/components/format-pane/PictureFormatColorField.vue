@@ -18,6 +18,7 @@ const binding = computed(() => props.controller.choice(props.field));
         :label="controller.t(field)"
         :default-label="controller.t('automatic')"
         :disabled="binding.disabled"
+        size="small"
         :mixed="!binding.disabled && binding.value === undefined"
         :show-default="false"
         show-value

@@ -151,6 +151,7 @@ const sourceNote = computed(() => {
               :mixed="c.isMixedField('textColor')"
               :label="c.s.value('textColor')"
               :disabled="!c.fieldCapability('textColor').enabled"
+              size="small"
               @select="
                 (value) => {
                   if (textColor(value ?? '')) restore();

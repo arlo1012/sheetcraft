@@ -231,12 +231,12 @@ onBeforeUnmount(cancelSlide);
 <style scoped lang="scss">
 .picture-paint-number {
   display: grid;
-  gap: 3px;
+  gap: 6px;
   min-width: 0;
 
   &__slider {
     min-width: 0;
-    padding-inline: var(--sheetcraft-space-5);
+    padding: var(--sheetcraft-space-2) var(--sheetcraft-space-5) var(--sheetcraft-space-3);
   }
 }
 </style>

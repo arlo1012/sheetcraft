@@ -2,6 +2,7 @@
 import { computed, ref, useId, watch } from "vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
+import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import { provideNativePopupScope } from "../../../shared/floating/useNativePopupOwnership";
 import { useShapeTextFieldDraft } from "../shape-text-field-drafts";
 import { useMenu } from "../../../shared/menu/useMenu";
@@ -76,13 +77,17 @@ defineSlots<{ default: () => unknown }>();
         :data-shape-text-edit-session="sessionId"
       >
         <template #body>
-          <ShapeFormatChoiceField :controller="controller" field="textDirection" />
-          <ShapeFormatChoiceField :controller="controller" field="textVerticalAlignment" />
-          <ShapeFormatChoiceField
-            v-if="controller.props.snapshot?.values.textDirection === 'stacked'"
-            :controller="controller"
-            field="textLineOrder"
-          />
+          <GallerySection :title="label">
+            <div class="shape-ribbon-layout-menu__fields">
+              <ShapeFormatChoiceField :controller="controller" field="textDirection" />
+              <ShapeFormatChoiceField :controller="controller" field="textVerticalAlignment" />
+              <ShapeFormatChoiceField
+                v-if="controller.props.snapshot?.values.textDirection === 'stacked'"
+                :controller="controller"
+                field="textLineOrder"
+              />
+            </div>
+          </GallerySection>
         </template>
       </MenuSurface>
     </Teleport>
@@ -94,6 +99,11 @@ defineSlots<{ default: () => unknown }>();
   &__panel {
     width: 300px;
     z-index: var(--sheetcraft-layer-menu);
+  }
+  &__fields {
+    display: grid;
+    gap: 10px;
+    padding: var(--sheetcraft-space-2) var(--sheetcraft-space-2) var(--sheetcraft-space-1);
   }
 }
 </style>
