@@ -370,7 +370,7 @@ watch(
 .new-cell-style-dialog dt {
   color: var(--sheetcraft-text-secondary);
 }
-.new-cell-style-dialog dt :deep(.t-checkbox) {
+.new-cell-style-dialog dt > * {
   margin: 0;
 }
 .new-cell-style-dialog dd {

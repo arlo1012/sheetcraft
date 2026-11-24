@@ -28,7 +28,15 @@ describe("checkWebUi", () => {
       "apps/web/src/shared/floating/useFloatingPanel.ts":
         'import { computePosition } from "@floating-ui/dom";',
       "apps/web/src/shared/menu/MenuSurface.vue": '<div role="menu" />',
-      "apps/web/src/modules/example/Editor.vue": ".editor { z-index: 30; }",
+      "apps/web/src/shared/dialog/DialogFooter.vue":
+        '<template><div class="sheetcraft-dialog-footer" /></template>',
+      "apps/web/src/shared/styles/_tdesign.scss": ".t-dialog { border-radius: 16px; }",
+      "apps/web/src/shared/cell-text/FontFormatField.vue":
+        'import { filterFontFamilyOption } from "./font-catalog";',
+      "apps/web/src/shared/color/CustomColorInput.vue":
+        '<template><input type="color" /></template>',
+      "apps/web/src/modules/example/Editor.vue":
+        '<template><TInputNumber class="sheetcraft-input-number--persistent-controls" theme="column" /></template><style>.editor { z-index: 30; }</style>',
     });
 
     expect(checkWebUi(root)).toEqual([]);
@@ -114,5 +122,33 @@ describe("checkWebUi", () => {
     });
 
     expect(checkWebUi(root)).toEqual([]);
+  });
+
+  it("rejects raw disclosures, native color pickers, hand-written dialog footers, font filters, local TDesign overrides, and non-compliant InputNumber", () => {
+    const root = fixture({
+      "apps/web/src/modules/example/BadDialog.vue": `
+        <script setup lang="ts">
+        import { filterFontFamilyOption } from "../../shared/cell-text/font-catalog";
+        </script>
+        <template>
+          <details><summary>More</summary></details>
+          <input type="color" />
+          <TInputNumber theme="normal" />
+          <div class="sheetcraft-dialog-footer" />
+        </template>
+        <style scoped lang="scss">
+        // Comments mentioning .t-button are ignored
+        .example :deep(.t-button) { padding: 0; }
+        </style>`,
+    });
+
+    expect(checkWebUi(root).map((violation) => violation.rule)).toEqual([
+      "Use shared/dialog/DialogFooter instead of hand-writing .sheetcraft-dialog-footer markup or styles.",
+      "Use FontFormatField instead of wiring filterFontFamilyOption directly in feature code.",
+      "Keep TDesign (.t-*) overrides in apps/web/src/shared/styles/; do not style library internals locally.",
+      "Use FormatSection or TDesign Collapse for disclosures; raw <details> elements are disallowed.",
+      'Use ColorPaletteSelect or ColorPalette instead of raw <input type="color"> controls.',
+      'InputNumber must set theme="column" and class="sheetcraft-input-number--persistent-controls".',
+    ]);
   });
 });

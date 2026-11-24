@@ -67,6 +67,10 @@ function addViolation(
   });
 }
 
+function stripCssCommentsPreservingOffsets(css: string): string {
+  return css.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/gu, (match) => match.replace(/[^\n]/gu, " "));
+}
+
 function hasSharedFloatingOwnership(path: string): boolean {
   return toPosixPath(path).includes("/apps/web/src/shared/floating/");
 }
@@ -75,6 +79,25 @@ function hasSharedMenuOwnership(relativePath: string): boolean {
   return (
     relativePath.startsWith("apps/web/src/shared/menu/") || rawMenuExceptions.has(relativePath)
   );
+}
+
+function hasSharedStyleOwnership(relativePath: string): boolean {
+  return relativePath.startsWith("apps/web/src/shared/styles/");
+}
+
+function hasSharedDialogFooterOwnership(relativePath: string): boolean {
+  return (
+    relativePath === "apps/web/src/shared/dialog/DialogFooter.vue" ||
+    hasSharedStyleOwnership(relativePath)
+  );
+}
+
+function hasSharedColorOwnership(relativePath: string): boolean {
+  return relativePath.startsWith("apps/web/src/shared/color/");
+}
+
+function hasSharedCellTextOwnership(relativePath: string): boolean {
+  return relativePath.startsWith("apps/web/src/shared/cell-text/");
 }
 
 function staticSurfaceClasses(source: string): Map<string, number> {
@@ -147,6 +170,90 @@ function checkSurfaceStyles(
   }
 }
 
+function checkTDesignOverrides(
+  root: string,
+  file: string,
+  source: string,
+  relativePath: string,
+  violations: WebUiViolation[],
+): void {
+  if (hasSharedStyleOwnership(relativePath)) return;
+  const isVue = relativePath.endsWith(".vue");
+  const isStylesheet = relativePath.endsWith(".css") || relativePath.endsWith(".scss");
+  if (!isVue && !isStylesheet) return;
+
+  const ranges: Array<{ start: number; text: string }> = isVue
+    ? [...source.matchAll(/<style(?:\s[^>]*)?>([\s\S]*?)<\/style>/gu)].map((match) => {
+        const headerLength = match[0].indexOf(">") + 1;
+        return { start: (match.index ?? 0) + headerLength, text: match[1] };
+      })
+    : [{ start: 0, text: source }];
+
+  for (const range of ranges) {
+    const stripped = stripCssCommentsPreservingOffsets(range.text);
+    for (const match of stripped.matchAll(/\.t-[a-z][a-z0-9_-]*/gu)) {
+      addViolation(
+        violations,
+        root,
+        file,
+        source,
+        range.start + (match.index ?? 0),
+        "Keep TDesign (.t-*) overrides in apps/web/src/shared/styles/; do not style library internals locally.",
+      );
+    }
+  }
+}
+
+function checkVueTemplates(
+  root: string,
+  file: string,
+  source: string,
+  relativePath: string,
+  violations: WebUiViolation[],
+): void {
+  if (!relativePath.endsWith(".vue")) return;
+
+  for (const match of source.matchAll(/<details\b/gu)) {
+    addViolation(
+      violations,
+      root,
+      file,
+      source,
+      match.index ?? 0,
+      "Use FormatSection or TDesign Collapse for disclosures; raw <details> elements are disallowed.",
+    );
+  }
+
+  if (!hasSharedColorOwnership(relativePath)) {
+    for (const match of source.matchAll(/<input\b[^>]*\btype\s*=\s*(["'])color\1/gu)) {
+      addViolation(
+        violations,
+        root,
+        file,
+        source,
+        match.index ?? 0,
+        'Use ColorPaletteSelect or ColorPalette instead of raw <input type="color"> controls.',
+      );
+    }
+  }
+
+  for (const match of source.matchAll(/<T?InputNumber\b([\s\S]*?)>/gu)) {
+    const attrs = match[1];
+    const hasPersistent = attrs.includes("sheetcraft-input-number--persistent-controls");
+    const hasColumn = /\btheme\s*=\s*(["'])column\1/u.test(attrs);
+    if (!hasPersistent || !hasColumn) {
+      addViolation(
+        violations,
+        root,
+        file,
+        source,
+        match.index ?? 0,
+        'InputNumber must set theme="column" and class="sheetcraft-input-number--persistent-controls".',
+      );
+    }
+  }
+}
+
 function checkFile(root: string, file: string, violations: WebUiViolation[]): void {
   const source = readFileSync(file, "utf8");
   const relativePath = toPosixPath(relative(root, file));
@@ -179,7 +286,35 @@ function checkFile(root: string, file: string, violations: WebUiViolation[]): vo
     }
   }
 
+  if (!hasSharedDialogFooterOwnership(relativePath)) {
+    for (const match of source.matchAll(/\bsheetcraft-dialog-footer\b/gu)) {
+      addViolation(
+        violations,
+        root,
+        file,
+        source,
+        match.index ?? 0,
+        "Use shared/dialog/DialogFooter instead of hand-writing .sheetcraft-dialog-footer markup or styles.",
+      );
+    }
+  }
+
+  if (!hasSharedCellTextOwnership(relativePath)) {
+    for (const match of source.matchAll(/\bfilterFontFamilyOption\b/gu)) {
+      addViolation(
+        violations,
+        root,
+        file,
+        source,
+        match.index ?? 0,
+        "Use FontFormatField instead of wiring filterFontFamilyOption directly in feature code.",
+      );
+    }
+  }
+
   checkSurfaceStyles(root, file, source, relativePath, violations);
+  checkTDesignOverrides(root, file, source, relativePath, violations);
+  checkVueTemplates(root, file, source, relativePath, violations);
 
   const numericOverlayLayer = /\bz-index\s*:\s*(?:3[1-9]|[4-9]\d|[1-9]\d{2,})\b/gu;
   for (const match of source.matchAll(numericOverlayLayer)) {

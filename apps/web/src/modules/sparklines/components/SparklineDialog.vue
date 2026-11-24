@@ -6,6 +6,7 @@ import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Select } from "tdesign-vue-next/es/select";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { useAppI18n } from "../../../shared/i18n";
+import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import { vNativeControl } from "../../../shared/tdesign/native-control";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import type { SparklineDraft } from "../useSparklineActions";
@@ -108,20 +109,28 @@ const { t } = useAppI18n();
           /></FormItem>
         </div>
         <div class="sparkline-dialog__edit-row">
-          <FormItem :label="t('sparkline.color')"
-            ><input
-              name="sparkline-color"
-              v-model="draft.sparkline.color"
-              type="color"
-              :aria-label="t('sparkline.color')"
-          /></FormItem>
-          <FormItem :label="t('sparkline.negative')"
-            ><input
-              name="sparkline-negative-color"
-              v-model="draft.sparkline.negativeColor"
-              type="color"
-              :aria-label="t('sparkline.negative')"
-          /></FormItem>
+          <FormItem :label="t('sparkline.color')">
+            <ColorPaletteSelect
+              :model-value="draft.sparkline.color"
+              :label="t('sparkline.color')"
+              default-color="#2563eb"
+              size="small"
+              show-value
+              :disabled="disabled"
+              @select="draft.sparkline.color = $event ?? '#2563eb'"
+            />
+          </FormItem>
+          <FormItem :label="t('sparkline.negative')">
+            <ColorPaletteSelect
+              :model-value="draft.sparkline.negativeColor"
+              :label="t('sparkline.negative')"
+              default-color="#ef4444"
+              size="small"
+              show-value
+              :disabled="disabled"
+              @select="draft.sparkline.negativeColor = $event ?? '#ef4444'"
+            />
+          </FormItem>
         </div>
         <div class="sparkline-dialog__row">
           <Checkbox v-if="draft.sparkline.type === 'line'" v-model="draft.sparkline.markers">{{
@@ -179,12 +188,6 @@ const { t } = useAppI18n();
     padding: 9px 12px;
     border-radius: var(--sheetcraft-radius-dialog-card);
     background: var(--sheetcraft-surface-dialog-card);
-  }
-  input[type="color"] {
-    width: 34px;
-    height: 26px;
-    padding: 0;
-    border: 0;
   }
   p {
     margin: 0;

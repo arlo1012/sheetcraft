@@ -26,12 +26,16 @@
   their insets. Gallery choice buttons use `shared/gallery/gallery-choice` for
   hover, selected, focus, and disabled states; previews keep domain-specific drawing.
 
-| Pattern                   | Reference                                                        |
-| ------------------------- | ---------------------------------------------------------------- |
-| Grouped preset galleries  | `shared/gallery/GallerySection.vue`                              |
-| Option lists              | `shared/option-list/OptionList.vue`, `CellFormatDialog`          |
-| Searchable menus          | `shared/menu/MenuSearch.vue`, `WorkbookSheetNavigator`           |
-| Inputs and dialog actions | TDesign controls and `CellFormatDialog`; cancel precedes confirm |
+| Pattern                   | Reference                                                                            |
+| ------------------------- | ------------------------------------------------------------------------------------ |
+| Grouped preset galleries  | `shared/gallery/GallerySection.vue`, `PanelSelect` (`surface="gallery"`)             |
+| Option lists              | `shared/option-list/OptionList.vue`, `CellFormatDialog`                              |
+| Searchable menus          | `shared/menu/MenuSearch.vue`, `WorkbookSheetNavigator`                               |
+| Dialog status footers     | `shared/dialog/DialogFooter.vue`                                                     |
+| Side panes & disclosures  | `shared/format-pane/side-pane` mixin, `shared/format-pane/FormatSection.vue`         |
+| Color & font controls     | `shared/color/ColorPaletteSelect.vue`, `RibbonColorSplitButton.vue`, `FontFormatField.vue` |
+| Text style & alignment    | `shared/text-format/TextStyleToggleGroup.vue`, `TextAlignmentToggleGroup.vue`        |
+| Inputs and dialog actions | TDesign controls and `CellFormatDialog`; cancel precedes confirm                     |
 
 - Menu search fields use TDesign `Input` with `type="search"` and `clearable`,
   matching formula-category menus. `MenuSearch` owns the menu layout; the shared
@@ -105,6 +109,14 @@ Use CSS pixels at 100% scale; size and line height are a pair.
   `--sheetcraft-keyboard-focus-shadow` with their existing radius. Keep focus visible
   and separate from selected/checked state. Do not add feature-local focus
   overrides; canvas/SVG editing may keep target-specific feedback.
+- Inline segmented/toggle button groups in dialogs and format panes (such as
+  `TextStyleToggleGroup`, `TextAlignmentToggleGroup`, and quick-alignment bars)
+  use `shared/focus/useRovingButtonGroup` for roving `tabindex` (`0` / `-1`) and
+  `ArrowLeft` / `ArrowRight` / `Home` / `End` keyboard navigation while preserving
+  standard Ribbon `Tab` navigation for ribbon button rows.
+- Collapsible disclosures use `FormatSection` (backed by TDesign `Collapse`);
+  raw `<details>` / `<summary>` elements and raw `<input type="color">` inputs
+  are disallowed outside shared primitives.
 
 ## Dialog and popover actions
 
@@ -129,14 +141,17 @@ Use CSS pixels at 100% scale; size and line height are a pair.
   jitter or shifting footer actions.
 - Wide dialogs (`>= 520px`) whose footer left side has no auxiliary action
   button place form/step-level blocking hints, global submit errors, and brief
-  status summaries in the footer left slot using `.sheetcraft-dialog-footer`
-  with TDesign `Alert` (`theme="info" | "warning" | "error" | "success"`). Use
-  `warning` for incomplete prerequisites or no-op warnings, `error` for invalid
-  conflicts or submission failures, `success` for positive readiness/results,
-  and `info` for neutral summaries or recalculation notes. Keep field-specific
-  validation errors attached to their `FormItem`, explanatory guidance near the
-  controls it describes, and avoid crowding narrow (`< 500px`) dialogs or
-  footers that already place a destructive/reset button on the left.
+  status summaries in the footer left slot using `shared/dialog/DialogFooter.vue`
+  (backed by `.sheetcraft-dialog-footer` and TDesign `Alert` with
+  `theme="info" | "warning" | "error" | "success"`). Use `warning` for
+  incomplete prerequisites or no-op warnings, `error` for invalid conflicts or
+  submission failures, `success` for positive readiness/results, and `info` for
+  neutral summaries or recalculation notes. Narrow dialogs (`< 500px`) and
+  footers that already place a destructive/reset button on the left keep
+  dialog-level errors in the body using compact TDesign `Alert` (styled via
+  `.t-dialog__ctx .t-dialog__body .t-alert` in `shared/styles/_tdesign.scss`).
+  Keep field-specific validation errors attached to their `FormItem` and
+  explanatory guidance near the controls it describes.
 
 - Use `NewCellStyleDialog` (the Style dialog) as the reference for footer actions.
   Prefer TDesign Dialog's built-in `confirmBtn` and `cancelBtn` APIs. Custom
@@ -213,6 +228,16 @@ return, menu roles, rows, surface treatment, and overlay layer.
   shared exception because its grid has specialized radio-item interaction. Use
   native TDesign dialogs directly when their public API fits; this policy does
   not introduce wrappers for ordinary dialogs.
+
+## Automated governance (`check:web-ui`)
+
+`scripts/check-web-ui.mts` runs on `apps/web/src` (excluding tests) and rejects:
+- Direct `@floating-ui/vue` or `@floating-ui/dom` imports outside `shared/floating/`.
+- Raw `role="menu"` markup outside `shared/menu/` (except `BorderLineStylePanel.vue`).
+- Consumer padding, border, background, radius, or box-shadow overrides on `MenuSurface` or `FloatingPanelSurface`.
+- Numeric `z-index > 30` (global overlays must use `--sheetcraft-layer-*`).
+- Feature-local `.t-*` CSS overrides outside `shared/styles/`.
+- Raw `<details>` disclosures, raw `<input type="color">` outside `shared/color/`, hand-written `.sheetcraft-dialog-footer` outside `shared/dialog/DialogFooter.vue`, direct `filterFontFamilyOption` outside `shared/cell-text/`, and `<InputNumber>` missing `theme="column"` or `sheetcraft-input-number--persistent-controls`.
 
 ## Review
 
