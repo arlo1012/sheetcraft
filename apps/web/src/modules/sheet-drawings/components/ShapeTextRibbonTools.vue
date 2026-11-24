@@ -41,8 +41,6 @@ const props = defineProps<
 >();
 const c = useShapeFormatPane(props);
 const theme = useWorkbookTheme();
-const chinese = computed(() => props.locale === "zh-CN");
-const label = (en: string, zh: string) => (chinese.value ? zh : en);
 function pressed(field: ShapeFormatBooleanField): boolean | "mixed" {
   return c.isMixedField(field) ? "mixed" : props.snapshot?.values[field] === true;
 }
@@ -78,20 +76,20 @@ function toggleStyle(key: TextStyleToggleKey): void {
   toggle(styleFieldByKey[key]);
 }
 const horizontalAlignmentOptions = computed<readonly TextAlignmentOption[]>(() => [
-  { value: "left", label: label("Align Left", "左对齐"), icon: "left", actionAttr: "align-left" },
+  { value: "left", label: c.s.value("alignLeft"), icon: "left", actionAttr: "align-left" },
   {
     value: "center",
-    label: label("Center", "居中"),
+    label: c.s.value("center"),
     icon: "center",
     actionAttr: "align-center",
   },
   {
     value: "right",
-    label: label("Align Right", "右对齐"),
+    label: c.s.value("alignRight"),
     icon: "right",
     actionAttr: "align-right",
   },
-  { value: "justify", label: label("Justify", "两端对齐"), icon: "justify" },
+  { value: "justify", label: c.s.value("justify"), icon: "justify" },
 ]);
 const verticalAlignmentOptions = computed(() =>
   getShapeAlignmentOptions(c, "textVerticalAlignment"),
@@ -108,24 +106,12 @@ const sourceNote = computed(() => {
         drawingShapeTextCharacterSource(drawing),
         drawingShapeTextBaseCharacterFormat(drawing),
       ).some((format) => shapeRichTextSourceStyle(format, theme?.value).previewDiffers));
-  return approximate
-    ? label(
-        "Editing source text; full effects are preserved when you finish.",
-        "正在编辑源文字；结束编辑后保留完整效果。",
-      )
-    : undefined;
+  return approximate ? c.s.value("sourceTextEditingNote") : undefined;
 });
 </script>
 <template>
   <div class="shape-text-ribbon" :data-shape-text-edit-session="sessionId" data-shape-text-ribbon>
-    <RibbonToolbar
-      :label="
-        label(
-          mode === 'drawing' ? 'Drawing Tools' : 'Text Tools',
-          mode === 'drawing' ? '绘图工具' : '文本工具',
-        )
-      "
-    >
+    <RibbonToolbar :label="c.s.value(mode === 'drawing' ? 'drawingTools' : 'textTools')">
       <section
         v-if="mode === 'text'"
         class="shape-text-ribbon__compact"
@@ -216,14 +202,14 @@ const sourceNote = computed(() => {
       <section
         class="shape-text-ribbon__compact"
         data-ribbon-group="shape-text-appearance"
-        :aria-label="label('Text Appearance', '文字外观')"
+        :aria-label="c.s.value('textAppearance')"
       >
         <div class="shape-text-ribbon__row">
           <ShapeRibbonStyleMenu
             :controller="c"
             target="text"
             category="fill"
-            :label="label('Text Fill', '文字填充')"
+            :label="c.s.value('textFill')"
             :session-id="sessionId"
             ><PaintBucket
           /></ShapeRibbonStyleMenu>
@@ -231,7 +217,7 @@ const sourceNote = computed(() => {
             :controller="c"
             target="text"
             category="line"
-            :label="label('Text Outline', '文字轮廓')"
+            :label="c.s.value('textOutline')"
             :session-id="sessionId"
             ><PencilLine
           /></ShapeRibbonStyleMenu>
@@ -241,7 +227,7 @@ const sourceNote = computed(() => {
             :controller="c"
             target="text"
             category="effects"
-            :label="label('Text Effects', '文字效果')"
+            :label="c.s.value('textEffects')"
             :session-id="sessionId"
             ><Sparkles
           /></ShapeRibbonStyleMenu>
@@ -249,7 +235,7 @@ const sourceNote = computed(() => {
             :controller="c"
             target="text"
             category="styles"
-            :label="label('WordArt Styles', '艺术字样式')"
+            :label="c.s.value('wordArtStyles')"
             :session-id="sessionId"
             ><Type
           /></ShapeRibbonStyleMenu>
@@ -258,13 +244,13 @@ const sourceNote = computed(() => {
       <section
         class="shape-text-ribbon__compact"
         data-ribbon-group="shape-appearance"
-        :aria-label="label('Shape Appearance', '形状外观')"
+        :aria-label="c.s.value('shapeAppearance')"
       >
         <ShapeRibbonStyleMenu
           :controller="c"
           target="shape"
           category="fill"
-          :label="label('Shape Fill', '形状填充')"
+          :label="c.s.value('shapeFill')"
           :session-id="sessionId"
           ><PaintBucket
         /></ShapeRibbonStyleMenu>
@@ -272,7 +258,7 @@ const sourceNote = computed(() => {
           :controller="c"
           target="shape"
           category="line"
-          :label="label('Shape Outline', '形状轮廓')"
+          :label="c.s.value('shapeOutline')"
           :session-id="sessionId"
           ><PencilLine
         /></ShapeRibbonStyleMenu>

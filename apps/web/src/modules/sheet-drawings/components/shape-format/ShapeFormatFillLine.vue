@@ -31,13 +31,7 @@ const wordArtLabels = computed(
 );
 const wordArtApplicationSummary = computed(() => {
   const group = props.controller.props.snapshot?.drawing.kind === "shapeGroup";
-  return props.controller.props.locale === "zh-CN"
-    ? group
-      ? "预设应用详情"
-      : "应用于整个对象"
-    : group
-      ? "Preset application details"
-      : "Applies to the whole object";
+  return props.controller.s.value(group ? "presetDetailsGroup" : "presetDetailsObject");
 });
 const wordArtScope = computed(() => {
   const snapshot = props.controller.props.snapshot;

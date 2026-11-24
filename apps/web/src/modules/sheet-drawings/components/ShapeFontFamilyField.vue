@@ -27,13 +27,7 @@ const root = ref<HTMLElement>();
 const focused = ref(false);
 const feedbackId = `shape-font-feedback-${useId()}`;
 const feedback = computed(
-  () =>
-    error.value ||
-    (pending.value
-      ? props.controller.props.locale === "zh-CN"
-        ? "正在载入字体…"
-        : "Loading font…"
-      : undefined),
+  () => error.value || (pending.value ? props.controller.s.value("fontLoading") : undefined),
 );
 function focusout() {
   void nextTick(() => {

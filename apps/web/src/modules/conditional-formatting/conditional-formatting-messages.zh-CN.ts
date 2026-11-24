@@ -139,7 +139,7 @@ export const conditionalFormattingZhCN = {
     fillColor: "填充颜色",
     textColor: "字体颜色",
     bold: "加粗",
-    italic: "斜体",
+    italic: "倾斜",
     noFill: "无填充",
     automatic: "自动",
     commonRules: "突出显示单元格规则",

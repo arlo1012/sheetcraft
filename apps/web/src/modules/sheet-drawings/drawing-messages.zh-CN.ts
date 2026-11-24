@@ -150,4 +150,20 @@ export const drawingsZhCN = {
   "drawing.line": "直线",
   "drawing.star": "星形",
   "drawing.heart": "心形",
+  "drawing.formatShape": "设置形状格式",
+  "drawing.chartActions": "图表操作",
+  "drawing.shapeActions": "形状操作",
+  "drawing.editText": "编辑文本",
+  "drawing.changeShape": "更改形状…",
+  "drawing.objectProperties": "对象属性…",
+  "drawing.editPoints": "编辑顶点",
+  "drawing.connectorLayoutUnavailable":
+    "当前连接布局超出安全绘制范围，形状暂未显示。数据已保留，请撤销尺寸或可见性变化。",
+  "drawing.connectorOperationUnavailable":
+    "此连接线操作暂不可用。请使用端点、路线调整柄或格式窗格；连接关系已保留。",
+  "drawing.connectorSuspended": "连接线暂停：请展开其对象或目标。",
+  "drawing.connectorDegenerate": "连接线端点重合，暂无可见线段。",
+  "drawing.connectorPresentationUnavailable": "连接线文字或三维显示暂不可用。原始数据已保留。",
+  "drawing.pointChangeRejected": "无法应用此顶点更改，当前路径和撤销记录已保留。",
+  "drawing.textEditRejected": "无法应用文本更改。草稿已保留，可重试或复制。",
 };

@@ -182,6 +182,7 @@ export const SHAPE_GALLERY_LABELS: Readonly<
       count: string;
       connectorHint: string;
       drawingToolHint: string;
+      drawingToolFromMenuHint: string;
     }>
   >
 > = {
@@ -196,6 +197,7 @@ export const SHAPE_GALLERY_LABELS: Readonly<
       "Connectors use fixed paths. Automatic connections to other shapes are not available yet.",
     drawingToolHint:
       "Choose Curve or Freeform to place points; double-click to finish. Drag Scribble to draw a stroke.",
+    drawingToolFromMenuHint: "Start a new drawing from the Shapes menu",
   },
   "zh-CN": {
     gallery: "形状库",
@@ -206,6 +208,7 @@ export const SHAPE_GALLERY_LABELS: Readonly<
     count: "个形状",
     connectorHint: "连接符使用固定路径，暂不支持自动连接其他形状。",
     drawingToolHint: "曲线和任意多边形单击添加节点、双击完成；自由曲线按住拖动画出轨迹。",
+    drawingToolFromMenuHint: "请从顶部形状菜单开始新绘制",
   },
 };
 

@@ -2092,11 +2092,7 @@ watch(
       class="sheet-drawing-layer__connector-status"
       data-shape-connector-layout-unavailable
     >
-      {{
-        locale === "zh-CN"
-          ? "当前连接布局超出安全绘制范围，形状暂未显示。数据已保留，请撤销尺寸或可见性变化。"
-          : "This connected layout cannot be rendered safely. Shapes are temporarily hidden and all data is preserved. Undo the size or visibility change."
-      }}
+      {{ t("drawing.connectorLayoutUnavailable") }}
     </div>
     <div
       v-if="connectorFailure"
@@ -2104,11 +2100,7 @@ watch(
       class="sheet-drawing-layer__point-feedback"
       data-shape-connector-operation-unavailable
     >
-      {{
-        locale === "zh-CN"
-          ? "此连接线操作暂不可用。请使用端点、路线调整柄或格式窗格；连接关系已保留。"
-          : "This connector operation is unavailable. Use endpoints, route handles or the format pane. Connections are preserved."
-      }}
+      {{ t("drawing.connectorOperationUnavailable") }}
     </div>
     <div
       v-for="connector in unavailableConnectors"
@@ -2120,17 +2112,13 @@ watch(
       :data-shape-connector-unavailable-reason="connector.reason"
     >
       {{
-        locale === "zh-CN"
-          ? connector.status === "suspended"
-            ? "连接线暂停：请展开其对象或目标。"
+        t(
+          connector.status === "suspended"
+            ? "drawing.connectorSuspended"
             : connector.status === "degenerate"
-              ? "连接线端点重合，暂无可见线段。"
-              : "连接线文字或三维显示暂不可用。原始数据已保留。"
-          : connector.status === "suspended"
-            ? "Connector suspended. Expand its carrier or target."
-            : connector.status === "degenerate"
-              ? "Connector endpoints coincide. There is no visible segment."
-              : "Connector text or 3D presentation is unavailable. Source data is preserved."
+              ? "drawing.connectorDegenerate"
+              : "drawing.connectorPresentationUnavailable",
+        )
       }}
     </div>
     <span
@@ -2184,7 +2172,7 @@ watch(
       @click.stop
     >
       <RibbonButton
-        :label="locale === 'zh-CN' ? '设置形状格式' : 'Format Shape'"
+        :label="t('drawing.formatShape')"
         :disabled="!canChange(formatTarget.drawing)"
         data-shape-format-trigger
         @activate="formatSelected"
@@ -2198,11 +2186,7 @@ watch(
       class="sheet-drawing-layer__point-feedback"
       data-free-shape-update-rejected
     >
-      {{
-        locale === "zh-CN"
-          ? "无法应用此顶点更改，当前路径和撤销记录已保留。"
-          : "This point change could not be applied. Your path and undo history are preserved."
-      }}
+      {{ t("drawing.pointChangeRejected") }}
     </div>
     <div
       v-for="fragment in fragments"
@@ -2438,15 +2422,13 @@ watch(
         ref="shapeTextMenuSurface"
         :style="shapeTextMenuStyles"
         :label="
-          shapeTextMenu.kind === 'control'
-            ? t('control.title')
-            : shapeTextMenu.kind === 'chart'
-              ? locale === 'zh-CN'
-                ? '图表操作'
-                : 'Chart actions'
-              : locale === 'zh-CN'
-                ? '形状操作'
-                : 'Shape actions'
+          t(
+            shapeTextMenu.kind === 'control'
+              ? 'control.title'
+              : shapeTextMenu.kind === 'chart'
+                ? 'drawing.chartActions'
+                : 'drawing.shapeActions',
+          )
         "
       >
         <MenuItem v-if="shapeTextMenu.actions.copy" v-on="{ select: shapeTextMenu.actions.copy }">{{
@@ -2470,36 +2452,26 @@ watch(
           v-if="shapeTextMenu.kind === 'shape' || shapeTextMenu.kind === 'textBox'"
           :disabled="!shapeTextMenu.canText"
           v-on="{ select: shapeTextMenu.actions.text }"
-          >{{ locale === "zh-CN" ? "编辑文本" : "Edit Text" }}</MenuItem
+          >{{ t("drawing.editText") }}</MenuItem
         >
         <MenuItem
           v-if="shapeTextMenu.kind === 'shape' || shapeTextMenu.kind === 'textBox'"
           :disabled="!shapeTextMenu.canObject"
           v-on="{ select: shapeTextMenu.actions.object }"
           >{{
-            shapeTextMenu.kind === "shape"
-              ? locale === "zh-CN"
-                ? "更改形状…"
-                : "Change Shape…"
-              : locale === "zh-CN"
-                ? "对象属性…"
-                : "Object Properties…"
+            t(shapeTextMenu.kind === "shape" ? "drawing.changeShape" : "drawing.objectProperties")
           }}</MenuItem
         >
         <MenuItem
           v-if="shapeTextMenu.actions.points"
           v-on="{ select: shapeTextMenu.actions.points }"
-          >{{ locale === "zh-CN" ? "编辑顶点" : "Edit Points" }}</MenuItem
+          >{{ t("drawing.editPoints") }}</MenuItem
         >
         <MenuItem
           v-if="shapeTextMenu.kind !== 'chart'"
           v-on="{ select: shapeTextMenu.actions.format }"
           >{{
-            shapeTextMenu.kind === "control"
-              ? t("control.format")
-              : locale === "zh-CN"
-                ? "设置形状格式"
-                : "Format Shape"
+            t(shapeTextMenu.kind === "control" ? "control.format" : "drawing.formatShape")
           }}</MenuItem
         >
       </MenuSurface>
@@ -2528,7 +2500,7 @@ watch(
         :error="
           textEditSnapshot.error
             ? locale === 'zh-CN'
-              ? '无法应用文本更改。草稿已保留，可重试或复制。'
+              ? t('drawing.textEditRejected')
               : textEditSnapshot.error.message
             : undefined
         "

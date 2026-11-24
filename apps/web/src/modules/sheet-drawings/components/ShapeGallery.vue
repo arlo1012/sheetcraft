@@ -63,7 +63,7 @@ function title(choice: ShapeGalleryChoice): string {
   if (props.compact && choice.kind === "line" && choice.preset !== "line")
     return `${choice.label[props.locale]}: ${labels.value.connectorHint}`;
   return choice.kind === "drawingTool" && !props.allowDrawingTools
-    ? `${choice.label[props.locale]}: ${props.locale === "zh-CN" ? "请从顶部形状菜单开始新绘制" : "Start a new drawing from the Shapes menu"}`
+    ? `${choice.label[props.locale]}: ${labels.value.drawingToolFromMenuHint}`
     : choice.label[props.locale];
 }
 function choose(choice: ShapeGalleryChoice): void {

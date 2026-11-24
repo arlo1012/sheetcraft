@@ -108,11 +108,26 @@ const en = {
   resetMargins: "Apply standard margins",
   fontSearch: "Search fonts",
   fontEmpty: "No matching fonts",
+  fontLoading: "Loading font…",
   fontLoadFailed: "The selected font could not be loaded. Your draft has been kept.",
   applyRejected: "The change could not be applied. Your draft has been kept.",
   staleOwner: "The selection or drawing changed. Review the current values and try again.",
   missingSelection: "Select a shape to format it.",
   outOfRange: "Enter a number within the supported range.",
+  drawingTools: "Drawing Tools",
+  textTools: "Text Tools",
+  textAppearance: "Text Appearance",
+  shapeAppearance: "Shape Appearance",
+  shapeFill: "Shape Fill",
+  shapeOutline: "Shape Outline",
+  wordArtStyles: "WordArt Styles",
+  alignLeft: "Align Left",
+  alignRight: "Align Right",
+  sourceTextEditingNote: "Editing source text; full effects are preserved when you finish.",
+  presetDetailsGroup: "Preset application details",
+  presetDetailsObject: "Applies to the whole object",
+  transformGroupScope:
+    "Transform applies to {eligible} TextBox, WordArt or retained-transform text members of {total} members in the selected group.",
 } as const;
 export type ShapeFormatLabelKey = keyof typeof en;
 export type ShapeFormatTranslate = (key: ShapeFormatLabelKey) => string;
@@ -218,11 +233,26 @@ const zh: Record<ShapeFormatLabelKey, string> = {
   resetMargins: "应用标准边距",
   fontSearch: "搜索字体",
   fontEmpty: "没有匹配的字体",
+  fontLoading: "正在载入字体…",
   fontLoadFailed: "未能加载所选字体，已保留输入内容。",
   applyRejected: "未能应用更改，已保留输入内容。",
   staleOwner: "所选对象或形状已更改，请检查当前值后重试。",
   missingSelection: "选择要设置格式的形状。",
   outOfRange: "请输入支持范围内的数值。",
+  drawingTools: "绘图工具",
+  textTools: "文本工具",
+  textAppearance: "文字外观",
+  shapeAppearance: "形状外观",
+  shapeFill: "形状填充",
+  shapeOutline: "形状轮廓",
+  wordArtStyles: "艺术字样式",
+  alignLeft: "左对齐",
+  alignRight: "右对齐",
+  sourceTextEditingNote: "正在编辑源文字；结束编辑后保留完整效果。",
+  presetDetailsGroup: "预设应用详情",
+  presetDetailsObject: "应用于整个对象",
+  transformGroupScope:
+    "转换适用于所选组合中的 {eligible} 个文本框、艺术字或保留转换的文字成员（共 {total} 个成员）。",
 };
 export const SHAPE_FORMAT_LABELS = { "en-US": en, "zh-CN": zh } as const;
 export function createShapeFormatTranslate(locale: "en-US" | "zh-CN"): ShapeFormatTranslate {

@@ -34,9 +34,10 @@ const transformTitle = computed(
 const transformScope = computed(() => {
   const scope = props.controller.props.snapshot?.textWarpScope;
   if (!scope || props.controller.props.snapshot?.drawing.kind !== "shapeGroup") return;
-  return props.controller.props.locale === "zh-CN"
-    ? `转换适用于所选组合中的 ${scope.eligibleCount} 个文本框、艺术字或保留转换的文字成员（共 ${scope.descendantCount} 个成员）。`
-    : `Transform applies to ${scope.eligibleCount} TextBox, WordArt or retained-transform text members of ${scope.descendantCount} members in the selected group.`;
+  return props.controller.s
+    .value("transformGroupScope")
+    .replace("{eligible}", String(scope.eligibleCount))
+    .replace("{total}", String(scope.descendantCount));
 });
 const isConnector = computed(
   () =>

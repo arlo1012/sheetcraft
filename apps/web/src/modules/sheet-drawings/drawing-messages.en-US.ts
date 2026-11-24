@@ -162,4 +162,23 @@ export const drawingsEnUS = {
   "drawing.line": "Line",
   "drawing.star": "Star",
   "drawing.heart": "Heart",
+  "drawing.formatShape": "Format Shape",
+  "drawing.chartActions": "Chart actions",
+  "drawing.shapeActions": "Shape actions",
+  "drawing.editText": "Edit Text",
+  "drawing.changeShape": "Change Shape…",
+  "drawing.objectProperties": "Object Properties…",
+  "drawing.editPoints": "Edit Points",
+  "drawing.connectorLayoutUnavailable":
+    "This connected layout cannot be rendered safely. Shapes are temporarily hidden and all data is preserved. Undo the size or visibility change.",
+  "drawing.connectorOperationUnavailable":
+    "This connector operation is unavailable. Use endpoints, route handles or the format pane. Connections are preserved.",
+  "drawing.connectorSuspended": "Connector suspended. Expand its carrier or target.",
+  "drawing.connectorDegenerate": "Connector endpoints coincide. There is no visible segment.",
+  "drawing.connectorPresentationUnavailable":
+    "Connector text or 3D presentation is unavailable. Source data is preserved.",
+  "drawing.pointChangeRejected":
+    "This point change could not be applied. Your path and undo history are preserved.",
+  "drawing.textEditRejected":
+    "Could not apply text changes. Your draft is preserved to retry or copy.",
 };
