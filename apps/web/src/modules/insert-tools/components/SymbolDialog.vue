@@ -8,19 +8,11 @@ import { Select } from "tdesign-vue-next/es/select";
 import { Button } from "tdesign-vue-next/es/button";
 import { Tabs, TabPanel } from "tdesign-vue-next/es/tabs";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
-import { PrimaryTable } from "tdesign-vue-next/es/table";
-import type {
-  PrimaryTableCol,
-  RowEventContext,
-  TableRowAttributes,
-  TableRowData,
-} from "tdesign-vue-next/es/table/type";
-import OptionList from "../../../shared/option-list/OptionList.vue";
-import FormatSection from "../../../shared/format-pane/FormatSection.vue";
-import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
-import { useAppI18n, type MessageKey } from "../../../shared/i18n";
+import { useAppI18n } from "../../../shared/i18n";
 import SymbolCharacterGrid from "./SymbolCharacterGrid.vue";
-import SymbolFontSourceControls from "./SymbolFontSourceControls.vue";
+import SymbolCustomTab from "./SymbolCustomTab.vue";
+import SymbolExtensionsSection from "./SymbolExtensionsSection.vue";
+import SymbolSpecialTab from "./SymbolSpecialTab.vue";
 import {
   fontHasCodePoint,
   loadSymbolUnicodeCatalog,
@@ -34,14 +26,12 @@ import {
   type SymbolCodeFormat,
 } from "../symbols/symbol-dialog-model";
 import {
-  captureSymbolShortcut,
   defaultSymbolPreferences,
   moveCustomSymbol,
   SYMBOL_CUSTOM_LIMIT,
   symbolIdentity,
   useSymbolPreferences,
   validSymbolInsertion,
-  validateSymbolShortcut,
   withCustomSymbol,
   withRecentSymbol,
   type SymbolInsertion,
@@ -57,6 +47,7 @@ import type {
   LocalSymbolFont,
   LocalSymbolFontErrorCode,
 } from "../../../shared/cell-text/local-font-source";
+
 const props = defineProps<{
   disabled: boolean;
   editSessionId?: string;
@@ -108,17 +99,17 @@ const invalidCode = ref(false);
 const selected = ref<number | undefined>(32);
 const specialIndex = ref(0);
 const customIndex = ref(0);
+const customTabRef = ref<InstanceType<typeof SymbolCustomTab>>();
 const literal = ref("");
 const literalActive = ref(false);
 const selectionOverride = shallowRef<SymbolInsertion>();
 const inserted = ref(false);
 const resetVisible = ref(false);
-const shortcutInput = ref("");
-const shortcutMessage = ref<MessageKey>();
 const localRecent = ref<readonly SymbolInsertion[]>(
   preferences.value.recent.map((item) => ({ ...item })),
 );
 let mounted = true;
+
 async function loadFont(family = font.value?.family): Promise<boolean> {
   if (!family) return false;
   if (fontStates.value[family] === "ready") return true;
@@ -150,6 +141,7 @@ async function loadFont(family = font.value?.family): Promise<boolean> {
   fontRequests.set(family, request);
   return request;
 }
+
 async function load(): Promise<void> {
   loading.value = true;
   loadError.value = false;
@@ -191,10 +183,12 @@ async function load(): Promise<void> {
     if (mounted) loading.value = false;
   }
 }
+
 onMounted(() => void load());
 onBeforeUnmount(() => {
   mounted = false;
 });
+
 const points = computed(() =>
   catalog.value && (allUnicode.value || font.value)
     ? catalog.value.codePoints(allUnicode.value ? undefined : font.value!.ranges)
@@ -207,6 +201,7 @@ const filtered = computed(() =>
     : new Uint32Array(),
 );
 const customEntry = computed(() => preferences.value.custom[customIndex.value]);
+
 function selectedFamily(text: string): string | undefined {
   if (fontId.value === "normal-text") return undefined;
   return font.value &&
@@ -214,6 +209,7 @@ function selectedFamily(text: string): string | undefined {
     ? font.value.family
     : undefined;
 }
+
 const current = computed<SymbolInsertion | undefined>(() => {
   if (tab.value === "custom") return customEntry.value;
   if (literalActive.value && tab.value === "symbols")
@@ -230,6 +226,7 @@ const current = computed<SymbolInsertion | undefined>(() => {
   const text = String.fromCodePoint(selected.value);
   return { text, ...(selectedFamily(text) ? { fontFamily: selectedFamily(text) } : {}) };
 });
+
 watch(
   () => current.value?.fontFamily,
   (family) => {
@@ -237,6 +234,7 @@ watch(
   },
   { immediate: true },
 );
+
 const displayFontFamily = computed(
   () =>
     current.value?.fontFamily ??
@@ -253,9 +251,11 @@ const canInsert = computed(
     !!current.value &&
     (!displayFontFamily.value || fontStates.value[displayFontFamily.value] === "ready"),
 );
+
 function retryFont(): void {
   void loadFont(displayFontFamily.value);
 }
+
 const previewFontFamily = computed(() => current.value?.fontFamily ?? props.defaultFontFamily);
 const currentCode = computed(() =>
   current.value
@@ -337,6 +337,7 @@ const formatOptions = computed(() => [
   { label: t("symbolTools.latinDecimal"), value: "latin1-decimal" },
   { label: t("symbolTools.latinHex"), value: "latin1-hex" },
 ]);
+
 function rememberFontChoice(): void {
   const choice = font.value;
   savedView.value = {
@@ -358,10 +359,12 @@ function rememberFontChoice(): void {
     viewStorageError.value = true;
   }
 }
+
 function chooseFont(value: unknown): void {
   fontId.value = String(value);
   rememberFontChoice();
 }
+
 function registerLocalFont(item: LocalSymbolFont, select = true): void {
   const entry: SymbolFont = {
     id: `local:${item.id}`,
@@ -379,6 +382,7 @@ function registerLocalFont(item: LocalSymbolFont, select = true): void {
     rememberFontChoice();
   }
 }
+
 function selectPoint(cp: number): void {
   selectionOverride.value = undefined;
   selected.value = cp;
@@ -390,6 +394,7 @@ function selectPoint(cp: number): void {
   );
   subset.value = catalog.value?.character(cp)?.block?.[2] ?? "";
 }
+
 watch(fontId, () => {
   void loadFont();
 });
@@ -413,18 +418,7 @@ watch(query, () => {
   if (filtered.value.length && !filtered.value.includes(selected.value ?? -1))
     selectPoint(filtered.value[0]!);
 });
-watch(
-  () =>
-    [
-      customEntry.value ? symbolIdentity(customEntry.value) : undefined,
-      customEntry.value?.shortcut,
-    ] as const,
-  ([identity, shortcut], previous) => {
-    shortcutInput.value = shortcut ?? "";
-    if (identity !== previous?.[0]) shortcutMessage.value = undefined;
-  },
-  { immediate: true },
-);
+
 function navigateCode(value: string): void {
   selectionOverride.value = undefined;
   codeInput.value = value;
@@ -438,6 +432,7 @@ function navigateCode(value: string): void {
   query.value = "";
   selectPoint(cp);
 }
+
 function changeSubset(value: unknown): void {
   subset.value = String(value);
   query.value = "";
@@ -447,6 +442,7 @@ function changeSubset(value: unknown): void {
     : points.value[0];
   if (cp !== undefined) selectPoint(cp);
 }
+
 async function submitInsertion(item: SymbolInsertion): Promise<void> {
   const handler = props.insertText;
   const ownerId = props.editSessionId;
@@ -464,6 +460,7 @@ async function submitInsertion(item: SymbolInsertion): Promise<void> {
     item,
   ).recent;
 }
+
 async function insert(): Promise<void> {
   if (!canInsert.value || !current.value) return;
   await submitInsertion({
@@ -471,15 +468,18 @@ async function insert(): Promise<void> {
     ...(current.value.fontFamily ? { fontFamily: current.value.fontFamily } : {}),
   });
 }
+
 function close(context?: { trigger?: string }): void {
   if (resetVisible.value) return;
   // WPS keeps insertion in the draft on Escape, but only explicit Close publishes MRU.
   if (context?.trigger !== "esc") update({ ...preferences.value, recent: localRecent.value });
   emit("close");
 }
+
 function addCustom(): void {
   if (current.value) update(withCustomSymbol(preferences.value, current.value));
 }
+
 async function pickRecent(item: SymbolInsertion, insertNow = false): Promise<void> {
   const handler = props.insertText;
   const ownerId = props.editSessionId;
@@ -510,6 +510,7 @@ async function pickRecent(item: SymbolInsertion, insertNow = false): Promise<voi
       ...(item.fontFamily ? { fontFamily: item.fontFamily } : {}),
     });
 }
+
 function toggleVisible(index: number, visible: boolean): void {
   update({
     ...preferences.value,
@@ -518,6 +519,7 @@ function toggleVisible(index: number, visible: boolean): void {
     ),
   });
 }
+
 function move(delta: -1 | 1): void {
   const next = moveCustomSymbol(preferences.value, customIndex.value, delta);
   if (next !== preferences.value) {
@@ -525,148 +527,39 @@ function move(delta: -1 | 1): void {
     customIndex.value += delta;
   }
 }
+
 function removeCustom(): void {
   update({
     ...preferences.value,
     custom: preferences.value.custom.filter((_, index) => index !== customIndex.value),
   });
   customIndex.value = Math.max(0, Math.min(customIndex.value, preferences.value.custom.length - 1));
-  shortcutInput.value = customEntry.value?.shortcut ?? "";
 }
-function captureShortcut(event: KeyboardEvent): void {
-  if (event.key === "Tab") return;
-  event.preventDefault();
-  event.stopPropagation();
-  const value = captureSymbolShortcut(event);
-  if (value) {
-    shortcutInput.value = value;
-    shortcutMessage.value = undefined;
-  }
-}
-function assignShortcut(clear = false): void {
-  const entry = customEntry.value;
-  if (!entry) return;
-  const issue = clear
-    ? undefined
-    : validateSymbolShortcut(shortcutInput.value, preferences.value.custom, symbolIdentity(entry));
-  const errors = {
-    modifier: "symbolTools.shortcutModifier",
-    unsupported: "symbolTools.shortcutUnsupported",
-    reserved: "symbolTools.shortcutReserved",
-    duplicate: "symbolTools.shortcutDuplicate",
-  } as const;
-  if (issue) {
-    shortcutMessage.value = errors[issue];
-    return;
-  }
+
+function saveCustomShortcut(shortcut: string | undefined): void {
   update({
     ...preferences.value,
     custom: preferences.value.custom.map((item, index) => {
       if (index !== customIndex.value) return item;
       const { shortcut: _shortcut, ...rest } = item;
-      return clear ? rest : { ...rest, shortcut: shortcutInput.value };
+      return shortcut ? { ...rest, shortcut } : rest;
     }),
   });
-  if (clear) shortcutInput.value = "";
-  shortcutMessage.value = "symbolTools.shortcutSaved";
 }
+
 function reset(): void {
   update({ ...preferences.value, custom: defaultSymbolPreferences().custom });
   customIndex.value = 0;
-  shortcutInput.value = "";
+  customTabRef.value?.clearShortcutInput();
   resetVisible.value = false;
 }
-const specialOptions = computed(() =>
-  SPECIAL_SYMBOLS.map((entry, index) => ({
-    value: String(index),
-    label: t(`symbolTools.${entry.label}`),
-    text: entry.text,
-  })),
-);
-function selectSpecial(value: string): void {
-  specialIndex.value = Number(value);
+
+function onLiteralChange(): void {
+  literalActive.value = true;
+  selectionOverride.value = undefined;
 }
-function activateSpecial(value: string): void {
-  selectSpecial(value);
-  void insert();
-}
-const customRows = computed(() =>
-  preferences.value.custom.map((entry, index) => ({ index, entry })),
-);
-const customColumns = computed<PrimaryTableCol[]>(() => [
-  { colKey: "symbol", title: t("symbolTools.custom"), width: "50%" },
-  { colKey: "shortcut", title: t("symbolTools.shortcut"), width: "50%" },
-]);
-const customRowAttributes: TableRowAttributes<TableRowData> = ({ rowIndex }) => ({
-  role: "option",
-  "aria-selected": String(customIndex.value === rowIndex),
-  "data-row-index": String(rowIndex),
-  tabindex: customIndex.value === rowIndex ? "0" : "-1",
-});
-function selectCustomRows(keys: Array<string | number>): void {
-  if (typeof keys[0] === "number") customIndex.value = keys[0];
-}
-function activateCustomRow({ row, e }: RowEventContext<TableRowData>): void {
-  if (e.target instanceof Element && e.target.closest("input, label, button")) return;
-  customIndex.value = Number(row.index);
-  void insert();
-}
-function onCustomListKey(event: KeyboardEvent): void {
-  if ((event.target as HTMLElement).tagName === "INPUT") return;
-  const count = preferences.value.custom.length;
-  if (!count) return;
-  if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
-    event.preventDefault();
-    customIndex.value =
-      event.key === "Home"
-        ? 0
-        : event.key === "End"
-          ? count - 1
-          : Math.max(
-              0,
-              Math.min(count - 1, customIndex.value + (event.key === "ArrowDown" ? 1 : -1)),
-            );
-    const row = (event.currentTarget as HTMLElement).querySelector<HTMLElement>(
-      `[data-row-index="${customIndex.value}"]`,
-    );
-    row?.focus({ preventScroll: true });
-    row?.scrollIntoView?.({ block: "nearest" });
-  } else if (event.key === "Enter") {
-    event.preventDefault();
-    event.stopPropagation();
-    void insert();
-  }
-}
-const extensionsWrap = ref<HTMLElement>();
-const extensionsOpen = ref(false);
-let extensionsScrollTimer: ReturnType<typeof setTimeout> | undefined;
-function clearExtensionsScrollTimer(): void {
-  if (extensionsScrollTimer !== undefined) {
-    clearTimeout(extensionsScrollTimer);
-    extensionsScrollTimer = undefined;
-  }
-}
-onBeforeUnmount(clearExtensionsScrollTimer);
-watch(
-  fontRestoreError,
-  (error) => {
-    if (error) extensionsOpen.value = true;
-  },
-  { immediate: true },
-);
-watch(extensionsOpen, (open) => {
-  clearExtensionsScrollTimer();
-  if (open) {
-    const reveal = () =>
-      extensionsWrap.value?.scrollIntoView?.({ behavior: "smooth", block: "end" });
-    void nextTick(reveal);
-    extensionsScrollTimer = setTimeout(() => {
-      extensionsScrollTimer = undefined;
-      if (mounted && extensionsOpen.value) reveal();
-    }, 240);
-  }
-});
 </script>
+
 <template>
   <Dialog
     :visible="true"
@@ -826,134 +719,28 @@ watch(extensionsOpen, (open) => {
             {{ t("symbolTools.encodingNote") }}
           </div>
         </section>
-        <section
-          v-show="tab === 'special'"
-          class="symbol-dialog__page symbol-dialog__page--fill"
-          :aria-label="t('symbolTools.special')"
-        >
-          <OptionList
-            class="symbol-dialog__special-list"
-            :model-value="String(specialIndex)"
-            :options="specialOptions"
-            :label="t('symbolTools.special')"
-            item-data-attribute="data-symbol-special"
-            @select="selectSpecial"
-            @activate="activateSpecial"
-          >
-            <template #icon="{ option }">
-              <span
-                class="symbol-dialog__list-glyph"
-                :title="`U+${symbolCharacterCode(option.text.codePointAt(0)!)}`"
-                :style="{ fontFamily: selectedFamily(option.text) }"
-                >{{ /\s/u.test(option.text) ? "␣" : option.text }}</span
-              >
-            </template>
-          </OptionList>
-        </section>
-        <section
-          v-show="tab === 'custom'"
-          class="symbol-dialog__page symbol-dialog__page--fill"
-          :aria-label="t('symbolTools.custom')"
-        >
-          <div
-            class="symbol-dialog__custom-list"
-            role="listbox"
-            :aria-label="t('symbolTools.custom')"
-            @keydown="onCustomListKey"
-          >
-            <TableHeightWrapper v-slot="{ height }">
-              <PrimaryTable
-                class="sheetcraft-table--mini"
-                row-key="index"
-                :data="customRows"
-                :columns="customColumns"
-                :row-attributes="customRowAttributes"
-                :active-row-keys="[customIndex]"
-                active-row-type="single"
-                :disable-space-inactive-row="true"
-                :height="height"
-                :bordered="false"
-                size="small"
-                table-layout="fixed"
-                hover
-                :empty="t('symbolTools.emptyCustom')"
-                @active-change="selectCustomRows"
-                @row-dblclick="activateCustomRow"
-              >
-                <template #symbol="{ row }">
-                  <span class="symbol-dialog__custom-symbol">
-                    <span @click.stop @dblclick.stop>
-                      <Checkbox
-                        :checked="row.entry.visible"
-                        :aria-label="`${t('symbolTools.visible')}: ${row.entry.text}`"
-                        @change="toggleVisible(row.index, !!$event)"
-                      />
-                    </span>
-                    <span
-                      class="symbol-dialog__list-glyph"
-                      :title="
-                        row.entry.fontFamily
-                          ? (localFontLabels[row.entry.fontFamily] ?? row.entry.fontFamily)
-                          : t('symbolTools.inherited')
-                      "
-                      :style="{ fontFamily: row.entry.fontFamily }"
-                      >{{ /\s/u.test(row.entry.text) ? "␣" : row.entry.text }}</span
-                    >
-                  </span>
-                </template>
-                <template #shortcut="{ row }"
-                  ><kbd>{{ row.entry.shortcut }}</kbd></template
-                >
-              </PrimaryTable>
-            </TableHeightWrapper>
-          </div>
-          <div class="symbol-dialog__shortcut">
-            <FormItem class="symbol-dialog__field" :label="t('symbolTools.shortcut')"
-              ><Input
-                v-native-control="{ attributes: { 'aria-label': t('symbolTools.shortcut') } }"
-                size="small"
-                :value="shortcutInput"
-                readonly
-                :placeholder="t('symbolTools.shortcutCapture')"
-                @keydown="(_value, context) => captureShortcut(context.e)" /></FormItem
-            ><Button
-              theme="default"
-              variant="base"
-              :disabled="!customEntry || !shortcutInput"
-              @click="assignShortcut()"
-              >{{ t("symbolTools.assignShortcut") }}</Button
-            ><Button
-              theme="default"
-              variant="text"
-              :disabled="!customEntry?.shortcut"
-              @click="assignShortcut(true)"
-              >{{ t("symbolTools.removeShortcut") }}</Button
-            >
-          </div>
-          <div v-if="shortcutMessage" role="status" class="symbol-dialog__hint">
-            {{ t(shortcutMessage) }}
-          </div>
-          <div class="symbol-dialog__custom-actions">
-            <Button theme="default" variant="base" :disabled="customIndex <= 0" @click="move(-1)">{{
-              t("symbolTools.moveUp")
-            }}</Button
-            ><Button
-              theme="default"
-              variant="base"
-              :disabled="customIndex >= preferences.custom.length - 1"
-              @click="move(1)"
-              >{{ t("symbolTools.moveDown") }}</Button
-            ><Button
-              theme="default"
-              variant="base"
-              :disabled="!customEntry"
-              @click="removeCustom"
-              >{{ t("symbolTools.remove") }}</Button
-            ><Button theme="default" variant="base" @click="resetVisible = true">{{
-              t("symbolTools.reset")
-            }}</Button>
-          </div>
-        </section>
+
+        <SymbolSpecialTab
+          v-model:special-index="specialIndex"
+          :visible="tab === 'special'"
+          :selected-family="selectedFamily"
+          @insert="insert"
+        />
+
+        <SymbolCustomTab
+          ref="customTabRef"
+          v-model:custom-index="customIndex"
+          :visible="tab === 'custom'"
+          :custom="preferences.custom"
+          :local-font-labels="localFontLabels"
+          @insert="insert"
+          @toggle-visible="toggleVisible"
+          @move="move"
+          @remove="removeCustom"
+          @request-reset="resetVisible = true"
+          @save-shortcut="saveCustomShortcut"
+        />
+
         <div v-if="displayFontStatus === 'error'" role="alert" class="symbol-dialog__error">
           {{ t("symbolTools.fontFailed") }}
           <Button theme="default" variant="text" @click="retryFont">{{
@@ -1004,67 +791,27 @@ watch(extensionsOpen, (open) => {
             >{{ t(alreadyCustom ? "symbolTools.added" : "symbolTools.addCustom") }}</Button
           >
         </div>
-        <div ref="extensionsWrap" class="symbol-dialog__extensions">
-          <FormatSection v-model:open="extensionsOpen" :title="t('symbolTools.options')">
-            <div class="symbol-dialog__extension-content">
-              <SymbolFontSourceControls
-                v-show="tab === 'symbols'"
-                :loading="loading"
-                :default-font-family="defaultFontFamily"
-                :restore-error="fontRestoreError"
-                @register="registerLocalFont"
-              />
-              <div v-if="catalog && !allUnicode && font" class="symbol-dialog__hint">
-                {{
-                  t(
-                    font.source === "local" ? "symbolTools.localCoverage" : "symbolTools.coverage",
-                    {
-                      count: points.length,
-                      version: catalog.version,
-                    },
-                  )
-                }}
-              </div>
-              <div class="symbol-dialog__preview" :aria-label="t('symbolTools.preview')">
-                <span
-                  class="symbol-dialog__preview-glyph"
-                  :style="{ fontFamily: previewFontFamily }"
-                  >{{ current ? (/^\s+$/u.test(current.text) ? "␣" : current.text) : "—" }}</span
-                >
-                <div>
-                  <strong>{{ current ? currentCode : t("symbolTools.noSelection") }}</strong
-                  ><span>{{ currentName }}</span
-                  ><span v-if="currentAliases">{{ currentAliases }}</span
-                  ><span v-if="currentMetadata">{{ currentMetadata }}</span
-                  ><span>{{
-                    current?.fontFamily
-                      ? (localFontLabels[current.fontFamily] ?? current.fontFamily)
-                      : t("symbolTools.inherited")
-                  }}</span>
-                </div>
-              </div>
-              <div v-show="tab === 'symbols'">
-                <FormItem
-                  class="symbol-dialog__literal symbol-dialog__field"
-                  :label="t('symbolTools.literal')"
-                  ><Input
-                    v-native-control="{ attributes: { 'aria-label': t('symbolTools.literal') } }"
-                    v-model="literal"
-                    :maxlength="16"
-                    :placeholder="t('symbolTools.literalHint')"
-                    @change="
-                      literalActive = true;
-                      selectionOverride = undefined;
-                    "
-                    @enter="insert"
-                /></FormItem>
-              </div>
-              <p v-if="tab === 'special'" class="symbol-dialog__hint">
-                {{ t("symbolTools.specialNote") }}
-              </p>
-            </div>
-          </FormatSection>
-        </div>
+        <SymbolExtensionsSection
+          v-model:literal="literal"
+          :tab="tab"
+          :loading="loading"
+          :default-font-family="defaultFontFamily"
+          :font-restore-error="fontRestoreError"
+          :catalog="catalog"
+          :all-unicode="allUnicode"
+          :font="font"
+          :points-count="points.length"
+          :current="current"
+          :preview-font-family="previewFontFamily"
+          :current-code="currentCode"
+          :current-name="currentName"
+          :current-aliases="currentAliases"
+          :current-metadata="currentMetadata"
+          :local-font-labels="localFontLabels"
+          @register="registerLocalFont"
+          @literal-change="onLiteralChange"
+          @insert="insert"
+        />
       </div>
     </Form>
   </Dialog>
@@ -1081,6 +828,7 @@ watch(extensionsOpen, (open) => {
     >{{ t("symbolTools.resetQuestion") }}</Dialog
   >
 </template>
+
 <style scoped lang="scss">
 @use "../../../shared/gallery/gallery-choice" as gallery;
 @use "../../../shared/option-list/option-list" as option-list;
@@ -1110,9 +858,6 @@ watch(extensionsOpen, (open) => {
     min-width: 0;
     > * {
       flex-shrink: 0;
-    }
-    &--fill {
-      flex: 1 0 280px;
     }
   }
   &__fields {
@@ -1172,94 +917,11 @@ watch(extensionsOpen, (open) => {
       line-height: 28px;
     }
   }
-  &__special-list {
-    flex: 1 1 0;
-    min-height: 180px;
-  }
-  &__custom-symbol {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-  &__custom-list {
-    flex: 1 1 0;
-    min-height: 160px;
-    overflow: hidden;
-  }
   &__coverage-warning {
     padding: 8px 10px;
     color: var(--sheetcraft-text-secondary);
     font-size: var(--sheetcraft-font-size-body-small);
     line-height: var(--sheetcraft-line-height-body-small);
-  }
-  &__list-glyph {
-    flex: 0 0 36px;
-    max-width: 64px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    text-align: center;
-    font-size: 23px;
-    line-height: 28px;
-  }
-  &__shortcut {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    > .symbol-dialog__field {
-      flex: 1 1 240px;
-    }
-  }
-  &__custom-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    > :last-child {
-      margin-inline-start: auto;
-    }
-  }
-  &__preview {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    min-width: 0;
-    border-top: 1px solid var(--sheetcraft-border-subtle);
-    padding-top: 10px;
-    > div {
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-      > span {
-        overflow-wrap: anywhere;
-        color: var(--sheetcraft-text-secondary);
-        font-size: var(--sheetcraft-font-size-body-small);
-        line-height: var(--sheetcraft-line-height-body-small);
-      }
-    }
-    strong {
-      font-weight: 500;
-      overflow-wrap: anywhere;
-    }
-  }
-  &__preview-glyph {
-    flex: 0 0 58px;
-    max-width: 100px;
-    text-align: center;
-    font-size: 32px;
-    line-height: 42px;
-    overflow: hidden;
-  }
-  &__extensions {
-    flex: 0 0 auto;
-    min-width: 0;
-    border-top: 1px solid var(--sheetcraft-border-divider);
-  }
-  &__extension-content {
-    display: grid;
-    gap: 8px;
-    padding: 10px 12px;
-    border-radius: var(--sheetcraft-radius-dialog-card);
-    background: var(--sheetcraft-surface-dialog-card);
   }
   &__page-actions {
     flex: none;
@@ -1274,9 +936,6 @@ watch(extensionsOpen, (open) => {
     }
     &__body {
       max-height: calc(100dvh - 190px);
-    }
-    &__custom-actions > :last-child {
-      margin-inline-start: 0;
     }
   }
 }
