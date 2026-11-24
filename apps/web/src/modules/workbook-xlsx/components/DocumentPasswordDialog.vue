@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, useId } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
@@ -83,9 +84,12 @@ function submit() {
             autocomplete="new-password"
         /></TFormItem>
       </TForm>
-      <p v-if="error || incorrect" class="document-password__error" role="alert">
-        {{ error || t("review.incorrectPassword") }}
-      </p>
+      <TAlert
+        v-if="error || incorrect"
+        theme="error"
+        :message="error || t('review.incorrectPassword')"
+        role="alert"
+      />
     </div>
   </TDialog>
 </template>

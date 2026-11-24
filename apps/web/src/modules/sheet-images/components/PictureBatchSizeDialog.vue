@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, useId, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
@@ -118,7 +119,7 @@ function confirm() {
       label-align="top"
       :prevent-submit-default="true"
     >
-      <p v-if="error" class="picture-batch-size__error" role="alert">{{ error }}</p>
+      <TAlert v-if="error" theme="error" :message="error" role="alert" />
       <div class="picture-batch-size__row">
         <FormItem :label="t('image.widthPoints')"
           ><div class="picture-batch-size__control">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
@@ -34,6 +35,6 @@ watch(
           :maxlength="255"
           autocomplete="current-password" /></TFormItem
     ></TForm>
-    <p v-if="error" role="alert">{{ error }}</p>
+    <TAlert v-if="error" theme="error" :message="error" role="alert" />
   </TDialog>
 </template>

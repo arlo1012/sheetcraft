@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
@@ -39,7 +40,7 @@ const range = ref(props.initial);
         :show-picker="true"
         :select-reference="selectReference"
       />
-      <p v-if="error" role="alert">{{ error }}</p>
+      <TAlert v-if="error" theme="error" :message="error" role="alert" />
     </div>
   </Dialog>
 </template>

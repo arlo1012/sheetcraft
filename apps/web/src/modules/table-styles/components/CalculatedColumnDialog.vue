@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Textarea } from "tdesign-vue-next/es/textarea";
 import { vNativeControl } from "../../../shared/tdesign/native-control";
@@ -58,7 +59,7 @@ const source = ref(props.initial);
           :autosize="{ minRows: 2, maxRows: 5 }"
         />
       </label>
-      <p v-if="error" role="alert">{{ error }}</p>
+      <TAlert v-if="error" theme="error" :message="error" role="alert" />
     </div>
   </Dialog>
 </template>

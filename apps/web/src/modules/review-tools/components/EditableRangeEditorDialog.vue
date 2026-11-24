@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
@@ -122,7 +123,7 @@ function save(): void {
       <p v-if="draft.password && !clearPassword" class="editable-range-editor__hint">
         {{ t("review.keepPasswordHint") }}
       </p>
-      <p v-if="error" class="editable-range-editor__error" role="alert">{{ error }}</p>
+      <TAlert v-if="error" theme="error" :message="error" role="alert" />
     </div>
   </TDialog>
 </template>

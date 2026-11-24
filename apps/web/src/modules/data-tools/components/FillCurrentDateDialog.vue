@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import OptionList from "../../../shared/option-list/OptionList.vue";
 import { useAppI18n } from "../../../shared/i18n";
@@ -63,7 +64,7 @@ const sample = computed(() => formatFillDateSample(draft.value.format, draft.val
         />
       </div>
       <p class="fill-dialog__sample">{{ t("dataTools.fill.dateSample", { date: sample }) }}</p>
-      <p v-if="error" class="fill-dialog__error" role="alert">{{ error }}</p>
+      <TAlert v-if="error" theme="error" :message="error" role="alert" />
     </div>
   </Dialog>
 </template>

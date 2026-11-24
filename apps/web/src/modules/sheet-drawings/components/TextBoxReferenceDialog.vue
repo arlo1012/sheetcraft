@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Select } from "tdesign-vue-next/es/select";
@@ -85,19 +86,22 @@ function confirm() {
             : preview || t("drawing.textBoxReferenceBlank")
         }}</span>
       </div>
-      <p v-if="error" role="alert">
-        {{
+      <TAlert
+        v-if="error"
+        theme="error"
+        :message="
           t(
-            error === "invalid"
-              ? "drawing.textBoxReferenceInvalid"
-              : error === "stale"
-                ? "drawing.textBoxReferenceStale"
-                : error === "unavailable"
-                  ? "drawing.textBoxReferenceUnavailable"
-                  : "drawing.changeRejected",
+            error === 'invalid'
+              ? 'drawing.textBoxReferenceInvalid'
+              : error === 'stale'
+                ? 'drawing.textBoxReferenceStale'
+                : error === 'unavailable'
+                  ? 'drawing.textBoxReferenceUnavailable'
+                  : 'drawing.changeRejected',
           )
-        }}
-      </p>
+        "
+        role="alert"
+      />
       <Button
         v-if="request.linked"
         theme="default"

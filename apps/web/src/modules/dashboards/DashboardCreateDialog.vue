@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import {
@@ -71,7 +72,7 @@ const example = computed(() => {
       <img :src="example" :alt="t('dashboard.preview')" />
       <Checkbox v-model="snapshot">{{ t("dashboard.snapshot") }}</Checkbox>
       <Checkbox v-model="skip">{{ t("dashboard.skip") }}</Checkbox>
-      <span v-if="error" role="alert">{{ t("dashboard.error") }}</span>
+      <TAlert v-if="error" theme="error" :message="t('dashboard.error')" role="alert" />
     </div>
   </Dialog>
 </template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { Select as TSelect, Option as TOption } from "tdesign-vue-next/es/select";
 import { Input as TInput } from "tdesign-vue-next/es/input";
@@ -84,7 +85,7 @@ function location(cell: ReviewTextCell) {
       </TForm>
       <p v-if="skipped">{{ t("review.skippedProtected", { count: skipped }) }}</p>
       <p v-if="busy" role="status">{{ t("review.checking") }}</p>
-      <p v-if="error" role="alert">{{ error }}</p>
+      <TAlert v-if="error" theme="error" :message="error" role="alert" />
       <template v-if="result && !busy">
         <p v-if="result.truncated" role="status">{{ t("review.reviewTruncated") }}</p>
         <template v-if="current && currentCell">

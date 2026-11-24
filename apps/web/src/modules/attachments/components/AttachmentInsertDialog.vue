@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { RadioGroup, Radio } from "tdesign-vue-next/es/radio";
@@ -109,9 +110,12 @@ function confirm() {
         <span>{{ fileName || t(asIcon ? "attachment.title" : "attachment.document") }}</span>
       </div>
       <p>{{ t(method === "cloud" ? "attachment.shareLinkHint" : "attachment.insertHint") }}</p>
-      <p v-if="error && method === 'file'" class="attachment-insert__error" role="alert">
-        {{ t("attachment.failed") }}
-      </p>
+      <TAlert
+        v-if="error && method === 'file'"
+        theme="error"
+        :message="t('attachment.failed')"
+        role="alert"
+      />
     </div>
   </Dialog>
 </template>

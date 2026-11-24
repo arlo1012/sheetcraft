@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, useId } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Input } from "tdesign-vue-next/es/input";
@@ -66,9 +67,8 @@ const source = ref(
         <Checkbox v-model="draft.camera.gridLines">{{ t("camera.gridLines") }}</Checkbox>
       </div>
       <p>{{ t("camera.hint") }}</p>
-      <p v-if="error" role="alert">{{ t("camera.invalid") }}</p>
-    </Form></Dialog
-  >
+      <TAlert v-if="error" theme="error" :message="t('camera.invalid')" role="alert" /> </Form
+  ></Dialog>
 </template>
 <style scoped lang="scss">
 .camera-editor {

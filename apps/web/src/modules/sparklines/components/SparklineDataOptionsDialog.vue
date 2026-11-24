@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
@@ -73,9 +74,7 @@ function confirm(): void {
           >{{ t("sparkline.showHiddenData") }}</Checkbox
         >
       </div>
-      <p v-if="failed" class="sparkline-data-options__error" role="alert">
-        {{ t("sparkline.failed") }}
-      </p>
+      <TAlert v-if="failed" theme="error" :message="t('sparkline.failed')" role="alert" />
     </Form>
   </Dialog>
 </template>

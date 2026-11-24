@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
@@ -34,7 +35,7 @@ const all = ref(false);
       label-align="top"
       :prevent-submit-default="true"
     >
-      <p v-if="error" class="picture-compress__error" role="alert">{{ error }}</p>
+      <TAlert v-if="error" theme="error" :message="error" role="alert" />
       <div class="picture-compress__row">
         <FormItem :label="t('picture.maxSide')"
           ><InputNumber

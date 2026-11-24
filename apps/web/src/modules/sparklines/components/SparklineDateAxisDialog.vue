@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
@@ -37,6 +38,6 @@ const reference = ref(props.initial);
           :select-reference="selectReference"
       /></FormItem>
     </Form>
-    <p v-if="failed" role="alert">{{ t("sparkline.invalidDateRange") }}</p>
+    <TAlert v-if="failed" theme="error" :message="t('sparkline.invalidDateRange')" role="alert" />
   </Dialog>
 </template>

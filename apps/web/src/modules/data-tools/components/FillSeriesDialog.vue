@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { DatePicker as TDatePicker, type DatePickerProps } from "tdesign-vue-next/es/date-picker";
@@ -216,7 +217,7 @@ function apply(): void {
           />
         </div>
       </div>
-      <p v-if="error" class="fill-dialog__error" role="alert">{{ error }}</p>
+      <TAlert v-if="error" theme="error" :message="error" role="alert" />
     </div>
   </Dialog>
 </template>

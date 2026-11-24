@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, toRaw, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -283,9 +284,14 @@ watch(
         <TButton theme="default" variant="outline" @click="formatDialogOpen = true">{{
           t("cellStyles.dialog.format")
         }}</TButton>
-        <p v-if="duplicateName" role="alert">{{ t("cellStyles.dialog.styleNameExists") }}</p>
+        <TAlert
+          v-if="duplicateName"
+          theme="error"
+          :message="t('cellStyles.dialog.styleNameExists')"
+          role="alert"
+        />
       </div>
-      <p v-if="error" class="new-cell-style-dialog__error" role="alert">{{ error }}</p>
+      <TAlert v-if="error" theme="error" :message="error" role="alert" />
       <section class="new-cell-style-dialog__summary" :aria-label="t('cellStyles.dialog.summary')">
         <h3>{{ t("cellStyles.dialog.summary") }}</h3>
         <dl>

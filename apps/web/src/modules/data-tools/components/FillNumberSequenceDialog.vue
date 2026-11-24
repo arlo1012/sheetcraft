@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
@@ -89,9 +90,7 @@ function apply(): void {
           </TFormItem>
         </div>
       </TForm>
-      <p v-if="error" class="fill-number-dialog__error" role="alert">
-        {{ error }}
-      </p>
+      <TAlert v-if="error" theme="error" :message="error" role="alert" />
     </div>
   </Dialog>
 </template>

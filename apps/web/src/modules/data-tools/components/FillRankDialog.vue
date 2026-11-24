@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { Info } from "lucide-vue-next";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
@@ -112,7 +113,7 @@ function apply(): void {
         <div class="fill-rank-dialog__card">
           <TCheckbox v-model="draft.overwrite">{{ t("dataTools.fill.rankOverwrite") }}</TCheckbox>
         </div>
-        <p v-if="error" class="fill-rank-dialog__error" role="alert">{{ error }}</p>
+        <TAlert v-if="error" theme="error" :message="error" role="alert" />
       </TForm>
     </div>
   </Dialog>

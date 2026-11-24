@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -88,7 +89,7 @@ function confirm(): void {
       <TCheckbox v-model="replaceExisting" :disabled="!hasStyles || loading">
         {{ t("cellStyles.merge.replaceExisting") }}
       </TCheckbox>
-      <p v-if="error" class="merge-cell-styles-dialog__error" role="alert">{{ error }}</p>
+      <TAlert v-if="error" theme="error" :message="error" role="alert" />
     </div>
   </Dialog>
 </template>

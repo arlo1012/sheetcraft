@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Button } from "tdesign-vue-next/es/button";
 import { useAppI18n } from "../../../shared/i18n";
@@ -54,9 +55,13 @@ async function openFile(event: Event) {
         @change="openFile"
       />
       <p v-if="!canCapture">{{ t("drawing.captureUnsupported") }}</p>
-      <p v-if="failed" role="alert">{{ t("drawing.captureFileError") }}</p>
-    </div></Dialog
-  >
+      <TAlert
+        v-if="failed"
+        theme="error"
+        :message="t('drawing.captureFileError')"
+        role="alert"
+      /></div
+  ></Dialog>
 </template>
 <style scoped>
 .capture-source {

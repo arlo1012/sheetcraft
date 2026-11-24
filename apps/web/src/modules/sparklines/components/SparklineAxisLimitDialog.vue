@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
@@ -46,7 +47,7 @@ function confirm() {
           v-native-control="{ attributes: { 'aria-label': label, inputmode: 'decimal' } }"
       /></FormItem>
     </Form>
-    <p v-if="failed" class="axis-limit-error" role="alert">{{ t("sparkline.axisLimitFailed") }}</p>
+    <TAlert v-if="failed" theme="error" :message="t('sparkline.axisLimitFailed')" role="alert" />
   </Dialog>
 </template>
 <style scoped lang="scss">

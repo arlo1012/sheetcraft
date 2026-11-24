@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { formatCellAddress } from "@sheetcraft/core/coordinates";
 import type { PictureCellOverwriteConfirmation } from "../picture-cell-overwrite-confirmation";
@@ -48,17 +49,20 @@ const confirm = props.confirmation.confirm,
         })
       }}
     </p>
-    <p v-if="confirmation.error" role="alert">
-      {{
+    <TAlert
+      v-if="confirmation.error"
+      theme="error"
+      :message="
         t(
           confirmation.insertionTargets
-            ? confirmation.errorReason === "command"
-              ? "image.insertionFailed"
-              : "image.insertTargetsChanged"
-            : "image.convertFailed",
+            ? confirmation.errorReason === 'command'
+              ? 'image.insertionFailed'
+              : 'image.insertTargetsChanged'
+            : 'image.convertFailed',
         )
-      }}
-    </p>
+      "
+      role="alert"
+    />
   </Dialog>
 </template>
 

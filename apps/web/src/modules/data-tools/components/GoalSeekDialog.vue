@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
@@ -116,7 +117,7 @@ function confirm() {
             :pick-label="tr('simulation.selectCell')"
             :select-reference="selectCellReference" /></TFormItem
       ></TForm>
-      <p v-if="error" class="simulation-dialog__error" role="alert">{{ error }}</p>
+      <TAlert v-if="error" theme="error" :message="error" role="alert" />
       <SimulationResultPanel v-if="result" :result="result" />
     </div>
   </Dialog>
