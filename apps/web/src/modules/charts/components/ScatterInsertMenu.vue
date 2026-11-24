@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, useId } from "vue";
-import { ChartScatter, ChevronRight } from "lucide-vue-next";
+import { ChartScatter, ChevronRight, LayoutTemplate } from "lucide-vue-next";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { DEFAULT_WORKBOOK_THEME } from "@sheetcraft/core/workbook-theme";
 import {
@@ -10,16 +10,20 @@ import {
 } from "@sheetcraft/core/chart-presentation";
 import type { ChartInsertIntent } from "../chart-design-intents";
 import { useAppI18n } from "../../../shared/i18n";
+import GallerySection from "../../../shared/gallery/GallerySection.vue";
+import MenuItem from "../../../shared/menu/MenuItem.vue";
+import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import RibbonSplitButton from "../../../shared/ribbon/RibbonSplitButton.vue";
 import ScatterThumbnail from "./ScatterThumbnail.vue";
+
 const props = defineProps<{
   disabled: boolean;
   themeColors?: readonly string[];
   fullWidth?: boolean;
 }>();
-const emit = defineEmits<{ insert: [intent: ChartInsertIntent] }>();
+const emit = defineEmits<{ insert: [intent: ChartInsertIntent]; more: [] }>();
 const { t } = useAppI18n();
 const trigger = ref<InstanceType<typeof RibbonSplitButton>>(),
   surface = ref<InstanceType<typeof MenuSurface>>();
@@ -44,6 +48,7 @@ const { open, floatingStyles, toggleMenu, onTriggerKeydown, dismiss } = useMenu(
     family.value = "marker";
   },
 });
+
 function choose(style?: ScatterStyle, accent = 0) {
   if (props.disabled || (style && !open.value)) return;
   const intent: ChartInsertIntent = style
@@ -52,7 +57,14 @@ function choose(style?: ScatterStyle, accent = 0) {
   dismiss("programmatic", false);
   emit("insert", intent);
 }
+
+function openMore() {
+  if (props.disabled) return;
+  dismiss("programmatic", false);
+  emit("more");
+}
 </script>
+
 <template>
   <RibbonSplitButton
     ref="trigger"
@@ -70,8 +82,8 @@ function choose(style?: ScatterStyle, accent = 0) {
     @menu-keydown="onTriggerKeydown"
     ><ChartScatter
   /></RibbonSplitButton>
-  <Teleport to="body"
-    ><MenuSurface
+  <Teleport to="body">
+    <MenuSurface
       v-if="open"
       :id="menuId"
       ref="surface"
@@ -79,31 +91,31 @@ function choose(style?: ScatterStyle, accent = 0) {
       :style="floatingStyles"
       :label="t('chart.scatter')"
     >
-      <template #header
-        ><div class="scatter-gallery__heading">
-          <strong>{{ t("chart.scatter") }}</strong
-          ><button type="button" @click="choose()">
-            {{ t("chart.xy.more") }}<ChevronRight :size="13" />
-          </button></div
-      ></template>
-      <template #body
-        ><div class="scatter-gallery__content">
+      <template #body>
+        <GallerySection :title="t('chart.scatter')">
+          <template #actions>
+            <button type="button" class="scatter-gallery__more-link" @click="openMore">
+              {{ t("chart.xy.more") }}<ChevronRight :size="14" aria-hidden="true" />
+            </button>
+          </template>
           <div class="scatter-gallery__families" role="group" :aria-label="t('chart.subtypes')">
             <button
               v-for="tab in ['marker', 'smooth', 'line'] as const"
               :key="tab"
               type="button"
+              class="scatter-gallery__family"
               :aria-pressed="family === tab"
               :data-scatter-family="tab"
               @click="family = tab"
             >
-              <ScatterThumbnail :variant="tab" :colors="palette" />{{ t(`chart.xy.family.${tab}`) }}
+              <ScatterThumbnail :variant="tab" :colors="palette" />
+              <span>{{ t(`chart.xy.family.${tab}`) }}</span>
             </button>
           </div>
           <Checkbox v-model="followTheme" class="scatter-gallery__theme">{{
             t("chart.xy.followTheme")
           }}</Checkbox>
-          <section v-for="style in styles[family]" :key="style">
+          <section v-for="style in styles[family]" :key="style" class="scatter-gallery__group">
             <h3>{{ t(`chart.xy.variant.${style}`) }}</h3>
             <div class="scatter-gallery__cards">
               <button
@@ -111,6 +123,7 @@ function choose(style?: ScatterStyle, accent = 0) {
                 :key="accent"
                 type="button"
                 role="menuitem"
+                class="scatter-gallery__card"
                 :data-scatter-style="style"
                 :data-scatter-accent="accent"
                 :aria-label="
@@ -130,78 +143,107 @@ function choose(style?: ScatterStyle, accent = 0) {
                 <ScatterThumbnail :variant="style" :colors="rotateChartPalette(palette, accent)" />
               </button>
             </div>
-          </section></div
-      ></template> </MenuSurface
-  ></Teleport>
+          </section>
+        </GallerySection>
+      </template>
+      <template #footer>
+        <MenuSeparator />
+        <MenuItem @select="openMore">
+          <template #icon><LayoutTemplate /></template>
+          {{ t("chart.allChartTemplates") }}
+        </MenuItem>
+      </template>
+    </MenuSurface>
+  </Teleport>
 </template>
+
 <style scoped lang="scss">
+@use "../../../shared/gallery/gallery-choice" as gallery;
+
 .scatter-gallery {
-  width: min(438px, calc(100vw - 16px));
+  width: min(420px, calc(100vw - 16px));
   max-width: calc(100vw - 16px);
-}
-.scatter-gallery__heading,
-.scatter-gallery__content {
-  padding: 6px 12px;
-}
-.scatter-gallery__heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.scatter-gallery button {
-  font: inherit;
-  color: inherit;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.scatter-gallery button:hover,
-.scatter-gallery button:focus-visible {
-  background: var(--sheetcraft-surface-hover);
-}
-.scatter-gallery__heading button {
-  display: flex;
-  align-items: center;
-  color: var(--sheetcraft-text-secondary);
-}
-.scatter-gallery__families,
-.scatter-gallery__cards {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-}
-.scatter-gallery__families button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-}
-.scatter-gallery__families button[aria-pressed="true"],
-.scatter-gallery__cards button:hover {
-  background: var(--sheetcraft-action-primary-subtle);
-  border-color: var(--sheetcraft-action-primary);
-}
-.scatter-gallery__families svg {
-  width: 34px;
-  height: 26px;
-}
-.scatter-gallery__theme {
-  margin: 12px 0 2px;
-}
-.scatter-gallery h3 {
-  font-size: inherit;
-  font-weight: 500;
-  margin: 8px 0 4px;
-}
-.scatter-gallery__cards button {
-  padding: 4px;
-  border-color: var(--sheetcraft-border-subtle);
-}
-.scatter-gallery__cards svg {
-  display: block;
-  margin: auto;
-  width: 100%;
-  max-height: 65px;
+
+  &__more-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 4px;
+    border: 0;
+    border-radius: var(--sheetcraft-radius-default);
+    background: transparent;
+    color: var(--sheetcraft-text-secondary);
+    font: inherit;
+    font-size: var(--sheetcraft-font-size-body-small);
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--sheetcraft-surface-hover);
+      color: var(--sheetcraft-text-primary);
+      outline: none;
+    }
+  }
+
+  &__families,
+  &__cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  &__family {
+    @include gallery.choice(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: var(--sheetcraft-font-size-body-small);
+
+    svg {
+      width: 30px;
+      height: 22px;
+      flex: none;
+    }
+
+    &[aria-pressed="true"] {
+      background: var(--sheetcraft-action-primary-subtle);
+      border-color: var(--sheetcraft-action-primary);
+    }
+  }
+
+  &__theme {
+    margin: 10px 0 4px;
+  }
+
+  &__group {
+    h3 {
+      margin: 8px 0 6px;
+      color: var(--sheetcraft-text-secondary);
+      font-size: var(--sheetcraft-font-size-body-small);
+      font-weight: var(--sheetcraft-font-weight-medium);
+    }
+  }
+
+  &__card {
+    @include gallery.choice(4px);
+    display: block;
+    width: 100%;
+    min-width: 0;
+    border-color: var(--sheetcraft-border-subtle);
+    background: var(--sheetcraft-surface-panel);
+
+    svg {
+      display: block;
+      margin: auto;
+      width: 100%;
+      max-height: 62px;
+    }
+
+    &:hover,
+    &:focus-visible {
+      border-color: var(--sheetcraft-action-primary);
+    }
+  }
 }
 </style>

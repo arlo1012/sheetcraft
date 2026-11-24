@@ -5,9 +5,18 @@ import {
   ChartLine,
   ChartBar,
   ChartArea,
+  ChartCandlestick,
+  ChartColumnStacked,
   ChartNetwork,
   ChartNoAxesCombined,
+  CircleDot,
+  Cloud,
+  GitFork,
   LayoutDashboard,
+  LayoutGrid,
+  LayoutTemplate,
+  Radar,
+  Waves,
 } from "lucide-vue-next";
 import type { ChartType } from "@sheetcraft/core/sheet-charts";
 import type {
@@ -24,6 +33,7 @@ import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
+import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import { useAppI18n } from "../../../shared/i18n";
 const DynamicChartGallery = defineAsyncComponent(() => import("./DynamicChartGallery.vue"));
@@ -107,6 +117,12 @@ function insert(type: ChartType) {
   emit("insert", type);
   dismiss("programmatic", true);
 }
+function openGallery() {
+  if (props.disabled) return;
+  dismiss("programmatic", false);
+  commonMenu.dismiss("programmatic", false);
+  galleryOpen.value = true;
+}
 </script>
 <template>
   <section class="chart-insert-tools" role="group" :aria-label="t('chart.tools')">
@@ -184,12 +200,14 @@ function insert(type: ChartType) {
         :disabled="disabled"
         :theme-colors="themeColors"
         @insert="emit('insert', $event)"
+        @more="openGallery"
       />
       <ScatterInsertMenu
         full-width
         :disabled="disabled"
         :theme-colors="themeColors"
         @insert="emit('insert', $event)"
+        @more="openGallery"
       />
     </div>
     <div class="chart-insert-tools__actions">
@@ -238,28 +256,63 @@ function insert(type: ChartType) {
               :disabled="disabled"
               :apply="commonSession.apply" /></GallerySection
         ></template>
+        <template #footer>
+          <MenuSeparator />
+          <MenuItem @select="openGallery">
+            <template #icon><LayoutTemplate /></template>
+            {{ t("chart.allChartTemplates") }}
+          </MenuItem>
+        </template>
       </MenuSurface>
     </Teleport>
-    <Teleport to="body"
-      ><MenuSurface
+    <Teleport to="body">
+      <MenuSurface
         v-if="open"
         :id="menuId"
         ref="menuSurfaceRef"
         :style="floatingStyles"
         :label="t('chart.more')"
       >
-        <MenuItem data-chart-combo-recipe @select="insert('combo')">{{
-          t("chart.combo")
-        }}</MenuItem>
-        <MenuItem data-chart-stock @select="insert('stock')">{{ t("chart.stock") }}</MenuItem>
-        <MenuItem @select="insert('doughnut')">{{ t("chart.doughnut") }}</MenuItem
-        ><MenuItem @select="insert('radar')">{{ t("chart.radar") }}</MenuItem>
-        <MenuItem @select="insert('treemap')">{{ t("chart.treemap") }}</MenuItem
-        ><MenuItem @select="insert('sankey')">{{ t("chart.sankey") }}</MenuItem
-        ><MenuItem @select="insert('river')">{{ t("chart.river") }}</MenuItem
-        ><MenuItem @select="insert('wordCloud')">{{ t("chart.wordCloud") }}</MenuItem>
-      </MenuSurface></Teleport
-    >
+        <MenuItem data-chart-combo-recipe @select="insert('combo')">
+          <template #icon><ChartColumnStacked /></template>
+          {{ t("chart.combo") }}
+        </MenuItem>
+        <MenuItem data-chart-stock @select="insert('stock')">
+          <template #icon><ChartCandlestick /></template>
+          {{ t("chart.stock") }}
+        </MenuItem>
+        <MenuItem @select="insert('doughnut')">
+          <template #icon><CircleDot /></template>
+          {{ t("chart.doughnut") }}
+        </MenuItem>
+        <MenuItem @select="insert('radar')">
+          <template #icon><Radar /></template>
+          {{ t("chart.radar") }}
+        </MenuItem>
+        <MenuSeparator />
+        <MenuItem @select="insert('treemap')">
+          <template #icon><LayoutGrid /></template>
+          {{ t("chart.treemap") }}
+        </MenuItem>
+        <MenuItem @select="insert('sankey')">
+          <template #icon><GitFork /></template>
+          {{ t("chart.sankey") }}
+        </MenuItem>
+        <MenuItem @select="insert('river')">
+          <template #icon><Waves /></template>
+          {{ t("chart.river") }}
+        </MenuItem>
+        <MenuItem @select="insert('wordCloud')">
+          <template #icon><Cloud /></template>
+          {{ t("chart.wordCloud") }}
+        </MenuItem>
+        <MenuSeparator />
+        <MenuItem @select="openGallery">
+          <template #icon><LayoutTemplate /></template>
+          {{ t("chart.allChartTemplates") }}
+        </MenuItem>
+      </MenuSurface>
+    </Teleport>
   </section>
 </template>
 <style scoped lang="scss">

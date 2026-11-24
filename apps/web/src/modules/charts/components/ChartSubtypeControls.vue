@@ -76,6 +76,12 @@ const percentKey = computed(() => `chart.variant.${props.type}.percentStacked` a
     :aria-label="t('chart.subtypes')"
     @keydown="onKeydown"
   >
+    <p
+      v-if="type === 'line' && presentation !== 'dialog'"
+      class="chart-subtype-controls__group-label"
+    >
+      {{ t("chart.linePlainGroup") }}
+    </p>
     <div class="chart-subtype-controls__choices">
       <button
         type="button"
@@ -178,6 +184,12 @@ const percentKey = computed(() => `chart.variant.${props.type}.percentStacked` a
         <span>{{ t(percentKey) }}</span>
       </button>
       <template v-if="type === 'line'">
+        <p
+          v-if="presentation !== 'dialog'"
+          class="chart-subtype-controls__group-label chart-subtype-controls__group-label--row"
+        >
+          {{ t("chart.lineMarkerGroup") }}
+        </p>
         <button
           type="button"
           :role="presentation === 'dialog' ? 'radio' : 'menuitemradio'"
@@ -280,12 +292,23 @@ const percentKey = computed(() => `chart.variant.${props.type}.percentStacked` a
 <style scoped lang="scss">
 @use "../../../shared/gallery/gallery-choice" as gallery;
 .chart-subtype-controls {
-  width: min(630px, calc(100vw - 48px));
+  width: min(384px, calc(100vw - 48px));
   max-width: 100%;
+  &__group-label {
+    margin: 0 0 6px;
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    font-weight: var(--sheetcraft-font-weight-medium);
+
+    &--row {
+      grid-column: 1 / -1;
+      margin: 6px 0 0;
+    }
+  }
   &__choices {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
+    gap: 8px;
   }
   button {
     @include gallery.choice(6px);
@@ -293,15 +316,25 @@ const percentKey = computed(() => `chart.variant.${props.type}.percentStacked` a
     justify-items: center;
     gap: 4px;
     min-width: 0;
-    font-size: var(--sheetcraft-font-size-body-medium);
-    line-height: var(--sheetcraft-line-height-body-medium);
+    border-color: var(--sheetcraft-border-subtle);
+    background: var(--sheetcraft-surface-panel);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
+
+    &:hover,
+    &:focus-visible {
+      border-color: var(--sheetcraft-action-primary);
+    }
   }
   svg {
-    width: 80px;
-    height: 48px;
+    width: 72px;
+    height: 44px;
   }
   span {
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
   }
   &.is-dialog {
     width: 100%;

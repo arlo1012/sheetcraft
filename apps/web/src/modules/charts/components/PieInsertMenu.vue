@@ -1,23 +1,27 @@
 <script setup lang="ts">
-import { defineAsyncComponent, computed, ref, useId } from "vue";
-import { ChartPie, ChevronRight } from "lucide-vue-next";
+import { computed, ref, useId } from "vue";
+import { ChartPie, ChevronRight, LayoutTemplate } from "lucide-vue-next";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { DEFAULT_WORKBOOK_THEME } from "@sheetcraft/core/workbook-theme";
 import { pieFamilies, type PieFamily } from "@sheetcraft/core/chart-presentation";
 import type { ChartInsertIntent } from "../chart-design-intents";
 import { pieCardsByFamily } from "../chart-pie-cards";
 import { useAppI18n } from "../../../shared/i18n";
+import GallerySection from "../../../shared/gallery/GallerySection.vue";
+import MenuItem from "../../../shared/menu/MenuItem.vue";
+import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import RibbonSplitButton from "../../../shared/ribbon/RibbonSplitButton.vue";
 import PieThumbnail from "./PieThumbnail.vue";
-const PieCardPreview = defineAsyncComponent(() => import("./PieCardPreview.vue"));
+import PieCardPreview from "./PieCardPreview.vue";
+
 const props = defineProps<{
   disabled: boolean;
   themeColors?: readonly string[];
   fullWidth?: boolean;
 }>();
-const emit = defineEmits<{ insert: [intent: ChartInsertIntent] }>();
+const emit = defineEmits<{ insert: [intent: ChartInsertIntent]; more: [] }>();
 const { t } = useAppI18n(),
   trigger = ref<InstanceType<typeof RibbonSplitButton>>(),
   surface = ref<InstanceType<typeof MenuSurface>>();
@@ -33,22 +37,30 @@ const { open, floatingStyles, toggleMenu, onTriggerKeydown, dismiss } = useMenu(
     family.value = "pie";
   },
 });
-function choose(index?: number, more = false) {
-  if (props.disabled || ((more || index !== undefined) && !open.value)) return;
+
+function choose(index?: number) {
+  if (props.disabled || (index !== undefined && !open.value)) return;
   const choice = family.value;
   dismiss("programmatic", false);
-  if (index === undefined && !more) {
+  if (index === undefined) {
     emit("insert", "pie");
     return;
   }
   emit("insert", {
     type: choice === "doughnut" ? "doughnut" : "pie",
     pieFamily: choice,
-    card: index ?? 0,
+    card: index,
     followTheme: followTheme.value,
   });
 }
+
+function openMore() {
+  if (props.disabled) return;
+  dismiss("programmatic", false);
+  emit("more");
+}
 </script>
+
 <template>
   <RibbonSplitButton
     ref="trigger"
@@ -66,8 +78,8 @@ function choose(index?: number, more = false) {
     @menu-keydown="onTriggerKeydown"
     ><ChartPie
   /></RibbonSplitButton>
-  <Teleport to="body"
-    ><MenuSurface
+  <Teleport to="body">
+    <MenuSurface
       v-if="open"
       ref="surface"
       :id="menuId"
@@ -75,21 +87,20 @@ function choose(index?: number, more = false) {
       class="pie-gallery"
       :label="t('chart.pie')"
     >
-      <template #header
-        ><div class="pie-gallery__head">
-          <strong>{{ t(`chart.pieMenu.${family}`) }}</strong
-          ><button type="button" @click="choose(undefined, true)">
-            {{ t("chart.xy.more") }}<ChevronRight :size="14" />
-          </button></div
-      ></template>
-      <template #body
-        ><div class="pie-gallery__body">
+      <template #body>
+        <GallerySection :title="t(`chart.pieMenu.${family}`)">
+          <template #actions>
+            <button type="button" class="pie-gallery__more-link" @click="openMore">
+              {{ t("chart.xy.more") }}<ChevronRight :size="14" aria-hidden="true" />
+            </button>
+          </template>
           <div class="pie-gallery__controls">
             <div role="group" :aria-label="t('chart.subtypes')" class="pie-gallery__families">
               <button
                 v-for="tab in pieFamilies"
                 :key="tab"
                 type="button"
+                class="pie-gallery__family"
                 :title="t(`chart.pieMenu.${tab}`)"
                 :aria-label="t(`chart.pieMenu.${tab}`)"
                 :aria-pressed="family === tab"
@@ -107,6 +118,7 @@ function choose(index?: number, more = false) {
               :key="index"
               type="button"
               role="menuitem"
+              class="pie-gallery__card"
               :data-pie-card="index"
               :title="
                 t('chart.pieMenu.card', { family: t(`chart.pieMenu.${family}`), index: index + 1 })
@@ -124,95 +136,103 @@ function choose(index?: number, more = false) {
                 :follow-theme="followTheme"
               />
             </button>
-            <button
-              data-pie-more
-              type="button"
-              role="menuitem"
-              class="pie-gallery__more"
-              @click="choose(undefined, true)"
-            >
-              {{ t("chart.pieMenu.moreStyles") }}<ChevronRight :size="14" />
-            </button>
-          </div></div
-      ></template> </MenuSurface
-  ></Teleport>
+          </div>
+        </GallerySection>
+      </template>
+      <template #footer>
+        <MenuSeparator />
+        <MenuItem data-pie-more @select="openMore">
+          <template #icon><LayoutTemplate /></template>
+          {{ t("chart.pieMenu.moreStyles") }}
+        </MenuItem>
+      </template>
+    </MenuSurface>
+  </Teleport>
 </template>
+
 <style scoped lang="scss">
+@use "../../../shared/gallery/gallery-choice" as gallery;
+@use "../../../shared/option-list/option-list" as option-list;
+
 .pie-gallery {
-  width: min(596px, calc(100vw - 16px));
+  width: min(560px, calc(100vw - 16px));
   max-width: calc(100vw - 16px);
-}
-.pie-gallery__head,
-.pie-gallery__body {
-  padding: 6px 12px;
-}
-.pie-gallery__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.pie-gallery button {
-  font: inherit;
-  color: inherit;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: transparent;
-  cursor: pointer;
-}
-.pie-gallery button:hover,
-.pie-gallery button:focus-visible {
-  background: var(--sheetcraft-surface-hover);
-}
-.pie-gallery__head button {
-  display: flex;
-  align-items: center;
-  color: var(--sheetcraft-text-secondary);
-}
-.pie-gallery__families {
-  display: flex;
-  gap: 5px;
-  margin-bottom: 8px;
-}
-.pie-gallery__families button {
-  width: 43px;
-  padding: 1px;
-}
-.pie-gallery__families button[aria-pressed="true"] {
-  border-bottom: 2px solid var(--sheetcraft-action-primary);
-}
-.pie-gallery__cards {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin: 12px 0 4px;
-  max-height: min(422px, calc(100dvh - 200px));
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-}
-.pie-gallery__cards button {
-  padding: 4px;
-  border-color: var(--sheetcraft-border-subtle);
-}
-.pie-gallery__cards .pie-gallery__more {
-  grid-column: 1/-1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-color: transparent;
-  color: var(--sheetcraft-text-secondary);
-}
-.pie-gallery__cards .pie-gallery__more svg {
-  width: 14px;
-}
-.pie-gallery__cards button:hover {
-  border-color: var(--sheetcraft-action-primary);
-}
-.pie-gallery svg {
-  display: block;
-  width: 100%;
-}
-.pie-gallery__head svg {
-  width: 14px;
+
+  &__more-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 4px;
+    border: 0;
+    border-radius: var(--sheetcraft-radius-default);
+    background: transparent;
+    color: var(--sheetcraft-text-secondary);
+    font: inherit;
+    font-size: var(--sheetcraft-font-size-body-small);
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--sheetcraft-surface-hover);
+      color: var(--sheetcraft-text-primary);
+      outline: none;
+    }
+  }
+
+  &__controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sheetcraft-space-3);
+    margin-bottom: var(--sheetcraft-space-3);
+  }
+
+  &__families {
+    display: flex;
+    gap: 4px;
+  }
+
+  &__family {
+    @include gallery.choice(2px);
+    width: 44px;
+    height: 30px;
+
+    svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    &[aria-pressed="true"] {
+      background: var(--sheetcraft-action-primary-subtle);
+      border-color: var(--sheetcraft-action-primary);
+    }
+  }
+
+  &__cards {
+    @include option-list.scrollbar;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    max-height: min(360px, calc(100dvh - 220px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 2px;
+  }
+
+  &__card {
+    @include gallery.choice(4px);
+    display: block;
+    width: 100%;
+    min-width: 0;
+    aspect-ratio: 180 / 100;
+    border-color: var(--sheetcraft-border-subtle);
+    background: var(--sheetcraft-surface-panel);
+
+    &:hover,
+    &:focus-visible {
+      border-color: var(--sheetcraft-action-primary);
+    }
+  }
 }
 </style>
