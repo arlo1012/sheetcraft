@@ -134,7 +134,7 @@ defineExpose({
 });
 </script>
 <template>
-  <div ref="root">
+  <div ref="root" class="shape-ribbon-font-size-field">
     <FontFormatField
       ref="control"
       match-panel-width
@@ -164,3 +164,9 @@ defineExpose({
     />
   </div>
 </template>
+<style scoped lang="scss">
+.shape-ribbon-font-size-field {
+  width: 100%;
+  min-width: 0;
+}
+</style>

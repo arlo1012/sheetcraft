@@ -7,13 +7,14 @@ import {
 import { shapeRichTextSourceStyle } from "../shape-rich-text-source-style";
 import { useWorkbookTheme } from "../../../shared/color/workbook-theme-context";
 import { computed, nextTick } from "vue";
-import { PaintBucket, PencilLine, Sparkles, Type, WrapText, CaseSensitive } from "lucide-vue-next";
+import { PaintBucket, PencilLine, Sparkles, TextWrap, Type } from "lucide-vue-next";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import RibbonColorSplitButton from "../../../shared/color/RibbonColorSplitButton.vue";
 import TextAlignmentToggleGroup, {
   type TextAlignmentOption,
 } from "../../../shared/text-format/TextAlignmentToggleGroup.vue";
+import TextDirectionIcon from "../../../shared/text-format/TextDirectionIcon.vue";
 import TextStyleToggleGroup, {
   type TextStyleToggleItem,
   type TextStyleToggleKey,
@@ -114,11 +115,11 @@ const sourceNote = computed(() => {
     <RibbonToolbar :label="c.s.value(mode === 'drawing' ? 'drawingTools' : 'textTools')">
       <section
         v-if="mode === 'text'"
-        class="shape-text-ribbon__compact"
+        class="shape-text-ribbon__compact shape-text-ribbon__font"
         data-ribbon-group="shape-font"
         :aria-label="c.s.value('font')"
       >
-        <div class="shape-text-ribbon__row">
+        <div class="shape-text-ribbon__row shape-text-ribbon__font-row" data-ribbon-row="1">
           <div class="shape-text-ribbon__family">
             <ShapeFontFamilyField
               feedback-presentation="floating"
@@ -130,7 +131,7 @@ const sourceNote = computed(() => {
             <ShapeRibbonFontSizeField :controller="c" :session-id="sessionId" />
           </div>
         </div>
-        <div class="shape-text-ribbon__row">
+        <div class="shape-text-ribbon__row shape-text-ribbon__font-row" data-ribbon-row="2">
           <TextStyleToggleGroup
             variant="ribbon"
             :items="styleItems"
@@ -156,89 +157,114 @@ const sourceNote = computed(() => {
       </section>
       <section
         v-if="mode === 'text'"
-        class="shape-text-ribbon__compact"
+        class="shape-text-ribbon__compact shape-text-ribbon__grid-group"
         data-ribbon-group="shape-paragraph"
         :aria-label="c.s.value('paragraph')"
       >
-        <div class="shape-text-ribbon__row">
-          <TextAlignmentToggleGroup
-            variant="ribbon"
-            :options="horizontalAlignmentOptions"
-            :model-value="snapshot?.values.paragraphAlignment"
-            :mixed="c.isMixedField('paragraphAlignment')"
-            :disabled="!c.fieldCapability('paragraphAlignment').enabled"
-            :label="c.s.value('paragraphAlignment')"
-            @select="
-              (value) =>
-                change('paragraphAlignment', value as ShapeFormatValues['paragraphAlignment'])
-            "
-          />
+        <div class="shape-text-ribbon__grid-row" data-ribbon-row="1">
+          <div class="shape-text-ribbon__leading">
+            <TextAlignmentToggleGroup
+              variant="ribbon"
+              :options="verticalAlignmentOptions"
+              :model-value="snapshot?.values.textVerticalAlignment"
+              :mixed="c.isMixedField('textVerticalAlignment')"
+              :disabled="!c.fieldCapability('textVerticalAlignment').enabled"
+              :label="c.s.value('textVerticalAlignment')"
+              @select="
+                (value) =>
+                  change(
+                    'textVerticalAlignment',
+                    value as ShapeFormatValues['textVerticalAlignment'],
+                  )
+              "
+            />
+          </div>
+          <div class="shape-text-ribbon__action">
+            <RibbonButton
+              full-width
+              :label="c.s.value('textWrap')"
+              :text="c.s.value('textWrapShort')"
+              :pressed="pressed('textWrap')"
+              :disabled="!c.fieldCapability('textWrap').enabled"
+              @activate="toggle('textWrap')"
+              ><TextWrap aria-hidden="true"
+            /></RibbonButton>
+          </div>
         </div>
-        <div class="shape-text-ribbon__row">
-          <TextAlignmentToggleGroup
-            variant="ribbon"
-            :options="verticalAlignmentOptions"
-            :model-value="snapshot?.values.textVerticalAlignment"
-            :mixed="c.isMixedField('textVerticalAlignment')"
-            :disabled="!c.fieldCapability('textVerticalAlignment').enabled"
-            :label="c.s.value('textVerticalAlignment')"
-            @select="
-              (value) =>
-                change('textVerticalAlignment', value as ShapeFormatValues['textVerticalAlignment'])
-            "
-          />
-          <RibbonButton
-            :label="c.s.value('textWrap')"
-            :pressed="pressed('textWrap')"
-            :disabled="!c.fieldCapability('textWrap').enabled"
-            @activate="toggle('textWrap')"
-            ><WrapText
-          /></RibbonButton>
-          <ShapeRibbonLayoutMenu :controller="c" :session-id="sessionId"
-            ><CaseSensitive
-          /></ShapeRibbonLayoutMenu>
+        <div class="shape-text-ribbon__grid-row" data-ribbon-row="2">
+          <div class="shape-text-ribbon__leading">
+            <TextAlignmentToggleGroup
+              variant="ribbon"
+              :options="horizontalAlignmentOptions"
+              :model-value="snapshot?.values.paragraphAlignment"
+              :mixed="c.isMixedField('paragraphAlignment')"
+              :disabled="!c.fieldCapability('paragraphAlignment').enabled"
+              :label="c.s.value('paragraphAlignment')"
+              @select="
+                (value) =>
+                  change('paragraphAlignment', value as ShapeFormatValues['paragraphAlignment'])
+              "
+            />
+          </div>
+          <div class="shape-text-ribbon__action">
+            <ShapeRibbonLayoutMenu full-width :controller="c" :session-id="sessionId"
+              ><TextDirectionIcon
+            /></ShapeRibbonLayoutMenu>
+          </div>
         </div>
       </section>
       <section
-        class="shape-text-ribbon__compact"
+        class="shape-text-ribbon__compact shape-text-ribbon__grid-group"
         data-ribbon-group="shape-text-appearance"
         :aria-label="c.s.value('textAppearance')"
       >
-        <div class="shape-text-ribbon__row">
-          <ShapeRibbonStyleMenu
-            :controller="c"
-            target="text"
-            category="fill"
-            :label="c.s.value('textFill')"
-            :session-id="sessionId"
-            ><PaintBucket
-          /></ShapeRibbonStyleMenu>
-          <ShapeRibbonStyleMenu
-            :controller="c"
-            target="text"
-            category="line"
-            :label="c.s.value('textOutline')"
-            :session-id="sessionId"
-            ><PencilLine
-          /></ShapeRibbonStyleMenu>
+        <div class="shape-text-ribbon__grid-row" data-ribbon-row="1">
+          <div class="shape-text-ribbon__action">
+            <ShapeRibbonStyleMenu
+              full-width
+              :controller="c"
+              target="text"
+              category="fill"
+              :label="c.s.value('textFill')"
+              :session-id="sessionId"
+              ><PaintBucket
+            /></ShapeRibbonStyleMenu>
+          </div>
+          <div class="shape-text-ribbon__action">
+            <ShapeRibbonStyleMenu
+              full-width
+              :controller="c"
+              target="text"
+              category="line"
+              :label="c.s.value('textOutline')"
+              :session-id="sessionId"
+              ><PencilLine
+            /></ShapeRibbonStyleMenu>
+          </div>
         </div>
-        <div class="shape-text-ribbon__row">
-          <ShapeRibbonStyleMenu
-            :controller="c"
-            target="text"
-            category="effects"
-            :label="c.s.value('textEffects')"
-            :session-id="sessionId"
-            ><Sparkles
-          /></ShapeRibbonStyleMenu>
-          <ShapeRibbonStyleMenu
-            :controller="c"
-            target="text"
-            category="styles"
-            :label="c.s.value('wordArtStyles')"
-            :session-id="sessionId"
-            ><Type
-          /></ShapeRibbonStyleMenu>
+        <div class="shape-text-ribbon__grid-row" data-ribbon-row="2">
+          <div class="shape-text-ribbon__action">
+            <ShapeRibbonStyleMenu
+              full-width
+              :controller="c"
+              target="text"
+              category="effects"
+              :label="c.s.value('textEffects')"
+              :session-id="sessionId"
+              ><Sparkles
+            /></ShapeRibbonStyleMenu>
+          </div>
+          <div class="shape-text-ribbon__action">
+            <ShapeRibbonStyleMenu
+              full-width
+              :controller="c"
+              target="text"
+              category="styles"
+              :label="c.s.value('wordArtStyles')"
+              :session-id="sessionId"
+              ><Type
+            /></ShapeRibbonStyleMenu>
+          </div>
         </div>
       </section>
       <section
@@ -247,6 +273,7 @@ const sourceNote = computed(() => {
         :aria-label="c.s.value('shapeAppearance')"
       >
         <ShapeRibbonStyleMenu
+          full-width
           :controller="c"
           target="shape"
           category="fill"
@@ -255,6 +282,7 @@ const sourceNote = computed(() => {
           ><PaintBucket
         /></ShapeRibbonStyleMenu>
         <ShapeRibbonStyleMenu
+          full-width
           :controller="c"
           target="shape"
           category="line"
@@ -278,15 +306,49 @@ const sourceNote = computed(() => {
   &__compact {
     @include ribbon.compact;
   }
+  &__font {
+    --shape-font-family-width: 120px;
+    --shape-font-size-width: 48px;
+    --shape-font-gap: 4px;
+  }
   &__row {
     @include ribbon.row;
   }
+  &__font-row {
+    gap: var(--shape-font-gap);
+  }
+  &__grid-group {
+    grid-template-columns: max-content max-content;
+    column-gap: 4px;
+  }
+  &__grid-row {
+    @include ribbon.row;
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    gap: 4px;
+  }
+  &__leading {
+    display: flex;
+    align-items: center;
+  }
+  &__action {
+    display: grid;
+    min-width: 0;
+  }
   &__family {
-    width: 145px;
+    display: inline-flex;
+    align-items: center;
+    width: var(--shape-font-family-width);
+    height: var(--ribbon-control-height, 26px);
+    min-width: 0;
   }
   &__size {
-    width: 56px;
-    min-width: 56px;
+    display: inline-flex;
+    align-items: center;
+    width: var(--shape-font-size-width);
+    min-width: var(--shape-font-size-width);
+    height: var(--ribbon-control-height, 26px);
     flex-shrink: 0;
   }
   &__color {

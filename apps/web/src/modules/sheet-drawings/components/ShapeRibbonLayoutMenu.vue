@@ -6,10 +6,13 @@ import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import { provideNativePopupScope } from "../../../shared/floating/useNativePopupOwnership";
 import { useShapeTextFieldDraft } from "../shape-text-field-drafts";
 import { useMenu } from "../../../shared/menu/useMenu";
-import ShapeFormatAlignmentField from "./shape-format/ShapeFormatAlignmentField.vue";
 import ShapeFormatChoiceField from "./shape-format/ShapeFormatChoiceField.vue";
 import type { ShapeFormatController } from "./shape-format/useShapeFormatPane";
-const props = defineProps<{ controller: ShapeFormatController; sessionId?: number }>();
+const props = defineProps<{
+  controller: ShapeFormatController;
+  sessionId?: number;
+  fullWidth?: boolean;
+}>();
 const trigger = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
 const surface = ref<InstanceType<typeof MenuSurface> | null>(null);
 const id = `shape-ribbon-layout-${useId()}`;
@@ -55,11 +58,12 @@ watch(
 defineSlots<{ default: () => unknown }>();
 </script>
 <template>
-  <span class="shape-ribbon-layout-menu">
+  <span class="shape-ribbon-layout-menu" :class="{ 'is-full-width': fullWidth }">
     <RibbonMenuButton
       ref="trigger"
       :label="label"
       :text="label"
+      :full-width="fullWidth"
       :disabled="disabled"
       :expanded="menu.open.value"
       :menu-id="id"
@@ -80,8 +84,7 @@ defineSlots<{ default: () => unknown }>();
         <template #body>
           <GallerySection :title="label">
             <div class="shape-ribbon-layout-menu__fields">
-              <ShapeFormatChoiceField :controller="controller" field="textDirection" />
-              <ShapeFormatAlignmentField :controller="controller" field="textVerticalAlignment" />
+              <ShapeFormatChoiceField :controller="controller" field="textDirection" inline />
               <ShapeFormatChoiceField
                 v-if="controller.props.snapshot?.values.textDirection === 'stacked'"
                 :controller="controller"
@@ -97,14 +100,18 @@ defineSlots<{ default: () => unknown }>();
 <style scoped lang="scss">
 .shape-ribbon-layout-menu {
   display: inline-flex;
+  min-width: 0;
+  &.is-full-width {
+    display: flex;
+    width: 100%;
+  }
   &__panel {
-    width: 300px;
+    width: 260px;
     z-index: var(--sheetcraft-layer-menu);
   }
   &__fields {
     display: grid;
-    gap: 10px;
-    padding: var(--sheetcraft-space-2) var(--sheetcraft-space-2) var(--sheetcraft-space-1);
+    gap: var(--sheetcraft-space-3);
   }
 }
 </style>

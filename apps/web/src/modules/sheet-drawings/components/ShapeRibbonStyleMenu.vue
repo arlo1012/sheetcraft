@@ -18,6 +18,7 @@ const props = defineProps<{
   category: "fill" | "line" | "effects" | "styles";
   label: string;
   sessionId?: number;
+  fullWidth?: boolean;
 }>();
 defineSlots<{ default: () => unknown }>();
 const trigger = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
@@ -77,11 +78,12 @@ const line = computed(() => props.controller.styleBinding(props.target, "line"))
 const styles = computed(() => props.controller.wordArtStyleBinding());
 </script>
 <template>
-  <span class="shape-ribbon-style-menu">
+  <span class="shape-ribbon-style-menu" :class="{ 'is-full-width': fullWidth }">
     <RibbonMenuButton
       ref="trigger"
       :label="label"
       :text="label"
+      :full-width="fullWidth"
       :disabled="disabled"
       :expanded="menu.open.value"
       :menu-id="id"
@@ -136,6 +138,11 @@ const styles = computed(() => props.controller.wordArtStyleBinding());
 <style scoped lang="scss">
 .shape-ribbon-style-menu {
   display: inline-flex;
+  min-width: 0;
+  &.is-full-width {
+    display: flex;
+    width: 100%;
+  }
   &__panel {
     width: 330px;
     max-height: min(540px, 75vh);

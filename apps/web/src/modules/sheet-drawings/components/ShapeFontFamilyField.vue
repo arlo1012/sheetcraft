@@ -228,6 +228,7 @@ defineExpose({ flush, focus: () => field.value?.focus() });
 </template>
 <style scoped lang="scss">
 .shape-font-family-field {
+  width: 100%;
   min-width: 0;
   &__feedback {
     margin: 0;

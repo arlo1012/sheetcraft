@@ -10,7 +10,11 @@ import type {
   ShapeFormatValues,
 } from "../../shape-format-pane-model";
 import type { ShapeFormatController } from "./useShapeFormatPane";
-const props = defineProps<{ controller: ShapeFormatController; field: ShapeFormatChoiceField }>();
+const props = defineProps<{
+  controller: ShapeFormatController;
+  field: ShapeFormatChoiceField;
+  inline?: boolean;
+}>();
 const capability = computed(() => props.controller.fieldCapability(props.field));
 const root = ref<InstanceType<typeof FormatField>>();
 const inputId = `shape-format-choice-${useId()}`;
@@ -119,6 +123,7 @@ const action = computed(() => {
   <FormatField
     ref="root"
     :label="controller.fieldLabel(field)"
+    :inline="inline"
     :reason="capability.enabled ? undefined : capability.reason"
     :data-shape-format-field="field"
   >
