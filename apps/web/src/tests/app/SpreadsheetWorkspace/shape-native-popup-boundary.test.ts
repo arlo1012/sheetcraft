@@ -41,10 +41,7 @@ import * as measurement from "../../../modules/sheet-drawings/shape-text-measure
 import * as textPaint from "../../../modules/sheet-drawings/shape-text-paint";
 import * as groupPaint from "../../../modules/sheet-drawings/shape-group-paint";
 const mounted: VueWrapper[] = [];
-type SelectWrapper = Pick<
-  VueWrapper<InstanceType<typeof TSelect>>,
-  "get" | "findAll" | "props"
->;
+type SelectWrapper = Pick<VueWrapper<InstanceType<typeof TSelect>>, "get" | "findAll" | "props">;
 afterEach(() => {
   mounted.splice(0).forEach((wrapper) => wrapper.unmount());
   textPaint.clearShapeTextPaintCache();
@@ -345,48 +342,70 @@ test("real native text direction choice is inside the current pane, while stale 
   expect(serializeWorkbook(f.current.session.workbook)).toEqual(switched);
 }, 15000);
 
-test.each(["layout", "line"] as const)(
-  "Ribbon %s native child popup stays inside parent through pointer and closes one level per Escape",
-  async (kind) => {
-    const f = await fixture();
-    if (kind === "layout") {
-      const tab = f.wrapper.get<HTMLElement>('[data-ribbon-category="shape-text"]');
-      pointer(tab.element);
-      await tab.trigger("click");
-      await flushPromises();
-    }
-    const menu =
-      kind === "layout"
-        ? f.wrapper.getComponent(ShapeRibbonLayoutMenu)
-        : f.wrapper
-            .findAllComponents(ShapeRibbonStyleMenu)
-            .find((item) => item.props("category") === "line" && item.props("target") === "shape")!;
-    const parentTrigger = menu.get<HTMLElement>('[role="button"]');
-    pointer(parentTrigger.element);
-    parentTrigger.element.focus();
-    await flushPromises();
-    expect(f.current.sheetGridRef.getSelectedShapeObjects()).toEqual([["box"]]);
-    await parentTrigger.trigger("click");
-    await flushPromises();
-    const select = menu.findAllComponents(TSelect)[0]!;
-    const option = await open(select, kind === "layout" ? "Rotate all text 90°" : "No line");
-    pointer(option);
-    await flushPromises();
-    expect(select.exists()).toBe(true);
-    expect(select.props("popupVisible")).toBe(true);
-    expect(f.current.sheetGridRef.getSelectedShapeObjects()).toEqual([["box"]]);
-    const input = select.get<HTMLInputElement>("input");
-    input.element.focus();
-    await input.trigger("keydown", { key: "Escape", code: "Escape" });
-    await flushPromises();
-    expect(select.props("popupVisible")).toBe(false);
-    expect(menu.findAllComponents(TSelect)).not.toHaveLength(0);
-    await input.trigger("keydown", { key: "Escape", code: "Escape" });
-    await flushPromises();
-    expect(menu.findAllComponents(TSelect)).toHaveLength(0);
-  },
-  15000,
-);
+test("Ribbon text direction menu selects options directly, keeps shape selection, and closes on Escape", async () => {
+  const f = await fixture();
+  const tab = f.wrapper.get<HTMLElement>('[data-ribbon-category="shape-text"]');
+  pointer(tab.element);
+  await tab.trigger("click");
+  await flushPromises();
+  const menu = f.wrapper.getComponent(ShapeRibbonLayoutMenu);
+  const parentTrigger = menu.get<HTMLElement>('[role="button"]');
+  pointer(parentTrigger.element);
+  parentTrigger.element.focus();
+  await flushPromises();
+  expect(f.current.sheetGridRef.getSelectedShapeObjects()).toEqual([["box"]]);
+  await parentTrigger.trigger("click");
+  await flushPromises();
+  const option = document.body.querySelector<HTMLElement>(
+    '[data-shape-text-direction="rotate-90"]',
+  )!;
+  expect(option).not.toBeNull();
+  expect(option.textContent?.trim()).toBe("Rotate all text 90°");
+  pointer(option);
+  await flushPromises();
+  expect(f.current.sheetGridRef.getSelectedShapeObjects()).toEqual([["box"]]);
+  option.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }),
+  );
+  await flushPromises();
+  expect(document.body.querySelector('[data-shape-text-direction="rotate-90"]')).toBeNull();
+  await parentTrigger.trigger("click");
+  await flushPromises();
+  document.body.querySelector<HTMLElement>('[data-shape-text-direction="rotate-90"]')!.click();
+  await flushPromises();
+  expect(f.current.sheetGridRef.getSelectedShapeObjects()).toEqual([["box"]]);
+  expect(document.body.querySelector('[data-shape-text-direction="rotate-90"]')).toBeNull();
+}, 15000);
+
+test("Ribbon line native child popup stays inside parent through pointer and closes one level per Escape", async () => {
+  const f = await fixture();
+  const menu = f.wrapper
+    .findAllComponents(ShapeRibbonStyleMenu)
+    .find((item) => item.props("category") === "line" && item.props("target") === "shape")!;
+  const parentTrigger = menu.get<HTMLElement>('[role="button"]');
+  pointer(parentTrigger.element);
+  parentTrigger.element.focus();
+  await flushPromises();
+  expect(f.current.sheetGridRef.getSelectedShapeObjects()).toEqual([["box"]]);
+  await parentTrigger.trigger("click");
+  await flushPromises();
+  const select = menu.findAllComponents(TSelect)[0]!;
+  const option = await open(select, "No line");
+  pointer(option);
+  await flushPromises();
+  expect(select.exists()).toBe(true);
+  expect(select.props("popupVisible")).toBe(true);
+  expect(f.current.sheetGridRef.getSelectedShapeObjects()).toEqual([["box"]]);
+  const input = select.get<HTMLInputElement>("input");
+  input.element.focus();
+  await input.trigger("keydown", { key: "Escape", code: "Escape" });
+  await flushPromises();
+  expect(select.props("popupVisible")).toBe(false);
+  expect(menu.findAllComponents(TSelect)).not.toHaveLength(0);
+  await input.trigger("keydown", { key: "Escape", code: "Escape" });
+  await flushPromises();
+  expect(menu.findAllComponents(TSelect)).toHaveLength(0);
+}, 15000);
 
 test("retired native line options and captured commands cannot modify a replacement object or worksheet", async () => {
   const f = await fixture(),

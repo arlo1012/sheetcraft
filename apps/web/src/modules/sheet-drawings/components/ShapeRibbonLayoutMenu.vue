@@ -1,60 +1,115 @@
 <script setup lang="ts">
-import { computed, ref, useId, watch } from "vue";
+import { computed, nextTick, ref, useId, watch } from "vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
+import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
+import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
-import GallerySection from "../../../shared/gallery/GallerySection.vue";
-import { provideNativePopupScope } from "../../../shared/floating/useNativePopupOwnership";
-import { useShapeTextFieldDraft } from "../shape-text-field-drafts";
 import { useMenu } from "../../../shared/menu/useMenu";
-import ShapeFormatChoiceField from "./shape-format/ShapeFormatChoiceField.vue";
+import { useShapeTextFieldDraft } from "../shape-text-field-drafts";
+import { focusShapeTextEditInput } from "../shape-text-edit-ownership";
+import type { ShapeFormatOption, ShapeFormatValues } from "../shape-format-pane-model";
 import type { ShapeFormatController } from "./shape-format/useShapeFormatPane";
+
 const props = defineProps<{
   controller: ShapeFormatController;
   sessionId?: number;
   fullWidth?: boolean;
 }>();
+
 const trigger = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
 const surface = ref<InstanceType<typeof MenuSurface> | null>(null);
 const id = `shape-ribbon-layout-${useId()}`;
 const disabled = computed(() => !props.controller.fieldCapability("textDirection").enabled);
+const lineOrderEnabled = computed(() => props.controller.fieldCapability("textLineOrder").enabled);
 const label = computed(() => props.controller.s.value("textDirection"));
-const popupScopeActive = ref(false);
-const popups = provideNativePopupScope({
-  owner: () => (props.controller.props.snapshot ? props.controller.ownerKey.value : undefined),
-  active: () => popupScopeActive.value,
+const directionMixed = computed(() => props.controller.isMixedField("textDirection"));
+const lineOrderMixed = computed(() => props.controller.isMixedField("textLineOrder"));
+const currentDirection = computed(() => props.controller.props.snapshot?.values.textDirection);
+const currentLineOrder = computed(() => props.controller.props.snapshot?.values.textLineOrder);
+
+const directionOptions = computed<readonly ShapeFormatOption[]>(() => {
+  const override = props.controller.props.options?.textDirection;
+  if (override) return override;
+  const s = props.controller.s.value;
+  return [
+    { value: "horizontal", label: s("horizontal") },
+    { value: "vertical-rl", label: s("verticalRightToLeft") },
+    { value: "vertical-lr", label: s("verticalLeftToRight") },
+    { value: "rotate-90", label: s("rotate90") },
+    { value: "rotate-270", label: s("rotate270") },
+    { value: "stacked", label: s("stacked") },
+  ];
 });
+
+const lineOrderOptions = computed<readonly ShapeFormatOption[]>(() => {
+  const override = props.controller.props.options?.textLineOrder;
+  if (override) return override;
+  const s = props.controller.s.value;
+  return [
+    { value: "rtl", label: s("rightToLeft") },
+    { value: "ltr", label: s("leftToRight") },
+  ];
+});
+
 useShapeTextFieldDraft({
   owner: () => props.controller.props.snapshot?.owner.sessionId,
   flush: () => true,
   focus: () => {},
   containsTarget: (target) =>
-    popups.containsTarget(target) ||
-    (!!props.controller.props.snapshot &&
-      !disabled.value &&
-      target instanceof Node &&
-      target.isConnected &&
-      !!trigger.value?.rootElement?.isConnected &&
-      trigger.value.rootElement.contains(target)),
+    !!props.controller.props.snapshot &&
+    !disabled.value &&
+    target instanceof Node &&
+    target.isConnected &&
+    ((!!trigger.value?.rootElement?.isConnected && trigger.value.rootElement.contains(target)) ||
+      (!!surface.value?.rootElement?.isConnected && surface.value.rootElement.contains(target))),
 });
+
 const menu = useMenu({
   triggerRef: computed(() => trigger.value?.rootElement ?? null),
   menuSurfaceRef: surface,
   disabled,
-  additionalInside: popups.popupElements,
-  defaultFocus: "menu",
+  defaultFocus: "selected",
   placement: "bottom-start",
 });
-watch(
-  menu.open,
-  (value) => {
-    popupScopeActive.value = value;
-  },
-  { flush: "sync" },
-);
+
 watch(
   () => props.controller.ownerKey.value,
   () => menu.dismiss("programmatic", false),
 );
+
+function restore(): void {
+  const owner = props.sessionId;
+  if (owner !== undefined) void nextTick(() => focusShapeTextEditInput(owner));
+}
+
+function selectDirection(value: string): void {
+  if (disabled.value) return;
+  const option = directionOptions.value.find((item) => item.value === value);
+  if (!option || option.disabled) return;
+  if (
+    props.controller.session.fieldAction("textDirection")(
+      value as ShapeFormatValues["textDirection"],
+    )
+  ) {
+    menu.dismiss("programmatic", props.sessionId === undefined);
+    restore();
+  }
+}
+
+function selectLineOrder(value: string): void {
+  if (!lineOrderEnabled.value) return;
+  const option = lineOrderOptions.value.find((item) => item.value === value);
+  if (!option || option.disabled) return;
+  if (
+    props.controller.session.fieldAction("textLineOrder")(
+      value as ShapeFormatValues["textLineOrder"],
+    )
+  ) {
+    menu.dismiss("programmatic", props.sessionId === undefined);
+    restore();
+  }
+}
+
 defineSlots<{ default: () => unknown }>();
 </script>
 <template>
@@ -81,17 +136,33 @@ defineSlots<{ default: () => unknown }>();
         class="shape-ribbon-layout-menu__panel"
         :data-shape-text-edit-session="sessionId"
       >
-        <template #body>
-          <GallerySection :title="label">
-            <div class="shape-ribbon-layout-menu__fields">
-              <ShapeFormatChoiceField :controller="controller" field="textDirection" inline />
-              <ShapeFormatChoiceField
-                v-if="controller.props.snapshot?.values.textDirection === 'stacked'"
-                :controller="controller"
-                field="textLineOrder"
-              />
-            </div>
-          </GallerySection>
+        <MenuRadioItem
+          v-for="option in directionOptions"
+          :key="option.value"
+          indicator="check"
+          :checked="!directionMixed && currentDirection === option.value"
+          :disabled="disabled || option.disabled"
+          :data-shape-text-direction="option.value"
+          @select="selectDirection(option.value)"
+        >
+          {{ option.label }}
+        </MenuRadioItem>
+        <template v-if="!directionMixed && currentDirection === 'stacked'">
+          <MenuSeparator />
+          <li class="shape-ribbon-layout-menu__section-label" role="none" aria-hidden="true">
+            {{ controller.fieldLabel("textLineOrder") }}
+          </li>
+          <MenuRadioItem
+            v-for="option in lineOrderOptions"
+            :key="option.value"
+            indicator="check"
+            :checked="!lineOrderMixed && currentLineOrder === option.value"
+            :disabled="!lineOrderEnabled || option.disabled"
+            :data-shape-text-line-order="option.value"
+            @select="selectLineOrder(option.value)"
+          >
+            {{ option.label }}
+          </MenuRadioItem>
         </template>
       </MenuSurface>
     </Teleport>
@@ -106,12 +177,14 @@ defineSlots<{ default: () => unknown }>();
     width: 100%;
   }
   &__panel {
-    width: 260px;
     z-index: var(--sheetcraft-layer-menu);
   }
-  &__fields {
-    display: grid;
-    gap: var(--sheetcraft-space-3);
+  &__section-label {
+    padding: 4px var(--sheetcraft-tool-panel-padding) 2px;
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    font-weight: var(--sheetcraft-font-weight-medium);
+    list-style: none;
   }
 }
 </style>
