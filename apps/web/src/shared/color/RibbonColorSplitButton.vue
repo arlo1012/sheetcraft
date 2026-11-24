@@ -19,6 +19,8 @@ const props = withDefaults(
     defaultLabel?: string;
     mixed?: boolean;
     disabled?: boolean;
+    normalizeDefaultToNull?: boolean;
+    iconAttrs?: Record<string, string | undefined>;
     sessionId?: number;
   }>(),
   {
@@ -28,6 +30,8 @@ const props = withDefaults(
     defaultLabel: undefined,
     mixed: false,
     disabled: false,
+    normalizeDefaultToNull: false,
+    iconAttrs: undefined,
     sessionId: undefined,
   },
 );
@@ -77,6 +81,11 @@ function togglePanel(): void {
 function selectColor(color: string | null, reference?: ThemeColorReference): void {
   if (props.disabled) return;
   if (reference) emit("select", color, reference);
+  else if (
+    props.normalizeDefaultToNull &&
+    color?.toLowerCase() === props.defaultColor.toLowerCase()
+  )
+    emit("select", null);
   else emit("select", color);
   closePanel(true);
 }
@@ -117,7 +126,12 @@ watch(
       @toggle-menu="togglePanel"
       @menu-keydown="onTriggerKeydown"
     >
-      <span class="ribbon-color-split__icon" :style="indicatorStyle" :data-color-icon="kind">
+      <span
+        v-bind="iconAttrs"
+        class="ribbon-color-split__icon"
+        :style="indicatorStyle"
+        :data-color-icon="kind"
+      >
         <svg
           viewBox="0 0 24 24"
           fill="none"

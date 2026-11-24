@@ -1,13 +1,5 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import {
-  AlignCenter,
-  AlignCenterHorizontal,
-  AlignEndHorizontal,
-  AlignLeft,
-  AlignRight,
-  AlignStartHorizontal,
-} from "lucide-vue-next";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -22,6 +14,8 @@ import type {
 } from "@sheetcraft/core/style";
 import type { SelectionCellStyleState, ToggleStyleState } from "@sheetcraft/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
+import TextHorizontalAlignmentIcon from "../../../shared/text-format/TextHorizontalAlignmentIcon.vue";
+import TextVerticalAlignmentIcon from "../../../shared/text-format/TextVerticalAlignmentIcon.vue";
 import CellFormatTextOrientationControl from "./CellFormatTextOrientationControl.vue";
 
 type MergeState = "on" | "off" | "mixed";
@@ -252,7 +246,7 @@ const previewTextStyle = computed(() => {
                 :aria-pressed="horizontal === 'left'"
                 @click="setHorizontal('left')"
               >
-                <AlignLeft :size="14" aria-hidden="true" />
+                <TextHorizontalAlignmentIcon alignment="left" />
               </button>
               <button
                 type="button"
@@ -263,7 +257,7 @@ const previewTextStyle = computed(() => {
                 :aria-pressed="horizontal === 'center'"
                 @click="setHorizontal('center')"
               >
-                <AlignCenter :size="14" aria-hidden="true" />
+                <TextHorizontalAlignmentIcon alignment="center" />
               </button>
               <button
                 type="button"
@@ -274,7 +268,7 @@ const previewTextStyle = computed(() => {
                 :aria-pressed="horizontal === 'right'"
                 @click="setHorizontal('right')"
               >
-                <AlignRight :size="14" aria-hidden="true" />
+                <TextHorizontalAlignmentIcon alignment="right" />
               </button>
               <span class="cell-format-alignment__quick-sep" aria-hidden="true" />
               <button
@@ -286,7 +280,7 @@ const previewTextStyle = computed(() => {
                 :aria-pressed="vertical === 'top'"
                 @click="setVertical('top')"
               >
-                <AlignStartHorizontal :size="14" aria-hidden="true" />
+                <TextVerticalAlignmentIcon alignment="top" />
               </button>
               <button
                 type="button"
@@ -297,7 +291,7 @@ const previewTextStyle = computed(() => {
                 :aria-pressed="vertical === 'middle'"
                 @click="setVertical('middle')"
               >
-                <AlignCenterHorizontal :size="14" aria-hidden="true" />
+                <TextVerticalAlignmentIcon alignment="middle" />
               </button>
               <button
                 type="button"
@@ -308,7 +302,7 @@ const previewTextStyle = computed(() => {
                 :aria-pressed="vertical === 'bottom'"
                 @click="setVertical('bottom')"
               >
-                <AlignEndHorizontal :size="14" aria-hidden="true" />
+                <TextVerticalAlignmentIcon alignment="bottom" />
               </button>
             </div>
           </div>
@@ -478,6 +472,12 @@ const previewTextStyle = computed(() => {
     &:hover {
       background: var(--sheetcraft-surface-menu-hover);
       color: var(--sheetcraft-text-primary);
+    }
+
+    svg {
+      width: var(--sheetcraft-control-icon-size);
+      height: var(--sheetcraft-control-icon-size);
+      flex-shrink: 0;
     }
 
     &.is-active {
