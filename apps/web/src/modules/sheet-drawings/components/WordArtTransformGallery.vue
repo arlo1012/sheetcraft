@@ -22,6 +22,8 @@ const props = withDefaults(
     mixed?: boolean;
     /** False gives standalone formatting-pane radiogroup semantics. */
     menu?: boolean;
+    /** The host already owns horizontal inset (such as a FormatSection). */
+    inline?: boolean;
     locale?: WordArtTransformLocale;
     disabled?: boolean;
     disabledReason?: string;
@@ -214,6 +216,7 @@ defineExpose({
   <div
     ref="root"
     class="wordart-transform-gallery"
+    :class="{ 'wordart-transform-gallery--inline': inline }"
     :role="menu ? 'group' : 'radiogroup'"
     :aria-label="labels.gallery"
     :aria-busy="!!pendingId"
@@ -319,10 +322,16 @@ defineExpose({
 @use "../../../shared/gallery/gallery-choice" as gallery;
 
 .wordart-transform-gallery {
-  width: 448px;
+  width: min(448px, 100%);
   max-width: 100%;
   min-width: 0;
   container-type: inline-size;
+
+  &--inline {
+    --sheetcraft-gallery-header-inset: 0;
+
+    width: 100%;
+  }
 
   &__grid {
     display: grid;
@@ -373,6 +382,11 @@ defineExpose({
   &__hint,
   &__status {
     padding: var(--sheetcraft-space-2) var(--sheetcraft-tool-panel-padding);
+  }
+
+  &--inline &__hint,
+  &--inline &__status {
+    padding-inline: 0;
   }
 
   &__note {

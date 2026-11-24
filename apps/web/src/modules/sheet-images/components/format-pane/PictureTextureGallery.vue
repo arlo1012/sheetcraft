@@ -93,6 +93,7 @@ function keydown(event: KeyboardEvent) {
       :value-label="selected ? t(PICTURE_TEXTURE_LABELS[selected]) : t('effectCustom')"
       :disabled="disabled"
       size="small"
+      surface="gallery"
       panel-width="content"
       @open-change="open"
     >

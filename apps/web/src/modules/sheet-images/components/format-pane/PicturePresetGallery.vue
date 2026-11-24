@@ -131,6 +131,7 @@ function open(value: boolean) {
       :value-label="selected ? itemLabel(selected) : (emptyLabel ?? t('effectCustom'))"
       :disabled="disabled"
       size="small"
+      surface="gallery"
       panel-width="content"
       @open-change="open"
     >
@@ -174,7 +175,7 @@ function open(value: boolean) {
 <style scoped lang="scss">
 .picture-preset-gallery__actions {
   display: flex;
-  padding: 6px;
+  padding: 0 var(--sheetcraft-menu-inset) var(--sheetcraft-space-2);
 }
 
 .picture-preset-gallery__value {

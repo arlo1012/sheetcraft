@@ -40,9 +40,10 @@ const diagram = computed(() => getWordArtTransformDiagram(props.choice));
 <style scoped lang="scss">
 .wordart-transform-preview {
   display: block;
-  width: 96px;
-  max-width: 100%;
-  height: 48px;
+  width: 100%;
+  max-width: 96px;
+  height: auto;
+  aspect-ratio: 120 / 64;
   overflow: visible;
   pointer-events: none;
 

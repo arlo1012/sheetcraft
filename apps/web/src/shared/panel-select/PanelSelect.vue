@@ -12,10 +12,11 @@ const props = withDefaults(
     valueLabel: string;
     disabled?: boolean;
     size?: "small" | "medium" | "large";
+    surface?: "plain" | "gallery";
     panelWidth?: "trigger" | "content";
     panelClass?: string;
   }>(),
-  { disabled: false, size: "medium", panelWidth: "trigger" },
+  { disabled: false, size: "medium", surface: "plain", panelWidth: "trigger" },
 );
 const emit = defineEmits<{ "open-change": [open: boolean] }>();
 defineSlots<{
@@ -235,7 +236,7 @@ watch(open, (visible) => {
           :id="panelId"
           ref="panel"
           class="panel-select__panel"
-          :class="panelClass"
+          :class="[panelClass, { 'panel-select__panel--gallery': surface === 'gallery' }]"
           role="dialog"
           :aria-label="label"
           @keydown="onPanelKeydown"
@@ -262,8 +263,16 @@ watch(open, (visible) => {
   }
 
   &__panel {
+    box-sizing: border-box;
     width: 100%;
     min-width: 0;
+
+    &--gallery {
+      --sheetcraft-gallery-header-inset: var(--sheetcraft-menu-inset);
+      --sheetcraft-gallery-header-radius: var(--sheetcraft-radius-menu-item);
+
+      padding: var(--sheetcraft-menu-padding);
+    }
   }
 }
 </style>

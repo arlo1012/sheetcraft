@@ -163,7 +163,7 @@ function reason(category: ShapeFormatStyleCategory): string | undefined {
       <p v-if="transformScope" class="shape-format-effects__reason" data-text-transform-scope>
         {{ transformScope }}
       </p>
-      <WordArtTransformGallery v-bind="textWarp" />
+      <WordArtTransformGallery v-bind="textWarp" inline />
     </FormatSection>
   </div>
 </template>
