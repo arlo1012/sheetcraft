@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, useId, watch } from "vue";
 import { Omega } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
+import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
@@ -138,9 +139,11 @@ function title(item: SymbolInsertion): string {
         :data-cell-edit-session="editSessionId"
       >
         <template #body>
-          <div class="symbol-menu__section">
-            <div class="symbol-menu__label">{{ t("symbolTools.recent") }}</div>
-            <div class="symbol-menu__grid">
+          <GallerySection class="symbol-menu__section" :title="t('symbolTools.recent')">
+            <template #actions>
+              <span class="symbol-menu__count">{{ preferences.recent.length }}</span>
+            </template>
+            <div v-if="preferences.recent.length" class="symbol-menu__grid">
               <button
                 v-for="item in preferences.recent"
                 :key="symbolIdentity(item)"
@@ -157,13 +160,15 @@ function title(item: SymbolInsertion): string {
                 {{ /^\s+$/u.test(item.text) ? "␣" : item.text }}
               </button>
             </div>
-            <span v-if="!preferences.recent.length" class="symbol-menu__hint">{{
-              t("symbolTools.emptyRecent")
-            }}</span>
-          </div>
-          <div class="symbol-menu__section">
-            <div class="symbol-menu__label">{{ t("symbolTools.custom") }}</div>
-            <div class="symbol-menu__grid">
+            <p v-else class="symbol-menu__hint">
+              {{ t("symbolTools.emptyRecent") }}
+            </p>
+          </GallerySection>
+          <GallerySection class="symbol-menu__section" :title="t('symbolTools.custom')">
+            <template #actions>
+              <span class="symbol-menu__count">{{ visibleCustom.length }}</span>
+            </template>
+            <div v-if="visibleCustom.length" class="symbol-menu__grid">
               <button
                 v-for="item in visibleCustom"
                 :key="symbolIdentity(item)"
@@ -180,13 +185,20 @@ function title(item: SymbolInsertion): string {
                 {{ /^\s+$/u.test(item.text) ? "␣" : item.text }}
               </button>
             </div>
-          </div>
-          <div v-if="fontError" role="alert" class="symbol-menu__hint">
+            <p v-else class="symbol-menu__hint">
+              {{ t("symbolTools.emptyCustom") }}
+            </p>
+          </GallerySection>
+          <p
+            v-if="fontError"
+            role="alert"
+            class="symbol-menu__feedback symbol-menu__feedback--error"
+          >
             {{ t("symbolTools.fontFailed") }}
-          </div>
-          <div v-if="storageError" role="status" class="symbol-menu__hint">
+          </p>
+          <p v-if="storageError" role="status" class="symbol-menu__feedback">
             {{ t("symbolTools.storageError") }}
-          </div>
+          </p>
         </template>
         <template #footer
           ><MenuItem @select="more"
@@ -200,35 +212,52 @@ function title(item: SymbolInsertion): string {
 <style scoped lang="scss">
 @use "../../../shared/ribbon/ribbon-layout" as ribbon;
 @use "../../../shared/gallery/gallery-choice" as gallery;
-@use "../../../shared/option-list/option-list" as option-list;
+
 .symbol-menu-tool {
   @include ribbon.tool;
 }
+
 .symbol-menu {
   z-index: var(--sheetcraft-layer-menu);
   width: min(360px, calc(100vw - 24px));
   max-height: min(480px, calc(100dvh - 120px));
-}
-.symbol-menu__section {
-  padding: 8px 12px;
-}
-.symbol-menu__label,
-.symbol-menu__hint {
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--sheetcraft-text-secondary);
-}
-.symbol-menu__grid {
-  @include option-list.scrollbar;
-  display: grid;
-  grid-template-columns: repeat(9, minmax(0, 1fr));
-  margin-top: 6px;
-  button {
-    @include gallery.choice(0);
-    min-width: 0;
-    height: 32px;
-    font-size: 21px;
-    line-height: 28px;
+
+  &__count {
+    flex: none;
+    color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
+    white-space: nowrap;
+  }
+
+  &__hint,
+  &__feedback {
+    margin: 0;
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
+    color: var(--sheetcraft-text-secondary);
+  }
+
+  &__feedback {
+    padding: 0 var(--sheetcraft-tool-panel-padding) var(--sheetcraft-space-2);
+
+    &--error {
+      color: var(--sheetcraft-status-error);
+    }
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+    gap: var(--sheetcraft-space-1);
+
+    button {
+      @include gallery.choice(0);
+      min-width: 0;
+      height: 32px;
+      font-size: 21px;
+      line-height: 28px;
+    }
   }
 }
 </style>
