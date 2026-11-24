@@ -3,6 +3,7 @@ import { nextTick } from "vue";
 import { afterEach, expect, test, vi } from "vitest";
 import ShapeInsertMenu from "../../../modules/sheet-drawings/components/ShapeInsertMenu.vue";
 import ShapeGallery from "../../../modules/sheet-drawings/components/ShapeGallery.vue";
+import { clearRecentShapes } from "../../../modules/sheet-drawings/recent-shapes";
 import {
   SHAPE_GALLERY,
   type ShapeGalleryChoice,
@@ -12,6 +13,7 @@ import { createAppI18n } from "../../../shared/i18n";
 const wrappers: VueWrapper[] = [];
 afterEach(() => {
   wrappers.splice(0).forEach((wrapper) => wrapper.unmount());
+  clearRecentShapes();
   document.body.replaceChildren();
 });
 function shape(id: string): ShapeGalleryChoice {
@@ -203,4 +205,31 @@ test("Chinese labels follow the app locale and English search keeps the same cho
   await wrapper.setProps({ locale: "en-US" });
   expect(menu()!.getAttribute("aria-label")).toBe("Shapes");
   expect(button("doubleArrow").getAttribute("aria-label")).toBe("Double Arrow");
+});
+
+test("accepted shapes appear in Recently used shapes on next open and hide during search", async () => {
+  const { wrapper, handler } = fixture(true, "zh-CN");
+  await open(wrapper);
+  expect(menu()!.querySelector("[data-shape-recent-group]")).toBeNull();
+  button("heart").click();
+  await nextTick();
+  expect(menu()).toBeNull();
+
+  await open(wrapper);
+  const recentGroup = menu()!.querySelector("[data-shape-recent-group]");
+  expect(recentGroup).not.toBeNull();
+  expect(recentGroup!.getAttribute("aria-label")).toBe("最近使用的形状");
+  const recentButtons = recentGroup!.querySelectorAll<HTMLButtonElement>("[data-shape-recent]");
+  expect(recentButtons).toHaveLength(1);
+  expect(recentButtons[0]!.dataset.shapeChoice).toBe("heart");
+
+  await wrapper.getComponent(ShapeGallery).get('input[type="search"]').setValue("心");
+  expect(menu()!.querySelector("[data-shape-recent-group]")).toBeNull();
+  await wrapper.getComponent(ShapeGallery).get('input[type="search"]').setValue("");
+  const recentHeart = menu()!.querySelector<HTMLButtonElement>(
+    '[data-shape-recent][data-shape-choice="heart"]',
+  )!;
+  recentHeart.click();
+  await nextTick();
+  expect(handler).toHaveBeenLastCalledWith(shape("heart"), false);
 });

@@ -30,6 +30,9 @@ export const controlsEnUS = {
     "Drag the caption to move the control or double-click to edit. Choose a linked cell to write the control's value to it.",
   "control.invalid":
     "Check the linked cell, single-row or single-column item source and numeric limits.",
+  "control.groupSelection": "Selection",
+  "control.groupValue": "Value adjustment",
+  "control.groupLayout": "Actions & containers",
   "control.checkbox": "Checkbox",
   "control.radio": "Option button",
   "control.combo": "Combo box",

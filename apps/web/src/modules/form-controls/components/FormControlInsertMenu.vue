@@ -14,7 +14,7 @@ import {
 } from "lucide-vue-next";
 import type { FormControlType } from "@sheetcraft/core/form-controls";
 import { useAppI18n } from "../../../shared/i18n";
-import MenuItem from "../../../shared/menu/MenuItem.vue";
+import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
@@ -35,6 +35,37 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
   menuSurfaceRef: computed(() => surface.value ?? null),
   disabled: computed(() => props.disabled),
 });
+
+const groups = [
+  {
+    id: "selection",
+    titleKey: "control.groupSelection",
+    items: [
+      { type: "checkbox", labelKey: "control.checkbox", icon: SquareCheck },
+      { type: "radio", labelKey: "control.radio", icon: CircleDot },
+      { type: "combo", labelKey: "control.combo", icon: ListFilter },
+      { type: "list", labelKey: "control.list", icon: List },
+    ],
+  },
+  {
+    id: "value",
+    titleKey: "control.groupValue",
+    items: [
+      { type: "spinner", labelKey: "control.spinner", icon: ChevronsUpDown },
+      { type: "scrollbar", labelKey: "control.scrollbar", icon: SlidersHorizontal },
+    ],
+  },
+  {
+    id: "layout",
+    titleKey: "control.groupLayout",
+    items: [
+      { type: "button", labelKey: "control.button", icon: RectangleHorizontal },
+      { type: "label", labelKey: "control.label", icon: Type },
+      { type: "group", labelKey: "control.group", icon: SquareDashed },
+    ],
+  },
+] as const;
+
 function insert(type: FormControlType): void {
   if (props.disabled) return;
   dismiss("programmatic", false);
@@ -71,34 +102,29 @@ watch(
         :style="floatingStyles"
         class="form-control-insert__menu"
       >
-        <template #items>
-          <MenuItem @select="insert('checkbox')"
-            ><template #icon><SquareCheck /></template>{{ t("control.checkbox") }}</MenuItem
-          >
-          <MenuItem @select="insert('radio')"
-            ><template #icon><CircleDot /></template>{{ t("control.radio") }}</MenuItem
-          >
-          <MenuItem @select="insert('combo')"
-            ><template #icon><ListFilter /></template>{{ t("control.combo") }}</MenuItem
-          >
-          <MenuItem @select="insert('list')"
-            ><template #icon><List /></template>{{ t("control.list") }}</MenuItem
-          >
-          <MenuItem @select="insert('spinner')"
-            ><template #icon><ChevronsUpDown /></template>{{ t("control.spinner") }}</MenuItem
-          >
-          <MenuItem @select="insert('scrollbar')"
-            ><template #icon><SlidersHorizontal /></template>{{ t("control.scrollbar") }}</MenuItem
-          >
-          <MenuItem @select="insert('button')"
-            ><template #icon><RectangleHorizontal /></template>{{ t("control.button") }}</MenuItem
-          >
-          <MenuItem @select="insert('label')"
-            ><template #icon><Type /></template>{{ t("control.label") }}</MenuItem
-          >
-          <MenuItem @select="insert('group')"
-            ><template #icon><SquareDashed /></template>{{ t("control.group") }}</MenuItem
-          >
+        <template #body>
+          <GallerySection v-for="group in groups" :key="group.id" :title="t(group.titleKey)">
+            <div class="form-control-insert__grid" :data-form-control-group="group.id">
+              <button
+                v-for="item in group.items"
+                :key="item.type"
+                type="button"
+                role="menuitem"
+                tabindex="-1"
+                class="form-control-insert__choice"
+                :data-form-control-type="item.type"
+                @click="insert(item.type)"
+              >
+                <component
+                  :is="item.icon"
+                  class="form-control-insert__icon"
+                  :size="15"
+                  aria-hidden="true"
+                />
+                <span class="form-control-insert__label">{{ t(item.labelKey) }}</span>
+              </button>
+            </div>
+          </GallerySection>
         </template>
       </MenuSurface>
     </Teleport>
@@ -107,14 +133,51 @@ watch(
 
 <style scoped lang="scss">
 @use "../../../shared/ribbon/ribbon-layout" as ribbon;
+@use "../../../shared/gallery/gallery-choice" as gallery;
+
 .form-control-insert {
   @include ribbon.tool;
+
   &.is-full-width {
     display: flex;
     width: 100%;
   }
+
   &__menu {
+    width: 268px;
+    max-width: calc(100vw - var(--sheetcraft-space-4) * 2);
     z-index: var(--sheetcraft-layer-menu);
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sheetcraft-space-1);
+  }
+
+  &__choice {
+    @include gallery.choice(6px);
+
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: var(--sheetcraft-space-2);
+    min-height: 30px;
+    padding: 0 var(--sheetcraft-space-2);
+    text-align: left;
+  }
+
+  &__icon {
+    flex: none;
+    color: var(--sheetcraft-text-secondary);
+  }
+
+  &__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
   }
 }
 </style>

@@ -175,6 +175,7 @@ export const SHAPE_GALLERY_LABELS: Readonly<
     ShapeGalleryLocale,
     Readonly<{
       gallery: string;
+      recent: string;
       search: string;
       selected: string;
       noSelection: string;
@@ -188,6 +189,7 @@ export const SHAPE_GALLERY_LABELS: Readonly<
 > = {
   "en-US": {
     gallery: "Shape gallery",
+    recent: "Recently used shapes",
     search: "Search shapes",
     selected: "Selected",
     noSelection: "No shape selected",
@@ -201,6 +203,7 @@ export const SHAPE_GALLERY_LABELS: Readonly<
   },
   "zh-CN": {
     gallery: "形状库",
+    recent: "最近使用的形状",
     search: "搜索形状",
     selected: "已选",
     noSelection: "未选择形状",

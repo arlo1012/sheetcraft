@@ -8,6 +8,7 @@ import { useMenu } from "../../../shared/menu/useMenu";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import { vNativeControl } from "../../../shared/tdesign/native-control";
 import ShapeGallery from "./ShapeGallery.vue";
+import { useRecentShapes } from "../recent-shapes";
 import type { ShapeGalleryChoice, ShapeGalleryLocale } from "../shape-gallery";
 
 const props = withDefaults(
@@ -65,6 +66,7 @@ const menuSurfaceRef = computed(() =>
     : null,
 );
 const menuId = `shape-insert-menu-${useId().replaceAll(":", "")}`;
+const { recentShapeIds, recordRecentShape } = useRecentShapes();
 const continuous = ref(false);
 const rejected = ref(false);
 let generation = 0;
@@ -103,8 +105,10 @@ function selectionAction(): (choice: ShapeGalleryChoice) => void {
       // A failed owner action leaves all gallery choices available for retry.
     }
     if (!current()) return;
-    if (accepted) dismiss("programmatic", false);
-    else rejected.value = true;
+    if (accepted) {
+      recordRecentShape(choice.id);
+      dismiss("programmatic", false);
+    } else rejected.value = true;
   };
 }
 
@@ -154,6 +158,7 @@ onBeforeUnmount(() => generation++);
               compact
               :locale="locale"
               :disabled="disabled"
+              :recent-ids="recentShapeIds"
               :onChoose="selectionAction()"
             />
           </div>

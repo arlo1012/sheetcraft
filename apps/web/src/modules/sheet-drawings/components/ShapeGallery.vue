@@ -13,6 +13,10 @@ import {
   type ShapeGalleryLocale,
 } from "../shape-gallery";
 
+const SHAPE_BY_ID = new Map<string, ShapeGalleryChoice>(
+  SHAPE_GALLERY.flatMap((group) => group.items).map((item) => [item.id, item]),
+);
+
 const props = withDefaults(
   defineProps<{
     selected?: ShapeGalleryChoice | null;
@@ -20,36 +24,86 @@ const props = withDefaults(
     disabled?: boolean;
     allowDrawingTools?: boolean;
     compact?: boolean;
+    recentIds?: readonly string[];
   }>(),
-  { locale: "en-US", disabled: false, allowDrawingTools: true, compact: false },
+  {
+    locale: "en-US",
+    disabled: false,
+    allowDrawingTools: true,
+    compact: false,
+    recentIds: () => [],
+  },
 );
 const emit = defineEmits<{ choose: [choice: ShapeGalleryChoice] }>();
 const root = ref<HTMLElement | null>(null);
 const query = ref("");
-const activeId = ref<string | null>(null);
+const activeKey = ref<string | null>(null);
 const instanceId = useId();
 const toolHintId = `shape-gallery-tools-${instanceId}`;
 const searchInputId = `shape-gallery-search-${instanceId}`;
 const labels = computed(() => SHAPE_GALLERY_LABELS[props.locale]);
 const groups = computed(() => filterShapeGallery(query.value));
+const recentChoices = computed(() => {
+  if (query.value.trim() || !props.recentIds.length) return [];
+  const seen = new Set<string>();
+  const resolved: ShapeGalleryChoice[] = [];
+  for (const id of props.recentIds) {
+    if (seen.has(id)) continue;
+    const found = SHAPE_BY_ID.get(id);
+    if (found) {
+      seen.add(id);
+      resolved.push(found);
+    }
+  }
+  return resolved;
+});
+const sections = computed(() => {
+  const list: Array<{
+    key: string;
+    title: string;
+    isRecent: boolean;
+    categoryId?: string;
+    items: readonly ShapeGalleryChoice[];
+  }> = [];
+  if (recentChoices.value.length) {
+    list.push({
+      key: "recent",
+      title: labels.value.recent,
+      isRecent: true,
+      items: recentChoices.value,
+    });
+  }
+  for (const group of groups.value) {
+    list.push({
+      key: group.id,
+      title: group.label[props.locale],
+      isRecent: false,
+      categoryId: group.id,
+      items: group.items,
+    });
+  }
+  return list;
+});
 const visibleChoices = computed(() => groups.value.flatMap((group) => group.items));
-const availableChoices = computed(() =>
-  visibleChoices.value.filter((choice) => choice.kind !== "drawingTool" || props.allowDrawingTools),
+const availableEntries = computed(() =>
+  sections.value.flatMap((section) =>
+    section.items
+      .filter((choice) => choice.kind !== "drawingTool" || props.allowDrawingTools)
+      .map((choice) => ({
+        key: choiceKey(choice.id, section.isRecent),
+        id: choice.id,
+        isRecent: section.isRecent,
+      })),
+  ),
 );
-const selected = computed(() =>
-  props.selected
-    ? SHAPE_GALLERY.flatMap((group) => group.items).find(
-        (choice) => choice.id === props.selected?.id,
-      )
-    : undefined,
-);
-const tabChoiceId = computed(() => {
+const selected = computed(() => (props.selected ? SHAPE_BY_ID.get(props.selected.id) : undefined));
+const tabTargetKey = computed(() => {
   if (props.disabled) return null;
-  const choices = availableChoices.value;
+  const entries = availableEntries.value;
   return (
-    choices.find((choice) => choice.id === activeId.value)?.id ??
-    choices.find((choice) => choice.id === selected.value?.id)?.id ??
-    choices[0]?.id ??
+    entries.find((entry) => entry.key === activeKey.value)?.key ??
+    entries.find((entry) => !entry.isRecent && entry.id === selected.value?.id)?.key ??
+    entries[0]?.key ??
     null
   );
 });
@@ -57,6 +111,12 @@ const selectedConnector = computed(
   () => selected.value?.kind === "line" && selected.value.preset !== "line",
 );
 
+function choiceKey(id: string, isRecent: boolean): string {
+  return `${isRecent ? "recent" : "choice"}:${id}`;
+}
+function isTabTarget(id: string, isRecent: boolean): boolean {
+  return tabTargetKey.value === choiceKey(id, isRecent);
+}
 function title(choice: ShapeGalleryChoice): string {
   if (props.compact && choice.kind === "drawingTool" && props.allowDrawingTools)
     return `${choice.label[props.locale]}: ${labels.value.drawingToolHint}`;
@@ -72,7 +132,9 @@ function choose(choice: ShapeGalleryChoice): void {
 }
 function focusChoice(button: HTMLButtonElement | undefined): void {
   if (!button) return;
-  activeId.value = button.dataset.shapeChoice ?? null;
+  activeKey.value = button.dataset.shapeChoice
+    ? choiceKey(button.dataset.shapeChoice, "shapeRecent" in button.dataset)
+    : null;
   button.focus();
   button.scrollIntoView?.({ block: "nearest", inline: "nearest" });
 }
@@ -152,17 +214,20 @@ function onGalleryKeydown(event: KeyboardEvent): void {
 watch(
   () => props.selected?.id,
   () => {
-    activeId.value = null;
+    activeKey.value = null;
   },
 );
 watch(query, () => {
-  activeId.value = null;
+  activeKey.value = null;
 });
 defineExpose({
   focusSelected: () => {
     const buttons = galleryButtons();
     focusChoice(
-      buttons.find((button) => button.dataset.shapeChoice === selected.value?.id) ?? buttons[0],
+      buttons.find(
+        (button) =>
+          !("shapeRecent" in button.dataset) && button.dataset.shapeChoice === selected.value?.id,
+      ) ?? buttons[0],
     );
   },
 });
@@ -200,37 +265,39 @@ defineExpose({
     </div>
     <div class="shape-gallery__scroll" @keydown="onGalleryKeydown">
       <GallerySection
-        v-for="group in groups"
-        :key="group.id"
-        :title="group.label[locale]"
+        v-for="section in sections"
+        :key="section.key"
+        :title="section.title"
         :content-inset="!compact"
       >
         <template #actions>
-          <span class="shape-gallery__category-count">{{ group.items.length }}</span>
+          <span class="shape-gallery__category-count">{{ section.items.length }}</span>
         </template>
         <div
           class="shape-gallery__grid"
           role="group"
-          :aria-label="group.label[locale]"
-          :data-shape-category="group.id"
+          :aria-label="section.title"
+          :data-shape-category="section.categoryId"
+          :data-shape-recent-group="section.isRecent ? '' : undefined"
         >
           <button
-            v-for="choice in group.items"
-            :key="choice.id"
+            v-for="choice in section.items"
+            :key="choiceKey(choice.id, section.isRecent)"
             type="button"
             class="shape-gallery__choice"
             :data-shape-choice="choice.id"
+            :data-shape-recent="section.isRecent ? '' : undefined"
             :data-shape-kind="choice.kind"
             :disabled="disabled || (choice.kind === 'drawingTool' && !allowDrawingTools)"
             :aria-disabled="disabled || (choice.kind === 'drawingTool' && !allowDrawingTools)"
-            :aria-pressed="choice.id === selected?.id"
+            :aria-pressed="!section.isRecent && choice.id === selected?.id"
             :aria-label="choice.label[locale]"
             :aria-describedby="
               choice.kind === 'drawingTool' && allowDrawingTools ? toolHintId : undefined
             "
             :title="title(choice)"
-            :tabindex="choice.id === tabChoiceId ? 0 : -1"
-            @focus="activeId = choice.id"
+            :tabindex="isTabTarget(choice.id, section.isRecent) ? 0 : -1"
+            @focus="activeKey = choiceKey(choice.id, section.isRecent)"
             @click="choose(choice)"
           >
             <svg
