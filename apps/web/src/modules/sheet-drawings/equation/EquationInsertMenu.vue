@@ -16,6 +16,8 @@ const props = withDefaults(
     ownerId?: string | number;
     editSessionId?: string;
     locale?: EquationLocale;
+    compact?: boolean;
+    fullWidth?: boolean;
     handler: (
       presetId: EquationPresetId | null,
     ) => boolean | { accepted: boolean } | Promise<boolean | { accepted: boolean }>;
@@ -114,10 +116,15 @@ watch(
 onBeforeUnmount(() => generation.value++);
 </script>
 <template>
-  <span class="equation-insert-tool" :data-cell-edit-session="editSessionId">
+  <span
+    class="equation-insert-tool"
+    :class="{ 'is-full-width': fullWidth }"
+    :data-cell-edit-session="editSessionId"
+  >
     <RibbonMenuButton
       ref="button"
-      variant="tall"
+      :variant="compact ? 'compact' : 'tall'"
+      :full-width="fullWidth"
       :label="labels.equation"
       :text="labels.equation"
       :disabled="disabled"
@@ -186,6 +193,10 @@ onBeforeUnmount(() => generation.value++);
 @use "../../../shared/gallery/gallery-choice" as gallery;
 .equation-insert-tool {
   @include ribbon.tool;
+  &.is-full-width {
+    display: flex;
+    width: 100%;
+  }
 }
 .equation-insert-menu {
   width: 400px;

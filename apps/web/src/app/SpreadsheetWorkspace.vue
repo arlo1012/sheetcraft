@@ -3006,29 +3006,7 @@ const { onWorkspaceShapeTextOutsideAction, onWorkspaceNativeTextCopy, onWorkspac
           @insert-table="tableActions.requestCreate"
           @insert-slicer="tableSlicers.open"
           @manage-table="tableActions.openSettings"
-        >
-          <template #watermark>
-            <PageWatermarkMenu
-              :watermark="pageDecoration.watermark"
-              :presets="session.workbook.watermarkPresets"
-              :image-asset-urls="imageAssetUrls"
-              :disabled="
-                loading ||
-                fileBusy ||
-                xlsxBusy ||
-                decorationBusy ||
-                activeSheet.properties.protected
-              "
-              @apply="applyWatermark"
-              @custom="openWatermark"
-              @edit-document="openWatermark(undefined, pageDecoration.watermark)"
-              @apply-preset="applyWatermarkPreset"
-              @edit-preset="openWatermark"
-              @delete-preset="decorations.deletePreset"
-              @remove="decorations.removeWatermark"
-            />
-          </template>
-        </InsertToolbar>
+        />
       </template>
       <template #table-tools>
         <TableToolsToolbar

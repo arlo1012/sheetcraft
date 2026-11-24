@@ -15,6 +15,8 @@ const props = defineProps<{
   disabled: boolean;
   ownerId?: string | number;
   handler: (id: SheetIconId) => boolean;
+  compact?: boolean;
+  fullWidth?: boolean;
 }>();
 const { t } = useAppI18n();
 const button = ref<InstanceType<typeof RibbonMenuButton>>();
@@ -81,10 +83,11 @@ watch(
 </script>
 
 <template>
-  <span class="icon-insert-tool">
+  <span class="icon-insert-tool" :class="{ 'is-full-width': fullWidth }">
     <RibbonMenuButton
       ref="button"
-      variant="tall"
+      :variant="compact ? 'compact' : 'tall'"
+      :full-width="fullWidth"
       :label="t('drawing.icon')"
       :text="t('drawing.icon')"
       :disabled="disabled"
@@ -152,6 +155,10 @@ watch(
 @use "../../../shared/ribbon/ribbon-layout" as ribbon;
 .icon-insert-tool {
   @include ribbon.tool;
+  &.is-full-width {
+    display: flex;
+    width: 100%;
+  }
 }
 .icon-insert-menu {
   z-index: var(--sheetcraft-layer-menu);

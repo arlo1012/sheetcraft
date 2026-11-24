@@ -14,7 +14,11 @@ import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import RibbonSplitButton from "../../../shared/ribbon/RibbonSplitButton.vue";
 import ScatterThumbnail from "./ScatterThumbnail.vue";
-const props = defineProps<{ disabled: boolean; themeColors?: readonly string[] }>();
+const props = defineProps<{
+  disabled: boolean;
+  themeColors?: readonly string[];
+  fullWidth?: boolean;
+}>();
 const emit = defineEmits<{ insert: [intent: ChartInsertIntent] }>();
 const { t } = useAppI18n();
 const trigger = ref<InstanceType<typeof RibbonSplitButton>>(),
@@ -52,6 +56,7 @@ function choose(style?: ScatterStyle, accent = 0) {
 <template>
   <RibbonSplitButton
     ref="trigger"
+    :full-width="fullWidth"
     :label="t('chart.scatter')"
     :text="t('chart.scatter')"
     :menu-label="t('chart.variantMenu', { type: t('chart.scatter') })"

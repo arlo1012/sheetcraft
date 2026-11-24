@@ -19,7 +19,12 @@ import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 
-const props = defineProps<{ disabled: boolean; ownerId?: string | number }>();
+const props = defineProps<{
+  disabled: boolean;
+  ownerId?: string | number;
+  compact?: boolean;
+  fullWidth?: boolean;
+}>();
 const emit = defineEmits<{ insert: [type: FormControlType] }>();
 const { t } = useAppI18n();
 const button = ref<InstanceType<typeof RibbonMenuButton>>();
@@ -42,10 +47,11 @@ watch(
 </script>
 
 <template>
-  <span class="form-control-insert">
+  <span class="form-control-insert" :class="{ 'is-full-width': fullWidth }">
     <RibbonMenuButton
       ref="button"
-      variant="tall"
+      :variant="compact ? 'compact' : 'tall'"
+      :full-width="fullWidth"
       :label="t('control.title')"
       :text="t('control.title')"
       :disabled="disabled"
@@ -103,6 +109,10 @@ watch(
 @use "../../../shared/ribbon/ribbon-layout" as ribbon;
 .form-control-insert {
   @include ribbon.tool;
+  &.is-full-width {
+    display: flex;
+    width: 100%;
+  }
   &__menu {
     z-index: var(--sheetcraft-layer-menu);
   }

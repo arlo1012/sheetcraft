@@ -2,6 +2,7 @@ export type TableMessageSchema = {
   tables: {
     insertSlicer: string;
     slicer: string;
+    slicerUnavailable: string;
     slicerTools: string;
     slicerSettings: string;
     slicerOptions: string;

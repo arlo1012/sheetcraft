@@ -121,6 +121,7 @@ function insert(type: ChartType) {
     <div class="chart-insert-tools__columns">
       <RibbonSplitButton
         ref="columnTrigger"
+        full-width
         :label="t('chart.column')"
         :menu-label="t('chart.variantMenu', { type: t('chart.column') })"
         :text="t('chart.column')"
@@ -135,6 +136,7 @@ function insert(type: ChartType) {
       /></RibbonSplitButton>
       <RibbonSplitButton
         ref="lineTrigger"
+        full-width
         :label="t('chart.line')"
         :menu-label="t('chart.variantMenu', { type: t('chart.line') })"
         :text="t('chart.line')"
@@ -149,6 +151,7 @@ function insert(type: ChartType) {
       /></RibbonSplitButton>
       <RibbonSplitButton
         ref="barTrigger"
+        full-width
         :label="t('chart.bar')"
         :menu-label="t('chart.variantMenu', { type: t('chart.bar') })"
         :text="t('chart.bar')"
@@ -163,6 +166,7 @@ function insert(type: ChartType) {
       /></RibbonSplitButton>
       <RibbonSplitButton
         ref="areaTrigger"
+        full-width
         :label="t('chart.area')"
         :menu-label="t('chart.variantMenu', { type: t('chart.area') })"
         :text="t('chart.area')"
@@ -176,24 +180,41 @@ function insert(type: ChartType) {
         ><ChartArea
       /></RibbonSplitButton>
       <PieInsertMenu
+        full-width
         :disabled="disabled"
         :theme-colors="themeColors"
         @insert="emit('insert', $event)"
       />
       <ScatterInsertMenu
+        full-width
         :disabled="disabled"
         :theme-colors="themeColors"
         @insert="emit('insert', $event)"
       />
     </div>
-    <RibbonButton
-      variant="tall"
-      :label="t('chart.dynamic')"
-      :text="t('chart.dynamic')"
-      :disabled="disabled"
-      @activate="galleryOpen = true"
-      ><ChartNoAxesCombined
-    /></RibbonButton>
+    <div class="chart-insert-tools__actions">
+      <RibbonButton
+        full-width
+        :label="t('chart.dynamic')"
+        :text="t('chart.dynamic')"
+        :disabled="disabled"
+        @activate="galleryOpen = true"
+        ><ChartNoAxesCombined
+      /></RibbonButton>
+      <RibbonMenuButton
+        ref="triggerComponent"
+        full-width
+        :label="t('chart.more')"
+        :text="t('chart.more')"
+        :disabled="disabled"
+        :expanded="open"
+        :menu-id="menuId"
+        popup-role="menu"
+        @activate="toggleMenu"
+        @keydown="onTriggerKeydown"
+        ><ChartNetwork
+      /></RibbonMenuButton>
+    </div>
     <DynamicChartGallery
       v-if="galleryOpen && !disabled"
       @close="galleryOpen = false"
@@ -202,19 +223,6 @@ function insert(type: ChartType) {
         emit('insert', $event);
       "
     />
-    <RibbonMenuButton
-      ref="triggerComponent"
-      variant="tall"
-      :label="t('chart.more')"
-      :text="t('chart.more')"
-      :disabled="disabled"
-      :expanded="open"
-      :menu-id="menuId"
-      popup-role="menu"
-      @activate="toggleMenu"
-      @keydown="onTriggerKeydown"
-      ><ChartNetwork
-    /></RibbonMenuButton>
     <Teleport to="body">
       <MenuSurface
         v-if="commonMenu.open.value && commonSession"
@@ -260,8 +268,11 @@ function insert(type: ChartType) {
   @include ribbon.columns;
   &__columns {
     @include ribbon.two-rows;
-    grid-template-columns: repeat(3, auto);
+    grid-template-columns: repeat(3, max-content);
     column-gap: 4px;
+  }
+  &__actions {
+    @include ribbon.two-rows;
   }
 }
 </style>

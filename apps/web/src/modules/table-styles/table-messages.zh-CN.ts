@@ -4,6 +4,7 @@ export const tablesZhCN: TableMessageSchema = {
   tables: {
     insertSlicer: "插入切片器",
     slicer: "切片器",
+    slicerUnavailable: "请先创建表格或数据透视表后再插入切片器",
     slicerTools: "切片器工具",
     slicerSettings: "切片器设置",
     slicerOptions: "切片器选项",

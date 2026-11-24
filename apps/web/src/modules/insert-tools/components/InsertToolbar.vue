@@ -35,7 +35,6 @@ import {
   ALargeSmall,
   Star,
   Sigma,
-  Eraser,
   PanelTop,
 } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
@@ -44,6 +43,7 @@ import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import ImageInsertMenu from "../../home-tools/components/ImageInsertMenu.vue";
 import SparklineInsertMenu from "../../sparklines/components/SparklineInsertMenu.vue";
 import type { CellSparkline } from "@sheetcraft/core/sparklines";
+
 defineProps<{
   disabled: boolean;
   dashboardDisabled?: boolean;
@@ -67,6 +67,7 @@ defineProps<{
   insertWordArtHandler?: (choice: WordArtStylePreset) => boolean | Promise<boolean>;
   insertIconHandler?: (id: SheetIconId) => boolean;
 }>();
+
 const emit = defineEmits<{
   insertPivot: [chart: boolean];
   refreshPivot: [];
@@ -93,9 +94,10 @@ const emit = defineEmits<{
   insertSlicer: [];
   manageTable: [];
 }>();
-defineSlots<{ watermark(): unknown }>();
+
 const { t, locale } = useAppI18n();
 </script>
+
 <template>
   <RibbonToolbar :label="t('ribbon.insertTools')" :data-cell-edit-session="editSessionId">
     <PivotInsertTools
@@ -116,8 +118,8 @@ const { t, locale } = useAppI18n();
     >
       <RibbonButton
         variant="tall"
-        :label="t('tables.tools')"
-        :text="t('tables.create')"
+        :label="hasTable ? t('tables.settings') : t('tables.create')"
+        :text="hasTable ? t('tables.settings') : t('tables.create')"
         :disabled="disabled || hasPivot"
         data-insert-tool="table"
         @activate="hasTable ? emit('manageTable') : emit('insertTable')"
@@ -127,6 +129,7 @@ const { t, locale } = useAppI18n();
         variant="tall"
         :label="t('tables.insertSlicer')"
         :text="t('tables.slicer')"
+        :title="slicerDisabled ? t('tables.slicerUnavailable') : t('tables.insertSlicer')"
         :disabled="slicerDisabled ?? true"
         data-insert-tool="slicer"
         @activate="emit('insertSlicer')"
@@ -140,21 +143,6 @@ const { t, locale } = useAppI18n();
       data-ribbon-group="insert-illustrations"
     >
       <ImageInsertMenu :disabled="imageDisabled" @insert-image="emit('insertImage', $event)" />
-      <RibbonButton
-        variant="tall"
-        :label="t('attachment.document')"
-        :text="t('attachment.document')"
-        :disabled="imageDisabled && hyperlinkDisabled"
-        data-insert-tool="document"
-        @activate="emit('insertAttachment', 'document')"
-        ><FileText
-      /></RibbonButton>
-      <slot name="watermark" />
-      <ScreenCaptureMenu
-        :disabled="imageDisabled"
-        @record="emit('recordScreen')"
-        @capture="(shape, tools, excludeSelf) => emit('captureScreen', shape, tools, excludeSelf)"
-      />
       <ShapeInsertMenu
         v-if="insertShapeHandler"
         :disabled="imageDisabled"
@@ -172,67 +160,36 @@ const { t, locale } = useAppI18n();
         @activate="emit('insertDrawing', 'shape')"
         ><Shapes
       /></RibbonButton>
-      <IconInsertMenu
-        v-if="insertIconHandler"
-        :disabled="imageDisabled"
-        :owner-id="shapeOwnerId"
-        :handler="insertIconHandler"
-      />
-      <RibbonButton
-        v-else
-        variant="tall"
-        :label="t('drawing.icon')"
-        :text="t('drawing.icon')"
-        :disabled="imageDisabled"
-        data-insert-tool="icon"
-        @activate="emit('insertDrawing', 'icon')"
-        ><Star
-      /></RibbonButton>
-      <WordArtInsertMenu
-        v-if="insertWordArtHandler"
-        :disabled="imageDisabled"
-        :owner-id="shapeOwnerId"
-        :edit-session-id="editSessionId"
-        :handler="insertWordArtHandler"
-      />
-      <RibbonButton
-        v-else
-        variant="tall"
-        :label="t('drawing.wordArt')"
-        :text="t('drawing.wordArt')"
-        :disabled="imageDisabled"
-        data-insert-tool="wordArt"
-        @activate="emit('insertDrawing', 'wordArt')"
-        ><ALargeSmall
-      /></RibbonButton>
-      <TextBoxInsertMenu
-        v-if="insertShapeHandler"
-        :disabled="imageDisabled"
-        :owner-id="shapeOwnerId"
-        :edit-session-id="editSessionId"
-        :handler="insertShapeHandler"
-      />
-      <RibbonButton
-        v-else
-        variant="tall"
-        :label="t('drawing.textBox')"
-        :text="t('drawing.textBox')"
-        :disabled="imageDisabled"
-        data-insert-tool="text-box"
-        @activate="emit('insertDrawing', 'textBox')"
-        ><Type
-      /></RibbonButton>
-      <RibbonButton
-        variant="tall"
-        :label="t('pageLayout.headerFooterTools')"
-        :text="t('pageLayout.headerFooterTools')"
-        :disabled="headerFooterDisabled ?? disabled"
-        data-insert-tool="header-footer"
-        @activate="emit('insertHeaderFooter')"
-        ><PanelTop
-      /></RibbonButton>
-      <div class="insert-toolbar__diagrams">
+      <div class="insert-toolbar__stack">
+        <IconInsertMenu
+          v-if="insertIconHandler"
+          compact
+          full-width
+          :disabled="imageDisabled"
+          :owner-id="shapeOwnerId"
+          :handler="insertIconHandler"
+        />
+        <RibbonButton
+          v-else
+          full-width
+          :label="t('drawing.icon')"
+          :text="t('drawing.icon')"
+          :disabled="imageDisabled"
+          data-insert-tool="icon"
+          @activate="emit('insertDrawing', 'icon')"
+          ><Star
+        /></RibbonButton>
+        <ScreenCaptureMenu
+          compact
+          full-width
+          :disabled="imageDisabled"
+          @record="emit('recordScreen')"
+          @capture="(shape, tools, excludeSelf) => emit('captureScreen', shape, tools, excludeSelf)"
+        />
+      </div>
+      <div class="insert-toolbar__stack">
         <DiagramInsertMenu
+          full-width
           tool="flowchart"
           :disabled="imageDisabled"
           :title="t('flowchart.title')"
@@ -243,6 +200,7 @@ const { t, locale } = useAppI18n();
           ><Workflow
         /></DiagramInsertMenu>
         <DiagramInsertMenu
+          full-width
           tool="mind-map"
           :disabled="imageDisabled"
           :title="t('mindMap.title')"
@@ -261,21 +219,17 @@ const { t, locale } = useAppI18n();
       @dashboard="emit('insertDashboard')"
       @insert="emit('insertChart', $event)"
     />
-    <section class="insert-toolbar__group" role="group" :aria-label="t('sparkline.title')">
+    <section
+      class="insert-toolbar__group"
+      role="group"
+      :aria-label="t('sparkline.title')"
+      data-ribbon-group="insert-sparklines"
+    >
       <SparklineInsertMenu
         :disabled="sparklineDisabled"
         @insert="emit('insertSparkline', $event)"
       />
-      <RibbonButton
-        variant="tall"
-        :label="t('sparkline.remove')"
-        :text="t('sparkline.remove')"
-        :disabled="sparklineDisabled"
-        @activate="emit('clearSparklines')"
-        ><Eraser
-      /></RibbonButton>
     </section>
-
     <section
       class="insert-toolbar__group"
       :aria-label="t('hyperlinks.insert')"
@@ -291,62 +245,147 @@ const { t, locale } = useAppI18n();
         @activate="emit('insertHyperlink')"
         ><Link2
       /></RibbonButton>
-      <RibbonButton
-        variant="tall"
-        :label="t('attachment.title')"
-        :text="t('attachment.title')"
-        :disabled="imageDisabled"
-        data-insert-tool="attachment"
-        @activate="emit('insertAttachment', 'icon')"
-        ><Paperclip
-      /></RibbonButton>
-      <FormControlInsertMenu
-        :disabled="imageDisabled"
-        :owner-id="shapeOwnerId"
-        @insert="emit('insertControl', $event)"
-      />
-      <RibbonButton
-        variant="tall"
-        :label="t('camera.title')"
-        :text="t('camera.title')"
-        :disabled="imageDisabled"
-        data-insert-tool="camera"
-        @activate="emit('insertCamera')"
-        ><Camera
-      /></RibbonButton>
-      <EquationInsertMenu
-        v-if="insertEquationHandler"
-        :handler="insertEquationHandler"
+      <div class="insert-toolbar__stack">
+        <RibbonButton
+          full-width
+          :label="t('attachment.document')"
+          :text="t('attachment.document')"
+          :disabled="imageDisabled && hyperlinkDisabled"
+          data-insert-tool="document"
+          @activate="emit('insertAttachment', 'document')"
+          ><FileText
+        /></RibbonButton>
+        <RibbonButton
+          full-width
+          :label="t('attachment.title')"
+          :text="t('attachment.title')"
+          :disabled="imageDisabled"
+          data-insert-tool="attachment"
+          @activate="emit('insertAttachment', 'icon')"
+          ><Paperclip
+        /></RibbonButton>
+      </div>
+      <div class="insert-toolbar__stack">
+        <FormControlInsertMenu
+          compact
+          full-width
+          :disabled="imageDisabled"
+          :owner-id="shapeOwnerId"
+          @insert="emit('insertControl', $event)"
+        />
+        <RibbonButton
+          full-width
+          :label="t('camera.title')"
+          :text="t('camera.title')"
+          :disabled="imageDisabled"
+          data-insert-tool="camera"
+          @activate="emit('insertCamera')"
+          ><Camera
+        /></RibbonButton>
+      </div>
+    </section>
+    <section
+      class="insert-toolbar__group"
+      :aria-label="t('drawing.textBox')"
+      role="group"
+      data-ribbon-group="insert-text"
+    >
+      <TextBoxInsertMenu
+        v-if="insertShapeHandler"
         :disabled="imageDisabled"
         :owner-id="shapeOwnerId"
         :edit-session-id="editSessionId"
-        :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
+        :handler="insertShapeHandler"
       />
       <RibbonButton
         v-else
         variant="tall"
-        :label="t('drawing.equation')"
-        :text="t('drawing.equation')"
+        :label="t('drawing.textBox')"
+        :text="t('drawing.textBox')"
         :disabled="imageDisabled"
-        data-insert-tool="equation"
-        @activate="emit('insertDrawing', 'equation')"
-        ><Sigma
+        data-insert-tool="text-box"
+        @activate="emit('insertDrawing', 'textBox')"
+        ><Type
       /></RibbonButton>
-      <SymbolInsertMenu
-        :disabled="symbolDisabled"
-        :edit-session-id="editSessionId"
-        :insert-text="insertSymbolTextHandler"
-        @more="emit('insertSymbol')"
-        @insert="emit('insertSymbolText', $event)"
-      />
+      <div class="insert-toolbar__stack">
+        <WordArtInsertMenu
+          v-if="insertWordArtHandler"
+          compact
+          full-width
+          :disabled="imageDisabled"
+          :owner-id="shapeOwnerId"
+          :edit-session-id="editSessionId"
+          :handler="insertWordArtHandler"
+        />
+        <RibbonButton
+          v-else
+          full-width
+          :label="t('drawing.wordArt')"
+          :text="t('drawing.wordArt')"
+          :disabled="imageDisabled"
+          data-insert-tool="wordArt"
+          @activate="emit('insertDrawing', 'wordArt')"
+          ><ALargeSmall
+        /></RibbonButton>
+        <RibbonButton
+          full-width
+          :label="t('pageLayout.headerFooterTools')"
+          :text="t('pageLayout.headerFooterTools')"
+          :disabled="headerFooterDisabled ?? disabled"
+          data-insert-tool="header-footer"
+          @activate="emit('insertHeaderFooter')"
+          ><PanelTop
+        /></RibbonButton>
+      </div>
+    </section>
+    <section
+      class="insert-toolbar__group"
+      :aria-label="t('drawing.symbol')"
+      role="group"
+      data-ribbon-group="insert-symbols"
+    >
+      <div class="insert-toolbar__stack">
+        <EquationInsertMenu
+          v-if="insertEquationHandler"
+          compact
+          full-width
+          :handler="insertEquationHandler"
+          :disabled="imageDisabled"
+          :owner-id="shapeOwnerId"
+          :edit-session-id="editSessionId"
+          :locale="locale === 'zh-CN' ? 'zh-CN' : 'en-US'"
+        />
+        <RibbonButton
+          v-else
+          full-width
+          :label="t('drawing.equation')"
+          :text="t('drawing.equation')"
+          :disabled="imageDisabled"
+          data-insert-tool="equation"
+          @activate="emit('insertDrawing', 'equation')"
+          ><Sigma
+        /></RibbonButton>
+        <SymbolInsertMenu
+          compact
+          full-width
+          :disabled="symbolDisabled"
+          :edit-session-id="editSessionId"
+          :insert-text="insertSymbolTextHandler"
+          @more="emit('insertSymbol')"
+          @insert="emit('insertSymbolText', $event)"
+        />
+      </div>
     </section>
   </RibbonToolbar>
 </template>
+
 <style scoped lang="scss">
 @use "../../../shared/ribbon/ribbon-layout" as ribbon;
-.insert-toolbar__diagrams {
+
+.insert-toolbar__stack {
   @include ribbon.two-rows;
 }
+
 .insert-toolbar__group {
   @include ribbon.columns;
 }

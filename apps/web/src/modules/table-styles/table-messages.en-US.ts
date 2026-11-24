@@ -4,6 +4,7 @@ export const tablesEnUS: TableMessageSchema = {
   tables: {
     insertSlicer: "Insert Slicer",
     slicer: "Slicer",
+    slicerUnavailable: "Create a table or pivot table first to insert a slicer",
     slicerTools: "Slicer Tools",
     slicerSettings: "Slicer Settings",
     slicerOptions: "Slicer Options",

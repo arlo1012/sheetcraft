@@ -17,6 +17,8 @@ const props = defineProps<{
   disabled: boolean;
   editSessionId?: string;
   insertText?: (payload: SymbolInsertion) => boolean;
+  compact?: boolean;
+  fullWidth?: boolean;
 }>();
 const emit = defineEmits<{ more: []; insert: [payload: SymbolInsertion] }>();
 const { t } = useAppI18n();
@@ -113,13 +115,14 @@ function title(item: SymbolInsertion): string {
 }
 </script>
 <template>
-  <span class="symbol-menu-tool">
+  <span class="symbol-menu-tool" :class="{ 'is-full-width': fullWidth }">
     <RibbonMenuButton
       ref="triggerComponentRef"
       :label="t('drawing.symbol')"
       :text="t('drawing.symbol')"
       :disabled="disabled"
-      variant="tall"
+      :variant="compact ? 'compact' : 'tall'"
+      :full-width="fullWidth"
       data-insert-tool="symbol"
       popup-role="menu"
       :expanded="open"
@@ -215,6 +218,10 @@ function title(item: SymbolInsertion): string {
 
 .symbol-menu-tool {
   @include ribbon.tool;
+  &.is-full-width {
+    display: flex;
+    width: 100%;
+  }
 }
 
 .symbol-menu {

@@ -11,6 +11,7 @@ const props = defineProps<{
   workbookLabel: string;
   localLabel: string;
   tool: string;
+  fullWidth?: boolean;
 }>();
 const emit = defineEmits<{ workbook: []; local: [] }>();
 const trigger = ref<InstanceType<typeof RibbonMenuButton>>();
@@ -31,6 +32,7 @@ function choose(local: boolean) {
   <RibbonMenuButton
     ref="trigger"
     variant="compact"
+    :full-width="fullWidth"
     :label="title"
     :text="title"
     :disabled="disabled"

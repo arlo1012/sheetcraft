@@ -12,6 +12,8 @@ const props = defineProps<{
   ownerId?: string | number;
   editSessionId?: string;
   handler: (choice: WordArtStylePreset) => boolean | Promise<boolean>;
+  compact?: boolean;
+  fullWidth?: boolean;
 }>();
 const { t, locale } = useAppI18n();
 const button = ref<InstanceType<typeof RibbonMenuButton>>();
@@ -66,10 +68,15 @@ watch(
 onBeforeUnmount(() => generation++);
 </script>
 <template>
-  <span class="wordart-insert-tool" :data-cell-edit-session="editSessionId">
+  <span
+    class="wordart-insert-tool"
+    :class="{ 'is-full-width': fullWidth }"
+    :data-cell-edit-session="editSessionId"
+  >
     <RibbonMenuButton
       ref="button"
-      variant="tall"
+      :variant="compact ? 'compact' : 'tall'"
+      :full-width="fullWidth"
       :label="t('drawing.wordArt')"
       :text="t('drawing.wordArt')"
       :disabled="disabled"
@@ -109,6 +116,10 @@ onBeforeUnmount(() => generation++);
 @use "../../../shared/ribbon/ribbon-layout" as ribbon;
 .wordart-insert-tool {
   @include ribbon.tool;
+  &.is-full-width {
+    display: flex;
+    width: 100%;
+  }
 }
 .wordart-insert-menu {
   width: 544px;

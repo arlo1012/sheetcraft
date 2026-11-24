@@ -12,7 +12,11 @@ import { useMenu } from "../../../shared/menu/useMenu";
 import RibbonSplitButton from "../../../shared/ribbon/RibbonSplitButton.vue";
 import PieThumbnail from "./PieThumbnail.vue";
 const PieCardPreview = defineAsyncComponent(() => import("./PieCardPreview.vue"));
-const props = defineProps<{ disabled: boolean; themeColors?: readonly string[] }>();
+const props = defineProps<{
+  disabled: boolean;
+  themeColors?: readonly string[];
+  fullWidth?: boolean;
+}>();
 const emit = defineEmits<{ insert: [intent: ChartInsertIntent] }>();
 const { t } = useAppI18n(),
   trigger = ref<InstanceType<typeof RibbonSplitButton>>(),
@@ -48,6 +52,7 @@ function choose(index?: number, more = false) {
 <template>
   <RibbonSplitButton
     ref="trigger"
+    :full-width="fullWidth"
     :label="t('chart.pie')"
     :text="t('chart.pie')"
     :menu-label="t('chart.variantMenu', { type: t('chart.pie') })"

@@ -16,7 +16,7 @@ import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import { useAppI18n } from "../../../shared/i18n";
 import { captureShapes, type CaptureShape } from "../capture-region";
-const props = defineProps<{ disabled?: boolean }>();
+const props = defineProps<{ disabled?: boolean; compact?: boolean; fullWidth?: boolean }>();
 const emit = defineEmits<{
   record: [];
   capture: [shape: CaptureShape, tools: boolean, excludeSelf: boolean];
@@ -41,7 +41,8 @@ function choose(shape: CaptureShape, tools = false) {
 <template>
   <RibbonSplitButton
     ref="trigger"
-    variant="tall"
+    :variant="compact ? 'compact' : 'tall'"
+    :full-width="fullWidth"
     :label="t('drawing.screenshot')"
     :text="t('drawing.screenshot')"
     :menu-label="t('drawing.captureModes')"
