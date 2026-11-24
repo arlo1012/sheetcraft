@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
@@ -107,7 +108,7 @@ function confirm(context?: { e?: Event }): void {
           {{ t("tables.generatedHeaders") }}
         </p>
       </div>
-      <p v-if="error" class="create-table-dialog__error" role="alert">{{ error }}</p>
+      <TAlert v-if="error" theme="error" :message="error" role="alert" />
     </div>
   </Dialog>
 </template>

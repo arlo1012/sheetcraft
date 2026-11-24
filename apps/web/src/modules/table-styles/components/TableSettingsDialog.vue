@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input } from "tdesign-vue-next/es/input";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
@@ -72,7 +73,7 @@ const draft = ref({ ...props.initial });
         <Button variant="outline" @click="emit('convert')">{{ t("tables.convertToRange") }}</Button>
         <p>{{ t("tables.convertHint") }}</p>
       </div>
-      <p v-if="error" class="table-settings-dialog__error" role="alert">{{ error }}</p>
+      <TAlert v-if="error" theme="error" :message="error" role="alert" />
     </div>
   </Dialog>
 </template>

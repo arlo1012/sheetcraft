@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import { GripVertical, ChevronDown, ChevronUp, Pencil, PlusCircle, Trash2 } from "lucide-vue-next";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -374,7 +375,7 @@ async function selectRange(current: string): Promise<string | undefined> {
       <TCheckbox v-model="draft.applyToMatching" :disabled="!initial.canApplyToMatching">{{
         t("dataTools.dropdown.applyToMatching")
       }}</TCheckbox>
-      <p v-if="error" class="dropdown-list-dialog__error" role="alert">{{ error }}</p>
+      <TAlert v-if="error" theme="error" :message="error" role="alert" />
     </div>
     <template #footer>
       <div class="dropdown-list-dialog__footer">

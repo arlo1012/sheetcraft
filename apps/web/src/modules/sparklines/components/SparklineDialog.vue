@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Select } from "tdesign-vue-next/es/select";
@@ -131,9 +132,12 @@ const { t } = useAppI18n();
         </div>
       </template>
       <p>{{ t("sparkline.hint") }}</p>
-      <p v-if="error" class="sparkline-dialog__error" role="alert">
-        {{ t(failed ? "sparkline.failed" : "sparkline.invalid") }}
-      </p>
+      <TAlert
+        v-if="error"
+        theme="error"
+        :message="t(failed ? 'sparkline.failed' : 'sparkline.invalid')"
+        role="alert"
+      />
     </Form>
   </Dialog>
 </template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, useId, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
@@ -89,9 +90,12 @@ function save(): void {
           />
         </TFormItem>
       </TForm>
-      <p v-if="validationError || error" class="workbook-protection__error" role="alert">
-        {{ validationError || error }}
-      </p>
+      <TAlert
+        v-if="validationError || error"
+        theme="error"
+        :message="validationError || error"
+        role="alert"
+      />
     </div>
   </TDialog>
 </template>

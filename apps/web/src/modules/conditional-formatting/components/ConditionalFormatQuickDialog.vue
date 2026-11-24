@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -289,7 +290,7 @@ watch(
           />
         </div>
       </div>
-      <p v-if="error" role="alert" class="conditional-format-quick__error">{{ error }}</p>
+      <TAlert v-if="error" theme="error" :message="error" role="alert" />
     </div>
   </Dialog>
 </template>

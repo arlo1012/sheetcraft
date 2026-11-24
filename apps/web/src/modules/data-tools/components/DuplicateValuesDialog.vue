@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { SquareMousePointer } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
@@ -130,9 +131,7 @@ watch(
           </div>
         </TFormItem>
       </TForm>
-      <p v-if="error" class="duplicate-values-dialog__error" role="alert">
-        {{ error }}
-      </p>
+      <TAlert v-if="error" theme="error" :message="error" role="alert" />
     </div>
   </Dialog>
 </template>

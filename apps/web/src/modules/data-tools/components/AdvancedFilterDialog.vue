@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { SquareMousePointer } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
@@ -137,9 +138,8 @@ const canApply = computed(() =>
       <p v-if="draft.mode === 'copy'" class="advanced-filter-dialog__hint">
         {{ t("dataTools.advanced.copyHint") }}
       </p>
-      <p v-if="error" class="advanced-filter-dialog__error" role="alert">{{ error }}</p>
-    </div></Dialog
-  >
+      <TAlert v-if="error" theme="error" :message="error" role="alert" /></div
+  ></Dialog>
 </template>
 <style scoped lang="scss">
 .advanced-filter-dialog {
