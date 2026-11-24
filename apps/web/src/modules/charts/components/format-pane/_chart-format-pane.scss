@@ -1,0 +1,54 @@
+@mixin pane-field-styles {
+  .chart-format-pane__field {
+    display: grid;
+    grid-template-columns: var(--chart-format-label-width) minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+    min-width: 0;
+
+    > label,
+    > span {
+      min-height: 24px;
+      display: flex;
+      align-items: center;
+      color: var(--sheetcraft-text-secondary);
+      overflow-wrap: anywhere;
+    }
+
+    &--stack {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 4px;
+    }
+  }
+
+  .chart-format-pane__number {
+    display: flex;
+    gap: 2px;
+    align-items: flex-start;
+    min-width: 0;
+
+    > :first-child {
+      min-width: 0;
+      flex: 1;
+    }
+
+    > button {
+      flex-shrink: 0;
+    }
+  }
+
+  .chart-format-pane__paint {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .chart-format-pane__hint {
+    margin: 0;
+    color: var(--sheetcraft-text-secondary);
+    font-size: 12px;
+    line-height: 18px;
+  }
+}
