@@ -29,25 +29,26 @@ function menu() {
 
 describe("ImageInsertMenu", () => {
   test.each(["en-US", "zh-CN"] as const)(
-    "exposes two placement choices, one local file action and current limits (%s)",
+    "exposes direct cell and floating placement actions with placement preview and limits (%s)",
     async (locale) => {
       const wrapper = mountMenu(false, locale);
       await wrapper.get('[data-ribbon-action="image"]').trigger("click");
-      expect(menu().findAll('[role="menuitemradio"]')).toHaveLength(2);
-      expect(menu().findAll('[role="menuitem"]')).toHaveLength(1);
-      expect(menu().get("[data-image-insert-local]").attributes("role")).toBe("menuitem");
-      expect(menu().get("[data-image-insert-local]").text()).toBe(
-        locale === "en-US" ? "Pictures from file…" : "本地图片…",
+      expect(menu().findAll('[role="menuitem"]')).toHaveLength(2);
+      expect(menu().get('[data-image-insert-mode="cell"]').text()).toBe(
+        locale === "en-US" ? "Image in cell" : "单元格内图片",
+      );
+      expect(menu().get('[data-image-insert-mode="floating"]').text()).toBe(
+        locale === "en-US" ? "Floating image" : "浮动图片",
       );
       const hint = menu().get(".image-insert-menu__limits");
       expect(hint.text()).toContain("PNG");
       expect(hint.text()).toContain("10 MiB");
       expect(hint.text()).toContain("16,384");
       expect(hint.text()).toContain("33,554,432");
-      expect(hint.attributes("role")).toBe("none");
     },
   );
-  test("defaults to in-cell placement and waits for the local file action", async () => {
+
+  test("updates placement preview on hover or focus without inserting", async () => {
     const wrapper = mountMenu();
     const trigger = wrapper.get('[data-ribbon-action="image"]');
 
@@ -60,32 +61,24 @@ describe("ImageInsertMenu", () => {
     });
     await trigger.trigger("click");
     expect(menu().attributes("aria-label")).toBe("Insert image");
-    expect(menu().get('[data-image-insert-mode="cell"]').text()).toBe("Image in cell");
-    expect(menu().get('[data-image-insert-mode="cell"]').attributes("aria-checked")).toBe("true");
-    expect(menu().get('[data-image-insert-mode="floating"]').attributes("aria-checked")).toBe(
-      "false",
-    );
-    expect(wrapper.emitted("insertImage")).toBeUndefined();
-    await menu().get("[data-image-insert-local]").trigger("click");
+    expect(menu().get(".image-insert-menu__hint").text()).toContain("inside cells");
 
-    expect(wrapper.emitted("insertImage")).toEqual([["cell"]]);
-    expect(document.body.querySelector('[role="menu"]')).toBeNull();
+    await menu().get('[data-image-insert-mode="floating"]').trigger("pointerenter");
+    expect(menu().get(".image-insert-menu__hint").text()).toContain("float above cells");
+    expect(wrapper.emitted("insertImage")).toBeUndefined();
+
+    await menu().get('[data-image-insert-mode="cell"]').trigger("focus");
+    expect(menu().get(".image-insert-menu__hint").text()).toContain("inside cells");
+    expect(wrapper.emitted("insertImage")).toBeUndefined();
   });
 
   test.each(["cell", "floating"] as const)(
-    "selects %s placement without inserting until the local file action is chosen",
+    "inserts immediately in one click when choosing %s placement",
     async (mode) => {
       const wrapper = mountMenu();
       const trigger = wrapper.get('[data-ribbon-action="image"]');
       await trigger.trigger("click");
       await menu().get(`[data-image-insert-mode="${mode}"]`).trigger("click");
-
-      expect(menu().get(`[data-image-insert-mode="${mode}"]`).attributes("aria-checked")).toBe(
-        "true",
-      );
-      expect(trigger.attributes("aria-expanded")).toBe("true");
-      expect(wrapper.emitted("insertImage")).toBeUndefined();
-      await menu().get("[data-image-insert-local]").trigger("click");
 
       expect(wrapper.emitted("insertImage")).toEqual([[mode]]);
       expect(document.body.querySelector('[role="menu"]')).toBeNull();
@@ -93,29 +86,24 @@ describe("ImageInsertMenu", () => {
     },
   );
 
-  test("keeps the selected mode after Escape without requesting insertion", async () => {
+  test("keeps the previewed mode after Escape without requesting insertion", async () => {
     const wrapper = mountMenu();
     const trigger = wrapper.get('[data-ribbon-action="image"]');
     await trigger.trigger("click");
-    await menu().get('[data-image-insert-mode="floating"]').trigger("click");
+    await menu().get('[data-image-insert-mode="floating"]').trigger("pointerenter");
     await menu().trigger("keydown", { key: "Escape" });
 
     expect(document.body.querySelector('[role="menu"]')).toBeNull();
     expect(wrapper.emitted("insertImage")).toBeUndefined();
     await trigger.trigger("click");
-    expect(menu().get('[data-image-insert-mode="floating"]').attributes("aria-checked")).toBe(
-      "true",
-    );
-    expect(menu().get('[data-image-insert-mode="cell"]').attributes("aria-checked")).toBe("false");
-    await menu().get("[data-image-insert-local]").trigger("click");
-    expect(wrapper.emitted("insertImage")).toEqual([["floating"]]);
+    expect(menu().get(".image-insert-menu__hint").text()).toContain("float above cells");
   });
 
   test("cancels the open menu through its trigger without inserting", async () => {
     const wrapper = mountMenu();
     const trigger = wrapper.get('[data-ribbon-action="image"]');
     await trigger.trigger("click");
-    await menu().get('[data-image-insert-mode="floating"]').trigger("click");
+    await menu().get('[data-image-insert-mode="floating"]').trigger("pointerenter");
     await trigger.trigger("click");
     expect(document.body.querySelector('[role="menu"]')).toBeNull();
     expect(wrapper.emitted("insertImage")).toBeUndefined();
