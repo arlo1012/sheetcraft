@@ -10,6 +10,7 @@ import {
 import { createWorkbookSession } from "@sheetcraft/core/history";
 import { createSequentialIdFactory } from "@sheetcraft/core/runtime";
 import {
+  DEFAULT_ERROR_CHECK_SETTINGS,
   DUPLICATE_ERROR_CHECKS_STORAGE_KEY,
   readDuplicateErrorChecks,
   writeDuplicateErrorChecks,
@@ -326,6 +327,7 @@ describe("duplicate error checks", () => {
       }),
     );
     expect(readDuplicateErrorChecks(storage)).toEqual({
+      ...DEFAULT_ERROR_CHECK_SETTINGS,
       enabled: false,
       indicatorColor: null,
       duplicateEntries: true,
@@ -353,6 +355,7 @@ describe("duplicate error checks", () => {
       }),
     );
     expect(readDuplicateErrorChecks(storage)).toEqual({
+      ...DEFAULT_ERROR_CHECK_SETTINGS,
       enabled: true,
       indicatorColor: "#abcdef",
       duplicateEntries: false,
@@ -381,10 +384,7 @@ describe("duplicate error checks", () => {
     const storage = memoryStorage();
     writeDuplicateErrorChecks(
       {
-        enabled: true,
-        indicatorColor: null,
-        duplicateEntries: true,
-        numberStoredAsText: true,
+        ...DEFAULT_ERROR_CHECK_SETTINGS,
         ignored: [
           {
             workbookId: "workbook-b",
@@ -401,6 +401,7 @@ describe("duplicate error checks", () => {
     expect(
       left.checks.applySettings(
         {
+          ...DEFAULT_ERROR_CHECK_SETTINGS,
           enabled: false,
           indicatorColor: "#ff0000",
           duplicateEntries: false,
@@ -410,6 +411,7 @@ describe("duplicate error checks", () => {
       ),
     ).toBe(true);
     expect(left.checks.settings.value).toEqual({
+      ...DEFAULT_ERROR_CHECK_SETTINGS,
       enabled: false,
       indicatorColor: "#ff0000",
       duplicateEntries: false,
@@ -439,10 +441,7 @@ describe("duplicate error checks", () => {
     const storage = memoryStorage();
     storage.setItem(DUPLICATE_ERROR_CHECKS_STORAGE_KEY, "not json");
     expect(readDuplicateErrorChecks(storage)).toEqual({
-      enabled: true,
-      indicatorColor: null,
-      duplicateEntries: true,
-      numberStoredAsText: true,
+      ...DEFAULT_ERROR_CHECK_SETTINGS,
       ignored: [],
     });
     const unavailable: Storage = {
@@ -460,19 +459,14 @@ describe("duplicate error checks", () => {
       },
     };
     expect(readDuplicateErrorChecks(unavailable)).toEqual({
-      enabled: true,
-      indicatorColor: null,
-      duplicateEntries: true,
-      numberStoredAsText: true,
+      ...DEFAULT_ERROR_CHECK_SETTINGS,
       ignored: [],
     });
     expect(
       writeDuplicateErrorChecks(
         {
+          ...DEFAULT_ERROR_CHECK_SETTINGS,
           enabled: false,
-          indicatorColor: null,
-          duplicateEntries: true,
-          numberStoredAsText: true,
           ignored: [],
         },
         unavailable,

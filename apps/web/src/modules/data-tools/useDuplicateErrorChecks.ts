@@ -1,6 +1,4 @@
 import { computed, ref, type ComputedRef } from "vue";
-import { getDuplicateEntryIssues } from "@sheetcraft/core/duplicate-values";
-import { isNumericText } from "@sheetcraft/core/input";
 import { isCellInRange, normalizeCellRange } from "@sheetcraft/sheet-engine/selection";
 import {
   createCellKey,
@@ -11,21 +9,23 @@ import {
   type Workbook,
 } from "@sheetcraft/core/workbook";
 import {
+  ERROR_CHECK_RULE_KEYS,
+  normalizeErrorCheckSettings,
   readDuplicateErrorChecks,
   writeDuplicateErrorChecks,
   type DuplicateErrorChecksPreferences,
   type ErrorCheckSettings,
-  normalizeErrorCheckSettings,
 } from "./duplicate-error-preferences";
+import {
+  collectSheetErrorIssues,
+  ERROR_CHECK_KIND_TO_SETTING,
+  pickPrimaryErrorCheckKind,
+  stableErrorValue,
+  type ErrorCheckIssue,
+  type ErrorCheckKind,
+} from "./error-check-rules";
 
-type DuplicateIssue = ReturnType<typeof getDuplicateEntryIssues>[number];
-export type ErrorCheckKind = "duplicate" | "number-stored-as-text";
-
-type ErrorIssue = {
-  address: CellAddress;
-  kind: ErrorCheckKind;
-  signature: string;
-};
+export type { ErrorCheckKind };
 
 type Options = {
   getWorkbook: () => Workbook;
@@ -41,51 +41,13 @@ type CachedIssues = {
   workbook: Workbook;
   sheet: Sheet;
   revision: number;
-  issues: ErrorIssue[];
+  issues: ErrorCheckIssue[];
 };
 
 type CurrentIssues = CachedIssues & {
   errorKinds: Map<string, ErrorCheckKind>;
   signatures: Map<string, string>;
 };
-
-function stableValue(value: unknown): string {
-  const serialized = JSON.stringify(value);
-  return serialized === undefined ? String(value) : serialized;
-}
-
-function issueSignature(sheet: Sheet, evaluator: SheetEvaluator, issue: DuplicateIssue): string {
-  const rules = (sheet.duplicateRules ?? [])
-    .filter((rule) => issue.ruleIds.includes(rule.id))
-    .sort((left, right) => left.id.localeCompare(right.id))
-    .map((rule) => ({ id: rule.id, range: rule.range }));
-  return stableValue({
-    valueKey: issue.valueKey,
-    content: sheet.cells.get(createCellKey(issue.address))?.content ?? null,
-    computedValue: evaluator.getComputedValue(issue.address),
-    rules,
-  });
-}
-
-function numberStoredAsTextIssues(sheet: Sheet): ErrorIssue[] {
-  const issues: ErrorIssue[] = [];
-  for (const [cellKey, cell] of sheet.cells) {
-    const content = cell.content;
-    if (
-      content?.kind !== "literal" ||
-      typeof content.value !== "string" ||
-      !isNumericText(content.value)
-    )
-      continue;
-    const [row, column] = cellKey.split(":").map(Number) as [number, number];
-    issues.push({
-      address: { row, column },
-      kind: "number-stored-as-text",
-      signature: stableValue({ content }),
-    });
-  }
-  return issues;
-}
 
 function sameScope(
   issue: { workbookId: string; sheetId: string },
@@ -96,8 +58,8 @@ function sameScope(
 }
 
 /**
- * Browser-only presentation state for duplicate-entry and numeric-text issues.
- * It never changes duplicate rules or the command-time rejection validation.
+ * Browser-only presentation state for background cell error checks.
+ * It never mutates sheet rules or command-time validation.
  */
 export function useDuplicateErrorChecks(options: Options): {
   errorCells: ComputedRef<ReadonlySet<string>>;
@@ -133,27 +95,16 @@ export function useDuplicateErrorChecks(options: Options): {
     if (cache?.workbook === workbook && cache.sheet === sheet && cache.revision === revision)
       return cache;
     const evaluator = options.getEvaluator();
-    const issues: ErrorIssue[] = [
-      ...getDuplicateEntryIssues(sheet, evaluator).map((issue) => ({
-        address: issue.address,
-        kind: "duplicate" as const,
-        signature: issueSignature(sheet, evaluator, issue),
-      })),
-      ...numberStoredAsTextIssues(sheet),
-    ];
+    const issues = collectSheetErrorIssues(workbook, sheet, evaluator);
     cache = { workbook, sheet, revision, issues };
-
     return cache;
   }
 
   function visibleIssues(snapshot: CachedIssues): CurrentIssues {
-    const byCell = new Map<string, ErrorIssue[]>();
+    const byCell = new Map<string, ErrorCheckIssue[]>();
     for (const issue of snapshot.issues) {
-      if (
-        (issue.kind === "duplicate" && !preferences.duplicateEntries) ||
-        (issue.kind === "number-stored-as-text" && !preferences.numberStoredAsText)
-      )
-        continue;
+      const settingKey = ERROR_CHECK_KIND_TO_SETTING[issue.kind];
+      if (!preferences[settingKey]) continue;
       const cellKey = createCellKey(issue.address);
       const issues = byCell.get(cellKey);
       if (issues) issues.push(issue);
@@ -163,15 +114,12 @@ export function useDuplicateErrorChecks(options: Options): {
     const signatures = new Map<string, string>();
     for (const [cellKey, issues] of byCell) {
       issues.sort((left, right) => left.kind.localeCompare(right.kind));
-      errorKinds.set(
-        cellKey,
-        issues.some((issue) => issue.kind === "duplicate") ? "duplicate" : "number-stored-as-text",
-      );
+      errorKinds.set(cellKey, pickPrimaryErrorCheckKind(issues));
       signatures.set(
         cellKey,
         issues.length === 1 && issues[0]!.kind === "duplicate"
           ? issues[0]!.signature
-          : stableValue(issues.map(({ kind, signature }) => ({ kind, signature }))),
+          : stableErrorValue(issues.map(({ kind, signature }) => ({ kind, signature }))),
       );
     }
 
@@ -204,8 +152,8 @@ export function useDuplicateErrorChecks(options: Options): {
 
   const settings = computed<ErrorCheckSettings>(() => {
     void stateVersion.value;
-    const { enabled, indicatorColor, duplicateEntries, numberStoredAsText } = preferences;
-    return { enabled, indicatorColor, duplicateEntries, numberStoredAsText };
+    const { ignored: _ignored, ...rest } = preferences;
+    return { ...rest };
   });
 
   const errorKinds = computed<ReadonlyMap<string, ErrorCheckKind>>(() => {
@@ -286,11 +234,11 @@ export function useDuplicateErrorChecks(options: Options): {
     const ignored = snapshot
       ? preferences.ignored.filter((item) => !sameScope(item, snapshot.workbook, snapshot.sheet))
       : preferences.ignored;
+    const rulesChanged = ERROR_CHECK_RULE_KEYS.some((key) => preferences[key] !== normalized[key]);
     const changed =
       preferences.enabled !== normalized.enabled ||
       preferences.indicatorColor !== normalized.indicatorColor ||
-      preferences.duplicateEntries !== normalized.duplicateEntries ||
-      preferences.numberStoredAsText !== normalized.numberStoredAsText ||
+      rulesChanged ||
       ignored !== preferences.ignored;
     if (changed) updatePreferences({ ...normalized, ignored });
     return true;

@@ -649,9 +649,13 @@ export const enUS = {
         indicatorColor: "Error indicator color",
         automaticColor: "Automatic",
         rules: "Rules",
+        selectAllRules: "Select all",
+        restoreDefaultRules: "Reset defaults",
         duplicateEntries: "Duplicate-entry restriction violated",
-        unavailable: "TODO",
+        unavailable: "Unavailable",
         formulaError: "Formula error",
+        formulaErrorMessage: "The formula in this cell evaluates to an error value.",
+        ignoreAllFormulaErrorHint: "Ignore formula evaluation errors in the current worksheet",
         numberStoredAsText: "Numbers stored as text",
         convertNumber: "Convert to number",
         convertNumberBatch: "Convert selection to numbers",
@@ -660,19 +664,55 @@ export const enUS = {
           "This number is stored as text and may cause calculation errors.",
         ignoreAllNumberTextHint: "Ignore numbers stored as text on the current worksheet",
         twoDigitYear: "Cells containing years represented as 2 digits",
+        twoDigitYearMessage: "This text date uses a 2-digit year, which may cause year ambiguity.",
+        ignoreAllTwoDigitYearHint: "Ignore text dates with 2-digit years in the current worksheet",
         inconsistentFormula: "Formulas inconsistent with other formulas in the region",
+        inconsistentFormulaMessage:
+          "The formula in this cell differs from the formulas in adjacent cells.",
+        ignoreAllInconsistentFormulaHint: "Ignore inconsistent formulas in the current worksheet",
         formulaOmittingCells: "Formulas omitting cells in a region",
+        formulaOmittingCellsMessage:
+          "The formula in this cell omits adjacent numeric cells in the region.",
+        ignoreAllFormulaOmittingCellsHint:
+          "Ignore formulas omitting adjacent cells in the current worksheet",
         unlockedFormula: "Unlocked cells containing formulas",
+        unlockedFormulaMessage:
+          "This cell contains a formula and is not locked against edits when protected.",
+        ignoreAllUnlockedFormulaHint: "Ignore unlocked formula cells in the current worksheet",
         formulaRefersToEmpty: "Formulas referring to empty cells",
+        formulaRefersToEmptyMessage:
+          "The formula in this cell refers directly to one or more empty cells.",
+        ignoreAllFormulaRefersToEmptyHint:
+          "Ignore formulas referring to empty cells in the current worksheet",
         dataValidation: "Cell contents do not match data validation",
+        dataValidationMessage:
+          "The content of this cell does not satisfy the configured data validation rule.",
+        ignoreAllDataValidationHint: "Ignore data validation violations in the current worksheet",
         leadingTrailingSpaces: "Cells containing leading or trailing spaces",
+        leadingTrailingSpacesMessage:
+          "This cell text contains leading or trailing whitespace that may affect lookups or sorting.",
+        trimSpaces: "Trim leading/trailing spaces",
+        ignoreAllLeadingTrailingSpacesHint:
+          "Ignore cells with leading or trailing spaces in the current worksheet",
         calculatedColumn: "Inconsistent calculated column formula in tables",
+        calculatedColumnMessage:
+          "This cell does not match the calculated column formula for its table.",
+        ignoreAllCalculatedColumnHint:
+          "Ignore inconsistent calculated column formulas in the current worksheet",
         calculationIncomplete: "Formula calculations incomplete",
+        calculationIncompleteMessage:
+          "Manual calculation is active or a circular reference prevented this formula from updating.",
+        recalculateNow: "Recalculate workbook",
+        ignoreAllCalculationIncompleteHint:
+          "Ignore incomplete formula calculations in the current worksheet",
         irregularDate: "Irregular date format",
+        irregularDateMessage:
+          "This cell contains a non-standard text date that may not sort or calculate properly.",
+        ignoreAllIrregularDateHint: "Ignore irregular text dates in the current worksheet",
         resetIgnored: "Clear ignored records in this worksheet ({count})",
         resetPending:
           "{count} ignored record(s) in this worksheet will be cleared when you confirm.",
-        resetIgnoredHint: "There are no ignored duplicate-entry errors in this worksheet.",
+        resetIgnoredHint: "There are no ignored errors in this worksheet.",
         cancel: "Cancel",
         confirm: "OK",
       },

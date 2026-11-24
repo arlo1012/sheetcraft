@@ -1,18 +1,45 @@
 import { normalizeColor } from "../../shared/color/palette";
 
+export const ERROR_CHECK_RULE_KEYS = [
+  "duplicateEntries",
+  "formulaError",
+  "numberStoredAsText",
+  "twoDigitYear",
+  "inconsistentFormula",
+  "formulaOmittingCells",
+  "unlockedFormula",
+  "formulaRefersToEmpty",
+  "dataValidation",
+  "leadingTrailingSpaces",
+  "calculatedColumn",
+  "calculationIncomplete",
+  "irregularDate",
+] as const;
+
+export type ErrorCheckRuleKey = (typeof ERROR_CHECK_RULE_KEYS)[number];
+
 /** User-configurable presentation and rule switches for cell error checks. */
 export type ErrorCheckSettings = {
   enabled: boolean;
   indicatorColor: string | null;
-  duplicateEntries: boolean;
-  numberStoredAsText: boolean;
-};
+} & Record<ErrorCheckRuleKey, boolean>;
 
 export const DEFAULT_ERROR_CHECK_SETTINGS: Readonly<ErrorCheckSettings> = {
   enabled: true,
   indicatorColor: null,
   duplicateEntries: true,
+  formulaError: true,
   numberStoredAsText: true,
+  twoDigitYear: true,
+  inconsistentFormula: true,
+  formulaOmittingCells: true,
+  unlockedFormula: true,
+  formulaRefersToEmpty: false,
+  dataValidation: true,
+  leadingTrailingSpaces: true,
+  calculatedColumn: true,
+  calculationIncomplete: true,
+  irregularDate: true,
 };
 
 export type DuplicateErrorIgnoredIssue = {
@@ -27,7 +54,7 @@ export type DuplicateErrorChecksPreferences = ErrorCheckSettings & {
 };
 
 export const DUPLICATE_ERROR_CHECKS_STORAGE_KEY = "sheetcraft.duplicateErrorChecks";
-const STORAGE_VERSION = 3;
+const STORAGE_VERSION = 4;
 
 function getStorage(): Storage | undefined {
   try {
@@ -52,7 +79,7 @@ function isIgnoredIssue(value: unknown): value is DuplicateErrorIgnoredIssue {
   );
 }
 
-function isLegacyPreferences(value: unknown): value is {
+function isLegacyV1Preferences(value: unknown): value is {
   enabled: boolean;
   ignored: DuplicateErrorIgnoredIssue[];
 } {
@@ -69,12 +96,7 @@ function isLegacyPreferences(value: unknown): value is {
 export function normalizeErrorCheckSettings(value: unknown): ErrorCheckSettings | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const record = value as Record<string, unknown>;
-  if (
-    typeof record.enabled !== "boolean" ||
-    typeof record.duplicateEntries !== "boolean" ||
-    typeof record.numberStoredAsText !== "boolean"
-  )
-    return undefined;
+  if (typeof record.enabled !== "boolean") return undefined;
   const indicatorColor =
     record.indicatorColor === null
       ? null
@@ -82,21 +104,34 @@ export function normalizeErrorCheckSettings(value: unknown): ErrorCheckSettings 
         ? normalizeColor(record.indicatorColor)
         : undefined;
   if (indicatorColor === undefined) return undefined;
+
+  const rules = {} as Record<ErrorCheckRuleKey, boolean>;
+  for (const key of ERROR_CHECK_RULE_KEYS) {
+    if (typeof record[key] !== "boolean") return undefined;
+    rules[key] = record[key];
+  }
   return {
     enabled: record.enabled,
     indicatorColor,
-    duplicateEntries: record.duplicateEntries,
-    numberStoredAsText: record.numberStoredAsText,
+    ...rules,
   };
 }
 
-function normalizeLegacyErrorCheckSettings(value: unknown): ErrorCheckSettings | undefined {
+function normalizeLegacyErrorCheckSettings(
+  value: unknown,
+  requireNumberStoredAsText: boolean,
+): ErrorCheckSettings | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const record = value as Record<string, unknown>;
+  if (
+    typeof record.enabled !== "boolean" ||
+    typeof record.duplicateEntries !== "boolean" ||
+    (requireNumberStoredAsText && typeof record.numberStoredAsText !== "boolean")
+  )
+    return undefined;
   return normalizeErrorCheckSettings({
+    ...DEFAULT_ERROR_CHECK_SETTINGS,
     ...record,
-    numberStoredAsText:
-      record.numberStoredAsText ?? DEFAULT_ERROR_CHECK_SETTINGS.numberStoredAsText,
   });
 }
 
@@ -112,10 +147,13 @@ function parsePreferences(value: unknown): DuplicateErrorChecksPreferences | und
   };
 }
 
-function parseLegacyPreferences(value: unknown): DuplicateErrorChecksPreferences | undefined {
+function parseLegacyPreferences(
+  value: unknown,
+  requireNumberStoredAsText: boolean,
+): DuplicateErrorChecksPreferences | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const record = value as Record<string, unknown>;
-  const settings = normalizeLegacyErrorCheckSettings(record);
+  const settings = normalizeLegacyErrorCheckSettings(record, requireNumberStoredAsText);
   if (!settings || !Array.isArray(record.ignored) || !record.ignored.every(isIgnoredIssue))
     return undefined;
   return {
@@ -131,13 +169,14 @@ function defaultPreferences(): DuplicateErrorChecksPreferences {
 function clonePreferences(
   preferences: DuplicateErrorChecksPreferences,
 ): DuplicateErrorChecksPreferences {
-  return {
+  const cloned: DuplicateErrorChecksPreferences = {
+    ...DEFAULT_ERROR_CHECK_SETTINGS,
     enabled: preferences.enabled,
     indicatorColor: preferences.indicatorColor,
-    duplicateEntries: preferences.duplicateEntries,
-    numberStoredAsText: preferences.numberStoredAsText,
     ignored: preferences.ignored.map((issue) => ({ ...issue })),
   };
+  for (const key of ERROR_CHECK_RULE_KEYS) cloned[key] = preferences[key];
+  return cloned;
 }
 
 /** Reads browser-only warning preferences. Invalid or unavailable storage uses safe defaults. */
@@ -152,17 +191,19 @@ export function readDuplicateErrorChecks(
     if (!stored || typeof stored !== "object" || Array.isArray(stored)) return defaultPreferences();
     const record = stored as Record<string, unknown>;
     const preferences =
-      record.version === 1 && isLegacyPreferences(record.preferences)
+      record.version === 1 && isLegacyV1Preferences(record.preferences)
         ? {
             ...DEFAULT_ERROR_CHECK_SETTINGS,
             enabled: record.preferences.enabled,
             ignored: record.preferences.ignored.map((issue) => ({ ...issue })),
           }
         : record.version === 2
-          ? parseLegacyPreferences(record.preferences)
-          : record.version === STORAGE_VERSION
-            ? parsePreferences(record.preferences)
-            : undefined;
+          ? parseLegacyPreferences(record.preferences, false)
+          : record.version === 3
+            ? parseLegacyPreferences(record.preferences, true)
+            : record.version === STORAGE_VERSION
+              ? parsePreferences(record.preferences)
+              : undefined;
     if (!preferences) return defaultPreferences();
     const keys = preferences.ignored.map(
       (issue) => `${issue.workbookId}|${issue.sheetId}|${issue.cellKey}|${issue.signature}`,

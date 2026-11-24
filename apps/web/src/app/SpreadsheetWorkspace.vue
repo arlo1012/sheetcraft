@@ -78,6 +78,7 @@ const FormulaEditorDialog = defineAsyncComponent(
 );
 import { useDataToolsController } from "../modules/data-tools/useDataToolsController";
 import { useDuplicateErrorChecks } from "../modules/data-tools/useDuplicateErrorChecks";
+import { describeCellErrorCheck } from "../modules/data-tools/error-check-descriptions";
 import type { ErrorCheckSettings } from "../modules/data-tools/duplicate-error-preferences";
 const DuplicateErrorCheckOptionsDialog = defineAsyncComponent(
   () => import("../modules/data-tools/components/DuplicateErrorCheckOptionsDialog.vue"),
@@ -1800,15 +1801,36 @@ const activeCellErrorKind = computed(() =>
     `${activeAddress.value.row}:${activeAddress.value.column}`,
   ),
 );
+function trimActiveCellErrorSpaces(): void {
+  if (loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value) return;
+  if (!cellEditSession.finish()) return;
+  const content = getCellContent(activeSheet.value, activeAddress.value);
+  if (content?.kind !== "literal" || typeof content.value !== "string") return;
+  const trimmed = content.value.trim();
+  if (trimmed === content.value) return;
+  executeCommand({
+    type: "setCellContents",
+    changes: [
+      {
+        sheetId: activeSheet.value.id,
+        address: activeAddress.value,
+        content: trimmed === "" ? null : { kind: "literal", value: trimmed },
+      },
+    ],
+  });
+  void nextTick(focusCellEditor);
+}
+function recalculateFromCellError(): void {
+  if (loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value) return;
+  if (!cellEditSession.finish()) return;
+  recalculate();
+  void nextTick(focusCellEditor);
+}
 const activeCellErrorDescription = computed(() =>
-  activeCellErrorKind.value === "number-stored-as-text"
-    ? {
-        numberConversion: true,
-        label: t("dataTools.duplicates.errorChecks.numberStoredAsText"),
-        message: t("dataTools.duplicates.errorChecks.numberStoredAsTextMessage"),
-        ignoreAllHint: t("dataTools.duplicates.errorChecks.ignoreAllNumberTextHint"),
-      }
-    : undefined,
+  describeCellErrorCheck(activeCellErrorKind.value, t, {
+    trimActiveSpaces: trimActiveCellErrorSpaces,
+    recalculateWorkbook: recalculateFromCellError,
+  }),
 );
 const duplicateErrorOptionsVisible = ref(false);
 function openDuplicateErrorOptions(): void {

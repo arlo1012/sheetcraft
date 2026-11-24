@@ -9,11 +9,19 @@ import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import type { SheetRenderFrame } from "../rendering/sheet-render-frame";
 
+export type CellErrorQuickAction = {
+  id: string;
+  label: string;
+  requiresWrite?: boolean;
+  run: () => void;
+};
+
 export type CellErrorDescription = {
   label: string;
   message: string;
   ignoreAllHint: string;
   numberConversion?: boolean;
+  quickAction?: CellErrorQuickAction;
 };
 
 const props = withDefaults(
@@ -111,6 +119,12 @@ function select(
   else emit("options");
 }
 
+function runQuickAction(): void {
+  const action = description.value.quickAction;
+  dismiss("programmatic", false);
+  action?.run();
+}
+
 watch(
   () => [props.visible, props.activeCell.row, props.activeCell.column, overlay.value.visible],
   () => dismiss("programmatic", false),
@@ -177,6 +191,15 @@ watch(
           data-sheet-cell-error-action="correct-sheet"
           @select="select('correctSheet')"
           >{{ t("dataTools.duplicates.errorChecks.correctSheet") }}</MenuItem
+        >
+        <MenuSeparator />
+      </template>
+      <template v-if="description.quickAction">
+        <MenuItem
+          :disabled="description.quickAction.requiresWrite && readOnly"
+          :data-sheet-cell-error-action="description.quickAction.id"
+          @select="runQuickAction"
+          >{{ description.quickAction.label }}</MenuItem
         >
         <MenuSeparator />
       </template>
