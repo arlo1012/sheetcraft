@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { computed, ref } from "vue";
 import { Bold, Italic, Strikethrough, Underline } from "lucide-vue-next";
+import { useRovingButtonGroup } from "../focus/useRovingButtonGroup";
 import RibbonButton from "../ribbon/RibbonButton.vue";
 
 export type TextStyleToggleKey = "bold" | "italic" | "underline" | "strike";
@@ -13,7 +15,7 @@ export interface TextStyleToggleItem {
   actionAttr?: string;
 }
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     items: readonly TextStyleToggleItem[];
     label: string;
@@ -25,10 +27,19 @@ withDefaults(
 );
 
 const emit = defineEmits<{ toggle: [key: TextStyleToggleKey] }>();
+const groupRef = ref<HTMLElement | null>(null);
+const { resolveTabIndex, onFocusItem, onGroupFocusOut, onGroupKeydown } =
+  useRovingButtonGroup(groupRef);
+const preferredIndex = computed(() => {
+  const active = props.items.findIndex((item) => !item.disabled && item.pressed === true);
+  if (active >= 0) return active;
+  return props.items.findIndex((item) => !item.disabled);
+});
 </script>
 
 <template>
   <div
+    ref="groupRef"
     class="text-style-toggle-group"
     :class="[
       `text-style-toggle-group--${variant}`,
@@ -36,6 +47,8 @@ const emit = defineEmits<{ toggle: [key: TextStyleToggleKey] }>();
     ]"
     role="group"
     :aria-label="label"
+    @keydown="onGroupKeydown"
+    @focusout="onGroupFocusOut"
   >
     <template v-if="variant === 'ribbon'">
       <RibbonButton
@@ -57,18 +70,20 @@ const emit = defineEmits<{ toggle: [key: TextStyleToggleKey] }>();
     </template>
     <template v-else>
       <button
-        v-for="item in items"
+        v-for="(item, index) in items"
         :key="item.key"
         type="button"
         class="text-style-toggle-group__button"
         :class="{ 'is-active': item.pressed === true, 'is-mixed': item.pressed === 'mixed' }"
         :disabled="item.disabled"
+        :tabindex="resolveTabIndex(index, preferredIndex, item.disabled)"
         :aria-label="item.label"
         :title="item.label"
         :aria-pressed="item.pressed === 'mixed' ? 'mixed' : item.pressed"
         :data-shape-format-field="item.fieldAttr"
         :data-text-style-action="item.key"
         :data-format-pane-history-control="historyControl"
+        @focus="onFocusItem(index)"
         @click="emit('toggle', item.key)"
       >
         <Bold v-if="item.key === 'bold'" aria-hidden="true" />

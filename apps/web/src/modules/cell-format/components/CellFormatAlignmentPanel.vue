@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -13,6 +13,7 @@ import type {
   VerticalCellAlignment,
 } from "@sheetcraft/core/style";
 import type { SelectionCellStyleState, ToggleStyleState } from "@sheetcraft/core/style-state";
+import { useRovingButtonGroup } from "../../../shared/focus/useRovingButtonGroup";
 import { useAppI18n } from "../../../shared/i18n";
 import TextHorizontalAlignmentIcon from "../../../shared/text-format/TextHorizontalAlignmentIcon.vue";
 import TextVerticalAlignmentIcon from "../../../shared/text-format/TextVerticalAlignmentIcon.vue";
@@ -223,6 +224,8 @@ const previewTextStyle = computed(() => {
   }
   return base;
 });
+const quickBarRef = ref<HTMLElement | null>(null);
+const { onGroupKeydown: onQuickBarKeydown } = useRovingButtonGroup(quickBarRef);
 </script>
 
 <template>
@@ -233,9 +236,11 @@ const previewTextStyle = computed(() => {
           <div class="cell-format-alignment__group-head">
             <h3>{{ t("cellFormat.textAlignment") }}</h3>
             <div
+              ref="quickBarRef"
               class="cell-format-alignment__quick-bar"
               role="group"
               :aria-label="t('cellFormat.quickAlignment')"
+              @keydown="onQuickBarKeydown"
             >
               <button
                 type="button"

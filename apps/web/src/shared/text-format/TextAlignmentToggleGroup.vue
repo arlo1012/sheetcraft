@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed, ref } from "vue";
+import { useRovingButtonGroup } from "../focus/useRovingButtonGroup";
 import RibbonButton from "../ribbon/RibbonButton.vue";
 import TextHorizontalAlignmentIcon from "./TextHorizontalAlignmentIcon.vue";
 import TextVerticalAlignmentIcon from "./TextVerticalAlignmentIcon.vue";
@@ -21,7 +23,7 @@ export interface TextAlignmentOption<T extends string = string> {
   actionAttr?: string;
 }
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     options: readonly TextAlignmentOption[];
     modelValue?: string;
@@ -43,6 +45,18 @@ withDefaults(
 );
 
 const emit = defineEmits<{ select: [value: string] }>();
+const groupRef = ref<HTMLElement | null>(null);
+const { resolveTabIndex, onFocusItem, onGroupFocusOut, onGroupKeydown } =
+  useRovingButtonGroup(groupRef);
+const preferredIndex = computed(() => {
+  if (!props.mixed) {
+    const active = props.options.findIndex(
+      (option) => !props.disabled && !option.disabled && option.value === props.modelValue,
+    );
+    if (active >= 0) return active;
+  }
+  return props.options.findIndex((option) => !props.disabled && !option.disabled);
+});
 
 function isVerticalIcon(icon: TextAlignmentIconKind): icon is "top" | "middle" | "bottom" {
   return icon === "top" || icon === "middle" || icon === "bottom";
@@ -51,6 +65,7 @@ function isVerticalIcon(icon: TextAlignmentIconKind): icon is "top" | "middle" |
 
 <template>
   <div
+    ref="groupRef"
     class="text-alignment-toggle-group"
     :class="[
       `text-alignment-toggle-group--${variant}`,
@@ -61,6 +76,8 @@ function isVerticalIcon(icon: TextAlignmentIconKind): icon is "top" | "middle" |
     ]"
     role="group"
     :aria-label="label"
+    @keydown="onGroupKeydown"
+    @focusout="onGroupFocusOut"
   >
     <template v-if="variant === 'ribbon'">
       <RibbonButton
@@ -81,17 +98,19 @@ function isVerticalIcon(icon: TextAlignmentIconKind): icon is "top" | "middle" |
     </template>
     <template v-else>
       <button
-        v-for="option in options"
+        v-for="(option, index) in options"
         :key="option.value"
         type="button"
         class="text-alignment-toggle-group__button"
         :class="{ 'is-active': !mixed && modelValue === option.value }"
         :disabled="disabled || option.disabled"
+        :tabindex="resolveTabIndex(index, preferredIndex, disabled || option.disabled)"
         :aria-label="option.label"
         :title="option.label"
         :aria-pressed="!mixed && modelValue === option.value"
         :data-text-alignment-option="option.value"
         :data-format-pane-history-control="historyControl"
+        @focus="onFocusItem(index)"
         @click="emit('select', option.value)"
       >
         <TextVerticalAlignmentIcon v-if="isVerticalIcon(option.icon)" :alignment="option.icon" />
