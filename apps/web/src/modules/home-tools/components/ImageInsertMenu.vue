@@ -141,7 +141,7 @@ function insertImage(mode: "cell" | "floating"): void {
   &__placement {
     display: grid;
     gap: var(--sheetcraft-space-2);
-    inline-size: 16.5rem;
+    inline-size: 264px;
     max-inline-size: calc(100vw - var(--sheetcraft-space-4) * 4);
     padding: var(--sheetcraft-space-2) var(--sheetcraft-space-3) var(--sheetcraft-space-3);
     box-sizing: border-box;

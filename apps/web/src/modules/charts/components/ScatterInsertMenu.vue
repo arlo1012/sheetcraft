@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, useId } from "vue";
-import { ChartScatter, ChevronRight, LayoutTemplate } from "lucide-vue-next";
+import { ChartScatter, LayoutTemplate } from "lucide-vue-next";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { DEFAULT_WORKBOOK_THEME } from "@sheetcraft/core/workbook-theme";
 import {
@@ -93,11 +93,6 @@ function openMore() {
     >
       <template #body>
         <GallerySection :title="t('chart.scatter')">
-          <template #actions>
-            <button type="button" class="scatter-gallery__more-link" @click="openMore">
-              {{ t("chart.xy.more") }}<ChevronRight :size="14" aria-hidden="true" />
-            </button>
-          </template>
           <div class="scatter-gallery__families" role="group" :aria-label="t('chart.subtypes')">
             <button
               v-for="tab in ['marker', 'smooth', 'line'] as const"
@@ -163,27 +158,6 @@ function openMore() {
 .scatter-gallery {
   width: min(420px, calc(100vw - 16px));
   max-width: calc(100vw - 16px);
-
-  &__more-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    padding: 2px 4px;
-    border: 0;
-    border-radius: var(--sheetcraft-radius-default);
-    background: transparent;
-    color: var(--sheetcraft-text-secondary);
-    font: inherit;
-    font-size: var(--sheetcraft-font-size-body-small);
-    cursor: pointer;
-
-    &:hover,
-    &:focus-visible {
-      background: var(--sheetcraft-surface-hover);
-      color: var(--sheetcraft-text-primary);
-      outline: none;
-    }
-  }
 
   &__families,
   &__cards {
