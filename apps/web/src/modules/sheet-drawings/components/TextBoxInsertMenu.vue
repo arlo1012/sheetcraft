@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, useId, watch } from "vue";
-import { Type, TextCursorInput } from "lucide-vue-next";
+import { Type } from "lucide-vue-next";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
-import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
+import RibbonSplitButton from "../../../shared/ribbon/RibbonSplitButton.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import { useAppI18n } from "../../../shared/i18n";
 import { TEXT_BOX_CHOICES, type ShapeTextBoxChoice } from "../shape-gallery";
@@ -17,9 +17,9 @@ const props = defineProps<{
 const { t, locale } = useAppI18n();
 const choices = TEXT_BOX_CHOICES;
 const language = computed(() => (locale.value === "zh-CN" ? "zh-CN" : "en-US"));
-const button = ref<InstanceType<typeof RibbonMenuButton>>();
+const button = ref<InstanceType<typeof RibbonSplitButton>>();
 const surface = ref<InstanceType<typeof MenuSurface>>();
-const triggerRef = computed(() => button.value?.rootElement ?? null);
+const triggerRef = computed(() => button.value?.menuElement ?? null);
 const menuSurfaceRef = computed(() => surface.value ?? null);
 const menuId = `text-box-insert-${useId().replaceAll(":", "")}`;
 const rejected = ref(false);
@@ -37,6 +37,17 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
     rejected.value = false;
   },
 });
+
+function activateDirect(): void {
+  if (props.disabled) return;
+  if (open.value) dismiss("programmatic", false);
+  try {
+    props.handler(choices.horizontal, false);
+  } catch {
+    /* Ignore direct-activation rejection and keep toolbar responsive. */
+  }
+}
+
 const choose = computed(() => {
   void open.value;
   const token = generation.value,
@@ -77,20 +88,23 @@ onBeforeUnmount(() => generation.value++);
 </script>
 <template>
   <span class="text-box-insert-tool" :data-cell-edit-session="editSessionId">
-    <RibbonMenuButton
+    <RibbonSplitButton
       ref="button"
       variant="tall"
-      :label="t('drawing.textBox')"
+      :label="choices.horizontal.label[language]"
+      :menu-label="t('drawing.textBox')"
       :text="t('drawing.textBox')"
       :disabled="disabled"
+      :menu-disabled="disabled"
       :expanded="open"
       :menu-id="menuId"
       data-insert-tool="text-box"
       popup-role="menu"
-      @activate="toggleMenu"
-      @keydown="onTriggerKeydown"
+      @activate="activateDirect"
+      @toggle-menu="toggleMenu"
+      @menu-keydown="onTriggerKeydown"
       ><Type aria-hidden="true"
-    /></RibbonMenuButton>
+    /></RibbonSplitButton>
     <Teleport to="body">
       <MenuSurface
         v-if="open"
@@ -110,7 +124,21 @@ onBeforeUnmount(() => generation.value++);
             data-text-box-direction="horizontal"
             @select="choose.horizontal"
           >
-            <template #icon><TextCursorInput /></template>
+            <template #icon>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <path d="M6.5 9h5M9 9v6" />
+                <path d="M13.5 12h4.5M16 10l2 2-2 2" />
+              </svg>
+            </template>
             {{ choices.horizontal.label[language] }}
           </MenuItem>
           <MenuItem
@@ -120,7 +148,21 @@ onBeforeUnmount(() => generation.value++);
             data-text-box-direction="vertical"
             @select="choose.vertical"
           >
-            <template #icon><Type style="transform: rotate(90deg)" /></template>
+            <template #icon>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="4" y="3" width="16" height="18" rx="2" />
+                <path d="M7.5 7.5h5M10 7.5v5.5" />
+                <path d="M15 8v8M13 14l2 2 2-2" />
+              </svg>
+            </template>
             {{ choices.vertical.label[language] }}
           </MenuItem>
         </template>

@@ -29,13 +29,22 @@ async function click(selector: string) {
   await nextTick();
   await flushPromises();
 }
+const MENU_TRIGGER = "[data-insert-tool='equation'] [data-ribbon-split-menu]";
+const MAIN_TRIGGER = "[data-insert-tool='equation'] [data-ribbon-split-main]";
+
 describe("Insert Equation gallery", () => {
+  test("main split action inserts a new blank equation in one click", async () => {
+    const { handler } = fixture(vi.fn(() => true));
+    await click(MAIN_TRIGGER);
+    expect(handler).toHaveBeenCalledExactlyOnceWith(null);
+    expect(document.querySelector(".equation-insert-menu")).toBeNull();
+  });
   test("13 localized presets and Insert New Equation select their distinct payloads", async () => {
     const { handler } = fixture(
       vi.fn(() => true),
       { locale: "zh-CN" },
     );
-    await click("[data-insert-tool='equation']");
+    await click(MENU_TRIGGER);
     expect(document.querySelectorAll("[data-equation-preset]")).toHaveLength(13);
     expect(item("[data-equation-preset='quadratic-formula']").getAttribute("aria-label")).toBe(
       "一元二次方程求根公式",
@@ -43,14 +52,14 @@ describe("Insert Equation gallery", () => {
     expect(item("[data-equation-new]").textContent).toBe("插入新公式");
     await click("[data-equation-preset='quadratic-formula']");
     expect(handler).toHaveBeenLastCalledWith("quadratic-formula");
-    await click("[data-insert-tool='equation']");
+    await click(MENU_TRIGGER);
     await click("[data-equation-new]");
     expect(handler).toHaveBeenLastCalledWith(null);
   });
   test("failed insertion stays open and retry closes only on acceptance", async () => {
     const handler = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce({ accepted: true });
     fixture(handler);
-    await click("[data-insert-tool='equation']");
+    await click(MENU_TRIGGER);
     await click("[data-equation-preset='average']");
     expect(item("[role='alert']").textContent).toContain("could not be applied");
     await click("[data-equation-preset='average']");
@@ -58,23 +67,23 @@ describe("Insert Equation gallery", () => {
   });
   test("detached old rows cannot insert after close and reopen, owner change, or disable", async () => {
     const { wrapper, handler } = fixture();
-    await click("[data-insert-tool='equation']");
+    await click(MENU_TRIGGER);
     const old = item("[data-equation-preset='average']");
-    await click("[data-insert-tool='equation']");
-    await click("[data-insert-tool='equation']");
+    await click(MENU_TRIGGER);
+    await click(MENU_TRIGGER);
     old.click();
     await flushPromises();
     expect(handler).not.toHaveBeenCalled();
     const previousOwner = item("[data-equation-preset='average']");
     await wrapper.setProps({ ownerId: "sheet-b", editSessionId: "cell-2" });
-    await click("[data-insert-tool='equation']");
+    await click(MENU_TRIGGER);
     previousOwner.click();
     await flushPromises();
     expect(handler).not.toHaveBeenCalled();
     const disabled = item("[data-equation-preset='average']");
     await wrapper.setProps({ disabled: true });
     disabled.click();
-    await click("[data-insert-tool='equation']");
+    await click(MENU_TRIGGER);
     expect(handler).not.toHaveBeenCalled();
     expect(document.querySelector("[data-equation-preset]")).toBeNull();
   });
@@ -87,14 +96,14 @@ describe("Insert Equation gallery", () => {
         }),
     );
     const { wrapper } = fixture(handler as never);
-    await click("[data-insert-tool='equation']");
+    await click(MENU_TRIGGER);
     item("[data-equation-preset='average']").click();
     await nextTick();
     expect(item("[data-equation-preset='pythagorean-theorem']").hasAttribute("disabled")).toBe(
       true,
     );
     await wrapper.setProps({ editSessionId: "cell-2" });
-    await click("[data-insert-tool='equation']");
+    await click(MENU_TRIGGER);
     resolve(true);
     await flushPromises();
     expect(document.querySelectorAll("[data-equation-preset]")).toHaveLength(13);
@@ -110,7 +119,7 @@ describe("Insert Equation gallery", () => {
         }),
     );
     const { wrapper } = fixture(handler as never, { locale: "zh-CN" });
-    await wrapper.get("[data-insert-tool='equation']").trigger("click");
+    await wrapper.get(MENU_TRIGGER).trigger("click");
     item("[data-equation-preset='average']").click();
     await nextTick();
     expect(item(".equation-insert-menu").getAttribute("aria-busy")).toBe("true");
@@ -128,19 +137,19 @@ describe("Insert Equation gallery", () => {
   test("fast completion and dismissal never leave a delayed progress message", async () => {
     vi.useFakeTimers();
     const { wrapper } = fixture(vi.fn(() => false));
-    await wrapper.get("[data-insert-tool='equation']").trigger("click");
+    await wrapper.get(MENU_TRIGGER).trigger("click");
     item("[data-equation-preset='average']").click();
     await nextTick();
     await vi.advanceTimersByTimeAsync(150);
     expect(document.querySelector(".equation-insert-menu__status")).toBeNull();
     await wrapper.setProps({ handler: () => new Promise<boolean>(() => {}) });
-    await wrapper.get("[data-insert-tool='equation']").trigger("click");
+    await wrapper.get(MENU_TRIGGER).trigger("click");
     item("[data-equation-preset='average']").click();
     await nextTick();
-    await wrapper.get("[data-insert-tool='equation']").trigger("click");
+    await wrapper.get(MENU_TRIGGER).trigger("click");
     await vi.advanceTimersByTimeAsync(150);
     expect(document.querySelector(".equation-insert-menu")).toBeNull();
-    await wrapper.get("[data-insert-tool='equation']").trigger("click");
+    await wrapper.get(MENU_TRIGGER).trigger("click");
     expect(document.querySelector(".equation-insert-menu__status")).toBeNull();
   });
 });

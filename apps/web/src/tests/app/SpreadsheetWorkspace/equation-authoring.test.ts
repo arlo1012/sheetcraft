@@ -89,7 +89,7 @@ async function fixture(drawings: SheetDrawing[] = []) {
 }
 async function insertBlank(wrapper: VueWrapper) {
   await wrapper.get('[data-ribbon-category="insert"]').trigger("click");
-  await wrapper.get('[data-insert-tool="equation"]').trigger("click");
+  await wrapper.get('[data-insert-tool="equation"] [data-ribbon-split-menu]').trigger("click");
   document.body.querySelector<HTMLElement>("[data-equation-new]")!.click();
   await flushPromises();
 }

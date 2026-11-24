@@ -79,7 +79,7 @@ test.each(["horizontal", "vertical"] as const)(
   async (direction) => {
     const { wrapper, current } = await fixture();
     await wrapper.get('[data-ribbon-category="insert"]').trigger("click");
-    await wrapper.get('[data-insert-tool="text-box"]').trigger("click");
+    await wrapper.get('[data-insert-tool="text-box"] [data-ribbon-split-menu]').trigger("click");
     document.body.querySelector<HTMLElement>(`[data-text-box-direction="${direction}"]`)!.click();
     await flushPromises();
     expect(current.shapeCreation.request.value?.choice).toEqual(choice(direction));

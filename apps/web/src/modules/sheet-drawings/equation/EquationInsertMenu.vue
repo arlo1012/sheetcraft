@@ -3,9 +3,10 @@ import { computed, onBeforeUnmount, ref, useId, watch } from "vue";
 import { Radical } from "lucide-vue-next";
 import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
+import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
-import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
+import RibbonSplitButton from "../../../shared/ribbon/RibbonSplitButton.vue";
 import EquationContent from "../components/EquationContent.vue";
 import { EQUATION_PRESETS, type EquationLocale, type EquationPresetId } from "./equation-catalog";
 import en from "./equation-messages.en-US";
@@ -25,7 +26,7 @@ const props = withDefaults(
   { disabled: false, locale: "en-US" },
 );
 const labels = computed(() => (props.locale === "zh-CN" ? zh : en));
-const button = ref<InstanceType<typeof RibbonMenuButton>>();
+const button = ref<InstanceType<typeof RibbonSplitButton>>();
 const surface = ref<InstanceType<typeof MenuSurface>>();
 const menuId = `equation-insert-${useId().replaceAll(":", "")}`;
 const pending = ref(false);
@@ -43,7 +44,7 @@ watch(
   { flush: "sync" },
 );
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
-  triggerRef: computed(() => button.value?.rootElement ?? null),
+  triggerRef: computed(() => button.value?.menuElement ?? null),
   menuSurfaceRef: computed(() => surface.value ?? null),
   disabled: computed(() => props.disabled),
   onOpen() {
@@ -55,6 +56,30 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
     pending.value = false;
   },
 });
+
+async function activateDirect(): Promise<void> {
+  if (props.disabled || pending.value) return;
+  if (open.value) dismiss("programmatic", false);
+  const token = generation.value;
+  const handler = props.handler;
+  const owner = props.ownerId;
+  const session = props.editSessionId;
+  pending.value = true;
+  try {
+    await handler(null);
+  } catch {
+    /* Ignore direct-activation rejection and keep toolbar responsive. */
+  }
+  if (
+    token === generation.value &&
+    handler === props.handler &&
+    owner === props.ownerId &&
+    session === props.editSessionId
+  ) {
+    pending.value = false;
+  }
+}
+
 // Captured callbacks belong to the menu generation, owner, handler and edit session.
 const select = computed(() => {
   void open.value;
@@ -121,20 +146,23 @@ onBeforeUnmount(() => generation.value++);
     :class="{ 'is-full-width': fullWidth }"
     :data-cell-edit-session="editSessionId"
   >
-    <RibbonMenuButton
+    <RibbonSplitButton
       ref="button"
       :variant="compact ? 'compact' : 'tall'"
       :full-width="fullWidth"
-      :label="labels.equation"
+      :label="labels.newEquation"
+      :menu-label="labels.presets"
       :text="labels.equation"
-      :disabled="disabled"
+      :disabled="disabled || pending"
+      :menu-disabled="disabled"
       :expanded="open"
       :menu-id="menuId"
       data-insert-tool="equation"
-      @activate="toggleMenu"
-      @keydown="onTriggerKeydown"
+      @activate="activateDirect"
+      @toggle-menu="toggleMenu"
+      @menu-keydown="onTriggerKeydown"
       ><Radical aria-hidden="true"
-    /></RibbonMenuButton>
+    /></RibbonSplitButton>
     <Teleport to="body">
       <MenuSurface
         v-if="open"
@@ -171,9 +199,10 @@ onBeforeUnmount(() => generation.value++);
           </GallerySection>
         </template>
         <template #footer>
-          <MenuItem :disabled="disabled || pending" data-equation-new @select="selectNew">{{
-            labels.newEquation
-          }}</MenuItem>
+          <MenuSeparator />
+          <MenuItem :disabled="disabled || pending" data-equation-new @select="selectNew">
+            <template #icon><Radical /></template>{{ labels.newEquation }}
+          </MenuItem>
           <li
             v-if="showPending"
             class="equation-insert-menu__status"

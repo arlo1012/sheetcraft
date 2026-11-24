@@ -25,9 +25,16 @@ function menu() {
   return document.body.querySelector<HTMLElement>(".text-box-insert-menu");
 }
 async function open(wrapper: VueWrapper) {
-  await wrapper.get('[data-insert-tool="text-box"]').trigger("click");
+  await wrapper.get('[data-insert-tool="text-box"] [data-ribbon-split-menu]').trigger("click");
   await nextTick();
 }
+test("main split action immediately starts one-shot horizontal text box drawing", async () => {
+  const { wrapper, handler } = fixture();
+  await wrapper.get('[data-insert-tool="text-box"] [data-ribbon-split-main]').trigger("click");
+  await nextTick();
+  expect(handler).toHaveBeenCalledExactlyOnceWith(TEXT_BOX_CHOICES.horizontal, false);
+  expect(menu()).toBeNull();
+});
 test.each(["horizontal", "vertical"] as const)(
   "%s uses the exact shared one-shot choice and owned menu",
   async (direction) => {
@@ -86,7 +93,9 @@ test.each(["owner", "handler", "session", "disabled", "reopen", "unmount"] as co
 );
 test("shared keyboard menu navigation and Escape do not arm drawing", async () => {
   const { wrapper, handler } = fixture();
-  await wrapper.get('[data-insert-tool="text-box"]').trigger("keydown", { key: "ArrowDown" });
+  await wrapper
+    .get('[data-insert-tool="text-box"] [data-ribbon-split-menu]')
+    .trigger("keydown", { key: "ArrowDown" });
   expect(document.activeElement?.getAttribute("data-text-box-direction")).toBe("horizontal");
   document.activeElement!.dispatchEvent(
     new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }),
@@ -106,7 +115,7 @@ test("shared keyboard menu navigation and Escape do not arm drawing", async () =
 
 test("repeated keyboard opening refreshes captured actions while the menu stays open", async () => {
   const { wrapper, handler } = fixture();
-  const trigger = wrapper.get('[data-insert-tool="text-box"]');
+  const trigger = wrapper.get('[data-insert-tool="text-box"] [data-ribbon-split-menu]');
   await trigger.trigger("keydown", { key: "ArrowDown" });
   await trigger.trigger("keydown", { key: "ArrowDown" });
   menu()!.querySelector<HTMLElement>('[data-text-box-direction="vertical"]')!.click();
