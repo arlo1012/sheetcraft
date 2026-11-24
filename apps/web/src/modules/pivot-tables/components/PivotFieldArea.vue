@@ -225,12 +225,16 @@ function drop(event: DragEvent, index: number): void {
   }
   &__title {
     flex: 1;
+    font-weight: var(--sheetcraft-font-weight-medium);
   }
   &__icon-action {
     flex-shrink: 0;
     padding: 3px;
-    border-radius: 2px;
+    border-radius: var(--sheetcraft-radius-small);
     color: var(--sheetcraft-text-secondary);
+    &:hover:not([aria-disabled="true"]) {
+      background: var(--sheetcraft-icon-button-hover-bg);
+    }
   }
   &__grip {
     flex-shrink: 0;
@@ -251,7 +255,7 @@ function drop(event: DragEvent, index: number): void {
     overflow: auto;
     background: var(--sheetcraft-surface-panel);
     border: 1px solid var(--sheetcraft-border-control);
-    border-radius: 4px;
+    border-radius: var(--sheetcraft-radius-default);
     &.is-drop-target {
       border-color: var(--sheetcraft-action-primary);
     }
@@ -260,8 +264,8 @@ function drop(event: DragEvent, index: number): void {
       align-items: center;
       gap: 4px;
       min-height: 28px;
-      padding: 0 2px;
-      border-radius: 2px;
+      padding: 0 4px;
+      border-radius: var(--sheetcraft-radius-small);
       &:hover,
       &:focus-within {
         background: var(--sheetcraft-surface-hover);

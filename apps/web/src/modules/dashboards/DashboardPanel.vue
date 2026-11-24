@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount, shallowRef } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Button } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
@@ -381,7 +382,7 @@ function choose(kind: DashboardKind) {
           /></span>
         </article>
       </div>
-      <p v-if="failed" role="alert">{{ t("dashboard.error") }}</p>
+      <TAlert v-if="failed" theme="error" :message="t('dashboard.error')" role="alert" />
     </div>
     <Dialog
       v-if="adding"
@@ -410,7 +411,12 @@ function choose(kind: DashboardKind) {
       @confirm="saveSettings"
       @close="preference = undefined"
     >
-      <Form label-align="left" :label-width="locale === 'zh-CN' ? 76 : 100">
+      <Form
+        class="sheetcraft-form-grid"
+        label-align="left"
+        :label-width="locale === 'zh-CN' ? 76 : 100"
+        :prevent-submit-default="true"
+      >
         <template v-if="preference === 'boardTitle'"
           ><FormItem :label="t('dashboard.boardTitle')"
             ><Input
@@ -445,7 +451,7 @@ function choose(kind: DashboardKind) {
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  background: #f6f7f9;
+  background: var(--sheetcraft-surface-secondary);
 }
 .dashboard.theme-blue {
   background: #e9f2fc;
@@ -467,6 +473,7 @@ article header {
 }
 .dashboard-bar {
   overflow-x: auto;
+  border-bottom: 1px solid var(--sheetcraft-border-subtle);
 }
 .grow {
   flex: 1;
@@ -490,7 +497,7 @@ article {
   background: var(--sheetcraft-surface-panel);
   color: var(--sheetcraft-text-primary);
   border: 1px solid var(--sheetcraft-border-subtle);
-  border-radius: 5px;
+  border-radius: var(--sheetcraft-radius-dialog-card);
   padding: 7px;
 }
 article strong {

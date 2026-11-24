@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { Search, Star } from "lucide-vue-next";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { useAppI18n } from "../../../shared/i18n";
@@ -70,11 +71,14 @@ function navigate(event: KeyboardEvent, id: SheetIconId) {
     <div class="icon-library__search">
       <TInput
         v-model="query"
+        :size="full ? 'medium' : 'small'"
         clearable
         :placeholder="t('drawing.icons.search')"
         v-native-control="{ attributes: { 'aria-label': t('drawing.icons.search') } }"
       >
-        <template #prefix-icon><Search :size="16" /></template>
+        <template #prefix-icon
+          ><Search class="sheetcraft-action-icon" aria-hidden="true"
+        /></template>
       </TInput>
     </div>
     <nav class="icon-library__filters" :aria-label="t('drawing.icons.library')">
@@ -149,12 +153,18 @@ function navigate(event: KeyboardEvent, id: SheetIconId) {
         }}
       </TButton>
     </aside>
-    <p v-if="rejected || storageFailed" class="icon-library__error" role="alert">
-      {{ t(rejected ? "drawing.changeRejected" : "drawing.icons.storageFailed") }}
-    </p>
+    <TAlert
+      v-if="rejected || storageFailed"
+      class="icon-library__error"
+      theme="error"
+      :message="t(rejected ? 'drawing.changeRejected' : 'drawing.icons.storageFailed')"
+      role="alert"
+    />
   </div>
 </template>
 <style scoped lang="scss">
+@use "../../../shared/gallery/gallery-choice" as gallery;
+
 .icon-library {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 128px;
@@ -178,7 +188,7 @@ function navigate(event: KeyboardEvent, id: SheetIconId) {
     gap: 4px;
     border: 0;
     padding: 4px 7px;
-    border-radius: 4px;
+    border-radius: var(--sheetcraft-radius-default);
     background: transparent;
     color: var(--sheetcraft-text-secondary);
     font: inherit;
@@ -206,21 +216,13 @@ function navigate(event: KeyboardEvent, id: SheetIconId) {
     padding: 4px 2px 8px;
   }
   &__grid button {
+    @include gallery.choice(0);
     position: relative;
     display: grid;
     place-items: center;
     min-width: 0;
     aspect-ratio: 1;
     color: var(--sheetcraft-text-primary);
-    border: 1px solid transparent;
-    border-radius: 5px;
-    background: transparent;
-    cursor: pointer;
-  }
-  &__grid button:hover,
-  &__grid button:focus-visible {
-    background: var(--sheetcraft-action-primary-subtle);
-    border-color: var(--sheetcraft-action-primary);
   }
   &__grid button svg:not(.icon-library__mark) {
     width: 64%;
@@ -255,7 +257,7 @@ function navigate(event: KeyboardEvent, id: SheetIconId) {
     aspect-ratio: 1;
     max-height: 110px;
     background: var(--sheetcraft-surface-secondary);
-    border-radius: 5px;
+    border-radius: var(--sheetcraft-radius-default);
   }
   &__sample svg {
     width: 65%;
@@ -263,8 +265,6 @@ function navigate(event: KeyboardEvent, id: SheetIconId) {
   }
   &__error {
     grid-area: error;
-    color: var(--sheetcraft-status-error);
-    margin: 0;
   }
   &__empty {
     padding: 8px;

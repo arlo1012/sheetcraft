@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, useId, watch, onBeforeUnmount } from "vue";
 import { X, GripVertical, Search } from "lucide-vue-next";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Input } from "tdesign-vue-next/es/input";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
@@ -205,7 +206,10 @@ defineExpose({
 <template>
   <aside class="pivot-fields-pane" :aria-label="t('pivot.fieldList')">
     <header class="pivot-fields-pane__header">
-      <strong>{{ t("pivot.title") }}</strong>
+      <div class="pivot-fields-pane__heading">
+        <strong>{{ t("pivot.title") }}</strong>
+        <span :title="table.name">{{ table.name }}</span>
+      </div>
       <TButton
         variant="text"
         shape="square"
@@ -217,115 +221,121 @@ defineExpose({
         <template #icon><X class="sheetcraft-action-icon" aria-hidden="true" /></template>
       </TButton>
     </header>
-    <section
-      class="pivot-fields-pane__available"
-      @dragover="dragging?.area && !disabled && $event.preventDefault()"
-      @drop="dropRemove"
-    >
-      <h3>{{ t("pivot.fieldList") }}</h3>
-      <p>{{ t("pivot.dragHint") }}</p>
-      <Input
-        v-model="search"
-        v-native-control="{
-          attributes: {
-            id: searchInputId,
-            name: searchInputId,
-            'aria-label': t('pivot.searchFields'),
-          },
-        }"
-        :placeholder="t('pivot.searchFields')"
-        :aria-label="t('pivot.searchFields')"
-        clearable
+    <div class="pivot-fields-pane__body">
+      <section
+        class="pivot-fields-pane__available"
+        @dragover="dragging?.area && !disabled && $event.preventDefault()"
+        @drop="dropRemove"
       >
-        <template #prefixIcon
-          ><Search class="sheetcraft-action-icon" aria-hidden="true"
-        /></template>
-      </Input>
-      <ul class="pivot-fields-pane__fields">
-        <li
-          v-for="choice in filtered"
-          :key="choice.field"
-          :draggable="!disabled"
-          :data-pivot-source-field="choice.field"
-          @dragstart="start($event, choice)"
-          @dragend="dragging = undefined"
+        <h3>{{ t("pivot.fieldList") }}</h3>
+        <p>{{ t("pivot.dragHint") }}</p>
+        <Input
+          v-model="search"
+          size="small"
+          v-native-control="{
+            attributes: {
+              id: searchInputId,
+              name: searchInputId,
+              'aria-label': t('pivot.searchFields'),
+            },
+          }"
+          :placeholder="t('pivot.searchFields')"
+          :aria-label="t('pivot.searchFields')"
+          clearable
         >
-          <GripVertical class="sheetcraft-action-icon pivot-fields-pane__grip" aria-hidden="true" />
-          <Checkbox
-            class="pivot-fields-pane__field-check"
-            :checked="used.has(choice.field)"
-            :disabled="disabled"
-            @change="toggle(choice.field, Boolean($event))"
-            ><span class="pivot-fields-pane__field-label" :title="choice.label">{{
-              choice.label
-            }}</span></Checkbox
+          <template #prefixIcon
+            ><Search class="sheetcraft-action-icon" aria-hidden="true"
+          /></template>
+        </Input>
+        <ul class="pivot-fields-pane__fields">
+          <li
+            v-for="choice in filtered"
+            :key="choice.field"
+            :draggable="!disabled"
+            :data-pivot-source-field="choice.field"
+            @dragstart="start($event, choice)"
+            @dragend="dragging = undefined"
           >
-        </li>
-      </ul>
-      <p v-if="!source" role="alert">{{ t("pivot.sourceUnavailable") }}</p>
-    </section>
-    <section class="pivot-fields-pane__configuration">
-      <h3>{{ t("pivot.areas") }}</h3>
-      <p>{{ t("pivot.areaHint") }}</p>
-      <div class="pivot-fields-pane__areas">
-        <PivotFieldArea
-          area="filters"
-          :items="items('filters')"
-          :choices="choices"
-          :disabled="disabled"
-          :dragging="!!dragging"
-          @add="add('filters', $event)"
-          @remove="remove('filters', $event)"
-          @move="(index, to, at) => move('filters', index, to, at)"
-          @settings="settings = { area: 'filters', index: $event }"
-          @drag-start="dragging = $event"
-          @drag-end="dragging = undefined"
-          @drop-field="drop('filters', $event)"
-        />
-        <PivotFieldArea
-          area="columns"
-          :items="items('columns')"
-          :choices="choices"
-          :disabled="disabled"
-          :dragging="!!dragging"
-          @add="add('columns', $event)"
-          @remove="remove('columns', $event)"
-          @move="(index, to, at) => move('columns', index, to, at)"
-          @settings="settings = { area: 'columns', index: $event }"
-          @drag-start="dragging = $event"
-          @drag-end="dragging = undefined"
-          @drop-field="drop('columns', $event)"
-        />
-        <PivotFieldArea
-          area="rows"
-          :items="items('rows')"
-          :choices="choices"
-          :disabled="disabled"
-          :dragging="!!dragging"
-          @add="add('rows', $event)"
-          @remove="remove('rows', $event)"
-          @move="(index, to, at) => move('rows', index, to, at)"
-          @settings="settings = { area: 'rows', index: $event }"
-          @drag-start="dragging = $event"
-          @drag-end="dragging = undefined"
-          @drop-field="drop('rows', $event)"
-        />
-        <PivotFieldArea
-          area="values"
-          :items="items('values')"
-          :choices="choices"
-          :disabled="disabled"
-          :dragging="!!dragging"
-          @add="add('values', $event)"
-          @remove="remove('values', $event)"
-          @move="(index, to, at) => move('values', index, to, at)"
-          @settings="settings = { area: 'values', index: $event }"
-          @drag-start="dragging = $event"
-          @drag-end="dragging = undefined"
-          @drop-field="drop('values', $event)"
-        />
-      </div>
-    </section>
+            <GripVertical
+              class="sheetcraft-action-icon pivot-fields-pane__grip"
+              aria-hidden="true"
+            />
+            <Checkbox
+              class="pivot-fields-pane__field-check"
+              :checked="used.has(choice.field)"
+              :disabled="disabled"
+              @change="toggle(choice.field, Boolean($event))"
+              ><span class="pivot-fields-pane__field-label" :title="choice.label">{{
+                choice.label
+              }}</span></Checkbox
+            >
+          </li>
+        </ul>
+        <TAlert v-if="!source" theme="error" :message="t('pivot.sourceUnavailable')" role="alert" />
+      </section>
+      <section class="pivot-fields-pane__configuration">
+        <h3>{{ t("pivot.areas") }}</h3>
+        <p>{{ t("pivot.areaHint") }}</p>
+        <div class="pivot-fields-pane__areas">
+          <PivotFieldArea
+            area="filters"
+            :items="items('filters')"
+            :choices="choices"
+            :disabled="disabled"
+            :dragging="!!dragging"
+            @add="add('filters', $event)"
+            @remove="remove('filters', $event)"
+            @move="(index, to, at) => move('filters', index, to, at)"
+            @settings="settings = { area: 'filters', index: $event }"
+            @drag-start="dragging = $event"
+            @drag-end="dragging = undefined"
+            @drop-field="drop('filters', $event)"
+          />
+          <PivotFieldArea
+            area="columns"
+            :items="items('columns')"
+            :choices="choices"
+            :disabled="disabled"
+            :dragging="!!dragging"
+            @add="add('columns', $event)"
+            @remove="remove('columns', $event)"
+            @move="(index, to, at) => move('columns', index, to, at)"
+            @settings="settings = { area: 'columns', index: $event }"
+            @drag-start="dragging = $event"
+            @drag-end="dragging = undefined"
+            @drop-field="drop('columns', $event)"
+          />
+          <PivotFieldArea
+            area="rows"
+            :items="items('rows')"
+            :choices="choices"
+            :disabled="disabled"
+            :dragging="!!dragging"
+            @add="add('rows', $event)"
+            @remove="remove('rows', $event)"
+            @move="(index, to, at) => move('rows', index, to, at)"
+            @settings="settings = { area: 'rows', index: $event }"
+            @drag-start="dragging = $event"
+            @drag-end="dragging = undefined"
+            @drop-field="drop('rows', $event)"
+          />
+          <PivotFieldArea
+            area="values"
+            :items="items('values')"
+            :choices="choices"
+            :disabled="disabled"
+            :dragging="!!dragging"
+            @add="add('values', $event)"
+            @remove="remove('values', $event)"
+            @move="(index, to, at) => move('values', index, to, at)"
+            @settings="settings = { area: 'values', index: $event }"
+            @drag-start="dragging = $event"
+            @drag-end="dragging = undefined"
+            @drop-field="drop('values', $event)"
+          />
+        </div>
+      </section>
+    </div>
     <PivotFieldSettingsDialog
       v-if="settings && settingField !== undefined"
       :key="`${table.id}-${settings.area}-${settings.index}`"
@@ -348,43 +358,37 @@ defineExpose({
   </aside>
 </template>
 <style scoped lang="scss">
+@use "../../../shared/format-pane/side-pane" as sidePane;
+
 .pivot-fields-pane {
-  display: grid;
-  grid-template-rows: auto minmax(180px, 1.1fr) minmax(260px, 1fr);
-  width: clamp(320px, 26vw, 380px);
-  flex: 0 0 clamp(320px, 26vw, 380px);
-  max-width: 45vw;
-  min-height: 0;
-  gap: 16px;
-  padding: 12px 14px;
-  border-left: 1px solid var(--sheetcraft-border-subtle);
-  background: var(--sheetcraft-surface-panel);
-  color: var(--sheetcraft-text-primary);
-  font-family: var(--sheetcraft-font-sans);
-  font-size: var(--sheetcraft-font-size-body-medium);
-  line-height: var(--sheetcraft-line-height-body-medium);
-  overflow: auto;
-  overscroll-behavior: contain;
+  @include sidePane.shell;
+  @include sidePane.mobile-width;
+
   &__header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: var(--sheetcraft-space-2);
-    min-height: 24px;
-    strong {
-      font-size: var(--sheetcraft-font-size-title-small);
-      line-height: var(--sheetcraft-line-height-title-small);
-      font-weight: var(--sheetcraft-font-weight-semibold);
-    }
+    @include sidePane.header;
   }
+
+  &__heading {
+    @include sidePane.heading;
+  }
+
+  &__body {
+    @include sidePane.body;
+    display: grid;
+    grid-template-rows: minmax(180px, 1.1fr) minmax(240px, 1fr);
+    gap: 14px;
+  }
+
   h3 {
     margin: 0;
     font-size: inherit;
-    font-weight: 600;
+    font-weight: var(--sheetcraft-font-weight-semibold);
   }
   p {
     margin: 0;
     color: var(--sheetcraft-text-secondary);
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: var(--sheetcraft-line-height-body-small);
   }
   &__available {
     display: grid;
@@ -399,16 +403,16 @@ defineExpose({
     min-height: 0;
     overflow: auto;
     border: 1px solid var(--sheetcraft-border-control);
-    border-radius: 4px;
+    border-radius: var(--sheetcraft-radius-default);
     background: var(--sheetcraft-surface-panel);
     li {
       display: flex;
       align-items: center;
       gap: 6px;
       min-height: 28px;
-      padding: 0 2px;
+      padding: 0 4px;
       cursor: grab;
-      border-radius: 2px;
+      border-radius: var(--sheetcraft-radius-small);
       &:hover {
         background: var(--sheetcraft-surface-hover);
       }
@@ -440,9 +444,6 @@ defineExpose({
     grid-template-rows: repeat(2, minmax(0, 1fr));
     min-height: 0;
     gap: 10px 12px;
-  }
-  [role="alert"] {
-    color: var(--sheetcraft-status-error);
   }
 }
 </style>
