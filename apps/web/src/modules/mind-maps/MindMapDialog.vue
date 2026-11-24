@@ -10,6 +10,8 @@ import { Select } from "tdesign-vue-next/es/select";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { Undo2, Redo2, ZoomIn, ZoomOut, ArrowUp, ArrowDown, Download } from "lucide-vue-next";
 import { useAppI18n } from "../../shared/i18n";
+import ColorPaletteSelect from "../../shared/color/ColorPaletteSelect.vue";
+import DialogFooter from "../../shared/dialog/DialogFooter.vue";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { downloadBlob } from "../../shared/files/download";
 import { attachmentBlob } from "../attachments/attachment-file";
@@ -204,6 +206,7 @@ function fontSize(value: string | number) {
         : null
     "
     :cancel-btn="t('picture.cancel')"
+    :footer="!!draft"
     @confirm="draft && emit('save', draft)"
     @close="emit('close')"
   >
@@ -267,7 +270,7 @@ function fontSize(value: string | number) {
           />
         </div>
         <Form
-          class="properties"
+          class="properties sheetcraft-form-grid"
           :label-width="locale === 'zh-CN' ? 65 : 80"
           label-align="left"
           :prevent-submit-default="true"
@@ -305,35 +308,35 @@ function fontSize(value: string | number) {
                 /></div
             ></FormItem>
             <FormItem :label="t('mindMap.font')"
-              ><InputNumber :value="active.fontSize ?? 15" :min="8" :max="48" @change="fontSize"
+              ><InputNumber
+                class="sheetcraft-input-number--persistent-controls sheetcraft-input-number--full-width"
+                :aria-label="t('mindMap.font')"
+                :value="active.fontSize ?? 15"
+                :min="8"
+                :max="48"
+                theme="column"
+                size="small"
+                @change="fontSize"
             /></FormItem>
             <FormItem :label="t('mindMap.fill')">
-              <input
-                name="mind-map-node-fill"
-                class="fill"
-                type="color"
-                :aria-label="t('mindMap.fill')"
-                :value="
-                  active.fill ||
-                  (active.id === draft.root.id
+              <ColorPaletteSelect
+                :model-value="active.fill || null"
+                :default-color="
+                  active.id === draft.root.id
                     ? { green: '#158451', blue: '#286187', plum: '#7a476f' }[draft.theme]
-                    : '#ffffff')
+                    : '#ffffff'
                 "
-                @change="
-                  active.fill = ($event.target as HTMLInputElement).value;
-                  record();
+                :default-label="t('mindMap.setDefault')"
+                :label="t('mindMap.fill')"
+                size="small"
+                @select="
+                  (color) => {
+                    if (color) active.fill = color;
+                    else delete active.fill;
+                    record();
+                  }
                 "
               />
-              <Button
-                variant="text"
-                size="small"
-                :disabled="!active.fill"
-                @click="
-                  delete active.fill;
-                  record();
-                "
-                >{{ t("mindMap.setDefault") }}</Button
-              >
             </FormItem>
             <FormItem
               ><Checkbox
@@ -372,8 +375,24 @@ function fontSize(value: string | number) {
           ><ZoomIn :size="16"
         /></Button>
       </div>
-      <span v-if="error || errorKey" role="alert">{{ t(errorKey || "mindMap.error") }}</span>
     </div>
+    <template v-if="draft" #footer>
+      <DialogFooter
+        :status="error || errorKey ? t(errorKey || 'mindMap.error') : undefined"
+        theme="error"
+      >
+        <Button theme="default" variant="base" @click="emit('close')">{{
+          t("picture.cancel")
+        }}</Button>
+        <Button
+          theme="primary"
+          variant="base"
+          :disabled="!draft.title.trim()"
+          @click="emit('save', draft)"
+          >{{ t(source ? "mindMap.save" : "mindMap.insert") }}</Button
+        >
+      </DialogFooter>
+    </template>
   </Dialog>
 </template>
 <style scoped lang="scss">

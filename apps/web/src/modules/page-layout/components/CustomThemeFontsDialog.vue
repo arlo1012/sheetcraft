@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch, watchPostEffect } from "vue";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { useAppI18n } from "../../../shared/i18n";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import FontFormatField from "../../../shared/cell-text/FontFormatField.vue";
 import FontSettingsAction from "../../../shared/cell-text/FontSettingsAction.vue";
 import { useFontCatalog } from "../../../shared/cell-text/useFontCatalog";
@@ -121,7 +123,6 @@ watch(
           <TInput v-model="draft.name" autofocus clearable :status="error ? 'error' : undefined" />
         </div>
       </TFormItem>
-      <p v-if="error" class="custom-theme-fonts-dialog__error" role="alert">{{ error }}</p>
       <div class="custom-theme-fonts-dialog__content">
         <div class="custom-theme-fonts-dialog__fields">
           <section :aria-label="t('pageTools.westernFonts')">
@@ -207,6 +208,12 @@ watch(
         </section>
       </div>
     </TForm>
+    <template #footer>
+      <DialogFooter :status="error" theme="error">
+        <TButton theme="default" @click="close">{{ t("pageTools.cancel") }}</TButton>
+        <TButton theme="primary" @click="save">{{ t("pageTools.save") }}</TButton>
+      </DialogFooter>
+    </template>
   </TDialog>
 </template>
 

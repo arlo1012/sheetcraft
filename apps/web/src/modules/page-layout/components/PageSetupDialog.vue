@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { TabPanel as TTabPanel, Tabs as TTabs } from "tdesign-vue-next/es/tabs";
 import { cloneSheetPageSetup, type SheetPageSetup } from "@sheetcraft/core/page-setup";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { HeaderFooterEditTarget } from "../header-footer-editor";
 import {
@@ -168,8 +170,13 @@ function onDialogKeydown(event: KeyboardEvent): void {
             :select-reference="selectReference"
         /></TTabPanel>
       </TTabs>
-      <p v-if="setupError" class="page-setup-dialog__error" role="alert">{{ setupError }}</p>
     </div>
+    <template #footer>
+      <DialogFooter :status="setupError" theme="error">
+        <TButton theme="default" @click="close">{{ t("pageLayout.cancel") }}</TButton>
+        <TButton theme="primary" @click="confirm">{{ t("pageLayout.confirm") }}</TButton>
+      </DialogFooter>
+    </template>
   </Dialog>
   <CustomHeaderFooterDialog
     v-if="customVisible"
@@ -186,10 +193,6 @@ function onDialogKeydown(event: KeyboardEvent): void {
   &__tabs {
     min-width: 0;
     height: min(376px, calc(100dvh - 196px));
-  }
-  &__error {
-    margin: var(--sheetcraft-space-2) 0 0;
-    color: var(--sheetcraft-status-error);
   }
 }
 </style>

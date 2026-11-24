@@ -17,6 +17,7 @@ import {
   type DashboardWidget,
 } from "@sheetcraft/core/dashboard";
 import { useAppI18n } from "../../shared/i18n";
+import DialogFooter from "../../shared/dialog/DialogFooter.vue";
 import {
   formatRangeReference,
   resolveRangeReference,
@@ -157,6 +158,7 @@ function save() {
             :label="t('dashboard.style')"
         /></Tabs>
         <Form
+          class="sheetcraft-form-grid"
           label-align="left"
           :label-width="locale === 'zh-CN' ? 76 : 104"
           :prevent-submit-default="true"
@@ -288,11 +290,21 @@ function save() {
             </template>
           </template>
         </Form>
-        <p v-if="invalid || error" role="alert">
-          {{ t(invalid ? "dashboard.invalid" : "dashboard.error") }}
-        </p>
       </div>
     </div>
+    <template #footer>
+      <DialogFooter
+        :status="
+          invalid || error ? t(invalid ? 'dashboard.invalid' : 'dashboard.error') : undefined
+        "
+        theme="error"
+      >
+        <Button theme="default" variant="base" @click="emit('close')">{{
+          t("picture.cancel")
+        }}</Button>
+        <Button theme="primary" variant="base" @click="save">{{ t("dashboard.apply") }}</Button>
+      </DialogFooter>
+    </template>
   </Dialog>
 </template>
 <style scoped lang="scss">

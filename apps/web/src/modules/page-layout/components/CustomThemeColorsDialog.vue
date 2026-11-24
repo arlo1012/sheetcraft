@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch, watchPostEffect } from "vue";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { useAppI18n } from "../../../shared/i18n";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import ThemeColorPreview from "./ThemeColorPreview.vue";
 
 export type ThemeColorScheme = {
@@ -102,7 +104,6 @@ watch(
           <TInput v-model="draft.name" autofocus clearable :status="error ? 'error' : undefined" />
         </div>
       </TFormItem>
-      <p v-if="error" class="custom-theme-colors-dialog__error" role="alert">{{ error }}</p>
       <div class="custom-theme-colors-dialog__content">
         <section
           class="custom-theme-colors-dialog__colors"
@@ -155,6 +156,12 @@ watch(
         </section>
       </div>
     </TForm>
+    <template #footer>
+      <DialogFooter :status="error" theme="error">
+        <TButton theme="default" @click="close">{{ t("pageTools.cancel") }}</TButton>
+        <TButton theme="primary" @click="save">{{ t("pageTools.save") }}</TButton>
+      </DialogFooter>
+    </template>
   </TDialog>
 </template>
 
@@ -170,12 +177,6 @@ watch(
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: 4px;
-}
-.custom-theme-colors-dialog__error {
-  margin: -8px 0 0;
-  color: var(--sheetcraft-status-error);
-  font-size: 12px;
-  line-height: 18px;
 }
 .custom-theme-colors-dialog__name {
   width: 100%;

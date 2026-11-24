@@ -10,6 +10,7 @@ import { attachmentBlob } from "../attachments/attachment-file";
 import { downloadBlob } from "../../shared/files/download";
 import { Trash2, Undo2, Redo2, Download, ZoomIn, ZoomOut } from "lucide-vue-next";
 import { useAppI18n } from "../../shared/i18n";
+import DialogFooter from "../../shared/dialog/DialogFooter.vue";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { evaluateShapePreset, shapePresetPathToSvg } from "@sheetcraft/core/shape-presets";
 import {
@@ -200,6 +201,7 @@ function remove() {
         : null
     "
     :cancel-btn="t('picture.cancel')"
+    :footer="!!draft"
     @confirm="draft && emit('save', draft)"
     @close="emit('close')"
   >
@@ -334,7 +336,7 @@ function remove() {
       </Form>
       <Form
         v-if="node"
-        class="geometry"
+        class="geometry sheetcraft-form-grid"
         label-align="left"
         :label-width="zh ? 36 : 52"
         :prevent-submit-default="true"
@@ -345,15 +347,33 @@ function remove() {
           :label="t(`flowchart.${field}`)"
         >
           <InputNumber
+            class="sheetcraft-input-number--persistent-controls sheetcraft-input-number--full-width"
             :aria-label="t(`flowchart.${field}`)"
             :value="node[field]"
-            theme="normal"
+            theme="column"
+            size="small"
             @change="geometry(field, $event)"
           />
         </FormItem>
       </Form>
-      <span v-if="error || exportError" role="alert">{{ t("flowchart.failed") }}</span>
     </div>
+    <template v-if="draft" #footer>
+      <DialogFooter
+        :status="error || exportError ? t('flowchart.failed') : undefined"
+        theme="error"
+      >
+        <Button theme="default" variant="base" @click="emit('close')">{{
+          t("picture.cancel")
+        }}</Button>
+        <Button
+          theme="primary"
+          variant="base"
+          :disabled="!draft.nodes.length || !draft.title.trim()"
+          @click="emit('save', draft)"
+          >{{ source ? t("flowchart.save") : t("flowchart.insert") }}</Button
+        >
+      </DialogFooter>
+    </template>
   </Dialog>
 </template>
 <style scoped lang="scss">

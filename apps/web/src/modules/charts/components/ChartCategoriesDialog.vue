@@ -9,6 +9,7 @@ import type { ChartSourceCategories } from "@sheetcraft/core/chart-source";
 import type { SheetChart } from "@sheetcraft/core/sheet-charts";
 import type { Sheet, SheetEvaluator, Workbook } from "@sheetcraft/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import { vNativeControl } from "../../../shared/tdesign/native-control";
 import {
   formatChartSourceCategories,
@@ -118,6 +119,15 @@ watch(
     if (disabled) pickerEpoch++;
   },
 );
+const footerError = computed(() =>
+  compositionBlocked.value
+    ? t("chart.sourceFinishComposition")
+    : attempted.value && invalid.value
+      ? t("chart.sourceInvalidCategories")
+      : feedback.value
+        ? t("chart.sourceApplyFailed")
+        : undefined,
+);
 onBeforeUnmount(() => {
   alive = false;
   pickerEpoch++;
@@ -183,16 +193,15 @@ onBeforeUnmount(() => {
           </div></FormItem
         ></Form
       >
-      <p v-if="compositionBlocked" class="chart-categories-editor__error" role="alert">
-        {{ t("chart.sourceFinishComposition") }}
-      </p>
-      <p v-else-if="attempted && invalid" class="chart-categories-editor__error" role="alert">
-        {{ t("chart.sourceInvalidCategories") }}
-      </p>
-      <p v-else-if="feedback" class="chart-categories-editor__error" role="alert">
-        {{ t("chart.sourceApplyFailed") }}
-      </p>
     </div>
+    <template #footer>
+      <DialogFooter :status="footerError" theme="error">
+        <Button theme="default" variant="base" @click="close">{{ t("picture.cancel") }}</Button>
+        <Button theme="primary" variant="base" :disabled="disabled" @click="confirm">{{
+          t("picture.confirm")
+        }}</Button>
+      </DialogFooter>
+    </template>
   </Dialog>
 </template>
 <style scoped lang="scss">
