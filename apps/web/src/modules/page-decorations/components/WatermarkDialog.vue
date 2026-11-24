@@ -11,8 +11,10 @@ import type { SheetWatermark } from "@sheetcraft/core/page-decoration";
 import { DEFAULT_SHEET_WATERMARK } from "@sheetcraft/core/page-decoration";
 import {
   CELL_FONT_SIZE_PRESETS,
-  filterFontFamilyOption,
+  resolveFontFamilyName,
 } from "../../../shared/cell-text/font-catalog";
+import FontFormatField from "../../../shared/cell-text/FontFormatField.vue";
+import FontSettingsAction from "../../../shared/cell-text/FontSettingsAction.vue";
 import { useFontCatalog } from "../../../shared/cell-text/useFontCatalog";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import { useAppI18n } from "../../../shared/i18n";
@@ -47,6 +49,26 @@ const labelWidth = computed(() => (locale.value === "zh-CN" ? 84 : 108));
 const { fontOptions, fontResourceRevision } = useFontCatalog(() =>
   draft.value.fontFamily ? [draft.value.fontFamily] : [],
 );
+const fontFieldOptions = computed(() =>
+  fontOptions.value.map(({ value, label, aliases }) => ({
+    label,
+    value,
+    fontFamily: value,
+    aliases,
+  })),
+);
+function setFontFamily(value: string | number): void {
+  if (!textEnabled.value || props.busy || typeof value !== "string") return;
+  const trimmed = value.trim();
+  if (!trimmed) return;
+  const canonical = resolveFontFamilyName(trimmed);
+  const option = fontFieldOptions.value.find(
+    (item) =>
+      item.label.toLowerCase() === trimmed.toLowerCase() ||
+      resolveFontFamilyName(item.value).toLowerCase() === canonical.toLowerCase(),
+  );
+  draft.value.fontFamily = option?.value ?? canonical;
+}
 const fontSizeOptions = CELL_FONT_SIZE_PRESETS.map((value) => ({ label: String(value), value }));
 const opacityPercent = computed({
   get: () => 100 - Math.round(draft.value.opacity * 100),
@@ -345,20 +367,24 @@ onBeforeUnmount(clearLocalImage);
               />
             </TFormItem>
             <TFormItem :label="t('pageDecoration.fontFamily')">
-              <TAutoComplete
-                v-model="draft.fontFamily"
-                v-native-control="{
-                  attributes: {
-                    id: `${dialogId}-font-family`,
-                    name: `${dialogId}-font-family`,
-                    'aria-label': t('pageDecoration.fontFamily'),
-                  },
+              <FontFormatField
+                appearance="field"
+                size="medium"
+                :model-value="draft.fontFamily"
+                :options="fontFieldOptions"
+                :label="t('pageDecoration.fontFamily')"
+                :search-label="t('format.searchFonts')"
+                :empty-label="t('format.noMatchingFonts')"
+                :disabled="!textEnabled || !!busy"
+                :native-attributes="{
+                  id: `${dialogId}-font-family`,
+                  name: `${dialogId}-font-family`,
+                  'aria-label': t('pageDecoration.fontFamily'),
                 }"
-                :disabled="!textEnabled || busy"
-                :options="fontOptions"
-                filterable
-                :filter="filterFontFamilyOption"
-              />
+                @change="setFontFamily"
+              >
+                <template #searchAction="{ close }"><FontSettingsAction @open="close" /></template>
+              </FontFormatField>
             </TFormItem>
             <TFormItem :label="t('pageDecoration.fontSize')">
               <TSelect

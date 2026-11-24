@@ -32,12 +32,13 @@ const props = withDefaults(
     label: string;
     disabled: boolean;
     appearance?: "ribbon" | "field";
+    size?: "small" | "medium";
     popupAttach?: () => HTMLElement;
     matchPanelWidth?: boolean;
     searchLabel?: string;
     emptyLabel?: string;
   }>(),
-  { appearance: "ribbon" },
+  { appearance: "ribbon", size: "small" },
 );
 defineSlots<{ searchAction?: (props: { close: () => void }) => unknown }>();
 const emit = defineEmits<{ change: [value: string | number]; focusChange: [value: boolean] }>();
@@ -303,7 +304,7 @@ defineExpose({
       :input-value="inputText"
       @update:input-value="updateDraft"
       allow-input
-      size="small"
+      :size="size"
       :popup-visible="open"
       :popup-props="popupProps"
       :input-props="inputProps"
@@ -423,7 +424,8 @@ defineExpose({
 
   &.is-field &__arrow {
     width: 16px;
-    height: 22px;
+    height: 100%;
+    min-height: 22px;
     padding-right: 0;
     color: var(--sheetcraft-text-muted);
 

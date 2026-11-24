@@ -3,10 +3,11 @@ import { computed, ref, watch, watchPostEffect } from "vue";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
-import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { useAppI18n } from "../../../shared/i18n";
+import FontFormatField from "../../../shared/cell-text/FontFormatField.vue";
+import FontSettingsAction from "../../../shared/cell-text/FontSettingsAction.vue";
 import { useFontCatalog } from "../../../shared/cell-text/useFontCatalog";
-import { filterFontFamilyOption } from "../../../shared/cell-text/font-catalog";
+import { resolveFontFamilyName } from "../../../shared/cell-text/font-catalog";
 
 export type ThemeFontScheme = {
   name: string;
@@ -27,6 +28,32 @@ const { fontOptions } = useFontCatalog(() => [
   draft.value.headingEastAsia,
   draft.value.bodyEastAsia,
 ]);
+const fontFieldOptions = computed(() =>
+  fontOptions.value.map(({ value, label, aliases }) => ({
+    label,
+    value,
+    fontFamily: value,
+    aliases,
+  })),
+);
+function setThemeFont(
+  field: "headingFont" | "bodyFont" | "headingEastAsia" | "bodyEastAsia",
+  value: string | number,
+): void {
+  if (typeof value !== "string") return;
+  const trimmed = value.trim();
+  if (!trimmed) {
+    draft.value[field] = "";
+    return;
+  }
+  const canonical = resolveFontFamilyName(trimmed);
+  const option = fontFieldOptions.value.find(
+    (item) =>
+      item.label.toLowerCase() === trimmed.toLowerCase() ||
+      resolveFontFamilyName(item.value).toLowerCase() === canonical.toLowerCase(),
+  );
+  draft.value[field] = option?.value ?? canonical;
+}
 const westernHeadingStyle = computed(() => ({
   fontFamily: `'${draft.value.headingFont}', sans-serif`,
 }));
@@ -99,41 +126,69 @@ watch(
         <div class="custom-theme-fonts-dialog__fields">
           <section :aria-label="t('pageTools.westernFonts')">
             <strong>{{ t("pageTools.westernFonts") }}</strong>
-            <TFormItem :label="t('pageTools.westernHeadingFont')"
-              ><TSelect
-                v-model="draft.headingFont"
-                filterable
-                creatable
-                :options="fontOptions"
-                :filter="filterFontFamilyOption"
-            /></TFormItem>
-            <TFormItem :label="t('pageTools.westernBodyFont')"
-              ><TSelect
-                v-model="draft.bodyFont"
-                filterable
-                creatable
-                :options="fontOptions"
-                :filter="filterFontFamilyOption"
-            /></TFormItem>
+            <TFormItem :label="t('pageTools.westernHeadingFont')">
+              <FontFormatField
+                appearance="field"
+                size="medium"
+                :model-value="draft.headingFont"
+                :options="fontFieldOptions"
+                :label="t('pageTools.westernHeadingFont')"
+                :search-label="t('format.searchFonts')"
+                :empty-label="t('format.noMatchingFonts')"
+                :disabled="false"
+                @change="setThemeFont('headingFont', $event)"
+              >
+                <template #searchAction="{ close }"><FontSettingsAction @open="close" /></template>
+              </FontFormatField>
+            </TFormItem>
+            <TFormItem :label="t('pageTools.westernBodyFont')">
+              <FontFormatField
+                appearance="field"
+                size="medium"
+                :model-value="draft.bodyFont"
+                :options="fontFieldOptions"
+                :label="t('pageTools.westernBodyFont')"
+                :search-label="t('format.searchFonts')"
+                :empty-label="t('format.noMatchingFonts')"
+                :disabled="false"
+                @change="setThemeFont('bodyFont', $event)"
+              >
+                <template #searchAction="{ close }"><FontSettingsAction @open="close" /></template>
+              </FontFormatField>
+            </TFormItem>
           </section>
           <section :aria-label="t('pageTools.chineseFonts')">
             <strong>{{ t("pageTools.chineseFonts") }}</strong>
-            <TFormItem :label="t('pageTools.chineseHeadingFont')"
-              ><TSelect
-                v-model="draft.headingEastAsia"
-                filterable
-                creatable
-                :options="fontOptions"
-                :filter="filterFontFamilyOption"
-            /></TFormItem>
-            <TFormItem :label="t('pageTools.chineseBodyFont')"
-              ><TSelect
-                v-model="draft.bodyEastAsia"
-                filterable
-                creatable
-                :options="fontOptions"
-                :filter="filterFontFamilyOption"
-            /></TFormItem>
+            <TFormItem :label="t('pageTools.chineseHeadingFont')">
+              <FontFormatField
+                appearance="field"
+                size="medium"
+                :model-value="draft.headingEastAsia"
+                :options="fontFieldOptions"
+                :label="t('pageTools.chineseHeadingFont')"
+                :search-label="t('format.searchFonts')"
+                :empty-label="t('format.noMatchingFonts')"
+                :disabled="false"
+                @change="setThemeFont('headingEastAsia', $event)"
+              >
+                <template #searchAction="{ close }"><FontSettingsAction @open="close" /></template>
+              </FontFormatField>
+            </TFormItem>
+            <TFormItem :label="t('pageTools.chineseBodyFont')">
+              <FontFormatField
+                appearance="field"
+                size="medium"
+                :model-value="draft.bodyEastAsia"
+                :options="fontFieldOptions"
+                :label="t('pageTools.chineseBodyFont')"
+                :search-label="t('format.searchFonts')"
+                :empty-label="t('format.noMatchingFonts')"
+                :disabled="false"
+                @change="setThemeFont('bodyEastAsia', $event)"
+              >
+                <template #searchAction="{ close }"><FontSettingsAction @open="close" /></template>
+              </FontFormatField>
+            </TFormItem>
           </section>
         </div>
         <section class="custom-theme-fonts-dialog__preview" :aria-label="t('pageTools.preview')">

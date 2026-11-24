@@ -137,6 +137,7 @@ defineExpose({
   <div ref="root">
     <FontFormatField
       ref="control"
+      match-panel-width
       :model-value="value.kind === 'value' ? value.value : undefined"
       :draft="binding"
       :options="options"

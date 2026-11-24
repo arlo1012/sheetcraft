@@ -2164,7 +2164,7 @@ test.each([false, true])(
     );
     expect(pane.props("capabilities").fields.textWrap?.enabled).toBe(false);
     expect(pane.props("capabilities").fields.paragraphAlignment?.enabled).toBe(false);
-    await pane.get('[data-shape-format-field="textBold"] input').setValue(true);
+    await pane.get('[data-shape-format-field="textBold"]').trigger("click");
     await flushPromises();
     expect(state.shapeTextEdit.snapshot.value!.draftView.shapeText!.characterRuns).toEqual([
       { start: 0, end: 6, bold: true },
@@ -2203,10 +2203,9 @@ test.each([false, true])(
     expect(objectPane.props("capabilities").fields.paragraphAlignment?.enabled).toBe(true);
     await objectPane.get(".shape-format-pane__modes").findAll("button")[1]!.trigger("click");
     await objectPane.findAll('[role="tab"]')[2]!.trigger("click");
-    objectPane
-      .get('[data-shape-format-field="paragraphAlignment"]')
-      .getComponent(TSelect)
-      .vm.$emit("change", "right");
+    await objectPane
+      .get('[data-shape-format-field="paragraphAlignment"] [data-text-alignment-option="right"]')
+      .trigger("click");
     await flushPromises();
     expect(directSource(state).shapeText!.paragraph.alignment).toBe("right");
     expect(directSource(state).shapeText!.characterRuns).toEqual([

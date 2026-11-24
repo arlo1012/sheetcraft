@@ -40,6 +40,10 @@ import type {
 import FontFormatField from "../../../shared/cell-text/FontFormatField.vue";
 import FontSettingsAction from "../../../shared/cell-text/FontSettingsAction.vue";
 import { useFontCatalog } from "../../../shared/cell-text/useFontCatalog";
+import TextStyleToggleGroup, {
+  type TextStyleToggleItem,
+  type TextStyleToggleKey,
+} from "../../../shared/text-format/TextStyleToggleGroup.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { MessageKey } from "../../../shared/i18n";
 import { getChartElementSettings } from "../chart-elements";
@@ -838,6 +842,22 @@ function setText<K extends keyof ChartTextFormat>(
   const intent = textIntent(setChartFormatField(textFormat.value, field, value));
   if (intent) submit(intent);
 }
+const textBoldActive = computed(
+  () => textFormat.value.bold ?? (kind.value === "title" && chart.value.type !== "wordCloud"),
+);
+const textStyleItems = computed<readonly TextStyleToggleItem[]>(() => [
+  { key: "bold", label: t("format.bold"), pressed: textBoldActive.value, disabled: props.disabled },
+  {
+    key: "italic",
+    label: t("format.italic"),
+    pressed: textFormat.value.italic ?? false,
+    disabled: props.disabled,
+  },
+]);
+function toggleTextStyle(key: TextStyleToggleKey): void {
+  if (key === "bold") setText("bold", !textBoldActive.value);
+  else if (key === "italic") setText("italic", !(textFormat.value.italic ?? false));
+}
 function setFontFamily(value: unknown): void {
   if (typeof value !== "string") return;
   const intent = textIntent(setChartTextFontFamily(textFormat.value, value || undefined));
@@ -1219,6 +1239,7 @@ function escapeDraft(event: KeyboardEvent): void {
       data-chart-format-navigation
     >
       <TRadioGroup
+        class="sheetcraft-radio-group--stretched"
         :value="legendMode"
         variant="default-filled"
         :aria-label="t('chart.formatPane')"
@@ -1416,6 +1437,7 @@ function escapeDraft(event: KeyboardEvent): void {
               :focus-boundary="() => sharedNumericFocusBoundary('labelAngle')"
               :on-commit="labelAngleCommit"
               presentation="inline-stepper"
+              full-width
               :show-unit="false"
               @draft-change="sharedNumericDraftChange('labelAngle', $event)"
               @cancel="delete sharedNumericResetErrors.labelAngle"
@@ -1481,6 +1503,7 @@ function escapeDraft(event: KeyboardEvent): void {
               :focus-boundary="() => sharedNumericFocusBoundary('titleRotation')"
               :on-commit="titleRotationCommit"
               presentation="inline-stepper"
+              full-width
               :show-unit="false"
               @draft-change="sharedNumericDraftChange('titleRotation', $event)"
               @cancel="delete sharedNumericResetErrors.titleRotation"
@@ -1525,6 +1548,7 @@ function escapeDraft(event: KeyboardEvent): void {
               :focus-boundary="() => sharedNumericFocusBoundary('min')"
               :on-commit="minCommit"
               presentation="inline-stepper"
+              full-width
               :show-unit="false"
               @draft-change="sharedNumericDraftChange('min', $event)"
               @cancel="delete sharedNumericResetErrors.min"
@@ -1561,6 +1585,7 @@ function escapeDraft(event: KeyboardEvent): void {
               :focus-boundary="() => sharedNumericFocusBoundary('max')"
               :on-commit="maxCommit"
               presentation="inline-stepper"
+              full-width
               :show-unit="false"
               @draft-change="sharedNumericDraftChange('max', $event)"
               @cancel="delete sharedNumericResetErrors.max"
@@ -1597,6 +1622,7 @@ function escapeDraft(event: KeyboardEvent): void {
               :focus-boundary="() => sharedNumericFocusBoundary('majorUnit')"
               :on-commit="majorUnitCommit"
               presentation="inline-stepper"
+              full-width
               :show-unit="false"
               @draft-change="sharedNumericDraftChange('majorUnit', $event)"
               @cancel="delete sharedNumericResetErrors.majorUnit"
@@ -1634,6 +1660,7 @@ function escapeDraft(event: KeyboardEvent): void {
               :focus-boundary="() => sharedNumericFocusBoundary('minorUnit')"
               :on-commit="minorUnitCommit"
               presentation="inline-stepper"
+              full-width
               :show-unit="false"
               @draft-change="sharedNumericDraftChange('minorUnit', $event)"
               @cancel="delete sharedNumericResetErrors.minorUnit"
@@ -1691,6 +1718,7 @@ function escapeDraft(event: KeyboardEvent): void {
       >
         <TRadioGroup
           v-if="isAxis"
+          class="sheetcraft-radio-group--stretched"
           :value="axisTextMode"
           variant="default-filled"
           data-chart-format-navigation
@@ -1703,6 +1731,7 @@ function escapeDraft(event: KeyboardEvent): void {
         <div class="chart-format-pane__field">
           <span>{{ t("format.fontFamily") }}</span
           ><FontFormatField
+            appearance="field"
             :model-value="textFormat.scriptFonts ? undefined : (textFormat.fontFamily ?? '')"
             :placeholder="textFormat.scriptFonts ? t('chart.scriptOrThemeFont') : undefined"
             :options="fontFamilyOptions"
@@ -1734,6 +1763,7 @@ function escapeDraft(event: KeyboardEvent): void {
               :focus-boundary="() => sharedNumericFocusBoundary('fontSize')"
               :on-commit="fontSizeCommit"
               presentation="inline-stepper"
+              full-width
               :show-unit="false"
               @draft-change="sharedNumericDraftChange('fontSize', $event)"
               @cancel="delete sharedNumericResetErrors.fontSize"
@@ -1767,20 +1797,15 @@ function escapeDraft(event: KeyboardEvent): void {
             "
           />
         </div>
-        <div class="chart-format-pane__checks">
-          <TCheckbox
-            data-format-pane-history-control="discrete"
-            :checked="textFormat.bold ?? (kind === 'title' && chart.type !== 'wordCloud')"
-            :disabled="disabled"
-            :onChange="captureAction((value: unknown) => setText('bold', !!value))"
-            >{{ t("format.bold") }}</TCheckbox
-          ><TCheckbox
-            data-format-pane-history-control="discrete"
-            :checked="textFormat.italic ?? false"
-            :disabled="disabled"
-            :onChange="captureAction((value: unknown) => setText('italic', !!value))"
-            >{{ t("format.italic") }}</TCheckbox
-          >
+        <div class="chart-format-pane__field">
+          <span>{{ t("cellFormat.fontStyle") }}</span>
+          <TextStyleToggleGroup
+            variant="field"
+            history-control="discrete"
+            :items="textStyleItems"
+            :label="t('cellFormat.fontStyle')"
+            :onToggle="captureAction(toggleTextStyle)"
+          />
         </div>
         <p class="chart-format-pane__hint">{{ t("chart.formatFontHint") }}</p>
         <TButton
@@ -1882,6 +1907,7 @@ function escapeDraft(event: KeyboardEvent): void {
               :focus-boundary="() => sharedNumericFocusBoundary('strokeWidth')"
               :on-commit="strokeWidthCommit"
               presentation="inline-stepper"
+              full-width
               :show-unit="false"
               @draft-change="sharedNumericDraftChange('strokeWidth', $event)"
               @cancel="delete sharedNumericResetErrors.strokeWidth"
@@ -1963,6 +1989,7 @@ function escapeDraft(event: KeyboardEvent): void {
             :focus-boundary="() => sharedNumericFocusBoundary('decimals')"
             :on-commit="decimalsCommit"
             presentation="inline-stepper"
+            full-width
             :show-unit="false"
             @draft-change="sharedNumericDraftChange('decimals', $event)"
             @cancel="delete sharedNumericResetErrors.decimals"
@@ -2096,6 +2123,7 @@ function escapeDraft(event: KeyboardEvent): void {
               :focus-boundary="() => sharedNumericFocusBoundary('strokeWidth')"
               :on-commit="strokeWidthCommit"
               presentation="inline-stepper"
+              full-width
               :show-unit="false"
               @draft-change="sharedNumericDraftChange('strokeWidth', $event)"
               @cancel="delete sharedNumericResetErrors.strokeWidth"
@@ -2189,6 +2217,7 @@ function escapeDraft(event: KeyboardEvent): void {
               :focus-boundary="() => sharedNumericFocusBoundary('markerSizePt')"
               :on-commit="markerSizePtCommit"
               presentation="inline-stepper"
+              full-width
               :show-unit="false"
               @draft-change="sharedNumericDraftChange('markerSizePt', $event)"
               @cancel="delete sharedNumericResetErrors.markerSizePt"
@@ -2241,6 +2270,7 @@ function escapeDraft(event: KeyboardEvent): void {
               :focus-boundary="() => sharedNumericFocusBoundary('gapWidth')"
               :on-commit="gapWidthCommit"
               presentation="inline-stepper"
+              full-width
               :show-unit="false"
               @draft-change="sharedNumericDraftChange('gapWidth', $event)"
               @cancel="delete sharedNumericResetErrors.gapWidth"
@@ -2278,6 +2308,7 @@ function escapeDraft(event: KeyboardEvent): void {
               :focus-boundary="() => sharedNumericFocusBoundary('overlap')"
               :on-commit="overlapCommit"
               presentation="inline-stepper"
+              full-width
               :show-unit="false"
               @draft-change="sharedNumericDraftChange('overlap', $event)"
               @cancel="delete sharedNumericResetErrors.overlap"
@@ -2403,11 +2434,6 @@ function escapeDraft(event: KeyboardEvent): void {
     flex-direction: column;
     align-items: flex-start;
     gap: 6px;
-  }
-  &__checks {
-    display: flex;
-    align-items: center;
-    gap: 16px;
   }
   &__stack {
     display: grid;

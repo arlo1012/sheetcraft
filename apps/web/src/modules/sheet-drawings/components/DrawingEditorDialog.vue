@@ -14,6 +14,10 @@ import {
 import { useAppI18n } from "../../../shared/i18n";
 import { vNativeControl } from "../../../shared/tdesign/native-control";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
+import TextStyleToggleGroup, {
+  type TextStyleToggleItem,
+  type TextStyleToggleKey,
+} from "../../../shared/text-format/TextStyleToggleGroup.vue";
 import DrawingContent from "./DrawingContent.vue";
 import type { TextBoxReferenceResolver } from "../textbox-reference-display";
 import ShapeGallery from "./ShapeGallery.vue";
@@ -150,6 +154,19 @@ function setTypography(
   } catch {
     applyError.value = true;
   }
+}
+const textStyleItems = computed<readonly TextStyleToggleItem[]>(() => [
+  { key: "bold", label: t("drawing.bold"), pressed: draft.value.bold, disabled: props.disabled },
+  {
+    key: "italic",
+    label: t("drawing.italic"),
+    pressed: draft.value.italic,
+    disabled: props.disabled,
+  },
+]);
+function toggleTextStyle(key: TextStyleToggleKey): void {
+  if (key === "bold") setTypography("textBold", !draft.value.bold);
+  else if (key === "italic") setTypography("textItalic", !draft.value.italic);
 }
 const galleryError = ref(false);
 const selectedChoice = computed(() =>
@@ -400,19 +417,17 @@ const shapes: DrawingShape[] = [
               theme="column"
             />
           </FormItem>
-          <FormItem v-if="drawing.kind !== 'equation'"
-            ><Checkbox
-              :model-value="draft.bold"
-              :disabled="disabled"
-              @update:model-value="setTypography('textBold', $event)"
-              >{{ t("drawing.bold") }}</Checkbox
-            ><Checkbox
-              :model-value="draft.italic"
-              :disabled="disabled"
-              @update:model-value="setTypography('textItalic', $event)"
-              >{{ t("drawing.italic") }}</Checkbox
-            ></FormItem
-          >
+          <FormItem v-if="drawing.kind !== 'equation'" :label="t('cellFormat.fontStyle')">
+            <div class="drawing-editor__styles">
+              <TextStyleToggleGroup
+                variant="field"
+                size="small"
+                :items="textStyleItems"
+                :label="t('cellFormat.fontStyle')"
+                @toggle="toggleTextStyle"
+              />
+            </div>
+          </FormItem>
         </div>
         <div class="drawing-editor__row">
           <FormItem :label="t('drawing.width')">
@@ -507,6 +522,10 @@ const shapes: DrawingShape[] = [
   }
   &__color {
     width: 64px;
+    flex: none;
+  }
+  &__styles {
+    width: 72px;
     flex: none;
   }
   &__row {

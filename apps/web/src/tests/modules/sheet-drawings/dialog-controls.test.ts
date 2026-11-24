@@ -87,6 +87,10 @@ test.each(["shape", "textBox", "wordArt", "icon", "equation"] as const)(
       expect(input.props("disabled")).toBe(true);
     for (const checkbox of wrapper.findAllComponents(Checkbox))
       expect(checkbox.props("disabled")).toBe(true);
+    for (const styleButton of document.querySelectorAll<HTMLButtonElement>(
+      "button[data-text-style-action]",
+    ))
+      expect(styleButton.disabled).toBe(true);
     for (const textarea of wrapper.findAllComponents(Textarea))
       expect(textarea.props("disabled")).toBe(true);
     for (const color of wrapper.findAllComponents(ColorPaletteSelect)) {
@@ -121,6 +125,10 @@ test("late field events cannot mutate the local draft while the editor is disabl
     checkbox.vm.$emit("update:modelValue", true);
     checkbox.vm.$emit("change", true);
   }
+  for (const styleButton of document.querySelectorAll<HTMLButtonElement>(
+    "button[data-text-style-action]",
+  ))
+    styleButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   for (const color of wrapper.findAllComponents(ColorPaletteSelect))
     color.vm.$emit("select", "#ff0000");
   document

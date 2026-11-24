@@ -180,13 +180,15 @@ describe("shape text layout and paragraph controls", () => {
       ["stacked", "ltr", ["Left", "Center", "Right"]],
     ] as const) {
       await f.revise({ textDirection: direction, textLineOrder: lineOrder });
-      const options = choice(f.wrapper, "textVerticalAlignment").props("options")!;
-      expect(options.map((option) => ("value" in option ? option.value : undefined))).toEqual([
+      const buttons = f.wrapper.findAll(
+        '[data-shape-format-field="textVerticalAlignment"] button[data-text-alignment-option]',
+      );
+      expect(buttons.map((button) => button.attributes("data-text-alignment-option"))).toEqual([
         "top",
         "middle",
         "bottom",
       ]);
-      expect(options.map((option) => option.label)).toEqual(labels);
+      expect(buttons.map((button) => button.attributes("aria-label"))).toEqual(labels);
     }
   });
   test("normal/exact line spacing and retained numeric drafts survive accepted edits", async () => {
@@ -330,7 +332,9 @@ describe("shape font exact-resource preparation", () => {
     const f = fixture();
     font(f.wrapper).vm.$emit("change", "Noto Sans");
     await nextTick();
-    choice(f.wrapper, "paragraphAlignment").vm.$emit("change", "center");
+    await f.wrapper
+      .get('[data-shape-format-field="paragraphAlignment"] [data-text-alignment-option="center"]')
+      .trigger("click");
     await flushPromises();
     const intent = f.onIntent.mock.calls.at(-1)![0];
     await f.revise({ paragraphAlignment: "center" }, intent.intentId);

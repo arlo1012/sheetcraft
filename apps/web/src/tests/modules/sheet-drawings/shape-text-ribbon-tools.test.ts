@@ -5,7 +5,7 @@ import ShapeTextRibbonTools from "../../../modules/sheet-drawings/components/Sha
 import ShapeRibbonStyleMenu from "../../../modules/sheet-drawings/components/ShapeRibbonStyleMenu.vue";
 import ShapeObjectToolControls from "../../../modules/sheet-drawings/components/ShapeObjectToolControls.vue";
 import FontFormatField from "../../../shared/cell-text/FontFormatField.vue";
-import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
+import RibbonColorSplitButton from "../../../shared/color/RibbonColorSplitButton.vue";
 import { createAppI18n } from "../../../shared/i18n";
 import { drawingShapeTextValues } from "../../../modules/sheet-drawings/shape-text-options";
 import type {
@@ -78,7 +78,7 @@ function fixture(mode: "drawing" | "text" = "text", locale: "en-US" | "zh-CN" = 
     global: {
       plugins: [createAppI18n(locale)],
       stubs: {
-        ColorPaletteSelect: true,
+        RibbonColorSplitButton: true,
         ShapeFormatNumberField: true,
         ShapeRibbonStyleMenu: true,
         ShapeRibbonLayoutMenu: true,
@@ -157,7 +157,7 @@ describe("concrete text and drawing ribbon tools on the existing shape format co
         baseRevision: 3,
       }),
     );
-    const color = f.wrapper.getComponent(ColorPaletteSelect);
+    const color = f.wrapper.getComponent(RibbonColorSplitButton);
     expect(color.props("modelValue")).toBe("#123456");
     color.vm.$emit("select", "#ff0000");
     await nextTick();
@@ -212,7 +212,7 @@ describe("concrete text and drawing ribbon tools on the existing shape format co
     expect(action(f.wrapper, "bold").attributes("aria-pressed")).toBe("mixed");
     await action(f.wrapper, "bold").trigger("click");
     expect(f.wrapper.getComponent(FontFormatField).props("disabled")).toBe(true);
-    expect(f.wrapper.getComponent(ColorPaletteSelect).props("disabled")).toBe(true);
+    expect(f.wrapper.getComponent(RibbonColorSplitButton).props("disabled")).toBe(true);
     expect(f.onIntent).not.toHaveBeenCalled();
   });
 });

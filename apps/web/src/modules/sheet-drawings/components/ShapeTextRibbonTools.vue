@@ -7,31 +7,23 @@ import {
 import { shapeRichTextSourceStyle } from "../shape-rich-text-source-style";
 import { useWorkbookTheme } from "../../../shared/color/workbook-theme-context";
 import { computed, nextTick } from "vue";
-import {
-  AlignCenter,
-  AlignJustify,
-  AlignLeft,
-  AlignRight,
-  AlignVerticalDistributeCenter,
-  Bold,
-  Italic,
-  Underline,
-  Strikethrough,
-  PaintBucket,
-  PencilLine,
-  Sparkles,
-  Type,
-  WrapText,
-  CaseSensitive,
-} from "lucide-vue-next";
+import { PaintBucket, PencilLine, Sparkles, Type, WrapText, CaseSensitive } from "lucide-vue-next";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
-import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
+import RibbonColorSplitButton from "../../../shared/color/RibbonColorSplitButton.vue";
+import TextAlignmentToggleGroup, {
+  type TextAlignmentOption,
+} from "../../../shared/text-format/TextAlignmentToggleGroup.vue";
+import TextStyleToggleGroup, {
+  type TextStyleToggleItem,
+  type TextStyleToggleKey,
+} from "../../../shared/text-format/TextStyleToggleGroup.vue";
 import ShapeFontFamilyField from "./ShapeFontFamilyField.vue";
 import ShapeRibbonFontSizeField from "./ShapeRibbonFontSizeField.vue";
 import ShapeObjectToolControls from "./ShapeObjectToolControls.vue";
 import ShapeRibbonLayoutMenu from "./ShapeRibbonLayoutMenu.vue";
 import ShapeRibbonStyleMenu from "./ShapeRibbonStyleMenu.vue";
+import { getShapeAlignmentOptions } from "./shape-format/shape-alignment-options";
 import { useShapeFormatPane, type ShapeFormatPaneInput } from "./shape-format/useShapeFormatPane";
 import type {
   ShapeFormatBooleanField,
@@ -64,6 +56,46 @@ function change<K extends ShapeFormatField>(field: K, value: ShapeFormatValues[K
 function toggle(field: ShapeFormatBooleanField): void {
   change(field, props.snapshot?.values[field] !== true);
 }
+const styleFieldByKey: Record<TextStyleToggleKey, ShapeFormatBooleanField> = {
+  bold: "textBold",
+  italic: "textItalic",
+  underline: "textUnderline",
+  strike: "textStrike",
+};
+const styleItems = computed<readonly TextStyleToggleItem[]>(() =>
+  (["bold", "italic", "underline", "strike"] as const).map((key) => {
+    const field = styleFieldByKey[key];
+    return {
+      key,
+      label: c.s.value(field),
+      pressed: pressed(field),
+      disabled: !c.fieldCapability(field).enabled,
+      actionAttr: key,
+    };
+  }),
+);
+function toggleStyle(key: TextStyleToggleKey): void {
+  toggle(styleFieldByKey[key]);
+}
+const horizontalAlignmentOptions = computed<readonly TextAlignmentOption[]>(() => [
+  { value: "left", label: label("Align Left", "左对齐"), icon: "left", actionAttr: "align-left" },
+  {
+    value: "center",
+    label: label("Center", "居中"),
+    icon: "center",
+    actionAttr: "align-center",
+  },
+  {
+    value: "right",
+    label: label("Align Right", "右对齐"),
+    icon: "right",
+    actionAttr: "align-right",
+  },
+  { value: "justify", label: label("Justify", "两端对齐"), icon: "justify" },
+]);
+const verticalAlignmentOptions = computed(() =>
+  getShapeAlignmentOptions(c, "textVerticalAlignment"),
+);
 const textColor = computed(() => c.session.fieldAction("textColor"));
 const sourceNote = computed(() => {
   if (props.sessionId === undefined) return undefined;
@@ -113,45 +145,20 @@ const sourceNote = computed(() => {
           </div>
         </div>
         <div class="shape-text-ribbon__row">
-          <RibbonButton
-            :label="c.s.value('textBold')"
-            :pressed="pressed('textBold')"
-            :disabled="!c.fieldCapability('textBold').enabled"
-            data-shape-ribbon-action="bold"
-            @activate="toggle('textBold')"
-            ><Bold
-          /></RibbonButton>
-          <RibbonButton
-            :label="c.s.value('textItalic')"
-            :pressed="pressed('textItalic')"
-            :disabled="!c.fieldCapability('textItalic').enabled"
-            data-shape-ribbon-action="italic"
-            @activate="toggle('textItalic')"
-            ><Italic
-          /></RibbonButton>
-          <RibbonButton
-            :label="c.s.value('textUnderline')"
-            :pressed="pressed('textUnderline')"
-            :disabled="!c.fieldCapability('textUnderline').enabled"
-            data-shape-ribbon-action="underline"
-            @activate="toggle('textUnderline')"
-            ><Underline
-          /></RibbonButton>
-          <RibbonButton
-            :label="c.s.value('textStrike')"
-            :pressed="pressed('textStrike')"
-            :disabled="!c.fieldCapability('textStrike').enabled"
-            data-shape-ribbon-action="strike"
-            @activate="toggle('textStrike')"
-            ><Strikethrough
-          /></RibbonButton>
+          <TextStyleToggleGroup
+            variant="ribbon"
+            :items="styleItems"
+            :label="c.s.value('textStyle')"
+            @toggle="toggleStyle"
+          />
           <div class="shape-text-ribbon__color">
-            <ColorPaletteSelect
+            <RibbonColorSplitButton
+              kind="text"
               :model-value="snapshot?.values.textColor || null"
               :mixed="c.isMixedField('textColor')"
               :label="c.s.value('textColor')"
               :disabled="!c.fieldCapability('textColor').enabled"
-              size="small"
+              :session-id="sessionId"
               @select="
                 (value) => {
                   if (textColor(value ?? '')) restore();
@@ -168,51 +175,32 @@ const sourceNote = computed(() => {
         :aria-label="c.s.value('paragraph')"
       >
         <div class="shape-text-ribbon__row">
-          <RibbonButton
-            :label="label('Align Left', '左对齐')"
-            :pressed="snapshot?.values.paragraphAlignment === 'left'"
+          <TextAlignmentToggleGroup
+            variant="ribbon"
+            :options="horizontalAlignmentOptions"
+            :model-value="snapshot?.values.paragraphAlignment"
+            :mixed="c.isMixedField('paragraphAlignment')"
             :disabled="!c.fieldCapability('paragraphAlignment').enabled"
-            data-shape-ribbon-action="align-left"
-            @activate="change('paragraphAlignment', 'left')"
-            ><AlignLeft
-          /></RibbonButton>
-          <RibbonButton
-            :label="label('Center', '居中')"
-            :pressed="snapshot?.values.paragraphAlignment === 'center'"
-            :disabled="!c.fieldCapability('paragraphAlignment').enabled"
-            data-shape-ribbon-action="align-center"
-            @activate="change('paragraphAlignment', 'center')"
-            ><AlignCenter
-          /></RibbonButton>
-          <RibbonButton
-            :label="label('Align Right', '右对齐')"
-            :pressed="snapshot?.values.paragraphAlignment === 'right'"
-            :disabled="!c.fieldCapability('paragraphAlignment').enabled"
-            data-shape-ribbon-action="align-right"
-            @activate="change('paragraphAlignment', 'right')"
-            ><AlignRight
-          /></RibbonButton>
-          <RibbonButton
-            :label="label('Justify', '两端对齐')"
-            :pressed="snapshot?.values.paragraphAlignment === 'justify'"
-            :disabled="!c.fieldCapability('paragraphAlignment').enabled"
-            @activate="change('paragraphAlignment', 'justify')"
-            ><AlignJustify
-          /></RibbonButton>
+            :label="c.s.value('paragraphAlignment')"
+            @select="
+              (value) =>
+                change('paragraphAlignment', value as ShapeFormatValues['paragraphAlignment'])
+            "
+          />
         </div>
         <div class="shape-text-ribbon__row">
-          <RibbonButton
-            :label="label('Align Middle', '垂直居中')"
-            :pressed="snapshot?.values.textVerticalAlignment === 'middle'"
+          <TextAlignmentToggleGroup
+            variant="ribbon"
+            :options="verticalAlignmentOptions"
+            :model-value="snapshot?.values.textVerticalAlignment"
+            :mixed="c.isMixedField('textVerticalAlignment')"
             :disabled="!c.fieldCapability('textVerticalAlignment').enabled"
-            @activate="
-              change(
-                'textVerticalAlignment',
-                snapshot?.values.textVerticalAlignment === 'middle' ? 'top' : 'middle',
-              )
+            :label="c.s.value('textVerticalAlignment')"
+            @select="
+              (value) =>
+                change('textVerticalAlignment', value as ShapeFormatValues['textVerticalAlignment'])
             "
-            ><AlignVerticalDistributeCenter
-          /></RibbonButton>
+          />
           <RibbonButton
             :label="c.s.value('textWrap')"
             :pressed="pressed('textWrap')"
@@ -311,12 +299,13 @@ const sourceNote = computed(() => {
     width: 145px;
   }
   &__size {
-    width: 100px;
-    min-width: 100px;
+    width: 56px;
+    min-width: 56px;
     flex-shrink: 0;
   }
   &__color {
-    width: 50px;
+    width: auto;
+    flex-shrink: 0;
   }
   &__status {
     margin: 0 8px;

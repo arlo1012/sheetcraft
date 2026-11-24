@@ -6,6 +6,7 @@ import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import { provideNativePopupScope } from "../../../shared/floating/useNativePopupOwnership";
 import { useShapeTextFieldDraft } from "../shape-text-field-drafts";
 import { useMenu } from "../../../shared/menu/useMenu";
+import ShapeFormatAlignmentField from "./shape-format/ShapeFormatAlignmentField.vue";
 import ShapeFormatChoiceField from "./shape-format/ShapeFormatChoiceField.vue";
 import type { ShapeFormatController } from "./shape-format/useShapeFormatPane";
 const props = defineProps<{ controller: ShapeFormatController; sessionId?: number }>();
@@ -80,7 +81,7 @@ defineSlots<{ default: () => unknown }>();
           <GallerySection :title="label">
             <div class="shape-ribbon-layout-menu__fields">
               <ShapeFormatChoiceField :controller="controller" field="textDirection" />
-              <ShapeFormatChoiceField :controller="controller" field="textVerticalAlignment" />
+              <ShapeFormatAlignmentField :controller="controller" field="textVerticalAlignment" />
               <ShapeFormatChoiceField
                 v-if="controller.props.snapshot?.values.textDirection === 'stacked'"
                 :controller="controller"

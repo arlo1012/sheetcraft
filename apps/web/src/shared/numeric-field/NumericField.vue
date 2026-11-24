@@ -19,6 +19,7 @@ const props = withDefaults(
       emptyText?: string;
       presentation?: "column" | "inline-stepper" | "plain";
       showLabel?: boolean;
+      fullWidth?: boolean;
       /** Presentation only; the native accessible value always retains its display unit. */
       showUnit?: boolean;
       feedbackPresentation?: "inline" | "floating";
@@ -344,7 +345,7 @@ defineExpose({
         },
       }"
       class="sheetcraft-input-number--persistent-controls"
-      :class="{ 'sheetcraft-input-number--full-width': showLabel }"
+      :class="{ 'sheetcraft-input-number--full-width': showLabel || fullWidth }"
       theme="column"
       size="small"
       :model-value="displayedNumber"

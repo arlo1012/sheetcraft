@@ -6,6 +6,7 @@ import { Select as TSelect } from "tdesign-vue-next/es/select";
 import FormatSection from "../../../../shared/format-pane/FormatSection.vue";
 import FormatField from "../../../../shared/format-pane/FormatField.vue";
 import type { PictureFormatLengthUnit } from "../../../sheet-images/picture-format-pane-model";
+import ShapeFormatAlignmentField from "./ShapeFormatAlignmentField.vue";
 import ShapeFormatNumberField from "./ShapeFormatNumberField.vue";
 import ShapeFormatChoiceField from "./ShapeFormatChoiceField.vue";
 import ShapeFormatCheckbox from "./ShapeFormatCheckbox.vue";
@@ -108,7 +109,7 @@ const action = computed(() => {
         }
       "
     >
-      <ShapeFormatChoiceField :controller="controller" field="textVerticalAlignment" />
+      <ShapeFormatAlignmentField :controller="controller" field="textVerticalAlignment" />
       <ShapeFormatChoiceField :controller="controller" field="textDirection" />
       <ShapeFormatChoiceField
         v-show="

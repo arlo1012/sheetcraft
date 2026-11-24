@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import CellVerticalAlignmentIcon from "./CellVerticalAlignmentIcon.vue";
+import { computed } from "vue";
 import type { CellStylePatch, VerticalCellAlignment } from "@sheetcraft/core/style";
 import type { SelectionCellStyleState } from "@sheetcraft/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
-import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
+import TextAlignmentToggleGroup, {
+  type TextAlignmentOption,
+} from "../../../shared/text-format/TextAlignmentToggleGroup.vue";
 
 const props = defineProps<{
   state: SelectionCellStyleState["verticalAlign"];
@@ -15,57 +17,28 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
+const options = computed<readonly TextAlignmentOption<VerticalCellAlignment>[]>(() => [
+  { value: "top", label: t("format.alignTop"), icon: "top" },
+  { value: "middle", label: t("format.alignMiddle"), icon: "middle" },
+  { value: "bottom", label: t("format.alignBottom"), icon: "bottom" },
+]);
 
-function isActive(alignment: VerticalCellAlignment): boolean {
-  return !props.state.mixed && (props.state.value ?? "bottom") === alignment;
-}
-
-function align(alignment: "top" | "middle" | "bottom"): void {
+function align(alignment: string): void {
   emit("applyStyle", {
-    verticalAlign: alignment === "bottom" ? null : alignment,
+    verticalAlign: alignment === "bottom" ? null : (alignment as "top" | "middle"),
   });
 }
 </script>
 
 <template>
-  <div class="vertical-alignment-controls" role="group" :aria-label="t('format.verticalAlignment')">
-    <RibbonButton
-      class="vertical-alignment-controls__button"
-      :disabled="disabled"
-      :label="t('format.alignTop')"
-      :pressed="isActive('top')"
-      data-vertical-alignment-action="top"
-      @activate="align('top')"
-    >
-      <CellVerticalAlignmentIcon alignment="top" />
-    </RibbonButton>
-    <RibbonButton
-      class="vertical-alignment-controls__button"
-      :disabled="disabled"
-      :label="t('format.alignMiddle')"
-      :pressed="isActive('middle')"
-      data-vertical-alignment-action="middle"
-      @activate="align('middle')"
-    >
-      <CellVerticalAlignmentIcon alignment="middle" />
-    </RibbonButton>
-    <RibbonButton
-      class="vertical-alignment-controls__button"
-      :disabled="disabled"
-      :label="t('format.alignBottom')"
-      :pressed="isActive('bottom')"
-      data-vertical-alignment-action="bottom"
-      @activate="align('bottom')"
-    >
-      <CellVerticalAlignmentIcon alignment="bottom" />
-    </RibbonButton>
-  </div>
+  <TextAlignmentToggleGroup
+    class="vertical-alignment-controls"
+    variant="ribbon"
+    :options="options"
+    :model-value="state.value ?? 'bottom'"
+    :mixed="state.mixed"
+    :disabled="disabled"
+    :label="t('format.verticalAlignment')"
+    @select="align"
+  />
 </template>
-
-<style scoped lang="scss">
-.vertical-alignment-controls {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-}
-</style>

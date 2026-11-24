@@ -637,7 +637,7 @@ describe("chart format right pane", () => {
       { kind: "title" },
       { drawing: drawing({ type: "wordCloud", source: undefined }) },
     );
-    expect(checkbox(wrapper, "Bold").props("checked")).toBe(false);
+    expect(wrapper.get('[data-text-style-action="bold"]').attributes("aria-pressed")).toBe("false");
   });
   test("radar offers real color/line/marker controls without secondary/smoothing", () => {
     const { wrapper } = fixture(
@@ -1335,7 +1335,7 @@ describe("legend text and surface panes", () => {
     });
     expect(modes(wrapper).props("value")).toBe("text");
     expect(input(wrapper, "fontSize").isVisible()).toBe(true);
-    checkbox(wrapper, "Bold").vm.$emit("change", true);
+    await wrapper.get('[data-text-style-action="bold"]').trigger("click");
     await flushPromises();
     expect(nextApply).toHaveBeenLastCalledWith({
       kind: "legend",
@@ -1439,7 +1439,7 @@ describe("independent axis title controls", () => {
       ).accepted,
     ).toBe(false);
     expect(apply).not.toHaveBeenCalled();
-    checkbox(wrapper, "Bold").vm.$emit("change", true);
+    await wrapper.get('[data-text-style-action="bold"]').trigger("click");
     await flushPromises();
     expect(apply).toHaveBeenLastCalledWith({
       kind: "valueAxis",
@@ -1467,7 +1467,7 @@ describe("independent axis title controls", () => {
     );
     await titleMode(wrapper, "title");
     expect(input(wrapper, "fontSize").element.value).toBe("");
-    expect(checkbox(wrapper, "Bold").props("checked")).toBe(false);
+    expect(wrapper.get('[data-text-style-action="bold"]').attributes("aria-pressed")).toBe("false");
     await wrapper.get('[data-chart-format-reset="axisTitleText"]').trigger("click");
     expect(apply).toHaveBeenLastCalledWith({ kind: "valueAxis", format: axis });
     await wrapper.get('[data-chart-format-reset="element"]').trigger("click");
