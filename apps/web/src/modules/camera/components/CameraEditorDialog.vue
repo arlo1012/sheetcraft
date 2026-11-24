@@ -63,31 +63,28 @@ const source = ref(
             },
           }"
       /></FormItem>
-      <div class="camera-editor__card">
+      <div class="camera-editor__toggle">
         <Checkbox v-model="draft.camera.gridLines">{{ t("camera.gridLines") }}</Checkbox>
       </div>
-      <p>{{ t("camera.hint") }}</p>
+      <p class="camera-editor__hint">{{ t("camera.hint") }}</p>
       <TAlert v-if="error" theme="error" :message="t('camera.invalid')" role="alert" /> </Form
   ></Dialog>
 </template>
 <style scoped lang="scss">
 .camera-editor {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   &__reference {
     width: 100%;
   }
-  &__card {
-    padding: 9px 12px;
-    border-radius: var(--sheetcraft-radius-dialog-card);
-    background: var(--sheetcraft-surface-dialog-card);
+  &__toggle {
+    padding-top: 2px;
   }
-  p {
+  &__hint {
     margin: 0;
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: 1.5;
     color: var(--sheetcraft-text-secondary);
-  }
-  [role="alert"] {
-    color: var(--sheetcraft-status-error);
   }
 }
 </style>

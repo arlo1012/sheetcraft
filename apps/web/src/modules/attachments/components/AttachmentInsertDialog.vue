@@ -73,20 +73,14 @@ function confirm() {
         :prevent-submit-default="true"
       >
         <FormItem v-if="documentEntry" :label="t('attachment.insertMethod')">
-          <div class="attachment-insert__card">
-            <RadioGroup
-              v-model="method"
-              :disabled="busy"
-              :aria-label="t('attachment.insertMethod')"
-            >
-              <Radio value="cloud" data-attachment-mode="cloud" :disabled="cloudDisabled">{{
-                t("hyperlinks.cloud")
-              }}</Radio>
-              <Radio value="file" data-attachment-mode="file" :disabled="fileDisabled">{{
-                t("attachment.fileAttachment")
-              }}</Radio>
-            </RadioGroup>
-          </div>
+          <RadioGroup v-model="method" :disabled="busy" :aria-label="t('attachment.insertMethod')">
+            <Radio value="cloud" data-attachment-mode="cloud" :disabled="cloudDisabled">{{
+              t("hyperlinks.cloud")
+            }}</Radio>
+            <Radio value="file" data-attachment-mode="file" :disabled="fileDisabled">{{
+              t("attachment.fileAttachment")
+            }}</Radio>
+          </RadioGroup>
         </FormItem>
         <FormItem v-if="method === 'file'" :label="t('attachment.file')"
           ><div class="attachment-insert__file">
@@ -96,7 +90,7 @@ function confirm() {
             }}</Button>
           </div></FormItem
         >
-        <div v-if="method === 'file'" class="attachment-insert__card">
+        <div v-if="method === 'file'" class="attachment-insert__toggle">
           <Checkbox v-model="asIcon" :disabled="busy">{{ t("attachment.displayAsIcon") }}</Checkbox>
         </div>
       </Form>
@@ -109,7 +103,9 @@ function confirm() {
         <FileText v-else :size="48" aria-hidden="true" />
         <span>{{ fileName || t(asIcon ? "attachment.title" : "attachment.document") }}</span>
       </div>
-      <p>{{ t(method === "cloud" ? "attachment.shareLinkHint" : "attachment.insertHint") }}</p>
+      <p class="attachment-insert__hint">
+        {{ t(method === "cloud" ? "attachment.shareLinkHint" : "attachment.insertHint") }}
+      </p>
       <TAlert
         v-if="error && method === 'file'"
         theme="error"
@@ -123,29 +119,28 @@ function confirm() {
 <style scoped lang="scss">
 .attachment-insert {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   &__form {
     display: grid;
-    gap: 10px;
+    gap: 12px;
   }
-  &__card {
-    width: 100%;
-    padding: 9px 12px;
-    border-radius: var(--sheetcraft-radius-dialog-card);
-    background: var(--sheetcraft-surface-dialog-card);
+  &__toggle {
+    padding-top: 2px;
   }
   &__file {
     display: flex;
     width: 100%;
     align-items: center;
-    gap: 12px;
-    padding: 6px 8px 6px 12px;
-    border-radius: var(--sheetcraft-radius-dialog-card);
-    background: var(--sheetcraft-surface-dialog-card);
+    gap: 10px;
+    padding: 4px 6px 4px 10px;
+    border: 1px solid var(--sheetcraft-border-input);
+    border-radius: var(--sheetcraft-radius-floating-item);
+    background: var(--sheetcraft-surface-panel);
   }
   &__file > span {
     flex: 1;
     min-width: 0;
+    color: var(--sheetcraft-text-secondary);
     overflow-wrap: anywhere;
   }
   &__preview {
@@ -158,12 +153,11 @@ function confirm() {
     color: var(--sheetcraft-text-secondary);
     overflow-wrap: anywhere;
   }
-  p {
+  &__hint {
     margin: 0;
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: 1.5;
     color: var(--sheetcraft-text-secondary);
-  }
-  p.attachment-insert__error {
-    color: var(--sheetcraft-status-error);
   }
 }
 </style>

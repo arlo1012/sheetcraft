@@ -64,12 +64,10 @@ function apply(): void {
     <div class="fill-number-dialog">
       <TForm class="fill-number-dialog__form sheetcraft-form-grid" :data="draft" label-align="top">
         <TFormItem name="axis" :label="t('dataTools.fill.sequenceDirection')">
-          <div class="fill-number-dialog__card">
-            <TRadioGroup v-model="draft.axis" :aria-label="t('dataTools.fill.sequenceDirection')">
-              <TRadio value="rows">{{ t("dataTools.fill.rows") }}</TRadio>
-              <TRadio value="columns">{{ t("dataTools.fill.columns") }}</TRadio>
-            </TRadioGroup>
-          </div>
+          <TRadioGroup v-model="draft.axis" :aria-label="t('dataTools.fill.sequenceDirection')">
+            <TRadio value="rows">{{ t("dataTools.fill.rows") }}</TRadio>
+            <TRadio value="columns">{{ t("dataTools.fill.columns") }}</TRadio>
+          </TRadioGroup>
         </TFormItem>
         <div class="fill-number-dialog__row">
           <TFormItem name="start" :label="t('dataTools.fill.startValue')">
@@ -103,14 +101,7 @@ function apply(): void {
 
   &__form {
     display: grid;
-    gap: 10px;
-  }
-
-  &__card {
-    width: 100%;
-    padding: 9px 12px;
-    border-radius: var(--sheetcraft-radius-dialog-card);
-    background: var(--sheetcraft-surface-dialog-card);
+    gap: 12px;
   }
 
   &__row {
@@ -118,11 +109,6 @@ function apply(): void {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
     min-width: 0;
-  }
-
-  &__error {
-    @include fill-dialog.auxiliary-text;
-    color: var(--sheetcraft-status-error);
   }
 }
 </style>

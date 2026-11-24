@@ -96,12 +96,10 @@ function apply(): void {
           </TFormItem>
         </div>
         <TFormItem name="order" :label="t('dataTools.fill.rankOrder')">
-          <div class="fill-rank-dialog__card">
-            <TRadioGroup v-model="draft.order" :aria-label="t('dataTools.fill.rankOrder')">
-              <TRadio value="descending">{{ t("dataTools.fill.rankDescending") }}</TRadio>
-              <TRadio value="ascending">{{ t("dataTools.fill.rankAscending") }}</TRadio>
-            </TRadioGroup>
-          </div>
+          <TRadioGroup v-model="draft.order" :aria-label="t('dataTools.fill.rankOrder')">
+            <TRadio value="descending">{{ t("dataTools.fill.rankDescending") }}</TRadio>
+            <TRadio value="ascending">{{ t("dataTools.fill.rankAscending") }}</TRadio>
+          </TRadioGroup>
         </TFormItem>
         <TFormItem name="ties" :label="t('dataTools.fill.rankTies')">
           <TSelect
@@ -110,7 +108,7 @@ function apply(): void {
             :aria-label="t('dataTools.fill.rankTies')"
           />
         </TFormItem>
-        <div class="fill-rank-dialog__card">
+        <div class="fill-rank-dialog__toggle">
           <TCheckbox v-model="draft.overwrite">{{ t("dataTools.fill.rankOverwrite") }}</TCheckbox>
         </div>
         <TAlert v-if="error" theme="error" :message="error" role="alert" />
@@ -127,7 +125,7 @@ function apply(): void {
 
   &__form {
     display: grid;
-    gap: 10px;
+    gap: 12px;
   }
 
   &__row {
@@ -137,11 +135,8 @@ function apply(): void {
     min-width: 0;
   }
 
-  &__card {
-    width: 100%;
-    padding: 9px 12px;
-    border-radius: var(--sheetcraft-radius-dialog-card);
-    background: var(--sheetcraft-surface-dialog-card);
+  &__toggle {
+    padding-top: 2px;
   }
 
   &__hint,

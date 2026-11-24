@@ -43,7 +43,7 @@ const { t } = useAppI18n();
     :aria-label="t(editing ? 'sparkline.edit' : 'sparkline.create')"
     role="dialog"
     aria-modal="true"
-    width="min(460px, calc(100vw - 32px))"
+    width="min(420px, calc(100vw - 32px))"
     placement="center"
     :close-on-overlay-click="false"
     :confirm-btn="{ content: t('picture.confirm'), disabled }"
@@ -57,35 +57,29 @@ const { t } = useAppI18n();
       label-align="top"
       :prevent-submit-default="true"
     >
-      <section class="sparkline-dialog__range" :aria-label="t('sparkline.selectData')">
-        <h3 class="sparkline-dialog__legend">{{ t("sparkline.selectData") }}</h3>
-        <FormItem :label="t('sparkline.source')">
-          <div class="sparkline-dialog__reference">
-            <RangeReferenceInput
-              ref="sourceInput"
-              v-model="draft.source"
-              :label="t('sparkline.source')"
-              :disabled="disabled"
-              :select-reference="selectReference"
-            />
-          </div>
-        </FormItem>
-      </section>
-      <section class="sparkline-dialog__range" :aria-label="t('sparkline.selectLocation')">
-        <h3 class="sparkline-dialog__legend">{{ t("sparkline.selectLocation") }}</h3>
-        <FormItem :label="t('sparkline.destination')">
-          <div class="sparkline-dialog__reference">
-            <RangeReferenceInput
-              ref="destinationInput"
-              v-model="draft.destination"
-              :label="t('sparkline.destination')"
-              :disabled="disabled"
-              :select-reference="selectReference"
-            />
-          </div>
-        </FormItem>
-      </section>
-      <template v-if="editing">
+      <FormItem :label="t('sparkline.source')">
+        <div class="sparkline-dialog__reference">
+          <RangeReferenceInput
+            ref="sourceInput"
+            v-model="draft.source"
+            :label="t('sparkline.source')"
+            :disabled="disabled"
+            :select-reference="selectReference"
+          />
+        </div>
+      </FormItem>
+      <FormItem :label="t('sparkline.destination')">
+        <div class="sparkline-dialog__reference">
+          <RangeReferenceInput
+            ref="destinationInput"
+            v-model="draft.destination"
+            :label="t('sparkline.destination')"
+            :disabled="disabled"
+            :select-reference="selectReference"
+          />
+        </div>
+      </FormItem>
+      <div v-if="editing" class="sparkline-dialog__edit-section">
         <div class="sparkline-dialog__edit-row">
           <FormItem :label="t('sparkline.type')"
             ><Select
@@ -132,15 +126,15 @@ const { t } = useAppI18n();
             />
           </FormItem>
         </div>
-        <div class="sparkline-dialog__row">
+        <div class="sparkline-dialog__checks">
           <Checkbox v-if="draft.sparkline.type === 'line'" v-model="draft.sparkline.markers">{{
             t("sparkline.markers")
           }}</Checkbox
           ><Checkbox v-model="draft.sparkline.axis">{{ t("sparkline.axis") }}</Checkbox
           ><Checkbox v-model="draft.sparkline.showHidden">{{ t("chart.showHidden") }}</Checkbox>
         </div>
-      </template>
-      <p>{{ t("sparkline.hint") }}</p>
+      </div>
+      <p class="sparkline-dialog__hint">{{ t("sparkline.hint") }}</p>
       <TAlert
         v-if="error"
         theme="error"
@@ -153,49 +147,38 @@ const { t } = useAppI18n();
 <style scoped lang="scss">
 .sparkline-dialog {
   display: grid;
-  gap: 10px;
-  &__range {
+  gap: 12px;
+
+  &__reference {
+    width: 100%;
+  }
+
+  &__edit-section {
     display: grid;
-    gap: 6px;
-    min-width: 0;
-    margin: 0;
-    padding: 10px 12px;
-    border: 0;
-    border-radius: var(--sheetcraft-radius-dialog-card);
-    background: var(--sheetcraft-surface-dialog-card);
+    gap: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--sheetcraft-border-divider);
   }
-  &__legend {
-    margin: 0;
-    font-size: var(--sheetcraft-font-size-body-medium);
-    line-height: var(--sheetcraft-line-height-body-medium);
-    font-weight: var(--sheetcraft-font-weight-semibold);
-    color: var(--sheetcraft-text-primary);
-  }
+
   &__edit-row {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
     min-width: 0;
   }
-  &__reference {
-    width: 100%;
-  }
-  &__row {
+
+  &__checks {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px 14px;
-    padding: 9px 12px;
-    border-radius: var(--sheetcraft-radius-dialog-card);
-    background: var(--sheetcraft-surface-dialog-card);
+    gap: 8px 16px;
   }
-  p {
+
+  &__hint {
     margin: 0;
-    font-size: 12px;
+    font-size: var(--sheetcraft-font-size-body-small);
+    line-height: 1.5;
     color: var(--sheetcraft-text-secondary);
-  }
-  p#{&}__error {
-    color: var(--sheetcraft-status-error);
   }
 }
 </style>

@@ -101,7 +101,7 @@ watch(
             /></template>
           </TInput>
         </TFormItem>
-        <div v-if="mode === 'count'" class="duplicate-values-dialog__card">
+        <div v-if="mode === 'count'" class="duplicate-values-dialog__toggle">
           <TCheckbox :checked="false" disabled>
             {{ t("dataTools.duplicates.insertChartTodo") }}
           </TCheckbox>
@@ -111,24 +111,22 @@ watch(
           name="fillColor"
           :label="t('dataTools.duplicates.fillColor')"
         >
-          <div class="duplicate-values-dialog__card">
-            <TRadioGroup
-              v-model="draft.fillColor"
-              direction="horizontal"
-              :disabled="busy"
-              :aria-label="t('dataTools.duplicates.fillColor')"
+          <TRadioGroup
+            v-model="draft.fillColor"
+            direction="horizontal"
+            :disabled="busy"
+            :aria-label="t('dataTools.duplicates.fillColor')"
+          >
+            <TRadio v-for="color in colors" :key="color.value" :value="color.value"
+              ><span class="duplicate-values-dialog__color-label"
+                ><span
+                  class="duplicate-values-dialog__swatch"
+                  :style="{ backgroundColor: color.value }"
+                  aria-hidden="true"
+                />{{ t(`dataTools.duplicates.colors.${color.label}`) }}</span
+              ></TRadio
             >
-              <TRadio v-for="color in colors" :key="color.value" :value="color.value"
-                ><span class="duplicate-values-dialog__color-label"
-                  ><span
-                    class="duplicate-values-dialog__swatch"
-                    :style="{ backgroundColor: color.value }"
-                    aria-hidden="true"
-                  />{{ t(`dataTools.duplicates.colors.${color.label}`) }}</span
-                ></TRadio
-              >
-            </TRadioGroup>
-          </div>
+          </TRadioGroup>
         </TFormItem>
       </TForm>
       <TAlert v-if="error" theme="error" :message="error" role="alert" />
@@ -138,16 +136,13 @@ watch(
 <style scoped lang="scss">
 .duplicate-values-dialog {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   &__form {
     display: grid;
-    gap: 10px;
+    gap: 12px;
   }
-  &__card {
-    width: 100%;
-    padding: 9px 12px;
-    border-radius: var(--sheetcraft-radius-dialog-card);
-    background: var(--sheetcraft-surface-dialog-card);
+  &__toggle {
+    padding-top: 2px;
   }
   &__color-label {
     display: inline-flex;
@@ -161,10 +156,6 @@ watch(
     height: 14px;
     border: 1px solid var(--sheetcraft-border-subtle);
     border-radius: 2px;
-  }
-  &__error {
-    margin: 0;
-    color: var(--sheetcraft-status-error);
   }
 }
 </style>

@@ -60,13 +60,13 @@ const all = ref(false);
           />
         </FormItem>
       </div>
-      <div class="picture-compress__card">
+      <div class="picture-compress__format">
         <RadioGroup v-model="format" :disabled="busy"
           ><Radio value="webp">WebP</Radio><Radio value="jpeg">JPEG</Radio></RadioGroup
         >
         <p>{{ t("picture.jpegHint") }}</p>
       </div>
-      <div class="picture-compress__card">
+      <div class="picture-compress__toggle">
         <Checkbox v-model="all" :disabled="busy">{{ t("picture.allPictures") }}</Checkbox>
       </div>
     </Form>
@@ -75,22 +75,20 @@ const all = ref(false);
 <style scoped lang="scss">
 .picture-compress {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   &__row {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
     min-width: 0;
   }
-  &__card {
+  &__format {
     display: grid;
     gap: 6px;
-    padding: 9px 12px;
-    border-radius: var(--sheetcraft-radius-dialog-card);
-    background: var(--sheetcraft-surface-dialog-card);
   }
-  &__error {
-    color: var(--sheetcraft-status-error);
+  &__toggle {
+    padding-top: 10px;
+    border-top: 1px solid var(--sheetcraft-border-divider);
   }
   p {
     margin: 0;

@@ -160,10 +160,9 @@ function apply(): void {
   }
   &__options {
     display: grid;
-    gap: 6px;
-    padding: 10px 12px;
-    border-radius: var(--sheetcraft-radius-dialog-card);
-    background: var(--sheetcraft-surface-dialog-card);
+    gap: 8px;
+    padding-top: 10px;
+    border-top: 1px solid var(--sheetcraft-border-divider);
   }
   &__footer {
     display: flex;

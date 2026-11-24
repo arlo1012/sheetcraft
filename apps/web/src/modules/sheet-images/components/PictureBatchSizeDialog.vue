@@ -156,7 +156,7 @@ function confirm() {
             /></div
         ></FormItem>
       </div>
-      <div class="picture-batch-size__card">
+      <div class="picture-batch-size__checks">
         <Checkbox v-model="locked">{{ t("picture.keepEachRatio") }}</Checkbox>
         <Checkbox v-model="all">{{ t("picture.allPictures") }}</Checkbox>
       </div>
@@ -166,7 +166,7 @@ function confirm() {
 <style scoped lang="scss">
 .picture-batch-size {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   &__row {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -176,16 +176,10 @@ function confirm() {
   &__control {
     width: 100%;
   }
-  &__card {
+  &__checks {
     display: grid;
-    gap: 6px;
-    padding: 9px 12px;
-    border-radius: var(--sheetcraft-radius-dialog-card);
-    background: var(--sheetcraft-surface-dialog-card);
-  }
-  &__error {
-    margin: 0;
-    color: var(--sheetcraft-status-error);
+    gap: 8px;
+    padding-top: 2px;
   }
 }
 </style>

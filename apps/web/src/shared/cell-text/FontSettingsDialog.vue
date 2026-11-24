@@ -58,9 +58,7 @@ const message = computed(() => {
   gap: 8px;
   width: 100%;
   min-width: 0;
-  padding: 12px;
-  border-radius: var(--sheetcraft-radius-dialog-card);
-  background: var(--sheetcraft-surface-dialog-card);
+  padding-top: 2px;
 
   p {
     margin: 0;

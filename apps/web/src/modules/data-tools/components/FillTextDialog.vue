@@ -55,26 +55,27 @@ watch(
           <TInput v-model="draft.text" :aria-label="t('dataTools.fill.text')" autofocus />
         </TFormItem>
         <TFormItem name="position" :label="t('dataTools.fill.insertPosition')">
-          <div class="fill-text-dialog__card">
-            <TRadioGroup
-              v-model="draft.position"
-              direction="vertical"
-              :aria-label="t('dataTools.fill.insertPosition')"
-            >
-              <TRadio value="start">{{ t("dataTools.fill.insertAtStart") }}</TRadio>
-              <TRadio value="end">{{ t("dataTools.fill.insertAtEnd") }}</TRadio>
-              <TRadio value="index">{{ t("dataTools.fill.insertAtIndex") }}</TRadio>
-            </TRadioGroup>
-          </div>
+          <TRadioGroup
+            v-model="draft.position"
+            direction="vertical"
+            class="fill-text-dialog__choices"
+            :aria-label="t('dataTools.fill.insertPosition')"
+          >
+            <TRadio value="start">{{ t("dataTools.fill.insertAtStart") }}</TRadio>
+            <TRadio value="end">{{ t("dataTools.fill.insertAtEnd") }}</TRadio>
+            <TRadio value="index">{{ t("dataTools.fill.insertAtIndex") }}</TRadio>
+          </TRadioGroup>
         </TFormItem>
         <div v-if="draft.position === 'index'" class="fill-text-dialog__row">
           <TFormItem name="from" :label="t('dataTools.fill.countDirection')">
-            <div class="fill-text-dialog__card">
-              <TRadioGroup v-model="draft.from" :aria-label="t('dataTools.fill.countDirection')">
-                <TRadio value="left">{{ t("dataTools.fill.fromLeft") }}</TRadio>
-                <TRadio value="right">{{ t("dataTools.fill.fromRight") }}</TRadio>
-              </TRadioGroup>
-            </div>
+            <TRadioGroup
+              v-model="draft.from"
+              class="fill-text-dialog__direction"
+              :aria-label="t('dataTools.fill.countDirection')"
+            >
+              <TRadio value="left">{{ t("dataTools.fill.fromLeft") }}</TRadio>
+              <TRadio value="right">{{ t("dataTools.fill.fromRight") }}</TRadio>
+            </TRadioGroup>
           </TFormItem>
           <TFormItem name="index" :label="t('dataTools.fill.index')">
             <TInputNumber
@@ -97,18 +98,25 @@ watch(
 
 .fill-text-dialog {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 
   &__form {
     display: grid;
-    gap: 10px;
+    gap: 12px;
   }
 
-  &__card {
-    width: 100%;
-    padding: 9px 12px;
-    border-radius: var(--sheetcraft-radius-dialog-card);
-    background: var(--sheetcraft-surface-dialog-card);
+  &__choices {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding-top: 2px;
+  }
+
+  &__direction {
+    display: flex;
+    align-items: center;
+    min-height: 30px;
   }
 
   &__row {
@@ -116,6 +124,8 @@ watch(
     grid-template-columns: minmax(0, 1fr) 128px;
     gap: 12px;
     min-width: 0;
+    padding-top: 10px;
+    border-top: 1px solid var(--sheetcraft-border-divider);
   }
 
   &__hint,

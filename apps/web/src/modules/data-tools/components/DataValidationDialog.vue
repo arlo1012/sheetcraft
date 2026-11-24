@@ -350,9 +350,7 @@ function onDialogKeydown(event: KeyboardEvent): void {
     flex-wrap: wrap;
     align-items: center;
     gap: 8px 18px;
-    padding: 9px 12px;
-    border-radius: var(--sheetcraft-radius-dialog-card);
-    background: var(--sheetcraft-surface-dialog-card);
+    padding-top: 2px;
   }
 
   &__footer {

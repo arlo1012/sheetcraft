@@ -51,21 +51,19 @@ function confirm(): void {
       :prevent-submit-default="true"
     >
       <FormItem :label="t('sparkline.emptyDisplay')">
-        <div class="sparkline-data-options__card">
-          <RadioGroup
-            v-model="empty"
-            role="radiogroup"
-            :aria-label="t('sparkline.emptyDisplay')"
-            :disabled="disabled"
-            class="sparkline-data-options__choices"
-          >
-            <Radio value="gap">{{ t("sparkline.gap") }}</Radio>
-            <Radio value="zero">{{ t("sparkline.zero") }}</Radio>
-            <Radio value="connect">{{ t("sparkline.connect") }}</Radio>
-          </RadioGroup>
-        </div>
+        <RadioGroup
+          v-model="empty"
+          role="radiogroup"
+          :aria-label="t('sparkline.emptyDisplay')"
+          :disabled="disabled"
+          class="sparkline-data-options__choices"
+        >
+          <Radio value="gap">{{ t("sparkline.gap") }}</Radio>
+          <Radio value="zero">{{ t("sparkline.zero") }}</Radio>
+          <Radio value="connect">{{ t("sparkline.connect") }}</Radio>
+        </RadioGroup>
       </FormItem>
-      <div class="sparkline-data-options__card">
+      <div class="sparkline-data-options__toggle">
         <Checkbox
           :checked="showHidden === true"
           :indeterminate="showHidden === undefined"
@@ -82,22 +80,19 @@ function confirm(): void {
 <style scoped lang="scss">
 .sparkline-data-options {
   display: grid;
-  gap: 10px;
-  &__card {
-    width: 100%;
-    padding: 9px 12px;
-    border-radius: var(--sheetcraft-radius-dialog-card);
-    background: var(--sheetcraft-surface-dialog-card);
-  }
+  gap: 12px;
+
   &__choices {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 6px;
+    gap: 8px;
+    padding-top: 2px;
   }
-  &__error {
-    margin: 0;
-    color: var(--sheetcraft-status-error);
+
+  &__toggle {
+    padding-top: 10px;
+    border-top: 1px solid var(--sheetcraft-border-divider);
   }
 }
 </style>

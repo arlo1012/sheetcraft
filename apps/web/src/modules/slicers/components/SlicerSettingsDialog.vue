@@ -99,15 +99,13 @@ function onConfirm(): void {
         </FormItem>
       </div>
       <FormItem :label="t('tables.slicerSortOrder')">
-        <div class="slicer-settings__card">
-          <RadioGroup v-model="sortOrder" data-slicer-settings-sort>
-            <Radio value="asc">{{ t("tables.slicerSortAsc") }}</Radio>
-            <Radio value="desc">{{ t("tables.slicerSortDesc") }}</Radio>
-          </RadioGroup>
-        </div>
+        <RadioGroup v-model="sortOrder" data-slicer-settings-sort>
+          <Radio value="asc">{{ t("tables.slicerSortAsc") }}</Radio>
+          <Radio value="desc">{{ t("tables.slicerSortDesc") }}</Radio>
+        </RadioGroup>
       </FormItem>
       <FormItem :label="t('tables.slicerOptions')">
-        <div class="slicer-settings__card slicer-settings__checks">
+        <div class="slicer-settings__checks">
           <Checkbox v-model="showHeader" data-slicer-settings-header>{{
             t("tables.slicerShowHeader")
           }}</Checkbox>
@@ -123,7 +121,7 @@ function onConfirm(): void {
 <style scoped lang="scss">
 .slicer-settings {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 
   &__row {
     display: grid;
@@ -136,17 +134,11 @@ function onConfirm(): void {
     width: 100%;
   }
 
-  &__card {
-    width: 100%;
-    padding: 9px 12px;
-    border-radius: var(--sheetcraft-radius-dialog-card);
-    background: var(--sheetcraft-surface-dialog-card);
-  }
-
   &__checks {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
+    padding-top: 2px;
   }
 }
 </style>

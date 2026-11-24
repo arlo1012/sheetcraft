@@ -139,12 +139,10 @@ watch(
         :data="draft"
         label-align="top"
       >
-        <div class="data-comparison-dialog__card">
-          <TRadioGroup v-model="draft.scope" :disabled="busy">
-            <TRadio value="single">{{ t("dataTools.comparison.singleRange") }}</TRadio>
-            <TRadio value="double">{{ t("dataTools.comparison.doubleRange") }}</TRadio>
-          </TRadioGroup>
-        </div>
+        <TRadioGroup v-model="draft.scope" :disabled="busy">
+          <TRadio value="single">{{ t("dataTools.comparison.singleRange") }}</TRadio>
+          <TRadio value="double">{{ t("dataTools.comparison.doubleRange") }}</TRadio>
+        </TRadioGroup>
 
         <div
           class="data-comparison-dialog__ranges"
@@ -245,34 +243,30 @@ watch(
           name="side"
           :label="t('dataTools.comparison.resultSource')"
         >
-          <div class="data-comparison-dialog__card">
-            <TRadioGroup v-model="draft.side" :disabled="busy">
-              <TRadio value="first">{{ t("dataTools.comparison.firstSource") }}</TRadio>
-              <TRadio value="second">{{ t("dataTools.comparison.secondSource") }}</TRadio>
-              <TRadio value="both">{{ t("dataTools.comparison.bothSource") }}</TRadio>
-            </TRadioGroup>
-          </div>
+          <TRadioGroup v-model="draft.side" :disabled="busy">
+            <TRadio value="first">{{ t("dataTools.comparison.firstSource") }}</TRadio>
+            <TRadio value="second">{{ t("dataTools.comparison.secondSource") }}</TRadio>
+            <TRadio value="both">{{ t("dataTools.comparison.bothSource") }}</TRadio>
+          </TRadioGroup>
         </TFormItem>
 
         <TFormItem v-if="isMarking" name="fillColor" :label="t('dataTools.comparison.fillColor')">
-          <div class="data-comparison-dialog__card">
-            <TRadioGroup
-              v-model="draft.fillColor"
-              direction="horizontal"
-              :disabled="busy"
-              :aria-label="t('dataTools.comparison.fillColor')"
+          <TRadioGroup
+            v-model="draft.fillColor"
+            direction="horizontal"
+            :disabled="busy"
+            :aria-label="t('dataTools.comparison.fillColor')"
+          >
+            <TRadio v-for="color in colors" :key="color.value" :value="color.value"
+              ><span class="data-comparison-dialog__color-label"
+                ><span
+                  class="data-comparison-dialog__swatch"
+                  :style="{ backgroundColor: color.value }"
+                  aria-hidden="true"
+                />{{ t(`dataTools.comparison.colors.${color.label}`) }}</span
+              ></TRadio
             >
-              <TRadio v-for="color in colors" :key="color.value" :value="color.value"
-                ><span class="data-comparison-dialog__color-label"
-                  ><span
-                    class="data-comparison-dialog__swatch"
-                    :style="{ backgroundColor: color.value }"
-                    aria-hidden="true"
-                  />{{ t(`dataTools.comparison.colors.${color.label}`) }}</span
-                ></TRadio
-              >
-            </TRadioGroup>
-          </div>
+          </TRadioGroup>
         </TFormItem>
       </TForm>
       <TAlert v-if="error" theme="error" :message="error" role="alert" />
@@ -285,18 +279,11 @@ watch(
 
 .data-comparison-dialog {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 
   &__form {
     display: grid;
-    gap: 10px;
-  }
-
-  &__card {
-    width: 100%;
-    padding: 9px 12px;
-    border-radius: var(--sheetcraft-radius-dialog-card);
-    background: var(--sheetcraft-surface-dialog-card);
+    gap: 12px;
   }
 
   &__ranges {
@@ -323,9 +310,6 @@ watch(
     align-items: center;
     justify-content: space-between;
     gap: 8px 16px;
-    padding: 9px 12px;
-    border-radius: var(--sheetcraft-radius-dialog-card);
-    background: var(--sheetcraft-surface-dialog-card);
   }
 
   &__columns {
