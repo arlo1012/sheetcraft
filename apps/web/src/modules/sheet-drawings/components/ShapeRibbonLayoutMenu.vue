@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { ChevronRight } from "lucide-vue-next";
 import { computed, nextTick, ref, useId, watch } from "vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
-import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
+import { useSubmenu } from "../../../shared/menu/useSubmenu";
 import { useShapeTextFieldDraft } from "../shape-text-field-drafts";
 import { focusShapeTextEditInput } from "../shape-text-edit-ownership";
 import type { ShapeFormatOption, ShapeFormatValues } from "../shape-format-pane-model";
@@ -18,7 +19,10 @@ const props = defineProps<{
 
 const trigger = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
 const surface = ref<InstanceType<typeof MenuSurface> | null>(null);
-const id = `shape-ribbon-layout-${useId()}`;
+const submenuSurface = ref<InstanceType<typeof MenuSurface> | null>(null);
+const baseId = useId().replaceAll(":", "");
+const id = `shape-ribbon-layout-${baseId}`;
+const submenuId = `shape-ribbon-layout-stacked-${baseId}`;
 const disabled = computed(() => !props.controller.fieldCapability("textDirection").enabled);
 const lineOrderEnabled = computed(() => props.controller.fieldCapability("textLineOrder").enabled);
 const label = computed(() => props.controller.s.value("textDirection"));
@@ -41,6 +45,11 @@ const directionOptions = computed<readonly ShapeFormatOption[]>(() => {
   ];
 });
 
+const stackedOption = computed(() =>
+  directionOptions.value.find((option) => option.value === "stacked"),
+);
+const stackedDisabled = computed(() => disabled.value || stackedOption.value?.disabled === true);
+
 const lineOrderOptions = computed<readonly ShapeFormatOption[]>(() => {
   const override = props.controller.props.options?.textLineOrder;
   if (override) return override;
@@ -49,6 +58,41 @@ const lineOrderOptions = computed<readonly ShapeFormatOption[]>(() => {
     { value: "rtl", label: s("rightToLeft") },
     { value: "ltr", label: s("leftToRight") },
   ];
+});
+
+const menu = useMenu({
+  triggerRef: computed(() => trigger.value?.rootElement ?? null),
+  menuSurfaceRef: surface,
+  disabled,
+  additionalInside: () => [submenuRef.value],
+  defaultFocus: "selected",
+  placement: "bottom-start",
+  onDismiss: () => {
+    closeSubmenu(false);
+  },
+  onOpen: () => {
+    closeSubmenu(false);
+  },
+});
+
+const {
+  submenuOpen: stackedOpen,
+  submenuElement: submenuRef,
+  submenuStyles,
+  openSubmenu,
+  closeSubmenu,
+  onParentKeydown,
+  onParentFocusin,
+  onParentMouseover,
+  onSubmenuKeydown,
+} = useSubmenu<"stacked">({
+  parentOpen: menu.open,
+  submenuSurfaceRef: submenuSurface,
+  getAnchor: () =>
+    surface.value?.rootElement?.querySelector<HTMLElement>(
+      '[data-shape-text-direction="stacked"]',
+    ) ?? null,
+  offset: 4,
 });
 
 useShapeTextFieldDraft({
@@ -61,15 +105,8 @@ useShapeTextFieldDraft({
     target instanceof Node &&
     target.isConnected &&
     ((!!trigger.value?.rootElement?.isConnected && trigger.value.rootElement.contains(target)) ||
-      (!!surface.value?.rootElement?.isConnected && surface.value.rootElement.contains(target))),
-});
-
-const menu = useMenu({
-  triggerRef: computed(() => trigger.value?.rootElement ?? null),
-  menuSurfaceRef: surface,
-  disabled,
-  defaultFocus: "selected",
-  placement: "bottom-start",
+      (!!surface.value?.rootElement?.isConnected && surface.value.rootElement.contains(target)) ||
+      (!!submenuRef.value?.isConnected && submenuRef.value.contains(target))),
 });
 
 watch(
@@ -82,7 +119,41 @@ function restore(): void {
   if (owner !== undefined) void nextTick(() => focusShapeTextEditInput(owner));
 }
 
+function openStackedSubmenu(focus = true): void {
+  if (stackedDisabled.value) return;
+  openSubmenu("stacked", focus);
+}
+
+function onMenuKeydown(event: KeyboardEvent): void {
+  const target = event.target instanceof HTMLElement ? event.target : null;
+  const direction = target?.closest<HTMLElement>("[data-shape-text-direction]")?.dataset
+    .shapeTextDirection;
+  if (direction === "stacked" && !stackedDisabled.value) {
+    onParentKeydown(event, "stacked");
+  }
+}
+
+function onMenuFocusin(event: FocusEvent): void {
+  const target = event.target instanceof HTMLElement ? event.target : null;
+  const direction = target?.closest<HTMLElement>("[data-shape-text-direction]")?.dataset
+    .shapeTextDirection;
+  onParentFocusin(direction === "stacked" ? "stacked" : undefined);
+}
+
+function onMenuMouseover(event: MouseEvent): void {
+  const target = event.target instanceof HTMLElement ? event.target : null;
+  const item = target?.closest<HTMLElement>("[data-shape-text-direction]");
+  if (!item) return;
+  onParentMouseover(
+    item.dataset.shapeTextDirection === "stacked" && !stackedDisabled.value ? "stacked" : undefined,
+  );
+}
+
 function selectDirection(value: string): void {
+  if (value === "stacked") {
+    openStackedSubmenu(true);
+    return;
+  }
   if (disabled.value) return;
   const option = directionOptions.value.find((item) => item.value === value);
   if (!option || option.disabled) return;
@@ -96,18 +167,32 @@ function selectDirection(value: string): void {
   }
 }
 
-function selectLineOrder(value: string): void {
-  if (!lineOrderEnabled.value) return;
+async function selectLineOrder(value: string): Promise<void> {
   const option = lineOrderOptions.value.find((item) => item.value === value);
-  if (!option || option.disabled) return;
-  if (
-    props.controller.session.fieldAction("textLineOrder")(
-      value as ShapeFormatValues["textLineOrder"],
-    )
-  ) {
-    menu.dismiss("programmatic", props.sessionId === undefined);
-    restore();
+  if (stackedDisabled.value || !option || option.disabled) return;
+  const lineOrder = value as ShapeFormatValues["textLineOrder"];
+  const alreadyStacked = !directionMixed.value && currentDirection.value === "stacked";
+  if (alreadyStacked) {
+    if (!lineOrderEnabled.value) return;
+    if (props.controller.session.fieldAction("textLineOrder")(lineOrder)) {
+      menu.dismiss("programmatic", props.sessionId === undefined);
+      restore();
+    }
+    return;
   }
+  const ownerBefore = props.controller.ownerKey.value;
+  if (!props.controller.session.fieldAction("textDirection")("stacked")) return;
+  await nextTick();
+  if (
+    props.controller.ownerKey.value === ownerBefore &&
+    props.controller.fieldCapability("textLineOrder").enabled &&
+    (props.controller.isMixedField("textLineOrder") ||
+      props.controller.props.snapshot?.values.textLineOrder !== lineOrder)
+  ) {
+    props.controller.session.fieldAction("textLineOrder")(lineOrder);
+  }
+  menu.dismiss("programmatic", props.sessionId === undefined);
+  restore();
 }
 
 defineSlots<{ default: () => unknown }>();
@@ -135,6 +220,9 @@ defineSlots<{ default: () => unknown }>();
         :style="menu.floatingStyles.value"
         class="shape-ribbon-layout-menu__panel"
         :data-shape-text-edit-session="sessionId"
+        @focusin="onMenuFocusin"
+        @mouseover="onMenuMouseover"
+        @keydown="onMenuKeydown"
       >
         <MenuRadioItem
           v-for="option in directionOptions"
@@ -142,28 +230,49 @@ defineSlots<{ default: () => unknown }>();
           indicator="check"
           :checked="!directionMixed && currentDirection === option.value"
           :disabled="disabled || option.disabled"
+          :aria-haspopup="option.value === 'stacked' ? 'menu' : undefined"
+          :aria-expanded="option.value === 'stacked' ? stackedOpen : undefined"
+          :aria-controls="option.value === 'stacked' && stackedOpen ? submenuId : undefined"
           :data-shape-text-direction="option.value"
           @select="selectDirection(option.value)"
         >
           {{ option.label }}
+          <template v-if="option.value === 'stacked'" #shortcut>
+            <ChevronRight :size="15" aria-hidden="true" />
+          </template>
         </MenuRadioItem>
-        <template v-if="!directionMixed && currentDirection === 'stacked'">
-          <MenuSeparator />
-          <li class="shape-ribbon-layout-menu__section-label" role="none" aria-hidden="true">
-            {{ controller.fieldLabel("textLineOrder") }}
-          </li>
-          <MenuRadioItem
-            v-for="option in lineOrderOptions"
-            :key="option.value"
-            indicator="check"
-            :checked="!lineOrderMixed && currentLineOrder === option.value"
-            :disabled="!lineOrderEnabled || option.disabled"
-            :data-shape-text-line-order="option.value"
-            @select="selectLineOrder(option.value)"
-          >
-            {{ option.label }}
-          </MenuRadioItem>
-        </template>
+      </MenuSurface>
+      <MenuSurface
+        v-if="stackedOpen"
+        :id="submenuId"
+        ref="submenuSurface"
+        :label="controller.fieldLabel('textLineOrder')"
+        :style="submenuStyles"
+        class="shape-ribbon-layout-menu__panel shape-ribbon-layout-menu__submenu"
+        :data-shape-text-edit-session="sessionId"
+        data-shape-text-stacked-submenu
+        @keydown="onSubmenuKeydown"
+      >
+        <MenuRadioItem
+          v-for="option in lineOrderOptions"
+          :key="option.value"
+          indicator="check"
+          :checked="
+            !directionMixed &&
+            currentDirection === 'stacked' &&
+            !lineOrderMixed &&
+            currentLineOrder === option.value
+          "
+          :disabled="
+            stackedDisabled ||
+            (!directionMixed && currentDirection === 'stacked' && !lineOrderEnabled) ||
+            option.disabled
+          "
+          :data-shape-text-line-order="option.value"
+          @select="void selectLineOrder(option.value)"
+        >
+          {{ option.label }}
+        </MenuRadioItem>
       </MenuSurface>
     </Teleport>
   </span>
@@ -179,12 +288,8 @@ defineSlots<{ default: () => unknown }>();
   &__panel {
     z-index: var(--sheetcraft-layer-menu);
   }
-  &__section-label {
-    padding: 4px var(--sheetcraft-tool-panel-padding) 2px;
-    color: var(--sheetcraft-text-secondary);
-    font-size: var(--sheetcraft-font-size-body-small);
-    font-weight: var(--sheetcraft-font-weight-medium);
-    list-style: none;
+  &__submenu {
+    z-index: var(--sheetcraft-layer-submenu);
   }
 }
 </style>

@@ -375,6 +375,20 @@ test("Ribbon text direction menu selects options directly, keeps shape selection
   await flushPromises();
   expect(f.current.sheetGridRef.getSelectedShapeObjects()).toEqual([["box"]]);
   expect(document.body.querySelector('[data-shape-text-direction="rotate-90"]')).toBeNull();
+  await parentTrigger.trigger("click");
+  await flushPromises();
+  const stacked = document.body.querySelector<HTMLElement>(
+    '[data-shape-text-direction="stacked"]',
+  )!;
+  stacked.click();
+  await flushPromises();
+  const ltr = document.body.querySelector<HTMLElement>('[data-shape-text-line-order="ltr"]')!;
+  expect(ltr).not.toBeNull();
+  pointer(ltr);
+  ltr.click();
+  await flushPromises();
+  expect(f.current.sheetGridRef.getSelectedShapeObjects()).toEqual([["box"]]);
+  expect(document.body.querySelector("[data-shape-text-stacked-submenu]")).toBeNull();
 }, 15000);
 
 test("Ribbon line native child popup stays inside parent through pointer and closes one level per Escape", async () => {
