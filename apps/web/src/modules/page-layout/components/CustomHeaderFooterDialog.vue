@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch, type CSSProperties } from "vue";
-import { Alert as TAlert } from "tdesign-vue-next/es/alert";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { TabPanel as TTabPanel, Tabs as TTabs } from "tdesign-vue-next/es/tabs";
@@ -438,13 +438,10 @@ watch(
       </div>
     </div>
     <template #footer>
-      <div class="sheetcraft-dialog-footer">
-        <TAlert v-if="setupError" theme="error" :message="setupError" role="alert" />
-        <div class="sheetcraft-dialog-footer__actions">
-          <TButton theme="default" @click="close">{{ t("pageLayout.cancel") }}</TButton>
-          <TButton theme="primary" @click="confirm">{{ t("pageLayout.confirm") }}</TButton>
-        </div>
-      </div>
+      <DialogFooter :status="setupError" theme="error">
+        <TButton theme="default" @click="close">{{ t("pageLayout.cancel") }}</TButton>
+        <TButton theme="primary" @click="confirm">{{ t("pageLayout.confirm") }}</TButton>
+      </DialogFooter>
     </template>
   </Dialog>
 </template>

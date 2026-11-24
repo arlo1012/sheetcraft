@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import { Alert as TAlert } from "tdesign-vue-next/es/alert";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import { Button } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
@@ -365,20 +365,12 @@ watch(
       </div>
     </div>
     <template #footer>
-      <div class="sheetcraft-dialog-footer">
-        <TAlert
-          v-if="error || localMessage"
-          theme="error"
-          :message="error || localMessage"
-          role="alert"
-        />
-        <div class="sheetcraft-dialog-footer__actions">
-          <Button theme="default" @click="onClose">{{ t("formulaTools.cancel") }}</Button>
-          <Button theme="primary" :disabled="composing" @click="onConfirm">{{
-            t("formulaTools.editorConfirm")
-          }}</Button>
-        </div>
-      </div>
+      <DialogFooter :status="error || localMessage || undefined" theme="error">
+        <Button theme="default" @click="onClose">{{ t("formulaTools.cancel") }}</Button>
+        <Button theme="primary" :disabled="composing" @click="onConfirm">{{
+          t("formulaTools.editorConfirm")
+        }}</Button>
+      </DialogFooter>
     </template>
   </Dialog>
 

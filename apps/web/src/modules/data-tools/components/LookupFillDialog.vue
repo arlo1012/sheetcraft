@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { Alert as TAlert } from "tdesign-vue-next/es/alert";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -382,33 +382,25 @@ watch(
         </div>
       </section>
     </div>
-    <template #footer
-      ><div class="sheetcraft-dialog-footer">
-        <TAlert
-          v-if="footerAlert"
-          :theme="footerAlert.theme"
-          :message="footerAlert.message"
-          role="alert"
-        />
-        <div class="sheetcraft-dialog-footer__actions">
-          <TButton theme="default" :disabled="busy" @click="emit('close')">{{
-            t("dataTools.common.cancel")
-          }}</TButton
-          ><TButton v-if="step !== 'ranges'" theme="default" :disabled="busy" @click="back">{{
-            t("dataTools.lookupFill.back")
-          }}</TButton
-          ><TButton
-            v-if="step !== 'preview'"
-            theme="primary"
-            :disabled="busy || (step === 'ranges' ? !rangesReady : !fieldsReady)"
-            @click="next"
-            >{{ t("dataTools.lookupFill.next") }}</TButton
-          ><TButton v-else theme="primary" :disabled="busy || !canApply" @click="apply">{{
-            t("dataTools.lookupFill.apply")
-          }}</TButton>
-        </div>
-      </div></template
-    >
+    <template #footer>
+      <DialogFooter :status="footerAlert?.message" :theme="footerAlert?.theme" status-role="alert">
+        <TButton theme="default" :disabled="busy" @click="emit('close')">{{
+          t("dataTools.common.cancel")
+        }}</TButton
+        ><TButton v-if="step !== 'ranges'" theme="default" :disabled="busy" @click="back">{{
+          t("dataTools.lookupFill.back")
+        }}</TButton
+        ><TButton
+          v-if="step !== 'preview'"
+          theme="primary"
+          :disabled="busy || (step === 'ranges' ? !rangesReady : !fieldsReady)"
+          @click="next"
+          >{{ t("dataTools.lookupFill.next") }}</TButton
+        ><TButton v-else theme="primary" :disabled="busy || !canApply" @click="apply">{{
+          t("dataTools.lookupFill.apply")
+        }}</TButton>
+      </DialogFooter>
+    </template>
   </Dialog>
 </template>
 

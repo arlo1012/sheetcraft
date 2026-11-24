@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Input } from "tdesign-vue-next/es/input";
 import { ref, computed, watch, onBeforeUnmount, nextTick } from "vue";
-import { Alert as TAlert } from "tdesign-vue-next/es/alert";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import { Button } from "tdesign-vue-next/es/button";
 import { Dialog, type DialogCloseContext } from "tdesign-vue-next/es/dialog";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
@@ -755,25 +755,17 @@ function onDialogKeydown(event: KeyboardEvent): void {
       </section>
     </div>
     <template #footer>
-      <div class="sheetcraft-dialog-footer">
-        <TAlert
-          v-if="footerAlert"
-          :theme="footerAlert.theme"
-          :message="footerAlert.message"
-          role="alert"
-        />
-        <div class="sheetcraft-dialog-footer__actions">
-          <Button
-            theme="default"
-            variant="base"
-            @click="sourceOpen ? finishSource(false) : emit('close')"
-            >{{ t("picture.cancel") }}</Button
-          >
-          <Button theme="primary" variant="base" :disabled="disabled" @click="confirmStep">{{
-            t(sourceOpen ? "chart.backToPreview" : "picture.confirm")
-          }}</Button>
-        </div>
-      </div>
+      <DialogFooter :status="footerAlert?.message" :theme="footerAlert?.theme" status-role="alert">
+        <Button
+          theme="default"
+          variant="base"
+          @click="sourceOpen ? finishSource(false) : emit('close')"
+          >{{ t("picture.cancel") }}</Button
+        >
+        <Button theme="primary" variant="base" :disabled="disabled" @click="confirmStep">{{
+          t(sourceOpen ? "chart.backToPreview" : "picture.confirm")
+        }}</Button>
+      </DialogFooter>
     </template>
   </Dialog>
 </template>

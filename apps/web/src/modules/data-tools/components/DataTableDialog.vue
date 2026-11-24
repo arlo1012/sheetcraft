@@ -3,7 +3,7 @@ import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import { BaseTable } from "tdesign-vue-next/es/table";
 import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
 import { computed, ref, watch } from "vue";
-import { Alert as TAlert } from "tdesign-vue-next/es/alert";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Button } from "tdesign-vue-next/es/button";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
@@ -201,19 +201,15 @@ watch(draft, (value) => emit("draftChange", copyDraft(value)), { deep: true });
       </section>
     </div>
     <template #footer>
-      <div class="sheetcraft-dialog-footer">
-        <TAlert
-          :theme="error ? 'error' : 'info'"
-          :message="error || t('dataTable.recalculation')"
-          :role="error ? 'alert' : 'status'"
-        />
-        <div class="sheetcraft-dialog-footer__actions">
-          <Button theme="default" @click="emit('close')">{{ cancelLabel }}</Button>
-          <Button theme="primary" :disabled="busy || !canSolve" @click="confirm">{{
-            confirmLabel
-          }}</Button>
-        </div>
-      </div>
+      <DialogFooter
+        :status="error || t('dataTable.recalculation')"
+        :theme="error ? 'error' : 'info'"
+      >
+        <Button theme="default" @click="emit('close')">{{ cancelLabel }}</Button>
+        <Button theme="primary" :disabled="busy || !canSolve" @click="confirm">{{
+          confirmLabel
+        }}</Button>
+      </DialogFooter>
     </template>
   </Dialog>
 </template>

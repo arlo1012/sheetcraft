@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { Alert as TAlert } from "tdesign-vue-next/es/alert";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -248,20 +248,17 @@ watch(
       </div>
     </div>
     <template #footer>
-      <div class="sheetcraft-dialog-footer">
-        <TAlert v-if="error" theme="error" :message="error" role="alert" />
-        <div class="sheetcraft-dialog-footer__actions">
-          <TButton theme="default" :disabled="busy" @click="emit('close')">{{
-            t("dataTools.consolidate.close")
-          }}</TButton>
-          <TButton
-            theme="primary"
-            :disabled="busy || !canApply"
-            @click="!busy && canApply && emit('apply', copyDraft(draft))"
-            >{{ t("dataTools.consolidate.apply") }}</TButton
-          >
-        </div>
-      </div>
+      <DialogFooter :status="error" theme="error">
+        <TButton theme="default" :disabled="busy" @click="emit('close')">{{
+          t("dataTools.consolidate.close")
+        }}</TButton>
+        <TButton
+          theme="primary"
+          :disabled="busy || !canApply"
+          @click="!busy && canApply && emit('apply', copyDraft(draft))"
+          >{{ t("dataTools.consolidate.apply") }}</TButton
+        >
+      </DialogFooter>
     </template>
   </Dialog>
 </template>

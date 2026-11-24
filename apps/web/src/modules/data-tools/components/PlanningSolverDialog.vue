@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Trash2 } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
-import { Alert as TAlert } from "tdesign-vue-next/es/alert";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -316,17 +316,14 @@ const methodHint = computed(() =>
       <SimulationResultPanel v-if="result" :result="result" />
     </div>
     <template #footer>
-      <div class="sheetcraft-dialog-footer">
-        <TAlert v-if="error" theme="error" :message="error" role="alert" />
-        <div class="sheetcraft-dialog-footer__actions">
-          <TButton theme="default" :disabled="busy" @click="emit('close')">{{
-            result ? tr("simulation.close") : tr("simulation.cancel")
-          }}</TButton>
-          <TButton theme="primary" :disabled="busy || !hasModel" @click="confirm">{{
-            confirmLabel
-          }}</TButton>
-        </div>
-      </div>
+      <DialogFooter :status="error" theme="error">
+        <TButton theme="default" :disabled="busy" @click="emit('close')">{{
+          result ? tr("simulation.close") : tr("simulation.cancel")
+        }}</TButton>
+        <TButton theme="primary" :disabled="busy || !hasModel" @click="confirm">{{
+          confirmLabel
+        }}</TButton>
+      </DialogFooter>
     </template>
   </Dialog>
 </template>

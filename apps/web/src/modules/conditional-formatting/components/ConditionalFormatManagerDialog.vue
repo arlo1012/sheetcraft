@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { SheetConditionalFormatRule } from "@sheetcraft/core/conditional-formatting";
-import { Alert as TAlert } from "tdesign-vue-next/es/alert";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -364,15 +364,12 @@ watch(() => [props.visible, props.rules, props.createKind, props.sheets, props.s
       />
     </section>
     <template #footer>
-      <div class="sheetcraft-dialog-footer">
-        <TAlert v-if="error" theme="error" :message="error" role="alert" />
-        <div class="sheetcraft-dialog-footer__actions">
-          <TButton theme="default" @click="emit('close')">{{
-            t("conditionalFormatting.cancel")
-          }}</TButton>
-          <TButton theme="primary" @click="save">{{ t("conditionalFormatting.save") }}</TButton>
-        </div>
-      </div>
+      <DialogFooter :status="error" theme="error">
+        <TButton theme="default" @click="emit('close')">{{
+          t("conditionalFormatting.cancel")
+        }}</TButton>
+        <TButton theme="primary" @click="save">{{ t("conditionalFormatting.save") }}</TButton>
+      </DialogFooter>
     </template>
   </Dialog>
   <ConditionalFormatQuickDialog

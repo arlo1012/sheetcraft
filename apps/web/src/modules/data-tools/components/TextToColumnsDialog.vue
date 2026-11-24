@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { Alert as TAlert } from "tdesign-vue-next/es/alert";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -689,28 +689,23 @@ function confirm(): void {
         </div>
       </div>
     </div>
-    <template #footer
-      ><div class="sheetcraft-dialog-footer">
-        <TAlert v-if="previewError" theme="error" :message="previewError" role="alert" />
-        <div class="sheetcraft-dialog-footer__actions">
-          <TButton theme="default" @click="emit('close')">{{
-            t("dataTools.common.cancel")
+    <template #footer>
+      <DialogFooter :status="previewError" theme="error">
+        <TButton theme="default" @click="emit('close')">{{ t("dataTools.common.cancel") }}</TButton
+        ><TButton v-if="step > 0" theme="default" data-split-previous @click="step -= 1">{{
+          t("dataTools.textToColumns.previous")
+        }}</TButton
+        ><TButton
+          theme="primary"
+          :disabled="step < 1 ? !canNext : !canApply"
+          data-split-next
+          @click="confirm"
+          >{{
+            step < 1 ? t("dataTools.textToColumns.next") : t("dataTools.textToColumns.confirm")
           }}</TButton
-          ><TButton v-if="step > 0" theme="default" data-split-previous @click="step -= 1">{{
-            t("dataTools.textToColumns.previous")
-          }}</TButton
-          ><TButton
-            theme="primary"
-            :disabled="step < 1 ? !canNext : !canApply"
-            data-split-next
-            @click="confirm"
-            >{{
-              step < 1 ? t("dataTools.textToColumns.next") : t("dataTools.textToColumns.confirm")
-            }}</TButton
-          >
-        </div>
-      </div></template
-    >
+        >
+      </DialogFooter>
+    </template>
   </Dialog>
 </template>
 <style scoped lang="scss">

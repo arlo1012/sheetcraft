@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { Alert as TAlert } from "tdesign-vue-next/es/alert";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
@@ -281,20 +281,15 @@ function confirm() {
       <p>{{ t("control.hint") }}</p>
     </Form>
     <template #footer>
-      <div class="sheetcraft-dialog-footer">
-        <TAlert
-          v-if="localError || error"
-          theme="error"
-          :message="localError || t('control.invalid')"
-          role="alert"
-        />
-        <div class="sheetcraft-dialog-footer__actions">
-          <TButton theme="default" @click="emit('close')">{{ t("picture.cancel") }}</TButton>
-          <TButton theme="primary" :disabled="disabled || Boolean(localError)" @click="confirm">{{
-            t("picture.confirm")
-          }}</TButton>
-        </div>
-      </div>
+      <DialogFooter
+        :status="localError || (error ? t('control.invalid') : undefined)"
+        theme="error"
+      >
+        <TButton theme="default" @click="emit('close')">{{ t("picture.cancel") }}</TButton>
+        <TButton theme="primary" :disabled="disabled || Boolean(localError)" @click="confirm">{{
+          t("picture.confirm")
+        }}</TButton>
+      </DialogFooter>
     </template>
   </Dialog>
 </template>

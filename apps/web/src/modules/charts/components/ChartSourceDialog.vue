@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
-import { Alert as TAlert } from "tdesign-vue-next/es/alert";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import { Button } from "tdesign-vue-next/es/button";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -953,20 +953,12 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <template #footer>
-      <div class="sheetcraft-dialog-footer">
-        <TAlert
-          v-if="footerAlert"
-          :theme="footerAlert.theme"
-          :message="footerAlert.message"
-          role="alert"
-        />
-        <div class="sheetcraft-dialog-footer__actions">
-          <Button theme="default" variant="base" @click="close">{{ t("picture.cancel") }}</Button>
-          <Button theme="primary" variant="base" :disabled="blocked" @click="confirm">{{
-            t("picture.confirm")
-          }}</Button>
-        </div>
-      </div>
+      <DialogFooter :status="footerAlert?.message" :theme="footerAlert?.theme" status-role="alert">
+        <Button theme="default" variant="base" @click="close">{{ t("picture.cancel") }}</Button>
+        <Button theme="primary" variant="base" :disabled="blocked" @click="confirm">{{
+          t("picture.confirm")
+        }}</Button>
+      </DialogFooter>
     </template>
   </Dialog>
   <ChartSeriesDialog

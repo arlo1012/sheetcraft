@@ -2,7 +2,7 @@
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 
 import { computed } from "vue";
-import { Alert as TAlert } from "tdesign-vue-next/es/alert";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { PrimaryTable as TTable } from "tdesign-vue-next/es/table";
@@ -210,29 +210,26 @@ function selectIssues(keys: Array<string | number>): void {
       </div>
     </div>
     <template #footer>
-      <div class="sheetcraft-dialog-footer">
-        <TAlert
-          :theme="footerAlert.theme"
-          :message="footerAlert.message"
-          :role="footerAlert.role"
-          aria-live="polite"
-        />
-        <div class="sheetcraft-dialog-footer__actions">
-          <TButton theme="default" :disabled="busy" @click="emit('close')">{{
-            t("proofreading.close")
-          }}</TButton>
-          <TButton
-            theme="primary"
-            :disabled="busy || safeSelectedCount === 0"
-            @click="emit('applySelected')"
-          >
-            {{ t("proofreading.applySelected") }}
-          </TButton>
-          <TButton :loading="busy" :disabled="busy" @click="emit('scan', draft)">
-            {{ hasScanned ? t("proofreading.rescan") : t("proofreading.scan") }}
-          </TButton>
-        </div>
-      </div>
+      <DialogFooter
+        :status="footerAlert.message"
+        :theme="footerAlert.theme"
+        :status-role="footerAlert.role"
+        aria-live="polite"
+      >
+        <TButton theme="default" :disabled="busy" @click="emit('close')">{{
+          t("proofreading.close")
+        }}</TButton>
+        <TButton
+          theme="primary"
+          :disabled="busy || safeSelectedCount === 0"
+          @click="emit('applySelected')"
+        >
+          {{ t("proofreading.applySelected") }}
+        </TButton>
+        <TButton :loading="busy" :disabled="busy" @click="emit('scan', draft)">
+          {{ hasScanned ? t("proofreading.rescan") : t("proofreading.scan") }}
+        </TButton>
+      </DialogFooter>
     </template>
   </Dialog>
 </template>
