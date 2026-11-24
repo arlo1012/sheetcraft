@@ -299,7 +299,7 @@ function fontSize(value: string | number) {
           <template v-if="active">
             <h3>{{ t("mindMap.style") }}</h3>
             <FormItem :label="t('mindMap.edit')"
-              ><div ref="textInput">
+              ><div ref="textInput" class="text-input">
                 <Input
                   :aria-label="t('mindMap.edit')"
                   v-model="active.text"
@@ -430,12 +430,7 @@ h3 {
 .zoom {
   justify-content: flex-end;
 }
-.fill {
-  width: 32px;
-  height: 24px;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  cursor: pointer;
+.text-input {
+  width: 100%;
 }
 </style>
