@@ -225,7 +225,17 @@ const previewTextStyle = computed(() => {
   return base;
 });
 const quickBarRef = ref<HTMLElement | null>(null);
-const { onGroupKeydown: onQuickBarKeydown } = useRovingButtonGroup(quickBarRef);
+const {
+  resolveTabIndex: resolveQuickBarTabIndex,
+  onFocusItem: onQuickBarFocus,
+  onGroupFocusOut: onQuickBarFocusOut,
+  onGroupKeydown: onQuickBarKeydown,
+} = useRovingButtonGroup(quickBarRef);
+const quickBarPreferredIndex = computed(() => {
+  if (horizontal.value === "center") return 1;
+  if (horizontal.value === "right") return 2;
+  return 0;
+});
 </script>
 
 <template>
@@ -240,6 +250,7 @@ const { onGroupKeydown: onQuickBarKeydown } = useRovingButtonGroup(quickBarRef);
               class="cell-format-alignment__quick-bar"
               role="group"
               :aria-label="t('cellFormat.quickAlignment')"
+              @focusout="onQuickBarFocusOut"
               @keydown="onQuickBarKeydown"
             >
               <button
@@ -249,6 +260,8 @@ const { onGroupKeydown: onQuickBarKeydown } = useRovingButtonGroup(quickBarRef);
                 :title="t('cellFormat.horizontalLeft')"
                 :aria-label="t('cellFormat.horizontalLeft')"
                 :aria-pressed="horizontal === 'left'"
+                :tabindex="resolveQuickBarTabIndex(0, quickBarPreferredIndex)"
+                @focus="onQuickBarFocus(0)"
                 @click="setHorizontal('left')"
               >
                 <TextHorizontalAlignmentIcon alignment="left" />
@@ -260,6 +273,8 @@ const { onGroupKeydown: onQuickBarKeydown } = useRovingButtonGroup(quickBarRef);
                 :title="t('cellFormat.horizontalCenter')"
                 :aria-label="t('cellFormat.horizontalCenter')"
                 :aria-pressed="horizontal === 'center'"
+                :tabindex="resolveQuickBarTabIndex(1, quickBarPreferredIndex)"
+                @focus="onQuickBarFocus(1)"
                 @click="setHorizontal('center')"
               >
                 <TextHorizontalAlignmentIcon alignment="center" />
@@ -271,6 +286,8 @@ const { onGroupKeydown: onQuickBarKeydown } = useRovingButtonGroup(quickBarRef);
                 :title="t('cellFormat.horizontalRight')"
                 :aria-label="t('cellFormat.horizontalRight')"
                 :aria-pressed="horizontal === 'right'"
+                :tabindex="resolveQuickBarTabIndex(2, quickBarPreferredIndex)"
+                @focus="onQuickBarFocus(2)"
                 @click="setHorizontal('right')"
               >
                 <TextHorizontalAlignmentIcon alignment="right" />
@@ -283,6 +300,8 @@ const { onGroupKeydown: onQuickBarKeydown } = useRovingButtonGroup(quickBarRef);
                 :title="t('cellFormat.verticalTop')"
                 :aria-label="t('cellFormat.verticalTop')"
                 :aria-pressed="vertical === 'top'"
+                :tabindex="resolveQuickBarTabIndex(3, quickBarPreferredIndex)"
+                @focus="onQuickBarFocus(3)"
                 @click="setVertical('top')"
               >
                 <TextVerticalAlignmentIcon alignment="top" />
@@ -294,6 +313,8 @@ const { onGroupKeydown: onQuickBarKeydown } = useRovingButtonGroup(quickBarRef);
                 :title="t('cellFormat.verticalMiddle')"
                 :aria-label="t('cellFormat.verticalMiddle')"
                 :aria-pressed="vertical === 'middle'"
+                :tabindex="resolveQuickBarTabIndex(4, quickBarPreferredIndex)"
+                @focus="onQuickBarFocus(4)"
                 @click="setVertical('middle')"
               >
                 <TextVerticalAlignmentIcon alignment="middle" />
@@ -305,6 +326,8 @@ const { onGroupKeydown: onQuickBarKeydown } = useRovingButtonGroup(quickBarRef);
                 :title="t('cellFormat.verticalBottom')"
                 :aria-label="t('cellFormat.verticalBottom')"
                 :aria-pressed="vertical === 'bottom'"
+                :tabindex="resolveQuickBarTabIndex(5, quickBarPreferredIndex)"
+                @focus="onQuickBarFocus(5)"
                 @click="setVertical('bottom')"
               >
                 <TextVerticalAlignmentIcon alignment="bottom" />
