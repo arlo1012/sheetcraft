@@ -10,6 +10,7 @@ import {
   useNativePopupOwnership,
 } from "../../../../shared/floating/useNativePopupOwnership";
 import { vNativeControl } from "../../../../shared/tdesign/native-control";
+import FormatField from "../../../../shared/format-pane/FormatField.vue";
 import {
   type PictureFormatCapabilities,
   type PictureFormatField,
@@ -399,23 +400,32 @@ defineExpose({
       </TTabs>
     </div>
     <Teleport to="body"><div :ref="setUnitsPopupHost" data-picture-format-units-popup /></Teleport>
-    <div v-if="snapshot" class="picture-format-pane__units">
-      <span>{{ t("units") }}</span
-      ><TSelect
-        v-native-control="unitsNativeControl"
-        :popup-visible="unitsPopup.visible.value"
-        :popup-props="unitsPopup.popupProps"
-        @popup-visible-change="unitsPopup.onVisibleChange.value"
-        :model-value="unit"
-        :options="unitOptions"
-        :disabled="controller.hasActiveNumericDraft.value"
-        :aria-label="t('units')"
-        size="small"
-        data-picture-format-units
-        @change="changeUnit"
-      />
-    </div>
     <div class="picture-format-pane__body">
+      <div
+        v-if="snapshot"
+        v-show="
+          !controller.hasDetailedCapabilities.value ||
+          tab === 'size-properties' ||
+          tab === 'picture'
+        "
+        class="picture-format-pane__units"
+      >
+        <FormatField :label="t('units')">
+          <TSelect
+            v-native-control="unitsNativeControl"
+            :popup-visible="unitsPopup.visible.value"
+            :popup-props="unitsPopup.popupProps"
+            @popup-visible-change="unitsPopup.onVisibleChange.value"
+            :model-value="unit"
+            :options="unitOptions"
+            :disabled="controller.hasActiveNumericDraft.value"
+            :aria-label="t('units')"
+            size="small"
+            data-picture-format-units
+            @change="changeUnit"
+          />
+        </FormatField>
+      </div>
       <div v-if="snapshot && commonReasons.size" class="picture-format-pane__status" role="status">
         <p v-for="reason in commonReasons" :key="reason">{{ reason }}</p>
       </div>
@@ -487,17 +497,7 @@ defineExpose({
     @include tabLabel.label;
   }
   &__units {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-    padding: 10px 12px 4px;
-    > span {
-      color: var(--sheetcraft-text-secondary);
-    }
-    > :last-child {
-      width: 72px;
-    }
+    @include sidePane.units-bar;
   }
   &__body {
     @include sidePane.body;

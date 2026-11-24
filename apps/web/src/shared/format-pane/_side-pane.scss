@@ -1,3 +1,5 @@
+@use "../option-list/option-list";
+
 @mixin shell($width: clamp(320px, 26vw, 380px)) {
   box-sizing: border-box;
   display: flex;
@@ -44,11 +46,18 @@
 }
 
 @mixin body($padding: 0 12px 12px) {
+  @include option-list.scrollbar;
+
   flex: 1;
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
   padding: $padding;
+}
+
+@mixin units-bar {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--sheetcraft-border-subtle);
 }
 
 @mixin mobile-width($width: 320px) {

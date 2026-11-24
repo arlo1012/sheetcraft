@@ -13,6 +13,7 @@ import {
   useNativePopupOwnership,
 } from "../../../../shared/floating/useNativePopupOwnership";
 import { vNativeControl } from "../../../../shared/tdesign/native-control";
+import FormatField from "../../../../shared/format-pane/FormatField.vue";
 import { useShapeTextFieldDraft } from "../../shape-text-field-drafts";
 import ShapeFormatFillLine from "./ShapeFormatFillLine.vue";
 import ShapeFormatEffects from "./ShapeFormatEffects.vue";
@@ -132,6 +133,11 @@ const tabs = computed<readonly ShapeFormatTab[]>(() =>
     ? ["fill-line", "effects", "size-properties"]
     : ["text-fill-line", "text-effects", "text-box"],
 );
+const showUnits = computed(
+  () =>
+    (mode.value === "shape" && tab.value === "size-properties") ||
+    (mode.value === "text" && tab.value === "text-box"),
+);
 const unitOptions = computed(() => [
   { value: "pt", label: props.t("unitPt") },
   { value: "in", label: props.t("unitIn") },
@@ -210,6 +216,7 @@ function beforeInteraction(event: Event) {
   if (
     !(event.target instanceof Element) ||
     !event.target.closest(".shape-format-pane__body") ||
+    event.target.closest(".shape-format-pane__units") ||
     !event.target.closest("input,textarea,button,[role=combobox],[role=checkbox]")
   )
     return;
@@ -347,23 +354,24 @@ defineExpose({
       </TTabs>
     </div>
     <Teleport to="body"><div :ref="setUnitsPopupHost" data-shape-format-units-popup /></Teleport>
-    <div v-if="snapshot" class="shape-format-pane__units">
-      <span>{{ t("units") }}</span
-      ><TSelect
-        v-native-control="unitsNativeControl"
-        :model-value="unit"
-        :popup-visible="unitsPopup.visible.value"
-        :popup-props="unitsPopup.popupProps"
-        @popup-visible-change="unitsPopup.onVisibleChange.value"
-        :options="unitOptions"
-        :disabled="controller.hasActiveNumericDraft.value"
-        size="small"
-        :aria-label="t('units')"
-        data-shape-format-units
-        @change="changeUnitAction"
-      />
-    </div>
     <div ref="paneBody" class="shape-format-pane__body" @scroll="rememberScroll">
+      <div v-if="snapshot" v-show="showUnits" class="shape-format-pane__units">
+        <FormatField :label="t('units')">
+          <TSelect
+            v-native-control="unitsNativeControl"
+            :model-value="unit"
+            :popup-visible="unitsPopup.visible.value"
+            :popup-props="unitsPopup.popupProps"
+            @popup-visible-change="unitsPopup.onVisibleChange.value"
+            :options="unitOptions"
+            :disabled="controller.hasActiveNumericDraft.value"
+            size="small"
+            :aria-label="t('units')"
+            data-shape-format-units
+            @change="changeUnitAction"
+          />
+        </FormatField>
+      </div>
       <p v-if="!snapshot" class="shape-format-pane__hint">
         {{ controller.s.value("missingSelection") }}
       </p>
@@ -478,17 +486,7 @@ defineExpose({
     @include tab-label.label($with-icon: true);
   }
   &__units {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-    padding: 10px 12px 4px;
-    > span {
-      color: var(--sheetcraft-text-secondary);
-    }
-    > :last-child {
-      width: 72px;
-    }
+    @include sidePane.units-bar;
   }
   &__body {
     @include sidePane.body;
