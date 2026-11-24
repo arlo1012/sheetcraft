@@ -430,7 +430,7 @@ function confirmStep(): void {
   else confirm();
 }
 const footerAlert = computed<{ theme: "error" | "warning"; message: string } | undefined>(() => {
-  if (error.value) return { theme: "error", message: t("chart.invalidSource") };
+  if (props.error) return { theme: "error", message: t("chart.invalidSource") };
   if (designFailed.value) return { theme: "error", message: t("chart.designApplyFailed") };
   if (!sourceOpen.value && draft.value.chart.type === "combo" && !comboAvailable.value) {
     return { theme: "warning", message: t("chart.comboUnavailable") };
