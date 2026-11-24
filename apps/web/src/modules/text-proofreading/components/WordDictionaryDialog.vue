@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Button } from "tdesign-vue-next/es/button";
 import { Textarea } from "tdesign-vue-next/es/textarea";
 import { Input } from "tdesign-vue-next/es/input";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import DictionaryEntryTable from "./DictionaryEntryTable.vue";
 import DictionaryManager from "./DictionaryManager.vue";
@@ -177,7 +179,12 @@ function editEntry(target: DictionaryCategory, entry: WordRule) {
     @close="finishEditor()"
   >
     <div class="word-dictionary">
-      <p v-if="controller.error.value" role="alert">{{ controller.error.value }}</p>
+      <TAlert
+        v-if="controller.error.value && controller.panel.value === 'dictionary'"
+        theme="error"
+        :message="controller.error.value"
+        role="alert"
+      />
       <template v-if="isEditor">
         <Textarea
           v-if="batchAccepted"
@@ -209,22 +216,22 @@ function editEntry(target: DictionaryCategory, entry: WordRule) {
       </template>
     </div>
     <template #footer>
-      <div class="word-dictionary__footer">
-        <span v-if="isEditor" class="word-dictionary__hint">{{ editorHint }}</span>
-        <div class="word-dictionary__footer-actions">
-          <Button theme="default" @click="finishEditor()">{{ t("wordProof.cancel") }}</Button>
-          <Button
-            theme="primary"
-            @click="
-              controller.panel.value === 'settings'
-                ? controller.save({ ...controller.dictionary.value, builtins }) &&
-                  (controller.panel.value = undefined)
-                : saveWord()
-            "
-            >{{ t("wordProof.save") }}</Button
-          >
-        </div>
-      </div>
+      <DialogFooter
+        :status="controller.error.value || (isEditor ? editorHint : undefined)"
+        :theme="controller.error.value ? 'error' : 'info'"
+      >
+        <Button theme="default" @click="finishEditor()">{{ t("wordProof.cancel") }}</Button>
+        <Button
+          theme="primary"
+          @click="
+            controller.panel.value === 'settings'
+              ? controller.save({ ...controller.dictionary.value, builtins }) &&
+                (controller.panel.value = undefined)
+              : saveWord()
+          "
+          >{{ t("wordProof.save") }}</Button
+        >
+      </DialogFooter>
     </template>
   </Dialog>
 </template>
@@ -235,21 +242,6 @@ function editEntry(target: DictionaryCategory, entry: WordRule) {
   p {
     margin: 0;
     color: var(--sheetcraft-text-secondary);
-  }
-  &__footer {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    text-align: left;
-  }
-  &__hint {
-    color: var(--sheetcraft-text-secondary);
-    flex: 1;
-  }
-  &__footer-actions {
-    display: flex;
-    flex-shrink: 0;
-    margin-left: auto;
   }
 }
 </style>

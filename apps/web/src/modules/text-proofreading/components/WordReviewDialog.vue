@@ -8,12 +8,31 @@ import { PrimaryTable } from "tdesign-vue-next/es/table";
 import type { PrimaryTableCol } from "tdesign-vue-next/es/table/type";
 import { formatCellAddress } from "@sheetcraft/core/coordinates";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { vNativeControl } from "../../../shared/tdesign/native-control";
 import type { useWordProofreading } from "../useWordProofreading";
 const props = defineProps<{ controller: ReturnType<typeof useWordProofreading> }>();
 const { t } = useAppI18n();
 const replacements = ref<Record<string, string>>({});
+const footerAlert = computed<{
+  theme: "error" | "warning" | "info";
+  message: string;
+  role: "alert" | "status";
+}>(() => {
+  if (props.controller.error.value) {
+    return { theme: "error", message: props.controller.error.value, role: "alert" };
+  }
+  if (props.controller.truncated.value) {
+    return { theme: "warning", message: t("wordProof.truncated"), role: "status" };
+  }
+  const parts: string[] = [];
+  if (props.controller.scanned.value) {
+    parts.push(t("wordProof.count", { count: props.controller.issues.value.length }));
+  }
+  parts.push(t("proofreading.selected", { count: props.controller.selected.value.length }));
+  return { theme: "info", message: parts.join(" · "), role: "status" };
+});
 watch([() => props.controller.panel.value, () => props.controller.scope.value], () => {
   replacements.value = {};
 });
@@ -120,11 +139,9 @@ function scan() {
           >
         </div>
       </div>
-      <p v-if="controller.error.value" role="alert">{{ controller.error.value }}</p>
       <p v-if="controller.skipped.value" class="word-review__hint">
         {{ t("wordProof.skipped", { count: controller.skipped.value }) }}
       </p>
-      <p v-if="controller.truncated.value" role="status">{{ t("wordProof.truncated") }}</p>
       <div class="word-review__table">
         <TableHeightWrapper v-slot="{ height }">
           <PrimaryTable
@@ -186,23 +203,20 @@ function scan() {
       </div>
     </div>
     <template #footer>
-      <div class="word-review__footer">
-        <div class="word-review__summary" aria-live="polite">
-          <span v-if="controller.scanned.value">{{
-            t("wordProof.count", { count: controller.issues.value.length })
-          }}</span>
-          <span>{{ t("proofreading.selected", { count: controller.selected.value.length }) }}</span>
-        </div>
-        <div class="word-review__footer-actions">
-          <Button theme="default" @click="controller.panel.value = undefined">{{
-            t("wordProof.close")
-          }}</Button>
-          <Button theme="primary" :disabled="!applicable.length" @click="applySelected">{{
-            t("wordProof.applySelected")
-          }}</Button>
-          <Button @click="scan">{{ t("wordProof.scan") }}</Button>
-        </div>
-      </div>
+      <DialogFooter
+        :status="footerAlert.message"
+        :theme="footerAlert.theme"
+        :status-role="footerAlert.role"
+        aria-live="polite"
+      >
+        <Button theme="default" @click="controller.panel.value = undefined">{{
+          t("wordProof.close")
+        }}</Button>
+        <Button theme="primary" :disabled="!applicable.length" @click="applySelected">{{
+          t("wordProof.applySelected")
+        }}</Button>
+        <Button @click="scan">{{ t("wordProof.scan") }}</Button>
+      </DialogFooter>
     </template>
   </Dialog>
 </template>
@@ -213,9 +227,7 @@ function scan() {
   p {
     margin: 0;
   }
-  &__toolbar,
-  &__footer,
-  &__summary {
+  &__toolbar {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -229,8 +241,7 @@ function scan() {
   &__scope {
     width: 180px;
   }
-  &__hint,
-  &__summary {
+  &__hint {
     color: var(--sheetcraft-text-secondary);
   }
   &__table {
@@ -242,18 +253,6 @@ function scan() {
     align-items: center;
     justify-content: center;
     flex-wrap: wrap;
-  }
-  &__footer {
-    justify-content: space-between;
-  }
-  &__summary {
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  &__footer-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
   }
 }
 </style>

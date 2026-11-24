@@ -18,6 +18,7 @@ import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Select as TSelect, Option as TOption } from "tdesign-vue-next/es/select";
 import { computed, reactive, ref, watch } from "vue";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import ConditionalFormatStyleDialog from "./ConditionalFormatStyleDialog.vue";
 import ConditionalFormatRankCriteria from "./ConditionalFormatRankCriteria.vue";
 import ConditionalFormatAverageCriteria from "./ConditionalFormatAverageCriteria.vue";
@@ -1025,11 +1026,16 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
             :format="category === 'visual' ? undefined : format"
           />
         </div>
-        <p v-if="error.format" class="conditional-format-editor__error" role="alert">
-          {{ error.format }}
-        </p>
       </section>
     </TForm>
+    <template #footer>
+      <DialogFooter :status="error.format" theme="error">
+        <TButton theme="default" @click="emit('close')">{{
+          t("conditionalFormatting.cancel")
+        }}</TButton>
+        <TButton theme="primary" @click="save">{{ t("conditionalFormatting.save") }}</TButton>
+      </DialogFooter>
+    </template>
   </Dialog>
   <ConditionalFormatStyleDialog
     v-if="hasInlineFormat && customVisible"

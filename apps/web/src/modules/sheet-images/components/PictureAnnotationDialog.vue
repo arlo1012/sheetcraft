@@ -12,6 +12,7 @@ import { isGroupedPicture } from "@sheetcraft/core/picture-group";
 import { getDetailedPictureStyleAssetIds } from "@sheetcraft/core/picture-detailed-style";
 import type { WorkbookTheme } from "@sheetcraft/core/workbook-theme";
 import { useAppI18n } from "../../../shared/i18n";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import { vNativeControl } from "../../../shared/tdesign/native-control";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import { paintImagePresentation } from "../../../shared/images/imageAppearance";
@@ -602,9 +603,21 @@ onBeforeUnmount(() => {
           </div>
         </section>
       </div>
-      <p v-if="error" role="alert">{{ error }}</p>
       <p>{{ t(framed ? "picture.annotationSourceHint" : "picture.annotationHint") }}</p>
     </div>
+    <template #footer>
+      <DialogFooter :status="error" theme="error">
+        <Button theme="default" variant="base" @click="close">{{ t("picture.cancel") }}</Button>
+        <Button
+          theme="primary"
+          variant="base"
+          :disabled="!canApply"
+          :loading="busy"
+          @click="confirm"
+          >{{ t("picture.apply") }}</Button
+        >
+      </DialogFooter>
+    </template>
   </Dialog>
 </template>
 <style scoped lang="scss">

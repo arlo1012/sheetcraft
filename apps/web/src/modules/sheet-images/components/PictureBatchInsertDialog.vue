@@ -17,6 +17,7 @@ import { Checkbox } from "tdesign-vue-next/es/checkbox";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
 import { BaseTable, type BaseTableCol } from "tdesign-vue-next/es/table";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { vNativeControl } from "../../../shared/tdesign/native-control";
 import type { PictureBatchArrangement, PictureBatchInsertion } from "../picture-batch-layout";
@@ -187,6 +188,7 @@ function confirm(): void {
         {{ t(mode === "cell" ? "image.batchCellHint" : "image.batchFloatingHint") }}
       </p>
       <Form
+        class="sheetcraft-form-grid"
         label-align="left"
         :label-width="locale === 'zh-CN' ? 132 : 176"
         :prevent-submit-default="true"
@@ -331,18 +333,38 @@ function confirm(): void {
           </BaseTable>
         </TableHeightWrapper>
       </div>
-      <p v-if="matchActive && nameMatches">
-        {{
-          t("image.batchMatchSummary", {
-            matched: nameMatches.plan.matches.length,
-            skipped: nameMatches.plan.entries.filter((entry) => entry.status === "unmatched")
-              .length,
-          })
-        }}
-      </p>
-      <p v-else>{{ t("image.batchCount", { count: order.length }) }}</p>
-      <p v-if="error" role="alert">{{ error }}</p>
     </div>
+    <template #footer>
+      <DialogFooter
+        :status="
+          error ||
+          (matchActive && nameMatches
+            ? t('image.batchMatchSummary', {
+                matched: nameMatches.plan.matches.length,
+                skipped: nameMatches.plan.entries.filter((entry) => entry.status === 'unmatched')
+                  .length,
+              })
+            : t('image.batchCount', { count: order.length }))
+        "
+        :theme="error ? 'error' : 'info'"
+      >
+        <Button theme="default" variant="base" @click="emit('close')">{{
+          t("picture.cancel")
+        }}</Button>
+        <Button
+          theme="primary"
+          variant="base"
+          :disabled="busy || !order.length || !validWrap || !validRowHeight || !validMatches"
+          :loading="busy"
+          @click="confirm"
+          >{{
+            matchActive
+              ? t("image.batchMatchInsert", { count: nameMatches?.plan.matches.length ?? 0 })
+              : t("drawing.insert")
+          }}</Button
+        >
+      </DialogFooter>
+    </template>
   </Dialog>
 </template>
 

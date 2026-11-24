@@ -2,8 +2,10 @@
 import { computed, ref, shallowRef, watch } from "vue";
 import { Pencil, Trash2, LockKeyholeOpen } from "lucide-vue-next";
 import { vIconAction } from "../../../shared/focus/icon-action";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { Button as TButton } from "tdesign-vue-next/es/button";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import {
   BaseTable as TTable,
   type BaseTableCol,
@@ -208,7 +210,13 @@ function save(protect = false): void {
         </TTable>
       </TableHeightWrapper>
     </div>
-    <p v-if="error" role="alert">{{ error }}</p>
+    <TAlert v-if="readOnly && error" theme="error" :message="error" role="alert" />
+    <template v-if="!readOnly" #footer>
+      <DialogFooter :status="error" theme="error">
+        <TButton theme="default" @click="emit('close')">{{ t("review.cancel") }}</TButton>
+        <TButton theme="primary" @click="save()">{{ t("review.confirm") }}</TButton>
+      </DialogFooter>
+    </template>
   </TDialog>
   <EditableRangeEditorDialog
     v-if="editor"

@@ -3,6 +3,7 @@ import { computed, nextTick, ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
+import { Alert as TAlert } from "tdesign-vue-next/es/alert";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { File, MapPin, Mail, Link as LinkIcon } from "lucide-vue-next";
 import OptionList from "../../../shared/option-list/OptionList.vue";
@@ -265,7 +266,7 @@ function onDialogKeydown(event: KeyboardEvent): void {
             v-native-control="{ attributes: { 'aria-label': t('hyperlinks.cloudAddress') } }"
             data-hyperlink-cloud
         /></FormItem>
-        <p v-if="error" class="hyperlink-form__error" role="alert">{{ error }}</p>
+        <TAlert v-if="error" theme="error" :message="error" role="alert" />
       </Form>
     </div>
     <template #footer>

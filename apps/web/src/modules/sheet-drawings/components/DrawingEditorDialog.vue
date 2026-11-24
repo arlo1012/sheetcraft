@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from "vue";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form, FormItem } from "tdesign-vue-next/es/form";
 import { Input } from "tdesign-vue-next/es/input";
 import { Textarea } from "tdesign-vue-next/es/textarea";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
 import { Checkbox } from "tdesign-vue-next/es/checkbox";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import {
   normalizeSheetDrawing,
   type SheetGraphicDrawing,
@@ -169,6 +171,13 @@ function toggleTextStyle(key: TextStyleToggleKey): void {
   else if (key === "italic") setTypography("textItalic", !draft.value.italic);
 }
 const galleryError = ref(false);
+const footerError = computed(() =>
+  galleryError.value || applyError.value
+    ? t("drawing.changeRejected")
+    : !validGeometry.value
+      ? t("drawing.geometryUnavailable")
+      : undefined,
+);
 const selectedChoice = computed(() =>
   SHAPE_GALLERY.flatMap((group) => group.items).find((choice) => {
     if (choice.kind === "preset") return choice.preset === draft.value.shapeGeometry?.preset;
@@ -273,9 +282,6 @@ const shapes: DrawingShape[] = [
         <p v-if="!draft.shapeGeometry && !draft.shapePath" class="drawing-editor__hint">
           {{ t("drawing.legacyGeometry") }}
         </p>
-        <p v-if="galleryError" class="drawing-editor__hint" role="alert">
-          {{ t("drawing.changeRejected") }}
-        </p>
       </div>
       <Form
         class="drawing-editor__fields sheetcraft-form-grid"
@@ -283,7 +289,6 @@ const shapes: DrawingShape[] = [
         :label-width="locale === 'zh-CN' ? 76 : 108"
         :prevent-submit-default="true"
       >
-        <p v-if="applyError" role="alert">{{ t("drawing.changeRejected") }}</p>
         <FormItem :label="t('drawing.name')"
           ><Input
             v-native-control="{ attributes: { 'aria-label': t('drawing.name') } }"
@@ -494,11 +499,16 @@ const shapes: DrawingShape[] = [
             </div>
           </div>
         </div>
-        <p v-if="!validGeometry" class="drawing-editor__hint" role="alert">
-          {{ t("drawing.geometryUnavailable") }}
-        </p>
       </Form>
     </div>
+    <template #footer>
+      <DialogFooter :status="footerError" theme="error">
+        <TButton theme="default" @click="emit('close')">{{ t("picture.cancel") }}</TButton>
+        <TButton theme="primary" :disabled="disabled || !validGeometry" @click="confirm">{{
+          t("picture.confirm")
+        }}</TButton>
+      </DialogFooter>
+    </template>
   </Dialog>
 </template>
 <style scoped lang="scss">

@@ -18,6 +18,7 @@ import {
   type PivotTableStyleElement,
 } from "@sheetcraft/core/pivot-table-styles";
 import CellFormatDialog from "../../cell-format/components/CellFormatDialog.vue";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import {
   mergeStyleFormatChange,
@@ -223,7 +224,6 @@ watch(
           autofocus
           data-table-style-name
         />
-        <p v-if="duplicateName" role="alert">{{ t("tableStyles.styleNameExists") }}</p>
       </div>
       <div class="new-table-style-dialog__main">
         <section
@@ -297,6 +297,17 @@ watch(
         {{ t(kind === "pivot" ? "tableStyles.setAsDefaultPivot" : "tableStyles.setAsDefault") }}
       </TCheckbox>
     </div>
+    <template #footer>
+      <DialogFooter
+        :status="duplicateName ? t('tableStyles.styleNameExists') : undefined"
+        theme="error"
+      >
+        <TButton theme="default" @click="emit('cancel')">{{ t("tableStyles.cancel") }}</TButton>
+        <TButton theme="primary" :disabled="!name.trim() || duplicateName" @click="confirm">{{
+          t("tableStyles.confirm")
+        }}</TButton>
+      </DialogFooter>
+    </template>
   </Dialog>
   <CellFormatDialog
     v-else

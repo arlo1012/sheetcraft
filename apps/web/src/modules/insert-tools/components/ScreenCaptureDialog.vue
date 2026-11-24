@@ -7,6 +7,7 @@ import { Button } from "tdesign-vue-next/es/button";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
 import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import { useAppI18n } from "../../../shared/i18n";
+import DialogFooter from "../../../shared/dialog/DialogFooter.vue";
 import { vNativeControl } from "../../../shared/tdesign/native-control";
 import {
   startPointerSession,
@@ -351,8 +352,22 @@ onBeforeUnmount(() => {
           t("drawing.captureAll")
         }}</Button>
       </Form>
-      <p v-if="failed" role="alert">{{ t("drawing.captureFailed") }}</p>
     </div>
+    <template #footer>
+      <DialogFooter :status="failed ? t('drawing.captureFailed') : undefined" theme="error">
+        <Button theme="default" variant="base" @click="emit('close')">{{
+          t("picture.cancel")
+        }}</Button>
+        <Button
+          theme="primary"
+          variant="base"
+          :disabled="!valid || busy"
+          :loading="busy"
+          @click="confirm"
+          >{{ t(recordingRegion ? "drawing.recordStart" : "drawing.insert") }}</Button
+        >
+      </DialogFooter>
+    </template>
   </Dialog>
 </template>
 
